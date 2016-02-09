@@ -20,7 +20,7 @@ def create_pid_file(fname, pid):
     fd.close()
 
 
-def get_process_pid(fname):
+def get_process_id(fname):
     pid_path = "%s/%s" % (pid_dir, fname)
     if not os.path.isfile(pid_path):
         return -1
@@ -116,7 +116,7 @@ class fdslight(dispatcher.dispatcher):
 
 
 def stop_service():
-    pid = get_process_pid(FDSL_PID_FILE)
+    pid = get_process_id(FDSL_PID_FILE)
     if pid < 1:
         return
 
