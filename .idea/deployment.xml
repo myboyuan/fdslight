@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" serverName="debian">
+    <serverData>
+      <paths name="debian">
+        <serverdata>
+          <mappings>
+            <mapping deploy="fdslight" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="thinkvm">
+        <serverdata>
+          <mappings>
+            <mapping deploy="fdslight" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>

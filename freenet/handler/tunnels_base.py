@@ -7,7 +7,6 @@ import freenet.lib.ipaddr as ipaddr
 import pywind.evtframework.handler.tcp_handler as tcp_handler
 from  pywind.global_vars import global_vars
 
-
 class tcp_tunnels_base(tcp_handler.tcp_handler):
     # socket超时时间
     __TIMEOUT = 60
