@@ -3,4 +3,4 @@
 1. LICENSE说明在LICENSE文件中，如果你做二次开发以及其它用途，请仔细阅读BSD LICENSE  
 2. 软件使用文档在 user.md 中  
 3. 软件的扩展开发文档在 developer.md 中，如果你想要扩展其功能请查阅此文件  
-
+4. 扩展阅读在ext_read.md中，当你对部署有疑问的时候可以查看此文档  
