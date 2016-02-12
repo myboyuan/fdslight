@@ -1,4 +1,5 @@
 #!/bin/bash
+#服务端的iptables nat配置
 #python3 fdslight_d.py -m server -d  start
 echo "1" > /proc/sys/net/ipv4/ip_forward
 iptables -F
