@@ -16,6 +16,13 @@
           </advancedOptions>
         </fileTransfer>
       </webServer>
+      <webServer id="58575881-dbec-47eb-be21-faaec8d95baa" name="pi" url="http://192.168.1.10">
+        <fileTransfer host="192.168.1.10" port="9090" rootFolder="/home/pi" accessType="SFTP" password="dfc7dfcfdfc3dfc1dfcbdfc3df9bdf9a" username="pi">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
     </option>
   </component>
 </project>

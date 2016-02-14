@@ -9,6 +9,13 @@
           </mappings>
         </serverdata>
       </paths>
+      <paths name="pi">
+        <serverdata>
+          <mappings>
+            <mapping deploy="fdslight" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="thinkvm">
         <serverdata>
           <mappings>
