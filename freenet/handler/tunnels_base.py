@@ -7,9 +7,13 @@ import freenet.lib.ipaddr as ipaddr
 import pywind.evtframework.handler.tcp_handler as tcp_handler
 from  pywind.global_vars import global_vars
 
+
 class tcp_tunnels_base(tcp_handler.tcp_handler):
     # socket超时时间
-    __TIMEOUT = 60
+    # 当没有验证成功的时候保持的连接时间
+    __timeout = 10
+    # 验证成功后的会话超时时间
+    __TIMEOUT_AUTH_OK = 60
     # 是否已经授权
     __is_auth = False
 
@@ -70,6 +74,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.__tun_fd = global_vars["freenet.tun_fd"]
             self.__c_addr = c_addr
             self.print_access_log("connect")
+            self.set_timeout(self.fileno, self.__timeout)
 
             return self.fileno
 
@@ -132,7 +137,6 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         # 在没有验证之前丢弃所有发过来的数据包
         if not self.__is_auth and action != over_tcp.ACT_AUTH: return
 
-        self.set_timeout(self.socket.fileno(), self.__TIMEOUT)
         if not self.__is_auth:
             if not self.fn_auth(byte_data):
                 self.print_access_log("auth_fail")
@@ -140,6 +144,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
                 return
             self.print_access_log("auth_ok")
             self.__is_auth = True
+            self.__timeout = self.__TIMEOUT_AUTH_OK
             return
 
         if action == over_tcp.ACT_PING:
@@ -222,6 +227,9 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         rdata = self.reader.read()
         self.decrypt_m.add_data(rdata)
 
+        if self.__is_auth:
+            self.set_timeout(self.socket.fileno(), self.__timeout)
+
         while self.decrypt_m.have_data():
             if not self.decrypt_m.is_ok():
                 break
@@ -232,7 +240,9 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         return
 
     def tcp_writable(self):
-        self.set_timeout(self.fileno, self.__TIMEOUT)
+        if self.__is_auth:
+            self.set_timeout(self.fileno, self.__timeout)
+
         self.remove_evt_write(self.fileno)
 
     def tcp_delete(self):
