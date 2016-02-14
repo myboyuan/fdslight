@@ -18,6 +18,7 @@ rules = [
     "*.gvt1.com",
     "*.gvt2.com",
     "*.google-analytics.com",
+    "*.yahoo.com",
 
     # 社交网络
     "*.facebook.com",
