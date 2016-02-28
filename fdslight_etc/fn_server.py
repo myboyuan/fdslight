@@ -2,7 +2,7 @@
 configs = {
     "tcp_bind_address": (
         "0.0.0.0",
-        8965
+        8964
     ),
     # 虚拟局域网IP分配范围
     "subnet": (
