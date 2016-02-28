@@ -73,3 +73,6 @@
 *.xinsheng.net
 *.vpngate.net
 *.akamai.net
+
+# 色情网站
+*.sex.com
