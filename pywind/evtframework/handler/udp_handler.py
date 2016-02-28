@@ -22,6 +22,9 @@ class udp_handler(handler.handler):
     def bind(self, address):
         self.socket.bind(address)
 
+    def getsockname(self):
+        return self.__socket.getsockname()
+
     def init_func(self, creator_fd, *args, **kwargs):
         pass
 
@@ -51,7 +54,7 @@ class udp_handler(handler.handler):
     def evt_read(self):
         while 1:
             try:
-                message, address = self.socket.recvfrom(4096)
+                message, address = self.socket.recvfrom(16384)
             except BlockingIOError:
                 break
             except:

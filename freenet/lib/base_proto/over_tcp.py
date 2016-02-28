@@ -33,7 +33,7 @@ class over_tcp_builder(object):
         ACT_PING,
         ACT_PONG,
         ACT_DATA,
-        ACT_CLOSE
+        ACT_CLOSE,
     ]
 
     __fixed_header_size = PROTO_MIN_HEADER_SIZE

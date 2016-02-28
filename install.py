@@ -5,8 +5,10 @@ import os, sys
 CC = "gcc"
 # Python的包含路径
 py_include = ""
-src_path = "freenet/lib/fn_utils.c"
-dst_path = "freenet/lib/fn_utils.so"
+src_path_1 = "freenet/lib/fn_utils.c"
+src_path_2 = "driver/py_fdsl_ctl.c"
+dst_path_1 = "freenet/lib/fn_utils.so"
+dst_path_2 = "freenet/lib/fdsl_ctl.so"
 
 
 def main():
@@ -20,11 +22,19 @@ def main():
         print("can not python3 include file")
         return
 
-    cmd = "%s %s -o %s -I %s -fPIC -shared -std=c99" % (
-        CC, src_path, dst_path, py_include
-    )
+    for src, dst in [(src_path_1, dst_path_1), (src_path_2, dst_path_2)]:
+        cmd = "%s %s -o %s -I %s -fPIC -shared -std=c99" % (
+            CC, src, dst, py_include
+        )
+        os.system(cmd)
 
-    os.system(cmd)
+    os.chdir("driver")
+    os.system("make")
+
+    if not os.path.isfile("fdslight.ko"):
+        print("install fdslight failed!!!")
+        return
+    ''''''
 
 
 if __name__ == '__main__':

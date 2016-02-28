@@ -6,12 +6,13 @@ import freenet.lib.base_proto.over_tcp as over_tcp
 import freenet.lib.ipaddr as ipaddr
 import pywind.evtframework.handler.tcp_handler as tcp_handler
 from  pywind.global_vars import global_vars
+import freenet.lib.fn_utils as fn_utils
 
 
 class tcp_tunnels_base(tcp_handler.tcp_handler):
     # socket超时时间
     # 当没有验证成功的时候保持的连接时间
-    __timeout = 10
+    __timeout = 30
     # 验证成功后的会话超时时间
     __TIMEOUT_AUTH_OK = 60
     # 是否已经授权
@@ -22,13 +23,13 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
     # 解密模块
     decrypt_m = None
 
-    __acts = [
+    __acts = (
         over_tcp.ACT_CLOSE,
         over_tcp.ACT_AUTH,
         over_tcp.ACT_DATA,
         over_tcp.ACT_PONG,
-        over_tcp.ACT_PING
-    ]
+        over_tcp.ACT_PING,
+    )
 
     # 客户端分配到的IP列表
     __client_ips = None
@@ -102,7 +103,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
 
         subnet = fns_config.configs["subnet"]
 
-        tun_fd = self.create_handler(self.fileno, tundev.tuns, "fn_server", subnet)
+        tun_fd = self.create_handler(self.fileno, tundev.tuns, fn_utils.TUN_DEV_NAME, subnet)
         global_vars["freenet.tun_fd"] = tun_fd
 
     def __send_ping(self):
@@ -128,6 +129,18 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         close = self.encrypt_m.build_close()
         self.add_evt_write(self.fileno)
         self.writer.write(close)
+
+    def __send_data(self, action, pkt_size, byte_data):
+        self.encrypt_m.set_body_size(pkt_size)
+
+        hdr = self.encrypt_m.wrap_header(action)
+        body = self.encrypt_m.wrap_body(byte_data)
+
+        self.encrypt_m.reset()
+
+        self.add_evt_write(self.fileno)
+        self.writer.write(hdr)
+        self.writer.write(body)
 
     def __handle_read_data(self, action, byte_data):
         if action not in self.__acts:
@@ -166,8 +179,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         src_ip = byte_data[12:16]
 
         # 丢弃不属于客户端分配到的IP的数据包
-        if src_ip not in self.__client_ips:
-            return
+        if src_ip not in self.__client_ips: return
 
         packet_length = (byte_data[2] << 8) | byte_data[3]
 
@@ -231,8 +243,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.set_timeout(self.socket.fileno(), self.__timeout)
 
         while self.decrypt_m.have_data():
-            if not self.decrypt_m.is_ok():
-                break
+            if not self.decrypt_m.is_ok(): break
             action = self.decrypt_m.header_info()
             byte_data = self.decrypt_m.body_data()
             self.decrypt_m.reset()
@@ -268,13 +279,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
 
     def message_from_handler(self, from_fd, byte_data):
         # 防止发送缓冲区过大以至于过度消耗内存
-        if self.writer.size() > self.__MAX_BUFFER_SIZE:
-            return
-
-        tun_fd = global_vars["freenet.tun_fd"]
-
-        if from_fd != tun_fd:
-            return
+        if self.writer.size() > self.__MAX_BUFFER_SIZE: return
 
         packet_length = (byte_data[2] << 8) | byte_data[3]
 
@@ -282,15 +287,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
 
-        self.encrypt_m.set_body_size(packet_length)
-        hdr = self.encrypt_m.wrap_header(over_tcp.ACT_DATA)
-        body = self.encrypt_m.wrap_body(byte_data)
-
-        self.encrypt_m.reset()
-
-        self.add_evt_write(self.fileno)
-        self.writer.write(hdr)
-        self.writer.write(body)
+        self.__send_data(over_tcp.ACT_DATA, packet_length, byte_data)
 
     def __build_log(self, text):
         t = time.strftime("time:%Y-%m-%d %H:%M:%S")

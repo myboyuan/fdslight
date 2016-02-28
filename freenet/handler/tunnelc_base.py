@@ -2,18 +2,92 @@
 """
 隧道客户端基本类
 """
-import json
-import socket
-import sys
+import json, socket, sys
 
 import fdslight_etc.fn_client as fnc_config
-import freenet.handler.tundev as tundev
 import freenet.lib.base_proto.over_tcp as over_tcp
 import pywind.evtframework.handler.tcp_handler as tcp_handler
+import pywind.lib.timer as timer
+import freenet.handler.traffic_pass as traffic_pass
+import freenet.lib.checksum as checksum
+import freenet.handler.dns_proxy as dns_proxy
+import freenet.handler.tundev as tundev
+
+
+class _static_nat(object):
+    """静态nat类"""
+    # nat转换相关变量
+    __dst_nat_table = None
+    __src_nat_table = None
+    # 分配到的虚拟IP列表
+    __virtual_ips = None
+
+    __timer = None
+    # IP地址租赁有效期,如果超过这个时间,IP地址将被回收,以便可以让别的客户端可以连接
+    __IP_TIMEOUT = 240
+
+    def __init__(self):
+        self.__dst_nat_table = {}
+        self.__src_nat_table = {}
+        self.__virtual_ips = []
+        self.__timer = timer.timer()
+
+    def add_virtual_ips(self, ips):
+        for ip in ips:
+            ip_pkt = socket.inet_aton(ip)
+            self.__virtual_ips.append(ip_pkt)
+        return
+
+    def get_new_packet_to_tunnel(self, pkt):
+        """获取要发送到tunnel的IP包
+        :param pkt:从局域网机器读取过来的包
+        """
+        src_addr = pkt[12:16]
+        vir_ip = self.__src_nat_table.get(src_addr, None)
+
+        if not vir_ip and not self.__virtual_ips: return None
+        if not vir_ip: vir_ip = self.__virtual_ips.pop(0)
+
+        pkt_list = list(pkt)
+        checksum.modify_address(vir_ip, pkt_list, checksum.FLAG_MODIFY_SRC_IP)
+
+        self.__timer.set_timeout(vir_ip, self.__IP_TIMEOUT)
+        self.__dst_nat_table[vir_ip] = src_addr
+        self.__src_nat_table[src_addr] = vir_ip
+
+        return bytes(pkt_list)
+
+    def get_new_packet_for_lan(self, pkt):
+        """获取要发送给局域网机器的包
+        :param pkt:收到的要发给局域网机器的包
+        """
+        dst_addr = pkt[16:20]
+        # 如果没在nat表中,那么不执行转换
+        if dst_addr not in self.__dst_nat_table: return None
+
+        dst_lan = self.__dst_nat_table[dst_addr]
+        self.__timer.set_timeout(dst_lan, self.__IP_TIMEOUT)
+        pkt_list = list(pkt)
+        checksum.modify_address(dst_lan, pkt_list, checksum.FLAG_MODIFY_DST_IP)
+
+        return bytes(pkt_list)
+
+    def recyle_ips(self):
+        """回收已经分配出去的IP地址"""
+        names = self.__timer.get_timeout_names()
+        for name in names:
+            if name in self.__src_nat_table:
+                t = self.__dst_nat_table[name]
+                # 重新加入到待分配的列表中
+                self.__virtual_ips.append(name)
+
+                del self.__dst_nat_table[t]
+                del self.__src_nat_table[name]
+            self.__timer.drop(name)
+        return
 
 
 class tcp_tunnelc_base(tcp_handler.tcp_handler):
-    __tun_fd = -1
     __encrypt_m = None
     __decrypt_m = None
     __TIMEOUT = 50
@@ -25,36 +99,57 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         over_tcp.ACT_CLOSE,
         over_tcp.ACT_PING,
         over_tcp.ACT_PONG,
-        over_tcp.ACT_DATA
+        over_tcp.ACT_DATA,
     ]
+
+    __timer = None
 
     # 是否发送过ping
     __is_sent_ping = False
 
+    __static_nat = None
+
     # 最大缓冲区大小
     __MAX_BUFFER_SIZE = 16 * 1024
 
-    def init_func(self, creator_fd):
+    __traffic_catch_fd = -1
+    __traffic_send_fd = -1
+
+    # 从其它handler收到的是否是dns消息
+    __is_from_dns_msg = False
+    __tun_fd = -1
+
+    def init_func(self, creator_fd, whitelist):
         server_addr = fnc_config.configs["tcp_server_address"]
 
         s = socket.socket()
 
-        s.connect(server_addr)
+        try:
+            s.connect(server_addr)
+        except:
+            print("connect to server %s:%s failed" % server_addr)
+            sys.exit(-1)
         self.set_socket(s)
+        name = "freenet.lib.crypto.%s" % fnc_config.configs["tcp_crypto_module"]
+        __import__(name)
+        m = sys.modules[name]
+
+        self.__encrypt_m = m.encrypt()
+        self.__decrypt_m = m.decrypt()
+
+        self.__static_nat = _static_nat()
+
+        self.__traffic_catch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read, whitelist)
+        self.__traffic_send_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
+
+        return self.fileno
+
+    def after(self, tun_fd):
+        self.__tun_fd = tun_fd
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         self.add_evt_write(self.fileno)
-
-        self.__tun_fd = self.create_handler(self.fileno, tundev.tunc, "fn_client")
-
-        name = "freenet.lib.crypto.%s" % fnc_config.configs["tcp_crypto_module"]
-        __import__(name)
-        m = sys.modules[name]
-        self.__encrypt_m = m.encrypt()
-        self.__decrypt_m = m.decrypt()
-
-        return self.fileno
 
     def __send_ping(self):
         """发送ping帧
@@ -96,9 +191,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         return
 
     def __handle_read_data(self, action, byte_data):
-        if action not in self.___acts:
-            return
-
+        if action not in self.___acts: return
         if over_tcp.ACT_AUTH == action:
             ret = self.fn_auth_response(byte_data)
             if not ret:
@@ -115,8 +208,9 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         if over_tcp.ACT_PING == action:
             self.__send_pong()
             return
-
-        self.send_message_to_handler(self.fileno, self.__tun_fd, byte_data)
+        new_pkt = self.__static_nat.get_new_packet_for_lan(byte_data)
+        if not new_pkt: return
+        self.send_message_to_handler(self.fileno, self.__tun_fd, new_pkt)
 
     def tcp_readable(self):
         self.set_timeout(self.fileno, self.__TIMEOUT)
@@ -124,13 +218,13 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         self.__decrypt_m.add_data(rdata)
 
         while self.__decrypt_m.have_data():
-            if not self.__decrypt_m.is_ok():
-                return
+            if not self.__decrypt_m.is_ok(): return
             action = self.__decrypt_m.header_info()
             body_data = self.__decrypt_m.body_data()
             self.__decrypt_m.reset()
             self.__handle_read_data(action, body_data)
 
+        self.__static_nat.recyle_ips()
         return
 
     def tcp_writable(self):
@@ -139,31 +233,37 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
             self.__send_auth(ret_data)
             return
 
+        self.__static_nat.recyle_ips()
         if self.writer.size() < 1:
             self.remove_evt_write(self.fileno)
             return
-
         self.set_timeout(self.fileno, self.__TIMEOUT)
-
         return
 
-    def message_from_handler(self, from_fd, byte_data):
-        # 没发送验证数据包就丢弃网卡的数据包
-        if not self.__is_sent_auth:
-            return
-        # 防止内存过度消耗
-        if self.writer.size() > self.__MAX_BUFFER_SIZE:
-            return
-
-        packet_length = (byte_data[2] << 8) | byte_data[3]
+    def __send_to_tunnel(self, packet_length, byte_data, action=over_tcp.ACT_DATA):
+        """向加密发送数据"""
         self.encrypt_m.set_body_size(packet_length)
-        hdr = self.encrypt_m.wrap_header(over_tcp.ACT_DATA)
+        hdr = self.encrypt_m.wrap_header(action)
         body = self.encrypt_m.wrap_body(byte_data)
 
         self.encrypt_m.reset()
         self.add_evt_write(self.fileno)
         self.writer.write(hdr)
         self.writer.write(body)
+
+    def message_from_handler(self, from_fd, byte_data):
+        # 没发送验证数据包就丢弃网卡的数据包
+        if not self.__is_sent_auth: return
+        # 防止内存过度消耗
+        if self.writer.size() > self.__MAX_BUFFER_SIZE: return
+        # 目前只支持IPv4
+        if (byte_data[0] & 0xf0) >> 4 != 4: return
+
+        new_pkt = self.__static_nat.get_new_packet_to_tunnel(byte_data)
+
+        if not new_pkt: return
+        packet_length = (new_pkt[2] << 8) | new_pkt[3]
+        self.__send_to_tunnel(packet_length, new_pkt)
 
     def tcp_error(self):
         print("the system error")
@@ -176,6 +276,8 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         sys.exit(-1)
 
     def tcp_timeout(self):
+        self.__static_nat.recyle_ips()
+
         if self.__is_sent_ping:
             self.delete_handler(self.fileno)
             return
@@ -204,4 +306,8 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
 
     def set_virtual_ips(self, ips):
         """设置虚拟IP"""
-        self.ctl_handler(self.fileno, self.__tun_fd, "set_virtual_ips", ips)
+        self.__static_nat.add_virtual_ips(ips)
+
+    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
+        if cmd != "dns_data": return False
+        self.__is_from_dns_msg = True

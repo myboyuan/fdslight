@@ -8,6 +8,8 @@
 #include <net/route.h>
 #include <sys/ioctl.h>
 
+#define TUN_DEV_NAME "fdslight"
+
 /* 增量式校检和 */
 static unsigned short csum_incremental_update_modified(unsigned short old_csum,
                 unsigned short old_field,
@@ -18,6 +20,23 @@ static unsigned short csum_incremental_update_modified(unsigned short old_csum,
    csum = (csum >> 16) + (csum & 0xffff);
    csum +=  (csum >> 16);
    return csum;
+}
+
+/* 计算校检和 */
+static unsigned short calc_checksum(unsigned short *buffer,int size)
+{
+    unsigned long cksum=0;
+    while (size>1){
+        cksum+=*buffer++;
+        size-=sizeof(unsigned short);
+    }
+    if(size){
+        cksum+=*(unsigned char *)buffer;
+    }
+    cksum=(cksum >>16)+(cksum & 0xffff);
+    cksum+=(cksum >>16);
+
+    return (unsigned short)(~cksum);
 }
 
 /**
@@ -192,12 +211,26 @@ calc_incre_csum(PyObject *self,PyObject *args)
     return PyLong_FromLong(ret);
 }
 
+static PyObject *
+calc_csum(PyObject *self,PyObject *args)
+{
+    const char *sts;
+    int size=0;
+    unsigned short int csum;
+    if(!PyArg_ParseTuple(args,"y#i",&sts,&size)) return NULL;
+
+    csum=calc_checksum((unsigned short *)sts,size);
+
+    return PyLong_FromLong(csum);
+}
+
 static PyMethodDef UtilsMethods[] = {
 	{"tuntap_create",tuntap_create,METH_VARARGS,"create tuntap device"},
 	{"interface_up",tuntap_interface_up,METH_VARARGS,"interface up tuntap "},
 	{"set_ipaddr",tuntap_set_ipaddr,METH_VARARGS,"set tuntap ip address"},
 	{"tuntap_delete",tuntap_delete,METH_VARARGS,"delete tuntap device ,it equals close"},
-	{"calc_incre_csum",calc_incre_csum,METH_VARARGS,"calculate incremental check sum"},
+	{"calc_incre_csum",calc_incre_csum,METH_VARARGS,"calculate incremental checksum"},
+	{"calc_csum",calc_csum,METH_VARARGS,"calculate checksum"},
 	{NULL,NULL,0,NULL}
 };
 
@@ -246,6 +279,8 @@ PyInit_fn_utils(void)
 			return NULL;
 		}
 	}
+
+	PyModule_AddStringMacro(m,TUN_DEV_NAME);
 
 	return m;
 

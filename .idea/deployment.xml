@@ -1,15 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" serverName="debian">
+  <component name="PublishConfigData" autoUpload="Always" serverName="debian">
     <serverData>
       <paths name="debian">
-        <serverdata>
-          <mappings>
-            <mapping deploy="fdslight" local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="pi">
         <serverdata>
           <mappings>
             <mapping deploy="fdslight" local="$PROJECT_DIR$" web="/" />
@@ -24,5 +17,6 @@
         </serverdata>
       </paths>
     </serverData>
+    <option name="myAutoUpload" value="ALWAYS" />
   </component>
 </project>
