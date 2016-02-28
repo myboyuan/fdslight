@@ -291,4 +291,4 @@ module_exit(fdsl_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("fdslight");
-MODULE_DESCRIPTION("the module for fdslight fdsl");
+MODULE_DESCRIPTION("the module for fdslight");
