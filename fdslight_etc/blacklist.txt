@@ -8,7 +8,7 @@
 *.gmail.com
 *.ytimg.com
 *.blogger.com
-*.blogspot.com
+*.blogspot.comn
 *.blogspot.hk
 *.blogspot.sg
 *.googlezip.net
@@ -41,6 +41,7 @@
 *.nicovideo.jp
 *.hgtv.com
 *.spotify.com
+*.scdn.co
 
 # 博客
 *.wordpress.com
