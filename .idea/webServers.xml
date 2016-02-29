@@ -9,8 +9,8 @@
           </advancedOptions>
         </fileTransfer>
       </webServer>
-      <webServer id="504503de-62a3-4848-bd1a-6f975abaf87d" name="thinkvm" url="http://freekai.net">
-        <fileTransfer host="freekai.net" port="9090" rootFolder="/data/mk" accessType="SFTP" password="dfc7dfcfdfc3dfc1dfcbdfc3df9bdf9a" username="mk">
+      <webServer id="504503de-62a3-4848-bd1a-6f975abaf87d" name="pachosting" url="http://freekai.net">
+        <fileTransfer host="freekai.net" port="9090" rootFolder="/home/mk/fdslight" accessType="SFTP" password="dfc7dfcfdfc3dfc1dfcbdfc3df9bdf9a" username="mk">
           <advancedOptions>
             <advancedOptions dataProtectionLevel="Private" />
           </advancedOptions>

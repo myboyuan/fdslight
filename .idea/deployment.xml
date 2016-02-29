@@ -9,7 +9,7 @@
           </mappings>
         </serverdata>
       </paths>
-      <paths name="thinkvm">
+      <paths name="pachosting">
         <serverdata>
           <mappings>
             <mapping deploy="fdslight" local="$PROJECT_DIR$" web="/" />

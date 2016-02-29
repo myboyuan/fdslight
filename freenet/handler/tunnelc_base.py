@@ -2,7 +2,7 @@
 """
 隧道客户端基本类
 """
-import json, socket, sys
+import json, socket, sys, time
 
 import fdslight_etc.fn_client as fnc_config
 import freenet.lib.base_proto.over_tcp as over_tcp
@@ -10,8 +10,6 @@ import pywind.evtframework.handler.tcp_handler as tcp_handler
 import pywind.lib.timer as timer
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.checksum as checksum
-import freenet.handler.dns_proxy as dns_proxy
-import freenet.handler.tundev as tundev
 
 
 class _static_nat(object):
@@ -77,7 +75,7 @@ class _static_nat(object):
         names = self.__timer.get_timeout_names()
         for name in names:
             if name in self.__src_nat_table:
-                t = self.__dst_nat_table[name]
+                t = self.__src_nat_table[name]
                 # 重新加入到待分配的列表中
                 self.__virtual_ips.append(name)
 
@@ -90,7 +88,7 @@ class _static_nat(object):
 class tcp_tunnelc_base(tcp_handler.tcp_handler):
     __encrypt_m = None
     __decrypt_m = None
-    __TIMEOUT = 50
+    __TIMEOUT = 3 * 60
     # 是否已经发送过验证报文
     __is_sent_auth = False
 
@@ -127,8 +125,10 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         try:
             s.connect(server_addr)
         except:
-            print("connect to server %s:%s failed" % server_addr)
-            sys.exit(-1)
+            self.print_access_log("connect_failed")
+            self.dispatcher.finish_dns_process()
+            return
+
         self.set_socket(s)
         name = "freenet.lib.crypto.%s" % fnc_config.configs["tcp_crypto_module"]
         __import__(name)
@@ -195,11 +195,13 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         if over_tcp.ACT_AUTH == action:
             ret = self.fn_auth_response(byte_data)
             if not ret:
-                print("Authentication failed")
+                self.print_access_log("auth_failed")
                 self.delete_handler(self.fileno)
+            else:
+                self.print_access_log("auth_ok")
             return
         if over_tcp.ACT_CLOSE == action:
-            print("the server require close")
+            print("connection_close")
             self.delete_handler(self.fileno)
             return
         if over_tcp.ACT_PONG == action:
@@ -210,7 +212,14 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
             return
         new_pkt = self.__static_nat.get_new_packet_for_lan(byte_data)
         if not new_pkt: return
-        self.send_message_to_handler(self.fileno, self.__tun_fd, new_pkt)
+        proto = new_pkt[9]
+
+        if 17 == proto:
+            t_fd = self.__traffic_send_fd
+        else:
+            t_fd = self.__tun_fd
+
+        self.send_message_to_handler(self.fileno, t_fd, new_pkt)
 
     def tcp_readable(self):
         self.set_timeout(self.fileno, self.__TIMEOUT)
@@ -266,22 +275,32 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         self.__send_to_tunnel(packet_length, new_pkt)
 
     def tcp_error(self):
-        print("the system error")
+        if not self.__is_sent_auth:
+            self.print_access_log("auth_timeout")
+        else:
+            self.print_access_log("server_closed")
+
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):
         self.unregister(self.fileno)
         self.socket.close()
-        print("the client exit")
-        sys.exit(-1)
 
     def tcp_timeout(self):
         self.__static_nat.recyle_ips()
 
         if self.__is_sent_ping:
+            self.print_access_log("can_not_recv_pong_timeout")
             self.delete_handler(self.fileno)
             return
         self.__send_ping()
+
+    def print_access_log(self, string):
+        t = time.strftime("time:%Y-%m-%d %H:%M:%S")
+        ipaddr = "%s:%s" % fnc_config.configs["tcp_server_address"]
+
+        text = "%s      %s      %s" % (string, ipaddr, t)
+        print(text)
 
     @property
     def encrypt_m(self):
@@ -307,7 +326,3 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
     def set_virtual_ips(self, ips):
         """设置虚拟IP"""
         self.__static_nat.add_virtual_ips(ips)
-
-    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd != "dns_data": return False
-        self.__is_from_dns_msg = True

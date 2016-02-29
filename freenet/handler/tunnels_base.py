@@ -14,7 +14,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
     # 当没有验证成功的时候保持的连接时间
     __timeout = 30
     # 验证成功后的会话超时时间
-    __TIMEOUT_AUTH_OK = 60
+    __TIMEOUT_AUTH_OK = 4 * 60
     # 是否已经授权
     __is_auth = False
 
@@ -203,7 +203,6 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.__client_ips.append(
                 packet_ip
             )
-
         ips = []
         for packet_ip in self.__client_ips:
             ips.append(
@@ -220,6 +219,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             except IndexError:
                 break
             ipalloc.put_addr(packet_ip)
+            self.ctl_handler(self.fileno, self.__tun_fd, "del_ip_map", packet_ip)
         return
 
     def tcp_accept(self):

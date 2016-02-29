@@ -52,8 +52,7 @@ class ip4addr(object):
         :param addr:
         :return:
         """
-        if self.__recycle_ips:
-            return self.__recycle_ips.pop(0)
+        if self.__recycle_ips: return self.__recycle_ips.pop(0)
 
         n = self.__current_max_ipaddr + 1
         host_n = self.__base_ipaddr & self.__mask

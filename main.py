@@ -160,12 +160,21 @@ class fdslight(dispatcher.dispatcher):
             self.__create_server_service(module)
 
         if mode == "client":
-            sys.stdout = open("/dev/null", "w")
-            sys.stderr = open("/dev/null", "w")
-            self.___create_client_service(module, debug=False)
+            sys.stdout = open(fnc_config.configs["access_log"], "a+")
+            sys.stderr = open(fnc_config.configs["error_log"], "a+")
+
+            self.___create_client_service(module)
             return
 
         return
+
+    def finish_dns_process(self):
+        if self.__debug:
+            os.kill(os.getpid(), signal.SIGINT)
+            return
+
+        pid = get_process_id(FDSL_DNS_PID_FILE)
+        if pid > 0: os.kill(pid, signal.SIGINT)
 
 
 def stop_service():

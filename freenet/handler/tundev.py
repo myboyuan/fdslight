@@ -4,7 +4,6 @@ import pywind.evtframework.excepts as excepts
 import os, sys, socket
 import pywind.evtframework.handler.handler as handler
 import freenet.lib.fn_utils as fn_utils
-import pywind.lib.timer as timer
 
 try:
     import fcntl
@@ -179,9 +178,6 @@ class tuns(tun_base):
     """
     # 把目的IP与源IP进行关联
     __dst_ip_to_fd = None
-    __NAT_TIMEOUT = 3 * 60
-    __timer = None
-    __TIMEOUT = 30
 
     def __add_route(self, dev_name, subnet):
         """给设备添加路由
@@ -211,16 +207,13 @@ class tuns(tun_base):
 
         self.__dst_ip_to_fd = {}
         self.__add_route(tun_devname, subnet)
-        self.__timer = timer.timer()
-        self.set_timeout(self.fileno, self.__TIMEOUT)
 
     def dev_error(self):
         print("error:server tun device error")
         self.delete_handler(self.fileno)
 
     def dev_timeout(self):
-        self.__clear()
-        self.set_timeout(self.fileno, self.__TIMEOUT)
+        pass
 
     def handle_ip_packet_from_read(self, ip_packet):
         dst_ip = ip_packet[16:20]
@@ -228,8 +221,6 @@ class tuns(tun_base):
         from_fd = self.__dst_ip_to_fd.get(dst_ip, None)
         # 抛弃没有来源的IP数据包
         if not from_fd: return
-
-        self.__timer.set_timeout(dst_ip, self.__NAT_TIMEOUT)
         try:
             self.send_message_to_handler(self.fileno, from_fd, ip_packet)
         except excepts.HandlerNotFoundErr:
@@ -248,14 +239,10 @@ class tuns(tun_base):
 
         if from_fd not in self.__dst_ip_to_fd: self.__dst_ip_to_fd[src_ip] = from_fd
 
-        self.__timer.set_timeout(src_ip, self.__NAT_TIMEOUT)
-
         self.add_evt_write(self.fileno)
         self.add_to_sent_queue(ip_packet)
 
-    def __clear(self):
-        names = self.__timer.get_timeout_names()
-        for name in names:
-            if name in self.__dst_ip_to_fd: del self.__dst_ip_to_fd[names]
-            if self.__timer.exists(name): self.__timer.drop(name)
-        return
+    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
+        if cmd != "del_ip_map": return False
+        del_ip, = args
+        if del_ip in self.__dst_ip_to_fd: del self.__dst_ip_to_fd[del_ip]
