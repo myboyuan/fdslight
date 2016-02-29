@@ -40,6 +40,7 @@
 # 音视频媒体网站
 *.nicovideo.jp
 *.hgtv.com
+*.spotify.com
 
 # 博客
 *.wordpress.com
