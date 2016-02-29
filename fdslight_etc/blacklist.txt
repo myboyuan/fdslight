@@ -44,6 +44,7 @@
 
 # 博客
 *.wordpress.com
+*.ameblo.jp
 
 # 论坛及讨论区
 *.bannedbook.org
