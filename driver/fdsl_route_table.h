@@ -8,6 +8,10 @@
 #define IP_VERSION_4 4
 #define IP_VERSION_6 6
 
+#define FDSL_ROUTE_CACHE_SIZE 1000
+
+
+/** 路由表相关结构**/
 struct __mask_to_ip_seg{
 	unsigned char mask_v;
 	char  ip_seg_set[256];
@@ -24,6 +28,83 @@ struct fdsl_route_table{
 	int ip_version;
 	struct fdsl_ip_tree *tree;
 };
+
+/** 缓存相关结构 **/
+struct fdsl_route_cache_data{
+    char flags;
+    unsigned char ipaddr[16];
+};
+
+// 缓存对象
+struct fdsl_route_cache{
+    int ip_version;
+    struct fdsl_route_cache_data *data[FDSL_ROUTE_CACHE_SIZE];
+};
+
+
+unsigned int fdsl_route_cache_times33(unsigned char *s,size_t length)
+{
+    unsigned int hash=5381;
+    for(int n=0;n<length;n++){
+        hash+=(hash<<5)+(*s++);
+    }
+
+    return hash & 0x7fffffff;
+}
+
+struct fdsl_route_cache *fdsl_route_cache_init(size_t bucket_size,int ip_version)
+{
+    struct fdsl_route_cache_data *data;
+    struct fdsl_route_cache *cache;
+    if(IP_VERSION_4!=ip_version && IP_VERSION_6!=ip_version) return NULL;
+
+    cache=kmalloc(sizeof(struct fdsl_route_cache),GFP_ATOMIC);
+    memset(cache,0,sizeof(struct fdsl_route_cache));
+
+    for (int n=0;n<FDSL_ROUTE_CACHE_SIZE;n++){
+        data=kmalloc(sizeof(struct fdsl_route_cache_data),GFP_ATOMIC);
+        memset(data,0,sizeof(struct fdsl_route_cache_data));
+        cache->data[n]=data;
+    }
+
+    return cache;
+}
+
+struct fdsl_route_cache_data *fdsl_route_cache_find(struct fdsl_route_cache *cache,unsigned char ipaddr)
+{
+    struct fdsl_route_cache_data *data;
+    unsigned int hash=fdsl_route_cache_times33(ipaddr) % FDSL_ROUTE_CACHE_SIZE;
+
+    data=cache->data[hash];
+
+    return data;
+}
+
+int fdsl_route_cache_add(struct fdsl_route_cache *cache,char flags,unsigned char ipaddr)
+{
+    struct fdsl_route_cache_data *data;
+    unsigned int hash=fdsl_route_cache_times33(ipaddr) % FDSL_ROUTE_CACHE_SIZE;
+
+    data=cache->data[hash];
+    cpy_size=4
+    if(IP_VERSION_6==cache->ip_version) cpy_size=16;
+    data->flags=flags;
+
+    memcpy(data->ipaddr,ipaddr,cpy_size);
+    return 0;
+}
+
+void fdsl_route_cache_release(struct fdsl_route_cache *cache)
+{
+    struct fdsl_route_cache_data *data;
+    for (int n=0;n<FDSL_ROUTE_CACHE_SIZE;n++){
+        data=cache->data[n];
+        kfree(data);
+    }
+
+    kfree(cache);
+}
+
 
 unsigned char __fdsl_route_table_get_seg_mask_v(int seg,int mask)
 {
