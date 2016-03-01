@@ -7,6 +7,7 @@ import freenet.lib.ipaddr as ipaddr
 import pywind.evtframework.handler.tcp_handler as tcp_handler
 from  pywind.global_vars import global_vars
 import freenet.lib.fn_utils as fn_utils
+import freenet.handler.traffic_pass as traffic_pass
 
 
 class tcp_tunnels_base(tcp_handler.tcp_handler):
@@ -44,6 +45,9 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
     __MAX_BUFFER_SIZE = 16 * 1024
     __c_addr = None
 
+    # 实现P2P打洞的相关变量
+    __handler_manager = None
+
     def init_func(self, creator_fd, s=None, c_addr=None):
         """
         :param creator_fd:
@@ -76,6 +80,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.__c_addr = c_addr
             self.print_access_log("connect")
             self.set_timeout(self.fileno, self.__timeout)
+            self.__handler_manager = traffic_pass.handler_manager()
 
             return self.fileno
 
@@ -187,7 +192,33 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
 
-        self.send_message_to_handler(self.fileno, self.__tun_fd, byte_data)
+        protocol = byte_data[9]
+
+        if protocol != 17:
+            self.send_message_to_handler(self.fileno, self.__tun_fd, byte_data)
+            return
+        # 对UDP协议特别处理，以便支持UDP穿透
+        ihl = (byte_data[0] & 0x0f) * 4
+        src_addr = byte_data[12:16]
+        b, e = (ihl, ihl + 1)
+        sport = (byte_data[b] << 8) | byte_data[e]
+
+        ip = src_addr.decode("iso-8859-1")
+
+        while 1:
+            exists = self.__handler_manager.exists(ip, sport)
+            if not exists:
+                fileno = self.create_handler(self.fileno, traffic_pass.udp_proxy)
+                self.__handler_manager.add(ip, sport, fileno)
+            else:
+                fileno = self.__handler_manager.get(ip, sport)
+            if self.handler_exists(fileno):
+                break
+            else:
+                self.__handler_manager.delete(ip, sport)
+            continue
+
+        self.send_message_to_handler(self.fileno, fileno, byte_data)
 
         return
 
@@ -261,6 +292,9 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         self.unregister(self.fileno)
         self.socket.close()
 
+        del_handlers = self.__handler_manager.get_all_fileno()
+        for fileno in del_handlers:
+            if self.handler_exists(fileno): self.delete_handler(fileno)
         self.fn_handler_clear()
 
     def tcp_error(self):

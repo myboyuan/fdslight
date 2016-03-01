@@ -142,6 +142,11 @@ class handler_manager(object):
         name = self.__build_key(ip, port)
         return self.__map[name]
 
+    def get_all_fileno(self):
+        vals = []
+        for key in self.__map: vals.append(self.__map[key])
+        return vals
+
 
 class udp_proxy(udp_handler.udp_handler):
     __creator_fd = -1
@@ -185,6 +190,7 @@ class udp_proxy(udp_handler.udp_handler):
         daddr, dport = self.__lan_address
 
         udp_packet = utils.build_udp_packet(saddr, daddr, sport, dport)
+
         self.send_message_to_handler(self.fileno, self.__creator_fd, udp_packet)
         self.__clear_timeout_session()
 
