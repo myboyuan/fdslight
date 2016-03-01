@@ -172,7 +172,9 @@ class fdslight(dispatcher.dispatcher):
     def client_reconnect(self):
         """客户端断线重连"""
         self.__tunnelc_fileno = self.create_handler(-1, self.__tunnelc.tcp_tunnel, [])
+
         self.get_handler(self.__tunnelc_fileno).after(self.__vir_nc_fileno)
+        self.get_handler(self.__vir_nc_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
 
 
 def stop_service():

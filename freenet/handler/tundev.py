@@ -154,6 +154,7 @@ class tunc(tun_base):
         self.__tunnel_fileno = fileno
 
     def handle_ip_packet_from_read(self, ip_packet):
+        if not self.handler_exists(self.__tunnel_fileno): return
         self.send_message_to_handler(self.fileno, self.__tunnel_fileno, ip_packet)
 
     def handle_ip_packet_for_write(self, ip_packet):

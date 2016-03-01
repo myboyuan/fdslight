@@ -192,7 +192,6 @@ class udp_proxy(udp_handler.udp_handler):
         udp_packet = utils.build_udp_packet(saddr, daddr, sport, dport, message)
 
         self.send_message_to_handler(self.fileno, self.__creator_fd, udp_packet)
-        self.__clear_timeout_session()
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
@@ -228,8 +227,6 @@ class udp_proxy(udp_handler.udp_handler):
         if dport == 0: return
         self.sendto(app_data, (dst_addr, dport))
 
-        self.__clear_timeout_session()
-
     def udp_error(self):
         self.delete_handler(self.fileno)
 
@@ -246,4 +243,5 @@ class udp_proxy(udp_handler.udp_handler):
         return
 
     def udp_timeout(self):
-        self.delete_handler(self.fileno)
+        self.__clear_timeout_session()
+        self.set_timeout(self.fileno, self.__TIMEOUT)
