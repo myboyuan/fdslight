@@ -23,10 +23,6 @@ class dispatcher(object):
         """
         instance = handler()
         fd = instance.init_func(creator_fd, *args, **kwargs)
-
-        if fd in self.__handlers:
-            raise excepts.HandlerFoundErr
-
         self.__handlers[fd] = instance
 
         return fd
@@ -36,8 +32,7 @@ class dispatcher(object):
         :param fd: 文件描述符
         :return:
         """
-        if fd not in self.__handlers:
-            return
+        if fd not in self.__handlers: return
 
         if self.__timer.exists(fd):
             self.__timer.drop(fd)
@@ -147,6 +142,8 @@ class dispatcher(object):
 
             if is_read:
                 handler.evt_read()
+
+            if not self.handler_exists(fd): break
 
             if is_write:
                 handler.evt_write()

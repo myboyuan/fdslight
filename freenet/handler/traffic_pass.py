@@ -238,7 +238,7 @@ class udp_proxy(udp_handler.udp_handler):
         """删除超时的会话"""
         names = self.__timer.get_timeout_names()
         for name in names:
-            if name in self.__internet_ip: del self.__internet_ip
+            if name in self.__internet_ip: del self.__internet_ip[name]
             self.__timer.drop(name)
         return
 
