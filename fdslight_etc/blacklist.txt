@@ -40,7 +40,6 @@
 
 # 音视频媒体网站
 *.nicovideo.jp
-*.hgtv.com
 *.spotify.com
 *.scdn.co
 
