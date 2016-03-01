@@ -126,7 +126,6 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
             s.connect(server_addr)
         except:
             self.print_access_log("connect_failed")
-            self.dispatcher.finish_dns_process()
             return
 
         self.set_socket(s)
@@ -285,6 +284,9 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
     def tcp_delete(self):
         self.unregister(self.fileno)
         self.socket.close()
+
+        self.print_access_log("re_connect")
+        self.dispatcher.client_reconnect()
 
     def tcp_timeout(self):
         self.__static_nat.recyle_ips()

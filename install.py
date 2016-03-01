@@ -29,8 +29,7 @@ def main():
         print("can not python3 include file")
         return
 
-    paths = [(src_path_1, dst_path_1), ]
-    if __mode == "client": paths.append((src_path_2, dst_path_2,))
+    paths = [(src_path_1, dst_path_1), (src_path_2, dst_path_2,)]
 
     for src, dst in paths:
         cmd = "%s %s -o %s -I %s -fPIC -shared -std=c99" % (
@@ -38,11 +37,11 @@ def main():
         )
         os.system(cmd)
 
-    if __mode=="client":
+    if __mode == "client":
         os.chdir("driver")
         os.system("make")
 
-    if not os.path.isfile("fdslight.ko") and __mode=="client":
+    if not os.path.isfile("fdslight.ko") and __mode == "client":
         print("install fdslight failed!!!")
         return
     ''''''

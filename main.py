@@ -76,6 +76,7 @@ class fdslight(dispatcher.dispatcher):
         path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
         if os.path.exists(path):
             os.system("rmmod fdslight")
+
         os.system("insmod fdslight.ko")
 
         os.chdir("../")
@@ -168,13 +169,10 @@ class fdslight(dispatcher.dispatcher):
 
         return
 
-    def finish_dns_process(self):
-        if self.__debug:
-            os.kill(os.getpid(), signal.SIGINT)
-            return
-
-        pid = get_process_id(FDSL_DNS_PID_FILE)
-        if pid > 0: os.kill(pid, signal.SIGINT)
+    def client_reconnect(self):
+        """客户端断线重连"""
+        self.__tunnelc_fileno = self.create_handler(-1, self.__tunnelc.tcp_tunnel, [])
+        self.get_handler(self.__tunnelc_fileno).after(self.__vir_nc_fileno)
 
 
 def stop_service():

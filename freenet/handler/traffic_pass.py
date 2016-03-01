@@ -189,7 +189,7 @@ class udp_proxy(udp_handler.udp_handler):
         self.set_timeout(self.fileno, self.__TIMEOUT)
         daddr, dport = self.__lan_address
 
-        udp_packet = utils.build_udp_packet(saddr, daddr, sport, dport)
+        udp_packet = utils.build_udp_packet(saddr, daddr, sport, dport, message)
 
         self.send_message_to_handler(self.fileno, self.__creator_fd, udp_packet)
         self.__clear_timeout_session()
@@ -208,6 +208,8 @@ class udp_proxy(udp_handler.udp_handler):
         src_addr = socket.inet_ntop(socket.AF_INET, byte_data[12:16])
         dst_addr = socket.inet_ntop(socket.AF_INET, byte_data[16:20])
 
+        if b"\0\0\0\0" == dst_addr: return
+
         udp_data = byte_data[ihl:]
 
         sport = (udp_data[0] << 8) | udp_data[1]
@@ -221,6 +223,9 @@ class udp_proxy(udp_handler.udp_handler):
 
         self.set_timeout(self.fileno, self.__TIMEOUT)
         self.add_evt_write(self.fileno)
+
+        # 目标端口为0 Linux会报错，暂时没想到办法,而Windows可以
+        if dport == 0: return
         self.sendto(app_data, (dst_addr, dport))
 
         self.__clear_timeout_session()

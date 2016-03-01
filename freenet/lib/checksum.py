@@ -139,49 +139,6 @@ def fill_ip_hdr_checksum(pkt_list):
     )
     return
 
-
-def fill_tcpudp_hdr_checksum(pkt_list, flags):
-    """填充tcp或者UDP头部校检和
-    :param pkt: 列表形式的IP数据包,比如[11,23,...]
-    """
-    hdr_len = (pkt_list[0] & 0x0f) * 4
-    tot_len = (pkt_list[2] << 8) | pkt_list[3]
-    tcpudpl = tot_len - hdr_len
-
-    a = (tcpudpl & 0xff00) >> 8
-    b = tcpudpl & 0x00ff
-
-    if flags == FLAG_FILL_TCP_CSUM:
-        n = hdr_len + 12
-        tcpudp_hdr_len = ((pkt_list[n] & 0xf0) >> 4) * 4
-        proto = 6
-        c = hdr_len + 16
-    else:
-        tcpudp_hdr_len = 8
-        proto = 17
-        c = hdr_len + 6
-
-    d = c + 2
-    e = hdr_len
-    f = hdr_len + tcpudp_hdr_len
-
-    hdr_tuple = (
-        # 伪头部
-        bytes(pkt_list[12:16]),
-        bytes(pkt_list[16:20]),
-        bytes((0, proto, a, b,)),
-        # 真实的头部
-        bytes(pkt_list[e:f])
-    )
-
-    checksum = fn_utils.calc_csum(b"".join(hdr_tuple), 12)
-    pkt_list[c:d] = (
-        (checksum & 0xff00) >> 8,
-        checksum & 0x00ff,
-    )
-    return
-
-
 def _calc_incre_checksum(old_checksum, old_field, new_field):
     """使用增量式计算校检和
     :param old_checksum: 2 bytes的旧校检和
