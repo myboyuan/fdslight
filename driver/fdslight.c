@@ -23,8 +23,9 @@
 #define DEV_CLASS FDSL_DEV_NAME
 #define QUEUE_SIZE 10
 
-#define FILTER_FLAGS_TCP_BLACKLIST 1
-#define FILTER_FLAGS_UDP_WHITELIST 2
+/* 缓存标志定义 */
+#define CACHE_FLAG_IN_TABLE 1    // 路由表中有该数据
+#define CACHE_FLAG_NO_TABLE 2 //路由表中没有该数据
 
 struct fdsl_poll{
 	struct fdsl_queue *r_queue;
@@ -47,6 +48,8 @@ static unsigned int subnet=0;
 static unsigned int mask=0;
 
 static struct fdsl_route_table *fdsl_whitelist_rt;
+// 白名单路由缓存
+static struct fdsl_route_cache *fdsl_wl_rc;
 
 static int chr_open(struct inode *node,struct file *f)
 {
@@ -162,6 +165,20 @@ static unsigned int chr_poll(struct file *f,struct poll_table_struct *wait)
 	return mask;
 }
 
+static unsigned int fdsl_push_packet_to_user(struct iphdr *ip_header)
+{
+    int err,tot_len;
+	tot_len=ntohs(ip_header->tot_len);
+	err=fdsl_queue_push(r_queue,(char *)ip_header,tot_len);
+
+	if(err) return NF_ACCEPT;
+
+	wake_up_interruptible(&poll->inq);
+
+    return NF_DROP;
+}
+
+
 static unsigned int nf_handle_in(const struct nf_hook_ops *ops,
 		struct sk_buff *skb,
 		const struct net_device *in,
@@ -170,10 +187,11 @@ static unsigned int nf_handle_in(const struct nf_hook_ops *ops,
 {
 	struct iphdr *ip_header;
 	struct udphdr *udp_header;
+	struct fdsl_route_cache_data *cdata;
 	unsigned short int dport,sport;
 	unsigned int saddr,daddr;
 	unsigned char protocol;
-	int err,tot_len;
+	int cache_not_exists,table_exists;
 
 
 	if(!flock_flag) return NF_ACCEPT;
@@ -200,14 +218,25 @@ static unsigned int nf_handle_in(const struct nf_hook_ops *ops,
 
 	if(subnet!=(mask & saddr)) return NF_ACCEPT;
 
-	if(fdsl_route_table_exists(fdsl_whitelist_rt,(unsigned char *)(&daddr))) return NF_ACCEPT;
+	// 首先从缓存中查找数据是否存在
+    cdata=fdsl_route_cache_find(fdsl_wl_rc,(unsigned char *)(&daddr));
+    cache_not_exists=memcmp(cdata->ipaddr,(unsigned char *)(&daddr),4);
 
-	tot_len=ntohs(ip_header->tot_len);
-	err=fdsl_queue_push(r_queue,(char *)ip_header,tot_len);
-	if(err) return NF_ACCEPT;
-	wake_up_interruptible(&poll->inq);
-	
-	return NF_DROP;
+    if(!cache_not_exists){
+        if(CACHE_FLAG_IN_TABLE==cdata->flags) return NF_ACCEPT;
+        if(CACHE_FLAG_NO_TABLE==cdata->flags) return fdsl_push_packet_to_user(ip_header);
+    }
+
+    table_exists=fdsl_route_table_exists(fdsl_whitelist_rt,(unsigned char *)(&daddr));
+
+	if(table_exists){
+	    fdsl_route_cache_add(fdsl_wl_rc,CACHE_FLAG_IN_TABLE,(unsigned char *)(&daddr));
+	    return NF_ACCEPT;
+	}
+
+	fdsl_route_cache_add(fdsl_wl_rc,CACHE_FLAG_NO_TABLE,(unsigned char *)(&daddr));
+
+    return fdsl_push_packet_to_user(ip_header);
 }
 
 static int create_dev(void)
@@ -271,6 +300,7 @@ static int fdsl_init(void)
 	poll->r_queue=r_queue;
 
 	fdsl_whitelist_rt=fdsl_route_table_init(IP_VERSION_4);
+	fdsl_wl_rc=fdsl_route_cache_init(IP_VERSION_4);
 
 	return 0;
 }
@@ -282,6 +312,7 @@ static void fdsl_exit(void)
 	fdsl_queue_release(r_queue);
 
 	fdsl_route_table_release(fdsl_whitelist_rt);
+	fdsl_route_cache_release(fdsl_wl_rc);
 
 	kfree(poll);
 }

@@ -52,7 +52,7 @@ unsigned int fdsl_route_cache_times33(unsigned char *s,size_t length)
     return hash & 0x7fffffff;
 }
 
-struct fdsl_route_cache *fdsl_route_cache_init(size_t bucket_size,int ip_version)
+struct fdsl_route_cache *fdsl_route_cache_init(int ip_version)
 {
     struct fdsl_route_cache_data *data;
     struct fdsl_route_cache *cache;
