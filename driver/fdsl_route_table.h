@@ -10,6 +10,7 @@
 
 #define FDSL_ROUTE_CACHE_SIZE 1000
 
+#define FDSL_IP_LEN(ip_ver) IP_VERSION_6!=ip_ver?4:16
 
 /** 路由表相关结构**/
 struct __mask_to_ip_seg{
@@ -41,7 +42,6 @@ struct fdsl_route_cache{
     struct fdsl_route_cache_data *data[FDSL_ROUTE_CACHE_SIZE];
 };
 
-
 unsigned int fdsl_route_cache_times33(unsigned char *s,size_t length)
 {
     unsigned int hash=5381;
@@ -70,24 +70,23 @@ struct fdsl_route_cache *fdsl_route_cache_init(size_t bucket_size,int ip_version
     return cache;
 }
 
-struct fdsl_route_cache_data *fdsl_route_cache_find(struct fdsl_route_cache *cache,unsigned char ipaddr)
+struct fdsl_route_cache_data *fdsl_route_cache_find(struct fdsl_route_cache *cache,unsigned char *ipaddr)
 {
     struct fdsl_route_cache_data *data;
-    unsigned int hash=fdsl_route_cache_times33(ipaddr) % FDSL_ROUTE_CACHE_SIZE;
+    unsigned int hash=fdsl_route_cache_times33(ipaddr,FDSL_IP_LEN(cache->ip_version)) % FDSL_ROUTE_CACHE_SIZE;
 
     data=cache->data[hash];
 
     return data;
 }
 
-int fdsl_route_cache_add(struct fdsl_route_cache *cache,char flags,unsigned char ipaddr)
+int fdsl_route_cache_add(struct fdsl_route_cache *cache,char flags,unsigned char *ipaddr)
 {
     struct fdsl_route_cache_data *data;
-    unsigned int hash=fdsl_route_cache_times33(ipaddr) % FDSL_ROUTE_CACHE_SIZE;
+    unsigned int hash=fdsl_route_cache_times33(ipaddr,FDSL_IP_LEN(cache->ip_version)) % FDSL_ROUTE_CACHE_SIZE;
+    size_t cpy_size= FDSL_IP_LEN(cache->ip_version);
 
     data=cache->data[hash];
-    cpy_size=4
-    if(IP_VERSION_6==cache->ip_version) cpy_size=16;
     data->flags=flags;
 
     memcpy(data->ipaddr,ipaddr,cpy_size);
