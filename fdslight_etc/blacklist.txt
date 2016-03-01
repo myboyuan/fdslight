@@ -59,6 +59,7 @@
 *.ntdtv.com
 *.bcchinese.net
 *.ntdtv.com.tw
+*.chinadigitaltimes.net
 
 # 网络存储
 *.dropbox.com
