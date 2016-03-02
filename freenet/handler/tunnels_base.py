@@ -8,6 +8,8 @@ import pywind.evtframework.handler.tcp_handler as tcp_handler
 from  pywind.global_vars import global_vars
 import freenet.lib.fn_utils as fn_utils
 import freenet.handler.traffic_pass as traffic_pass
+import freenet.handler.dns_proxy as dns_proxy
+
 
 class tcp_tunnels_base(tcp_handler.tcp_handler):
     # socket超时时间
@@ -39,6 +41,8 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
     # 实现P2P打洞的相关变量
     __handler_manager = None
 
+    __dns_proxy_fd = -1
+
     def init_func(self, creator_fd, s=None, c_addr=None):
         """
         :param creator_fd:
@@ -68,6 +72,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
 
             self.__creator_fd = creator_fd
             self.__tun_fd = global_vars["freenet.tun_fd"]
+            self.__dns_proxy_fd = global_vars["freenet.dns_proxy_fd"]
             self.__c_addr = c_addr
             self.print_access_log("connect")
             self.set_timeout(self.fileno, self.__timeout)
@@ -87,8 +92,10 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         self.set_socket(listen_socket)
         self.bind(bind_addr)
 
+        dns_server = config["dns"]
         subnet = config["subnet"]
         global_vars["freenet.ipaddr"] = ipaddr.ip4addr(*subnet)
+        global_vars["freenet.dns_proxy_fd"] = self.create_handler(self.fileno, dns_proxy.dnsd_proxy, dns_server)
 
         return self.fileno
 
@@ -172,8 +179,11 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.__is_sent_close = True
             return
 
-        src_ip = byte_data[12:16]
+        if action == over_tcp.ACT_DNS:
+            self.send_message_to_handler(self.fileno, self.__dns_proxy_fd, byte_data)
+            return
 
+        src_ip = byte_data[12:16]
         # 丢弃不属于客户端分配到的IP的数据包
         if src_ip not in self.__client_ips: return
 
@@ -305,6 +315,9 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
     def message_from_handler(self, from_fd, byte_data):
         # 防止发送缓冲区过大以至于过度消耗内存
         if self.writer.size() > self.__MAX_BUFFER_SIZE: return
+        if from_fd == self.__dns_proxy_fd:
+            self.__send_data(over_tcp.ACT_DNS, len(byte_data), byte_data)
+            return
 
         packet_length = (byte_data[2] << 8) | byte_data[3]
 

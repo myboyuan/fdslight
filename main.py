@@ -15,7 +15,6 @@ import freenet.lib.file_parser as file_parser
 import freenet.lib.fn_utils as fn_utils
 
 FDSL_PID_FILE = "fdslight.pid"
-FDSL_DNS_PID_FILE = "fdslight_dns.pid"
 
 __mode = "client"
 
@@ -39,7 +38,7 @@ def get_process_id(fname):
 
 
 def clear_pid_file():
-    for s in [FDSL_PID_FILE, FDSL_DNS_PID_FILE]:
+    for s in [FDSL_PID_FILE, ]:
         pid_path = "%s/%s" % (pid_dir, s)
         if os.path.isfile(pid_path):
             os.remove(pid_path)
@@ -82,7 +81,7 @@ class fdslight(dispatcher.dispatcher):
         os.chdir("../")
         self.__tunnelc = tunnelc
         self.__tunnelc_fileno = self.create_handler(-1, tunnelc.tcp_tunnel, self.__client_get_whitelist())
-        self.get_handler(self.__tunnelc_fileno).after(self.__vir_nc_fileno)
+        self.get_handler(self.__tunnelc_fileno).after(self.__vir_nc_fileno, self.__dns_fileno)
 
     def __create_client_vir_nc(self):
         """创建客户端虚拟网卡"""
@@ -118,23 +117,12 @@ class fdslight(dispatcher.dispatcher):
         self.__tunnelc_fileno = tunnel_fd
         self.get_handler(tunnel_fd).after(self.__vir_nc_fileno)
 
-    def __alrm_sig_handle_for_dns_proxy(self, signum, frame):
-        self.__create_dns_proxy()
-
     def ___create_client_service(self, tunnel):
-        pid = os.fork()
-        if pid == 0:
-            if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
-            self.create_poll()
-            self.__create_client_vir_nc()
-            self.__create_fn_tcp_client(tunnel)
-            self.get_handler(self.__vir_nc_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
-            os.kill(os.getppid(), signal.SIGALRM)
-            return
-
-        if not self.__debug: create_pid_file(FDSL_DNS_PID_FILE, os.getpid())
+        self.__create_dns_proxy()
         self.create_poll()
-        signal.signal(signal.SIGALRM, self.__alrm_sig_handle_for_dns_proxy)
+        self.__create_client_vir_nc()
+        self.__create_fn_tcp_client(tunnel)
+        self.get_handler(self.__vir_nc_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
 
     def __create_server_service(self, tunnel):
         if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
@@ -163,7 +151,6 @@ class fdslight(dispatcher.dispatcher):
         if mode == "client":
             sys.stdout = open(fnc_config.configs["access_log"], "a+")
             sys.stderr = open(fnc_config.configs["error_log"], "a+")
-
             self.___create_client_service(module)
             return
 
@@ -173,15 +160,12 @@ class fdslight(dispatcher.dispatcher):
         """客户端断线重连"""
         self.__tunnelc_fileno = self.create_handler(-1, self.__tunnelc.tcp_tunnel, [])
 
-        self.get_handler(self.__tunnelc_fileno).after(self.__vir_nc_fileno)
+        self.get_handler(self.__tunnelc_fileno).after(self.__vir_nc_fileno, self.__dns_fileno)
         self.get_handler(self.__vir_nc_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
 
 
 def stop_service():
     pid = get_process_id(FDSL_PID_FILE)
-    if pid < 1: return
-    os.kill(pid, signal.SIGINT)
-    if __mode == "client": pid = get_process_id(FDSL_DNS_PID_FILE)
     if pid < 1: return
     os.kill(pid, signal.SIGINT)
 

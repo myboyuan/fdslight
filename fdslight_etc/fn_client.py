@@ -14,9 +14,7 @@ configs = {
     "proxy_subnet": ("192.168.1.128", 25),
 
     # 不走代理流量的DNS服务器
-    "transparent_dns": "192.168.1.1",
-    # 流量走代理的DNS服务器
-    "encrypt_dns": "8.8.8.8",
+    "dns": "192.168.1.1",
     # DNS绑定地址
     "dns_bind": "0.0.0.0",
     # 访问日志

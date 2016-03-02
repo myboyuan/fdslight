@@ -170,7 +170,8 @@ class dnsd_proxy(dns_base):
         self.socket.close()
 
 
-class dns_proxy(dns_base):
+class dnsc_proxy(dns_base):
+    """客户端的DNS代理"""
     __host_match = None
     __timer = None
 
@@ -224,8 +225,7 @@ class dns_proxy(dns_base):
 
     def init_func(self, creator_fd, host_rules, debug=False):
         self.__creator_fd = creator_fd
-        self.__transparent_dns = fn_config.configs["transparent_dns"]
-        self.__encrypt_dns = fn_config.configs["encrypt_dns"]
+        self.__transparent_dns = fn_config.configs["dns"]
 
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.__debug = debug
@@ -245,9 +245,6 @@ class dns_proxy(dns_base):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
-        cmd = "route add -host %s dev %s" % (self.__encrypt_dns, fn_utils.TUN_DEV_NAME)
-        os.system(cmd)
-
         return self.fileno
 
     def udp_readable(self, message, address):
@@ -259,10 +256,6 @@ class dns_proxy(dns_base):
         # 把从DNS服务器收到的信息发送到客户端
         if ipaddr == self.__transparent_dns:
             self.__send_to_client(message)
-            return
-
-        if ipaddr == self.__encrypt_dns:
-            self.__handle_data_from_encrypt_dns(message)
             return
 
         dns_id = (message[0] << 8) | message[1]
@@ -299,9 +292,11 @@ class dns_proxy(dns_base):
             self.__send_to_dns_server(self.__transparent_dns, message)
             return
 
-        self.__send_to_dns_server(self.__encrypt_dns, message)
+        self.send_message_to_handler(self.fileno, self.__creator_fd, message)
 
-    def __handle_data_from_encrypt_dns(self, byte_data):
+    def message_from_handler(self, from_fd, byte_data):
+        if from_fd != self.__creator_fd: return
+
         msg = dns.message.from_wire(byte_data)
         for rrset in msg.answer:
             for cname in rrset:

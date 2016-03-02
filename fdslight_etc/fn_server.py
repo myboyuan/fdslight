@@ -9,6 +9,8 @@ configs = {
         "10.10.10.0",
         24
     ),
+    # DNS代理服务器
+    "dns": "8.8.8.8",
     "aes_key": "0123456789123456",
     # TCP加密模块
     "tcp_crypto_module": "aes_tcp",

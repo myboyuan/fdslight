@@ -106,9 +106,8 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
     __traffic_catch_fd = -1
     __traffic_send_fd = -1
 
-    # 从其它handler收到的是否是dns消息
-    __is_from_dns_msg = False
     __tun_fd = -1
+    __dns_fd = -1
 
     __udp_fragment = None
 
@@ -139,8 +138,9 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
 
         return self.fileno
 
-    def after(self, tun_fd):
+    def after(self, tun_fd, dns_fileno):
         self.__tun_fd = tun_fd
+        self.__dns_fd = dns_fileno
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
@@ -256,6 +256,9 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         self.writer.write(body)
 
     def message_from_handler(self, from_fd, byte_data):
+        if from_fd == self.__dns_fd:
+            self.__send_to_tunnel(len(byte_data), byte_data, action=over_tcp.ACT_DNS)
+            return
         # 没发送验证数据包就丢弃网卡的数据包
         if not self.__is_sent_auth: return
         # 防止内存过度消耗
@@ -269,10 +272,6 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         packet_length = (new_pkt[2] << 8) | new_pkt[3]
         self.__send_to_tunnel(packet_length, new_pkt)
 
-    def handler_ctl(self, from_fd, cmd):
-        if cmd != "dns_data": return False
-        self.__is_from_dns_msg = True
-
     def tcp_error(self):
         if not self.__is_sent_auth:
             self.print_access_log("auth_timeout")
@@ -285,8 +284,11 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         self.unregister(self.fileno)
         self.socket.close()
 
+        self.delete_handler(self.__traffic_catch_fd)
+        self.delete_handler(self.__traffic_send_fd)
+
         self.print_access_log("re_connect")
-        self.dispatcher.client_reconnect()
+        self.dispatcher.client_need_reconnect()
 
     def tcp_timeout(self):
         self.__static_nat.recyle_ips()
