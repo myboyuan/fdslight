@@ -9,11 +9,15 @@ class udp_handler(handler.handler):
     # 需要发送的数据
     __sent = None
     __socket = None
+    __is_connect = False
 
     def __init__(self):
         super(udp_handler, self).__init__()
-        self.__sent = {}
         self.__timer = timer.timer()
+
+    def connect(self, address):
+        self.__is_connect = True
+        self.socket.connect(address)
 
     def get_id(self, address):
         """根据地址生成唯一id"""
@@ -44,11 +48,21 @@ class udp_handler(handler.handler):
         self.udp_delete()
 
     def sendto(self, byte_data, address, flags=0):
+        if self.__is_connect: return False
+        if None == self.__sent: self.__sent = {}
+
         name = self.get_id(address)
         if name not in self.__sent:
             self.__sent[name] = []
-
         self.__sent[name].append((byte_data, flags, address,))
+        return True
+
+    def send(self, byte_data):
+        if not self.__is_connect: return False
+        if None == self.__sent: self.__sent = []
+
+        self.__sent.append(byte_data)
+
         return
 
     def evt_read(self):
@@ -64,8 +78,21 @@ class udp_handler(handler.handler):
         return
 
     def evt_write(self):
+        if self.__is_connect:
+            while 1:
+                if not self.__sent:
+                    self.udp_writable()
+                    return
+                byte_data = self.__sent.pop(0)
+                sent_size = self.socket.send(byte_data)
+                remain = byte_data[sent_size:]
+                if remain:
+                    self.__sent.insert(0, remain)
+                    return
+                continue
+            ''''''
+        ''''''
         del_names = []
-
         for name in self.__sent:
             data_queue = self.__sent[name]
             break_loop = False
@@ -84,8 +111,7 @@ class udp_handler(handler.handler):
                     break
                 continue
 
-            if break_loop:
-                break
+            if break_loop: break
 
             if not self.__sent[name]:
                 del_names.append(name)

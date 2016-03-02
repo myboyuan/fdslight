@@ -105,12 +105,19 @@ class dns_base(udp_handler.udp_handler):
 
 class dnsd_proxy(dns_base):
     """服务器端的DNS代理"""
-    __TIMEOUT = 60
+    __TIMEOUT = 30
+    __timer = None
+    __DNS_QUERY_TIMEOUT = 10
 
     def init_func(self, creator_fd, dns_server):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.set_socket(s)
         s.connect((dns_server, 53))
+
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
+
+        self.set_timeout(self.fileno, self.__TIMEOUT)
 
         return s.fileno()
 
@@ -119,15 +126,21 @@ class dnsd_proxy(dns_base):
             dns_id = (message[0] << 8) | message[1]
         except IndexError:
             return
+
         if not self.dns_id_exists(dns_id): return
+
         new_dns_id, dst_fd = self.get_dns_id_map(dns_id)
         self.del_dns_id_map(dns_id)
+        self.__timer.drop(dns_id)
 
         L = list(message)
         L[0:2] = ((new_dns_id & 0xff00) >> 8, new_dns_id & 0x00ff,)
 
         if not self.handler_exists(dst_fd): return
-        self.send_message_to_handler(self.fileno, dst_fd, message)
+        self.send_message_to_handler(self.fileno, bytes(L))
+
+    def udp_writable(self):
+        self.remove_evt_write(self.fileno)
 
     def message_from_handler(self, from_fd, byte_data):
         try:
@@ -139,12 +152,22 @@ class dnsd_proxy(dns_base):
         L = list(byte_data)
         L[0:2] = ((n_dns_id & 0xff00) >> 8, n_dns_id & 0x00ff,)
 
-    def send_dns_data_to_tunnel(self, dns_data):
-        """发送DNS数据到隧道"""
-        pass
+        self.set_dns_id_map(n_dns_id, (dns_id, from_fd,))
+        self.__timer.set_timeout(n_dns_id, self.__DNS_QUERY_TIMEOUT)
+
+        self.add_evt_write(self.fileno)
+        self.send(bytes(L))
 
     def udp_timeout(self):
-        pass
+        names = self.__timer.get_timeout_names()
+        for name in names:
+            if self.__timer.exists(name): self.__timer.drop(name)
+        self.recyle_resource(names)
+        self.set_timeout(self.fileno, self.__TIMEOUT)
+
+    def udp_delete(self):
+        self.unregister(self.fileno)
+        self.socket.close()
 
 
 class dns_proxy(dns_base):
