@@ -31,6 +31,9 @@ class traffic_read(handler.handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
+        if fn_config.configs["global_udp"]:fdsl_ctl.udp_global(fileno)
+        else:fdsl_ctl.udp_part(fileno)
+
         return self.fileno
 
     def evt_read(self):

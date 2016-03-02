@@ -108,7 +108,6 @@ class parser(object):
         """回收资源,可能有些IP分包发送了一部分就没有再发送"""
         names = self.__timer.get_timeout_names()
         for name in names:
-            print("delete")
             if name in self.__fragment_packets: del self.__fragment_packets[name]
             self.__timer.drop(name)
         return
