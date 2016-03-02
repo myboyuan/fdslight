@@ -103,6 +103,50 @@ class dns_base(udp_handler.udp_handler):
         return
 
 
+class dnsd_proxy(dns_base):
+    """服务器端的DNS代理"""
+    __TIMEOUT = 60
+
+    def init_func(self, creator_fd, dns_server):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.set_socket(s)
+        s.connect((dns_server, 53))
+
+        return s.fileno()
+
+    def udp_readable(self, message, address):
+        try:
+            dns_id = (message[0] << 8) | message[1]
+        except IndexError:
+            return
+        if not self.dns_id_exists(dns_id): return
+        new_dns_id, dst_fd = self.get_dns_id_map(dns_id)
+        self.del_dns_id_map(dns_id)
+
+        L = list(message)
+        L[0:2] = ((new_dns_id & 0xff00) >> 8, new_dns_id & 0x00ff,)
+
+        if not self.handler_exists(dst_fd): return
+        self.send_message_to_handler(self.fileno, dst_fd, message)
+
+    def message_from_handler(self, from_fd, byte_data):
+        try:
+            dns_id = (byte_data[0] << 8) | byte_data[1]
+        except IndexError:
+            return
+        # 避免DNS ID出现重复
+        n_dns_id = self.get_dns_id(dns_id)
+        L = list(byte_data)
+        L[0:2] = ((n_dns_id & 0xff00) >> 8, n_dns_id & 0x00ff,)
+
+    def send_dns_data_to_tunnel(self, dns_data):
+        """发送DNS数据到隧道"""
+        pass
+
+    def udp_timeout(self):
+        pass
+
+
 class dns_proxy(dns_base):
     __host_match = None
     __timer = None
@@ -178,7 +222,7 @@ class dns_proxy(dns_base):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
-        cmd = "route add -host %s dev %s" % (self.__encrypt_dns,fn_utils.TUN_DEV_NAME)
+        cmd = "route add -host %s dev %s" % (self.__encrypt_dns, fn_utils.TUN_DEV_NAME)
         os.system(cmd)
 
         return self.fileno
