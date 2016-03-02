@@ -9,7 +9,6 @@ from  pywind.global_vars import global_vars
 import freenet.lib.fn_utils as fn_utils
 import freenet.handler.traffic_pass as traffic_pass
 
-
 class tcp_tunnels_base(tcp_handler.tcp_handler):
     # socket超时时间
     # 当没有验证成功的时候保持的连接时间
@@ -23,14 +22,6 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
     encrypt_m = None
     # 解密模块
     decrypt_m = None
-
-    __acts = (
-        over_tcp.ACT_CLOSE,
-        over_tcp.ACT_AUTH,
-        over_tcp.ACT_DATA,
-        over_tcp.ACT_PONG,
-        over_tcp.ACT_PING,
-    )
 
     # 客户端分配到的IP列表
     __client_ips = None
@@ -148,8 +139,8 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         self.writer.write(body)
 
     def __handle_read_data(self, action, byte_data):
-        if action not in self.__acts:
-            print("not found action")
+        if action not in over_tcp.ACTS:
+            self.print_access_log("not_found_action")
             self.delete_handler(self.fileno)
             return
         # 在没有验证之前丢弃所有发过来的数据包

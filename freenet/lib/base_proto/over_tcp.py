@@ -20,22 +20,21 @@ ACT_AUTH = 3
 ACT_DATA = 4
 # 表示关闭
 ACT_CLOSE = 5
+# 表示的是DNS协议
+ACT_DNS = 6
 
 # 传输协议最小所占用的头大小
 PROTO_MIN_HEADER_SIZE = 5
 
 MAX_BODY_SIZE = 65535
 
+ACTS = (
+    ACT_AUTH, ACT_DNS, ACT_DATA,
+    ACT_PING, ACT_PONG, ACT_CLOSE,
+)
+
 
 class over_tcp_builder(object):
-    __acts = [
-        ACT_AUTH,
-        ACT_PING,
-        ACT_PONG,
-        ACT_DATA,
-        ACT_CLOSE,
-    ]
-
     __fixed_header_size = PROTO_MIN_HEADER_SIZE
 
     def __init__(self, fixed_header_size):
@@ -46,7 +45,7 @@ class over_tcp_builder(object):
         :param body_size: 内容体数据
         :return:
         """
-        if action not in self.__acts:
+        if action not in ACTS:
             raise exception.ProtocolErr("it is wrong action")
         L = (
             (1 << 4) | action,

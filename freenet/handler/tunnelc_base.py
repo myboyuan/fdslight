@@ -10,6 +10,7 @@ import pywind.evtframework.handler.tcp_handler as tcp_handler
 import pywind.lib.timer as timer
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.checksum as checksum
+import freenet.lib.ipfragment as ipfragment
 
 
 class _static_nat(object):
@@ -92,14 +93,6 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
     # 是否已经发送过验证报文
     __is_sent_auth = False
 
-    ___acts = [
-        over_tcp.ACT_AUTH,
-        over_tcp.ACT_CLOSE,
-        over_tcp.ACT_PING,
-        over_tcp.ACT_PONG,
-        over_tcp.ACT_DATA,
-    ]
-
     __timer = None
 
     # 是否发送过ping
@@ -116,6 +109,8 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
     # 从其它handler收到的是否是dns消息
     __is_from_dns_msg = False
     __tun_fd = -1
+
+    __udp_fragment = None
 
     def init_func(self, creator_fd, whitelist):
         server_addr = fnc_config.configs["tcp_server_address"]
@@ -140,6 +135,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
 
         self.__traffic_catch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read, whitelist)
         self.__traffic_send_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
+        self.__udp_fragment = ipfragment.udp_fragment()
 
         return self.fileno
 
@@ -190,7 +186,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         return
 
     def __handle_read_data(self, action, byte_data):
-        if action not in self.___acts: return
+        if action not in over_tcp.ACTS: return
         if over_tcp.ACT_AUTH == action:
             ret = self.fn_auth_response(byte_data)
             if not ret:
@@ -272,6 +268,10 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         if not new_pkt: return
         packet_length = (new_pkt[2] << 8) | new_pkt[3]
         self.__send_to_tunnel(packet_length, new_pkt)
+
+    def handler_ctl(self, from_fd, cmd):
+        if cmd != "dns_data": return False
+        self.__is_from_dns_msg = True
 
     def tcp_error(self):
         if not self.__is_sent_auth:

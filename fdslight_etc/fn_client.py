@@ -2,7 +2,7 @@
 configs = {
     "tcp_server_address": (
         # 你的服务器的地址以及端口
-        "domain.xxxx", 8964
+        "your_server_address", 8964
     ),
     "tunnelc": "tunnelc_simple",
     "tunnelc_simple": {
@@ -10,7 +10,7 @@ configs = {
         "password": "test"
     },
     "tcp_crypto_module": "aes_tcp",
-    # 需要代理的子网范围,在该子网范围内,会进行数据代理
+    # 需要代理的子网范围,在该子网范围内,会进行UDP白名单代理
     "proxy_subnet": ("192.168.1.128", 25),
 
     # 不走代理流量的DNS服务器

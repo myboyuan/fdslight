@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-import socket, sys
+import socket
 import freenet.lib.checksum as checksum
+import freenet.lib.fn_utils as fn_utils
 
 
 def build_udp_packet(saddr, daddr, sport, dport, message):
@@ -28,28 +29,19 @@ def build_udp_packet(saddr, daddr, sport, dport, message):
 
     L[2:4] = ((new_tot_len & 0xff00) >> 8, new_tot_len & 0x00ff,)
     # 修改IP校检和
-    csum = checksum._calc_incre_checksum(old_csum, old_tot_len, new_tot_len)
+    csum = fn_utils.calc_incre_csum(old_csum, old_tot_len, new_tot_len)
     L[10:12] = ((csum & 0xff00) >> 8, csum & 0x00ff,)
 
     # 修改UDP内容长度
     old_csum = (L[26] << 8) | L[27]
-    csum = checksum._calc_incre_checksum(old_csum, old_tot_len, new_tot_len)
+    csum = fn_utils.calc_incre_csum(old_csum, old_tot_len, new_tot_len)
     L[26:28] = ((csum & 0xff00) >> 8, csum & 0x00ff,)
 
-    # 修改UDP内容长度
-    old_csum = (L[26] << 8) | L[27]
+
     new_udp_len = 8 + msg_len
-    csum = checksum._calc_incre_checksum(old_csum, 8, new_udp_len)
+
     L[24:26] = ((new_udp_len & 0xff00) >> 8, new_udp_len & 0x00ff,)
-
-    # 修改源端口
-    old_csum = csum
-    csum = checksum._calc_incre_checksum(old_csum, 0, sport)
     L[20:22] = ((sport & 0xff00) >> 8, sport & 0x00ff,)
-
-    # 修改目的端口
-    old_csum = csum
-    csum = checksum._calc_incre_checksum(old_csum, 0, dport)
     L[22:24] = ((dport & 0xff00) >> 8, dport & 0x00ff,)
 
     L[26:28] = (0, 0,)
