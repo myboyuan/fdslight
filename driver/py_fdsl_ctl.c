@@ -37,10 +37,32 @@ fdsl_whitelist_exists(PyObject *self,PyObject *args)
     return PyLong_FromLong(ioctl(fileno,FDSL_IOC_WHITELIST_EXISTS,&ip4));
 }
 
+static PyObject *
+fdsl_udp_global(PyObject *self,PyObject *args)
+// UDP走全局代理,此模式白名单模式将会失效
+{
+    int fileno;
+    if(!PyArg_ParseTuple(args,"i",&fileno)) return NULL;
+
+    return PyLong_FromLong(ioctl(fileno,FDSL_IOC_GLOBAL_UDP_TRAFFIC,&fileno));
+}
+
+static PyObject *
+fdsl_udp_part(PyObject *self,PyObject *args)
+// UDP走局部代理
+{
+    int fileno;
+    if(!PyArg_ParseTuple(args,"i",&fileno)) return NULL;
+
+    return PyLong_FromLong(ioctl(fileno,FDSL_IOC_PART_UDP_TRAFFIC,&fileno));
+}
+
 static PyMethodDef fdsl_ctl_methods[]={
 	{"set_subnet",fdsl_set_subnet,METH_VARARGS,"set subnet"},
 	{"add_whitelist_subnet",fdsl_add_whitelist_subnet,METH_VARARGS,"set whitelist subnet"},
 	{"whitelist_exists",fdsl_whitelist_exists,METH_VARARGS,"whitelist exists"},
+	{"udp_global",fdsl_udp_global,METH_VARARGS,"udp global proxy"},
+	{"udp_part",fdsl_udp_part,METH_VARARGS,"udp part proxy"},
 	{NULL,NULL,0,NULL}
 };
 

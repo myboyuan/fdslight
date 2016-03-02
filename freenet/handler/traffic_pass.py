@@ -223,7 +223,6 @@ class udp_proxy(udp_handler.udp_handler):
         self.set_timeout(self.fileno, self.__TIMEOUT)
         self.add_evt_write(self.fileno)
 
-        # 目标端口为0 Linux会报错，暂时没想到办法,而Windows可以
         if dport == 0: return
         self.sendto(app_data, (dst_addr, dport))
 

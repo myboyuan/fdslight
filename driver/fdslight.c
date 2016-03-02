@@ -50,6 +50,8 @@ static unsigned int mask=0;
 static struct fdsl_route_table *fdsl_whitelist_rt;
 // 白名单路由缓存
 static struct fdsl_route_cache *fdsl_wl_rc;
+// UDP是否使用全局代理,默认不使用
+static char udp_global=0;
 
 static int chr_open(struct inode *node,struct file *f)
 {
@@ -125,6 +127,12 @@ static long chr_ioctl(struct file *f,unsigned int cmd,unsigned long arg)
 		 case FDSL_IOC_WHITELIST_EXISTS:
 		    ret=fdsl_whitelist_exists(arg);
 		    break;
+		 case FDSL_IOC_GLOBAL_UDP_TRAFFIC:
+		    udp_global=1;
+		    break;
+		 case FDSL_IOC_PART_UDP_TRAFFIC:
+		    udp_global=0;
+		    break;
 		default:
 			ret=-EINVAL;
 			break;
@@ -149,6 +157,7 @@ static int chr_release(struct inode *node,struct file *f)
 {
 	flock_flag=0;
     fdsl_queue_reset(r_queue);
+    udp_global=0;
 
 	return 0;
 }
@@ -212,6 +221,8 @@ static unsigned int nf_handle_in(const struct nf_hook_ops *ops,
     // DNS端口允许通过
     if(53==dport) return NF_ACCEPT;
 	if(53==sport) return NF_ACCEPT;
+
+	if(udp_global) return fdsl_push_packet_to_user(ip_header);
 
 	saddr=htonl((unsigned int)ip_header->saddr);
 	daddr=(unsigned int)ip_header->daddr;

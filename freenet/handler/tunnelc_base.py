@@ -89,7 +89,7 @@ class _static_nat(object):
 class tcp_tunnelc_base(tcp_handler.tcp_handler):
     __encrypt_m = None
     __decrypt_m = None
-    __TIMEOUT = 3 * 60
+    __TIMEOUT = 1 * 60
     # 是否已经发送过验证报文
     __is_sent_auth = False
 
@@ -228,7 +228,6 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
             self.__decrypt_m.reset()
             self.__handle_read_data(action, body_data)
 
-        self.__static_nat.recyle_ips()
         return
 
     def tcp_writable(self):
@@ -236,8 +235,6 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
             ret_data = self.fn_auth_request()
             self.__send_auth(ret_data)
             return
-
-        self.__static_nat.recyle_ips()
         if self.writer.size() < 1:
             self.remove_evt_write(self.fileno)
             return
@@ -265,12 +262,32 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         if self.writer.size() > self.__MAX_BUFFER_SIZE: return
         # 目前只支持IPv4
         if (byte_data[0] & 0xf0) >> 4 != 4: return
-
         new_pkt = self.__static_nat.get_new_packet_to_tunnel(byte_data)
-
         if not new_pkt: return
+
         packet_length = (new_pkt[2] << 8) | new_pkt[3]
-        self.__send_to_tunnel(packet_length, new_pkt)
+        protocol = new_pkt[9]
+
+        if protocol != 17:
+            self.__send_to_tunnel(packet_length, new_pkt)
+            return
+
+        flags = (new_pkt[6] & 0xe0) >> 5
+        flags_df = (flags & 0x2) >> 1
+
+        # 不能分段的数据包直接发送
+        if flags_df:
+            self.__send_to_tunnel(packet_length, new_pkt)
+            return
+
+        # 进行分片组包
+        self.__udp_fragment.add_data(new_pkt)
+        while 1:
+            udp_pkt = self.__udp_fragment.get_packet()
+            if not udp_pkt: break
+            pkt_len = (udp_pkt[2] << 8) | udp_pkt[3]
+            self.__send_to_tunnel(pkt_len, udp_pkt)
+        return
 
     def tcp_error(self):
         if not self.__is_sent_auth:
@@ -291,13 +308,10 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         self.dispatcher.client_need_reconnect()
 
     def tcp_timeout(self):
+        # 回收IP资源,以便别的机器能够顺利连接
         self.__static_nat.recyle_ips()
-
-        if self.__is_sent_ping:
-            self.print_access_log("can_not_recv_pong_timeout")
-            self.delete_handler(self.fileno)
-            return
-        self.__send_ping()
+        # 回收一些只发送了部分的IP分包的数据包的内存
+        self.__udp_fragment.recycle_resouce()
 
     def print_access_log(self, string):
         t = time.strftime("time:%Y-%m-%d %H:%M:%S")
