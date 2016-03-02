@@ -2,7 +2,7 @@
 configs = {
     "tcp_server_address": (
         # 你的服务器的地址以及端口
-        "vof.freekai.net", 8964
+        "your_server_address", 8964
     ),
     "tunnelc": "tunnelc_simple",
     "tunnelc_simple": {
@@ -10,9 +10,10 @@ configs = {
         "password": "test"
     },
     "tcp_crypto_module": "aes_tcp",
-    # 需要代理的子网范围,在该子网范围内,会进行UDP白名单代理
+    # 需要代理的子网范围,在该子网范围内,会进行UDP代理
     "proxy_subnet": ("192.168.1.128", 25),
-
+    # 全局UDP代理,默认为0表示不使用全局,改为1为全局UDP代理
+    "global_udp": 0,
     # 不走代理流量的DNS服务器
     "dns": "192.168.1.1",
     # DNS绑定地址
