@@ -118,6 +118,7 @@ class dnsd_proxy(dns_base):
         self.add_evt_read(self.fileno)
 
         self.set_timeout(self.fileno, self.__TIMEOUT)
+        self.__timer=timer.timer()
 
         return s.fileno()
 

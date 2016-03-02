@@ -90,7 +90,7 @@ class fdslight(dispatcher.dispatcher):
 
     def __create_dns_proxy(self):
         rules = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
-        self.__dns_fileno = self.create_handler(-1, dns_proxy.dns_proxy, rules, debug=self.__debug)
+        self.__dns_fileno = self.create_handler(-1, dns_proxy.dnsc_proxy, rules, debug=self.__debug)
 
     def init_func(self, mode, debug=True):
         if mode == "server":
@@ -118,8 +118,8 @@ class fdslight(dispatcher.dispatcher):
         self.get_handler(tunnel_fd).after(self.__vir_nc_fileno)
 
     def ___create_client_service(self, tunnel):
-        self.__create_dns_proxy()
         self.create_poll()
+        self.__create_dns_proxy()
         self.__create_client_vir_nc()
         self.__create_fn_tcp_client(tunnel)
         self.get_handler(self.__vir_nc_fileno).set_tunnel_fileno(self.__tunnelc_fileno)

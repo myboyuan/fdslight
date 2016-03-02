@@ -94,10 +94,6 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
     __is_sent_auth = False
 
     __timer = None
-
-    # 是否发送过ping
-    __is_sent_ping = False
-
     __static_nat = None
 
     # 最大缓冲区大小
@@ -146,15 +142,6 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         self.add_evt_read(self.fileno)
         self.add_evt_write(self.fileno)
 
-    def __send_ping(self):
-        """发送ping帧
-        :return:
-        """
-        self.__is_sent_ping = True
-        ping = self.encrypt_m.build_ping()
-        self.add_evt_write(self.fileno)
-        self.writer.write(ping)
-
     def __send_pong(self):
         """发送pong帧
         :return:
@@ -199,9 +186,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
             print("connection_close")
             self.delete_handler(self.fileno)
             return
-        if over_tcp.ACT_PONG == action:
-            self.__is_sent_ping = False
-            return
+        if over_tcp.ACT_PONG == action: return
         if over_tcp.ACT_PING == action:
             self.__send_pong()
             return

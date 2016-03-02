@@ -2,7 +2,7 @@
 configs = {
     "tcp_server_address": (
         # 你的服务器的地址以及端口
-        "your_server_address", 8964
+        "vof.freekai.net", 8964
     ),
     "tunnelc": "tunnelc_simple",
     "tunnelc_simple": {
