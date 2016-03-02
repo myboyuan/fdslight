@@ -17,6 +17,7 @@ class udp_handler(handler.handler):
 
     def connect(self, address):
         self.__is_connect = True
+        self.__sent = []
         self.socket.connect(address)
 
     def get_id(self, address):
@@ -24,6 +25,7 @@ class udp_handler(handler.handler):
         return "%s-%s" % address
 
     def bind(self, address):
+        self.__sent = {}
         self.socket.bind(address)
 
     def getsockname(self):
@@ -38,7 +40,6 @@ class udp_handler(handler.handler):
         self.__socket = s
 
     def timeout(self):
-        self.__sent = {}
         self.udp_timeout()
 
     def error(self):
@@ -49,11 +50,10 @@ class udp_handler(handler.handler):
 
     def sendto(self, byte_data, address, flags=0):
         if self.__is_connect: return False
-        if None == self.__sent: self.__sent = {}
 
         name = self.get_id(address)
-        if name not in self.__sent:
-            self.__sent[name] = []
+        if name not in self.__sent: self.__sent[name] = []
+
         self.__sent[name].append((byte_data, flags, address,))
         return True
 

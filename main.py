@@ -110,19 +110,13 @@ class fdslight(dispatcher.dispatcher):
 
         self.__run(mode, tunnel)
 
-    def client_need_reconnect(self):
-        """由客户端handler调用,告知需要重新连接隧道"""
-        tunnel_fd = self.create_handler(-1, self.__tunnelc.tcp_tunnel, [])
-
-        self.__tunnelc_fileno = tunnel_fd
-        self.get_handler(tunnel_fd).after(self.__vir_nc_fileno)
-
     def ___create_client_service(self, tunnel):
         self.create_poll()
         self.__create_dns_proxy()
         self.__create_client_vir_nc()
         self.__create_fn_tcp_client(tunnel)
         self.get_handler(self.__vir_nc_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
+        self.get_handler(self.__dns_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
 
     def __create_server_service(self, tunnel):
         if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
@@ -162,6 +156,7 @@ class fdslight(dispatcher.dispatcher):
 
         self.get_handler(self.__tunnelc_fileno).after(self.__vir_nc_fileno, self.__dns_fileno)
         self.get_handler(self.__vir_nc_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
+        self.get_handler(self.__dns_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
 
 
 def stop_service():

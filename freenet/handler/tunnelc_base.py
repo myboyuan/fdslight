@@ -10,7 +10,6 @@ import pywind.evtframework.handler.tcp_handler as tcp_handler
 import pywind.lib.timer as timer
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.checksum as checksum
-import freenet.lib.ipfragment as ipfragment
 
 
 class _static_nat(object):
@@ -105,8 +104,6 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
     __tun_fd = -1
     __dns_fd = -1
 
-    __udp_fragment = None
-
     def init_func(self, creator_fd, whitelist):
         server_addr = fnc_config.configs["tcp_server_address"]
 
@@ -130,7 +127,6 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
 
         self.__traffic_catch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read, whitelist)
         self.__traffic_send_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
-        self.__udp_fragment = ipfragment.udp_fragment()
 
         return self.fileno
 
@@ -190,6 +186,9 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         if over_tcp.ACT_PING == action:
             self.__send_pong()
             return
+        if over_tcp.ACT_DNS == action:
+            self.send_message_to_handler(self.fileno, self.__dns_fd, byte_data)
+            return
         new_pkt = self.__static_nat.get_new_packet_for_lan(byte_data)
         if not new_pkt: return
         proto = new_pkt[9]
@@ -248,31 +247,11 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         # 目前只支持IPv4
         if (byte_data[0] & 0xf0) >> 4 != 4: return
         new_pkt = self.__static_nat.get_new_packet_to_tunnel(byte_data)
+
         if not new_pkt: return
 
         packet_length = (new_pkt[2] << 8) | new_pkt[3]
-        protocol = new_pkt[9]
-
-        if protocol != 17:
-            self.__send_to_tunnel(packet_length, new_pkt)
-            return
-
-        flags = (new_pkt[6] & 0xe0) >> 5
-        flags_df = (flags & 0x2) >> 1
-
-        # 不能分段的数据包直接发送
-        if flags_df:
-            self.__send_to_tunnel(packet_length, new_pkt)
-            return
-
-        # 进行分片组包
-        self.__udp_fragment.add_data(new_pkt)
-        while 1:
-            udp_pkt = self.__udp_fragment.get_packet()
-            if not udp_pkt: break
-            pkt_len = (udp_pkt[2] << 8) | udp_pkt[3]
-            self.__send_to_tunnel(pkt_len, udp_pkt)
-        return
+        self.__send_to_tunnel(packet_length, new_pkt)
 
     def tcp_error(self):
         if not self.__is_sent_auth:
@@ -290,13 +269,11 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         self.delete_handler(self.__traffic_send_fd)
 
         self.print_access_log("re_connect")
-        self.dispatcher.client_need_reconnect()
+        self.dispatcher.client_reconnect()
 
     def tcp_timeout(self):
         # 回收IP资源,以便别的机器能够顺利连接
         self.__static_nat.recyle_ips()
-        # 回收一些只发送了部分的IP分包的数据包的内存
-        self.__udp_fragment.recycle_resouce()
 
     def print_access_log(self, string):
         t = time.strftime("time:%Y-%m-%d %H:%M:%S")
@@ -320,12 +297,16 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         pass
 
     def fn_auth_response(self, auth_resp_info):
-        """验证响应之后调用该函数
-        :param auth_resp_info:
-        :return Boolean: True表示系统继续执行,False则表示停止执行
+        """
+        验证响应之后调用该函数
+        :param
+        auth_resp_info:
+        :return Boolean: True表示系统继续执行, False则表示停止执行
         """
         return True
 
     def set_virtual_ips(self, ips):
-        """设置虚拟IP"""
+        """
+        设置虚拟IP
+        """
         self.__static_nat.add_virtual_ips(ips)

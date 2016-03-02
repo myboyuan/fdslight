@@ -7,6 +7,7 @@ import socket, os
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import fdslight_etc.fn_client as fn_config
 import freenet.lib.utils as utils
+import freenet.lib.udp_parser as udp_parser
 
 
 class traffic_read(handler.handler):
@@ -39,6 +40,8 @@ class traffic_read(handler.handler):
                 pkt = os.read(self.fileno, 8192)
             except BlockingIOError:
                 break
+
+            if not self.handler_exists(self.__creator_fd): return
             self.send_message_to_handler(self.fileno, self.__creator_fd, pkt)
         return
 
@@ -161,6 +164,7 @@ class udp_proxy(udp_handler.udp_handler):
     __TIMEOUT = 4 * 60
 
     __timer = None
+    __udp_parser = None
 
     def init_func(self, creator_fd):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -176,6 +180,7 @@ class udp_proxy(udp_handler.udp_handler):
 
         self.set_timeout(self.fileno, self.__TIMEOUT)
         self.__timer = timer.timer()
+        self.__udp_parser = udp_parser.parser()
 
         return self.fileno
 
@@ -202,29 +207,21 @@ class udp_proxy(udp_handler.udp_handler):
         # 目前只支持IPv4
         if version != 4: return
 
-        ihl = (byte_data[0] & 0x0f) * 4
-
-        src_addr = socket.inet_ntop(socket.AF_INET, byte_data[12:16])
-        dst_addr = socket.inet_ntop(socket.AF_INET, byte_data[16:20])
-
-        if b"\0\0\0\0" == dst_addr: return
-
-        udp_data = byte_data[ihl:]
-
-        sport = (udp_data[0] << 8) | udp_data[1]
-        dport = (udp_data[2] << 8) | udp_data[3]
-
-        self.__lan_address = (src_addr, sport)
-        self.__internet_ip[dst_addr] = sport
-        self.__timer.set_timeout(dst_addr, self.__UDP_SESSION_TIMEOUT)
-
-        app_data = udp_data[8:]
-
-        self.set_timeout(self.fileno, self.__TIMEOUT)
         self.add_evt_write(self.fileno)
+        self.__udp_parser.add_data(byte_data)
 
-        if dport == 0: return
-        self.sendto(app_data, (dst_addr, dport))
+        while 1:
+            result = self.__udp_parser.get_packet()
+            if not result: break
+            src_addr, dst_addr, sport, dport, app_data = result
+            if dst_addr == "0.0.0.0": continue
+            if dport == 0: continue
+
+            self.__lan_address = (src_addr, sport,)
+            self.__internet_ip[dst_addr] = sport
+            self.__timer.set_timeout(dst_addr, self.__UDP_SESSION_TIMEOUT)
+            self.sendto(app_data, (dst_addr, dport,))
+        return
 
     def udp_error(self):
         self.delete_handler(self.fileno)
@@ -239,6 +236,8 @@ class udp_proxy(udp_handler.udp_handler):
         for name in names:
             if name in self.__internet_ip: del self.__internet_ip[name]
             self.__timer.drop(name)
+
+        self.__udp_parser.recycle_resouce()
         return
 
     def udp_timeout(self):

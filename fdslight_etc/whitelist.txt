@@ -1,4 +1,4 @@
-# 2009年中国大陆IP地址列表
+# http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest
 
 58.14.0.0/15
 58.16.0.0/16

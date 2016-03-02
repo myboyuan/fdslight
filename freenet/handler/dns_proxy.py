@@ -112,13 +112,13 @@ class dnsd_proxy(dns_base):
     def init_func(self, creator_fd, dns_server):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.set_socket(s)
-        s.connect((dns_server, 53))
+        self.connect((dns_server, 53))
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
         self.set_timeout(self.fileno, self.__TIMEOUT)
-        self.__timer=timer.timer()
+        self.__timer = timer.timer()
 
         return s.fileno()
 
@@ -138,7 +138,7 @@ class dnsd_proxy(dns_base):
         L[0:2] = ((new_dns_id & 0xff00) >> 8, new_dns_id & 0x00ff,)
 
         if not self.handler_exists(dst_fd): return
-        self.send_message_to_handler(self.fileno, bytes(L))
+        self.send_message_to_handler(self.fileno, dst_fd, bytes(L))
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
@@ -187,6 +187,7 @@ class dnsc_proxy(dns_base):
     __encrypt_dns = None
 
     __route_table = None
+    __tunnel_fd = -1
 
     def __check_ipaddr(self, sts):
         """检查是否是IP地址
@@ -225,15 +226,13 @@ class dnsc_proxy(dns_base):
         if self.__timer.exists(dns_id): self.__timer.drop(dns_id)
 
     def init_func(self, creator_fd, host_rules, debug=False):
-        self.__creator_fd = creator_fd
         self.__transparent_dns = fn_config.configs["dns"]
 
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.set_socket(s)
         self.__debug = debug
 
-        s.bind((fn_config.configs["dns_bind"], 53))
-
-        self.set_socket(s)
+        self.bind((fn_config.configs["dns_bind"], 53))
         self.set_timeout(self.fileno, self.__TIMEOUT)
 
         self.__host_match = _host_match()
@@ -247,6 +246,9 @@ class dnsc_proxy(dns_base):
         self.add_evt_read(self.fileno)
 
         return self.fileno
+
+    def set_tunnel_fileno(self, fileno):
+        self.__tunnel_fd = fileno
 
     def udp_readable(self, message, address):
         # dns至少有12个字节
@@ -289,16 +291,15 @@ class dnsc_proxy(dns_base):
 
         if pos > 0 and self.__debug: print(host)
 
-        if not self.__host_match.is_match(host):
+        if not self.__host_match.is_match(host) or not self.handler_exists(self.__tunnel_fd):
             self.__send_to_dns_server(self.__transparent_dns, message)
             return
 
-        self.send_message_to_handler(self.fileno, self.__creator_fd, message)
+        self.send_message_to_handler(self.fileno, self.__tunnel_fd, message)
 
     def message_from_handler(self, from_fd, byte_data):
-        if from_fd != self.__creator_fd: return
-
         msg = dns.message.from_wire(byte_data)
+
         for rrset in msg.answer:
             for cname in rrset:
                 ip = cname.__str__()

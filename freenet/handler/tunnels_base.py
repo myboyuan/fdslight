@@ -188,16 +188,20 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         if src_ip not in self.__client_ips: return
 
         packet_length = (byte_data[2] << 8) | byte_data[3]
+        protocol = byte_data[9]
+
+        if len(byte_data) != packet_length:
+            self.print_access_log("wrong_ip_packet")
+            return
 
         if not self.fn_on_recv(packet_length):
             self.delete_handler(self.fileno)
             return
 
-        protocol = byte_data[9]
-
         if protocol != 17:
             self.send_message_to_handler(self.fileno, self.__tun_fd, byte_data)
             return
+
         # 对UDP协议特别处理，以便支持UDP穿透
         ihl = (byte_data[0] & 0x0f) * 4
         src_addr = byte_data[12:16]
@@ -292,7 +296,6 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         self.print_access_log("close")
         self.unregister(self.fileno)
         self.socket.close()
-
         del_handlers = self.__handler_manager.get_all_fileno()
         for fileno in del_handlers:
             if self.handler_exists(fileno): self.delete_handler(fileno)

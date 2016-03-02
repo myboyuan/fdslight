@@ -26,6 +26,7 @@
 *.google-analytics.com
 *.googlesyndication.com
 *.yahoo.com
+*.googlesyndication.com
 
 #  社交网络
 *.facebook.com
