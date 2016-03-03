@@ -18,7 +18,8 @@ configs = {
     "tunnels": "tunnels_simple",
     # 隧道模块配置
     "tunnels_simple": [
-        ("test", "test",)
+        # 格式为 (用户名,密码,)
+        ("test", "test",),
     ],
     # 故障日志
     "error_log": "/tmp/fdslight_error.log",
