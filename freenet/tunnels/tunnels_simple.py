@@ -37,16 +37,9 @@ class tcp_tunnel(tunnels_base.tcp_tunnels_base):
         else:
             pydict = {"status": False}
 
-        resp_auth = json.dumps(pydict).encode("utf-8")
-        self.encrypt_m.set_body_size(len(resp_auth))
-        hdr = self.encrypt_m.wrap_header(over_tcp.ACT_AUTH)
-        body = self.encrypt_m.wrap_body(resp_auth)
-
-        self.encrypt_m.reset()
-
-        self.writer.write(hdr)
-        self.writer.write(body)
-        self.add_evt_write(self.fileno)
+        auth_data = json.dumps(pydict).encode("utf-8")
+        pkt_size = len(auth_data)
+        self.send_data(over_tcp.ACT_AUTH, pkt_size, auth_data)
 
     def __gen_aes_key(self):
         """生成随机AES KEY"""

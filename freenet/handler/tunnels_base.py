@@ -132,7 +132,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         self.add_evt_write(self.fileno)
         self.writer.write(close)
 
-    def __send_data(self, action, pkt_size, byte_data):
+    def send_data(self, action, pkt_size, byte_data):
         self.encrypt_m.set_body_size(pkt_size)
 
         hdr = self.encrypt_m.wrap_header(action)
@@ -318,7 +318,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         # 防止发送缓冲区过大以至于过度消耗内存
         if self.writer.size() > self.__MAX_BUFFER_SIZE: return
         if from_fd == self.__dns_proxy_fd:
-            self.__send_data(over_tcp.ACT_DNS, len(byte_data), byte_data)
+            self.send_data(over_tcp.ACT_DNS, len(byte_data), byte_data)
             return
 
         packet_length = (byte_data[2] << 8) | byte_data[3]
@@ -327,7 +327,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
 
-        self.__send_data(over_tcp.ACT_DATA, packet_length, byte_data)
+        self.send_data(over_tcp.ACT_DATA, packet_length, byte_data)
 
     def __build_log(self, text):
         t = time.strftime("time:%Y-%m-%d %H:%M:%S")
