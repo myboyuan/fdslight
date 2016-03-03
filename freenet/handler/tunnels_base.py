@@ -16,7 +16,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
     # 当没有验证成功的时候保持的连接时间
     __timeout = 30
     # 验证成功后的会话超时时间
-    __TIMEOUT_AUTH_OK = 4 * 60
+    __TIMEOUT_AUTH_OK = 1 * 60
     # 是否已经授权
     __is_auth = False
 

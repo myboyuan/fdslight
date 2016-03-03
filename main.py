@@ -111,6 +111,7 @@ class fdslight(dispatcher.dispatcher):
         self.__run(mode, tunnel)
 
     def ___create_client_service(self, tunnel):
+        if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
         self.create_poll()
         self.__create_dns_proxy()
         self.__create_client_vir_nc()
