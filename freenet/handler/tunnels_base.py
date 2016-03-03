@@ -86,7 +86,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             bind_addr = ("0.0.0.0", 8964)
 
         listen_socket = socket.socket()
-
+        listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.set_fileno(listen_socket.fileno())
         self.set_socket(listen_socket)
         self.bind(bind_addr)
