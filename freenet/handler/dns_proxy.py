@@ -4,7 +4,7 @@ import pywind.lib.timer as timer
 import random, socket, os
 import dns.message
 import fdslight_etc.fn_client as fn_config
-import freenet.lib.fn_utils as fn_utils
+import time
 
 
 class _DNSProtoErr(Exception):
@@ -305,7 +305,6 @@ class dnsc_proxy(dns_base):
                 ip = cname.__str__()
                 if not self.__check_ipaddr(ip): continue
                 if ip in self.__route_table: continue
-
                 self.__route_table[ip] = None
                 cmd = "route add -host %s dev fdslight" % ip
                 os.system(cmd)
@@ -324,6 +323,7 @@ class dnsc_proxy(dns_base):
         dns_ids = self.__timer.get_timeout_names()
         for dns_id in dns_ids:
             if self.__timer.exists(dns_id): self.__timer.drop(dns_id)
+
         self.recyle_resource(dns_ids)
         self.set_timeout(self.fileno, self.__TIMEOUT)
         return

@@ -69,7 +69,7 @@ class fdslight(dispatcher.dispatcher):
     def __create_fn_tcp_client(self, tunnelc):
         os.chdir("driver")
         if not os.path.isfile("fdslight.ko"):
-            print("you can install this software")
+            print("you must install this software")
             sys.exit(-1)
 
         path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
