@@ -49,6 +49,7 @@ class tcp_tunnel(tunnels_base.tcp_tunnels_base):
         max_index = len(sts) - 1
         seq = []
 
+        # 默认加密支持AES-128
         for i in range(16):
             n = random.randint(0, max_index)
             seq.append(sts[n])
