@@ -15,6 +15,7 @@
 #include<linux/string.h>
 #include<linux/slab.h>
 #include<linux/errno.h>
+#include<linux/version.h>
 #include "fdsl_queue.h"
 #include "fdsl_dev_ctl.h"
 #include "fdsl_route_table.h"
@@ -188,11 +189,21 @@ static unsigned int fdsl_push_packet_to_user(struct iphdr *ip_header)
 }
 
 
-static unsigned int nf_handle_in(const struct nf_hook_ops *ops,
+static unsigned int nf_handle_in(
+// 处理流进的包
+#if LINUX_VERSION_CODE<=KERNEL_VERSION(3,1,2)
+        unsigned int hooknum,
+#endif
+        const struct nf_hook_ops *ops,
 		struct sk_buff *skb,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,1,0)
+        struct const struct nf_hook_state *state
+#else
 		const struct net_device *in,
 		const struct net_device *out,
-		int (*okfn)(struct sk_buff *))
+		int (*okfn)(struct sk_buff *)
+#endif
+		)
 {
 	struct iphdr *ip_header;
 	struct udphdr *udp_header;
