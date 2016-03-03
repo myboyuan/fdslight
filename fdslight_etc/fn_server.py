@@ -5,6 +5,7 @@ configs = {
         8964
     ),
     # 虚拟局域网IP分配范围
+    # 更改了此选项，你需要更改server_nat_script.sh文件，让nat策略与此子网一致
     "subnet": (
         "10.10.10.0",
         24
