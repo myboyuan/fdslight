@@ -18,7 +18,7 @@ class traffic_read(handler.handler):
         dev_path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
         fileno = os.open(dev_path, os.O_RDONLY)
 
-        subnet, mask = fn_config.configs["proxy_subnet"]
+        subnet, mask = fn_config.configs["udp_proxy_subnet"]
         n = utils.ip4s_2_number(subnet)
 
         fdsl_ctl.set_subnet(fileno, n, mask)

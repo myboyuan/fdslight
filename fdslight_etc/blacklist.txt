@@ -61,6 +61,7 @@
 *.bcchinese.net
 *.ntdtv.com.tw
 *.chinadigitaltimes.net
+*.reuters.com
 
 # 网络存储
 *.dropbox.com
