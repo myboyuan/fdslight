@@ -154,18 +154,10 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         self.add_evt_write(self.fileno)
         self.writer.write(close)
 
-    def __send_auth(self, pydict):
+    def send_auth(self, auth_data):
         self.__is_sent_auth = True
-        sts = json.dumps(pydict)
-        data_size = len(sts)
-        self.encrypt_m.set_body_size(data_size)
-        hdr = self.encrypt_m.wrap_header(over_tcp.ACT_AUTH)
-        body = self.encrypt_m.wrap_body(sts.encode("utf-8"))
-
-        self.writer.write(hdr)
-        self.writer.write(body)
-
-        self.encrypt_m.reset()
+        data_size = len(auth_data)
+        self.__send_to_tunnel(data_size, auth_data, action=over_tcp.ACT_AUTH)
         return
 
     def __handle_read_data(self, action, byte_data):
@@ -216,8 +208,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
 
     def tcp_writable(self):
         if not self.__is_sent_auth:
-            ret_data = self.fn_auth_request()
-            self.__send_auth(ret_data)
+            self.fn_auth_request()
             return
         if self.writer.size() < 1:
             self.remove_evt_write(self.fileno)

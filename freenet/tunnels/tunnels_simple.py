@@ -39,6 +39,8 @@ class tcp_tunnel(tunnels_base.tcp_tunnels_base):
 
         auth_data = json.dumps(pydict).encode("utf-8")
         pkt_size = len(auth_data)
+
+        # 向隧道发送数据
         self.send_data(over_tcp.ACT_AUTH, pkt_size, auth_data)
 
     def __gen_aes_key(self):
@@ -54,13 +56,19 @@ class tcp_tunnel(tunnels_base.tcp_tunnels_base):
         return "".join(seq)
 
     def fn_handler_init(self):
+        """类初始化的时候调用此函数"""
         self.__users = fns_config.configs["tunnels_simple"]
 
     def fn_on_connect(self, sock, caddr):
+        """客户端发生连接时调用此函数,一般不需要更改"""
         self.create_handler(self.fileno, tcp_tunnel, s=sock, c_addr=caddr)
         return True
 
     def fn_auth(self, byte_data):
+        """客户端发送验证的时候会调用此函数
+        :param byte_data: 客户端发送的验证数据
+        :return Boolean: True表示验证通过,False表示验证失败
+        """
         try:
             sts = byte_data.decode("utf-8")
             auth_info = json.loads(sts)
@@ -85,6 +93,7 @@ class tcp_tunnel(tunnels_base.tcp_tunnels_base):
             self.__send_auth_response(False)
             return False
 
+        # 一定要获取可以分配的IP地址，否则客户端没IP地址,无法进行流量代理
         ips = self.get_client_ips(5)
         aes_key = self.__gen_aes_key()
 
@@ -95,11 +104,23 @@ class tcp_tunnel(tunnels_base.tcp_tunnels_base):
         return True
 
     def fn_on_recv(self, recv_size):
+        """验证成功后客户端发送了数据包之后会调用此函数
+        :param recv_size: 客户端的数据包大小
+        :return Boolean:True表示继续执行,False表示不执行,即关闭连接
+        """
         return True
 
     def fn_on_send(self, send_size):
+        """服务器发送数据包调用此函数
+        :param send_size: 服务器发送的数据包大小
+        :return Boolean:True表示继续执行,False表示不执行,即关闭连接
+        """
         return True
 
     def fn_handler_clear(self):
+        """连接关闭后的资源回收
+        :return:
+        """
+        # 注意回收IP地址
         self.del_client_ips()
         return
