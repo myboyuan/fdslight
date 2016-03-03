@@ -3,7 +3,7 @@ import os, sys
 
 # 编译器名
 CC = "gcc"
-# Python的包含路径
+# Python开发包包含路径
 py_include = ""
 src_path_1 = "freenet/lib/fn_utils.c"
 src_path_2 = "driver/py_fdsl_ctl.c"
