@@ -4,11 +4,7 @@ import pywind.lib.timer as timer
 import random, socket, os
 import dns.message
 import fdslight_etc.fn_client as fn_config
-import time
 
-
-class _DNSProtoErr(Exception):
-    pass
 
 
 class _host_match(object):
@@ -184,7 +180,6 @@ class dnsc_proxy(dns_base):
     __debug = False
 
     __transparent_dns = None
-    __encrypt_dns = None
 
     __route_table = None
     __tunnel_fd = -1
@@ -229,6 +224,7 @@ class dnsc_proxy(dns_base):
         self.__transparent_dns = fn_config.configs["dns"]
 
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.set_socket(s)
         self.__debug = debug
 
@@ -323,7 +319,6 @@ class dnsc_proxy(dns_base):
         dns_ids = self.__timer.get_timeout_names()
         for dns_id in dns_ids:
             if self.__timer.exists(dns_id): self.__timer.drop(dns_id)
-
         self.recyle_resource(dns_ids)
         self.set_timeout(self.fileno, self.__TIMEOUT)
         return
