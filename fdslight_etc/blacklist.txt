@@ -62,6 +62,7 @@
 *.ntdtv.com.tw
 *.chinadigitaltimes.net
 *.reuters.com
+*.reutersmedia.net
 
 # 网络存储
 *.dropbox.com

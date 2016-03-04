@@ -328,7 +328,6 @@ class dnsc_proxy(dns_base):
             dns_msg = self.__dns_cache.get(host)
             L = list(dns_msg)
             L[0:2] = ((n_dns_id & 0xff00) >> 8, n_dns_id & 0x00ff,)
-            print("from cache----------------------------------------")
             self.send_message_to_handler(self.fileno, self.fileno, bytes(L))
             return
 
