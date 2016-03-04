@@ -14,9 +14,7 @@ import freenet.handler.dns_proxy as dns_proxy
 class tcp_tunnels_base(tcp_handler.tcp_handler):
     # socket超时时间
     # 当没有验证成功的时候保持的连接时间
-    __timeout = 30
-    # 验证成功后的会话超时时间
-    __TIMEOUT_AUTH_OK = 1 * 60
+    __TIMEOUT = 60
     # 是否已经授权
     __is_auth = False
 
@@ -76,7 +74,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.__dns_proxy_fd = global_vars["freenet.dns_proxy_fd"]
             self.__c_addr = c_addr
             self.print_access_log("connect")
-            self.set_timeout(self.fileno, self.__timeout)
+            self.set_timeout(self.fileno, self.__TIMEOUT)
             self.__handler_manager = traffic_pass.handler_manager()
             self.__debug = debug
 
@@ -128,7 +126,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         """发送pong帧
         :return:
         """
-        if self.__debug: self.print_access_log("send_ping")
+        if self.__debug: self.print_access_log("send_pong")
         pong = self.encrypt_m.build_pong()
         self.add_evt_write(self.fileno)
         self.writer.write(pong)
@@ -169,8 +167,6 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
                 return
             self.print_access_log("auth_ok")
             self.__is_auth = True
-            self.__timeout = self.__TIMEOUT_AUTH_OK
-            self.set_timeout(self.fileno, self.__timeout)
             return
 
         if action == over_tcp.ACT_PING:
@@ -319,7 +315,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
 
-        self.set_timeout(self.fileno, self.__timeout)
+        self.set_timeout(self.fileno, self.__TIMEOUT)
         self.__send_ping()
 
     def message_from_handler(self, from_fd, byte_data):
