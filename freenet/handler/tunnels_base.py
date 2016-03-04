@@ -82,6 +82,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
 
             return self.fileno
 
+        self.__debug = debug
         bind_addr = config.get("tcp_bind_address", None)
 
         if not bind_addr: bind_addr = ("0.0.0.0", 8964)
