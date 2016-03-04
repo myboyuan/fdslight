@@ -63,7 +63,7 @@ class traffic_send(handler.handler):
         self.__creator_fd = creator_fd
         self.__sent = []
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_TCP)
+        s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_UDP)
         s.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
         s.setblocking(0)
 
