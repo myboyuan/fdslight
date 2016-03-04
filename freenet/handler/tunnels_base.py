@@ -99,6 +99,10 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
 
         return self.fileno
 
+    @property
+    def debug(self):
+        return self.__debug
+
     def after(self):
         self.listen(10)
         self.register(self.fileno)
@@ -269,9 +273,9 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
                 s, addr = self.socket.accept()
             except BlockingIOError:
                 break
-
             ret = self.fn_on_connect(s, addr)
             if not ret:
+                s.close()
                 continue
             ''''''
         return

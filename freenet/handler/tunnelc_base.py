@@ -129,7 +129,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
 
         self.__traffic_catch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read, whitelist)
         self.__traffic_send_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
-        self.set_timeout(self.__TIMEOUT)
+        self.set_timeout(self.fileno,self.__TIMEOUT)
 
         return self.fileno
 
@@ -270,7 +270,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
     def tcp_timeout(self):
         # 回收IP资源,以便别的机器能够顺利连接
         self.__static_nat.recyle_ips()
-        self.set_timeout(self.__TIMEOUT)
+        self.set_timeout(self.fileno,self.__TIMEOUT)
 
     def print_access_log(self, string):
         t = time.strftime("time:%Y-%m-%d %H:%M:%S")
