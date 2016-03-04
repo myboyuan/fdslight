@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-import random
+import dns.resolver
 
-sts = b'E\x00\x05\xdc\xfd\x95 \x00?\x11\xe1j\n\n\n\x01\xc6k\x9c\x9a\xc7\xf6\r\x96\x08D\x91\xf8\x00\x01\x08(\x8e\xa1\xe7\x1fi/\xef3Ap\\\x1f\xef\x1c\n\x02\x00!'
+r=dns.resolver.Resolver()
+r.nameservers=["127.0.0.1",]
 
-ihl = (sts[0] & 0x0f) * 4
+qs=r.query("www.facebook.com")
 
-print((sts[28:]))
+for rs in qs:
+    print(rs)
+

@@ -38,12 +38,13 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
     __MAX_BUFFER_SIZE = 16 * 1024
     __c_addr = None
 
+    __debug = None
+
     # 实现P2P打洞的相关变量
     __handler_manager = None
-
     __dns_proxy_fd = -1
 
-    def init_func(self, creator_fd, s=None, c_addr=None):
+    def init_func(self, creator_fd, s=None, c_addr=None, debug=False):
         """
         :param creator_fd:
         :param tun_dev_name:在作为监听套接字的时候需要这个参数
@@ -77,13 +78,13 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.print_access_log("connect")
             self.set_timeout(self.fileno, self.__timeout)
             self.__handler_manager = traffic_pass.handler_manager()
+            self.__debug = debug
 
             return self.fileno
 
         bind_addr = config.get("tcp_bind_address", None)
 
-        if not bind_addr:
-            bind_addr = ("0.0.0.0", 8964)
+        if not bind_addr: bind_addr = ("0.0.0.0", 8964)
 
         listen_socket = socket.socket()
         listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -112,6 +113,8 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         """发送ping帧
         :return:
         """
+        if self.__debug: self.print_access_log("send_ping")
+
         ping = self.encrypt_m.build_ping()
         self.add_evt_write(self.fileno)
         self.writer.write(ping)
@@ -120,6 +123,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         """发送pong帧
         :return:
         """
+        if self.__debug: self.print_access_log("send_ping")
         pong = self.encrypt_m.build_pong()
         self.add_evt_write(self.fileno)
         self.writer.write(pong)
@@ -150,8 +154,9 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
         # 在没有验证之前丢弃所有发过来的数据包
-        if not self.__is_auth and action != over_tcp.ACT_AUTH: return
-
+        if not self.__is_auth and action != over_tcp.ACT_AUTH:
+            if self.__debug: self.print_access_log("drop_packet_because_of_not_auth")
+            return
         if not self.__is_auth:
             if not self.fn_auth(byte_data):
                 self.print_access_log("auth_fail")
@@ -160,6 +165,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.print_access_log("auth_ok")
             self.__is_auth = True
             self.__timeout = self.__TIMEOUT_AUTH_OK
+            self.set_timeout(self.fileno, self.__timeout)
             return
 
         if action == over_tcp.ACT_PING:
@@ -271,11 +277,10 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         return
 
     def tcp_readable(self):
+        if self.__debug: self.print_access_log("received_data")
+
         rdata = self.reader.read()
         self.decrypt_m.add_data(rdata)
-
-        if self.__is_auth:
-            self.set_timeout(self.socket.fileno(), self.__timeout)
 
         while self.decrypt_m.have_data():
             if not self.decrypt_m.is_ok(): break
@@ -286,9 +291,6 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         return
 
     def tcp_writable(self):
-        if self.__is_auth:
-            self.set_timeout(self.fileno, self.__timeout)
-
         self.remove_evt_write(self.fileno)
 
     def tcp_delete(self):
@@ -312,6 +314,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
 
+        self.set_timeout(self.fileno, self.__timeout)
         self.__send_ping()
 
     def message_from_handler(self, from_fd, byte_data):
@@ -329,14 +332,14 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
 
         self.send_data(over_tcp.ACT_DATA, packet_length, byte_data)
 
-    def __build_log(self, text):
+    def __build_access_log(self, text):
         t = time.strftime("time:%Y-%m-%d %H:%M:%S")
         ipaddr = "%s:%s" % (self.__c_addr)
 
         return "%s      %s      %s" % (text, ipaddr, t)
 
     def print_access_log(self, text):
-        print(self.__build_log(text))
+        print(self.__build_access_log(text))
 
     def fn_handler_init(self):
         """当创建新的handler时候,将会调用这个函数进行一些初始化操作,重写这个方法

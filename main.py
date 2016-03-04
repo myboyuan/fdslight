@@ -56,7 +56,7 @@ class fdslight(dispatcher.dispatcher):
     __debug = True
 
     def __create_fn_tcp_server(self, tunnels):
-        fn_s_no = self.create_handler(-1, tunnels.tcp_tunnel)
+        fn_s_no = self.create_handler(-1, tunnels.tcp_tunnel, debug=self.__debug)
 
         self.__tunnels_fileno = fn_s_no
         self.get_handler(fn_s_no).after()
@@ -79,8 +79,11 @@ class fdslight(dispatcher.dispatcher):
         os.system("insmod fdslight.ko")
 
         os.chdir("../")
+
+        whitelist = self.__client_get_whitelist()
+
         self.__tunnelc = tunnelc
-        self.__tunnelc_fileno = self.create_handler(-1, tunnelc.tcp_tunnel, self.__client_get_whitelist())
+        self.__tunnelc_fileno = self.create_handler(-1, tunnelc.tcp_tunnel, whitelist, debug=self.__debug)
         self.get_handler(self.__tunnelc_fileno).after(self.__vir_nc_fileno, self.__dns_fileno)
 
     def __create_client_vir_nc(self):

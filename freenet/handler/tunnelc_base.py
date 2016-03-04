@@ -104,11 +104,13 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
     __tun_fd = -1
     __dns_fd = -1
 
-    def init_func(self, creator_fd, whitelist):
+    __debug = None
+
+    def init_func(self, creator_fd, whitelist, debug=False):
         server_addr = fnc_config.configs["tcp_server_address"]
 
         s = socket.socket()
-
+        self.__debug = debug
         try:
             s.connect(server_addr)
         except:
@@ -127,6 +129,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
 
         self.__traffic_catch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read, whitelist)
         self.__traffic_send_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
+        self.set_timeout(self.__TIMEOUT)
 
         return self.fileno
 
@@ -142,6 +145,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         """发送pong帧
         :return:
         """
+        if self.__debug: self.print_access_log("send_pong")
         pong = self.encrypt_m.build_pong()
         self.add_evt_write(self.fileno)
         self.writer.write(pong)
@@ -150,6 +154,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         """发送close帧
         :return:
         """
+        if self.__debug: self.print_access_log("send_close")
         close = self.encrypt_m.build_close()
         self.add_evt_write(self.fileno)
         self.writer.write(close)
@@ -158,9 +163,11 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         self.__is_sent_auth = True
         data_size = len(auth_data)
         self.__send_to_tunnel(data_size, auth_data, action=over_tcp.ACT_AUTH)
+        self.print_access_log("send_auth")
         return
 
     def __handle_read_data(self, action, byte_data):
+        if self.__debug: self.print_access_log("received_data")
         if action not in over_tcp.ACTS: return
         if over_tcp.ACT_AUTH == action:
             ret = self.fn_auth_response(byte_data)
@@ -193,7 +200,6 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         self.send_message_to_handler(self.fileno, t_fd, new_pkt)
 
     def tcp_readable(self):
-        self.set_timeout(self.fileno, self.__TIMEOUT)
         rdata = self.reader.read()
         self.__decrypt_m.add_data(rdata)
 
@@ -213,8 +219,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         if self.writer.size() < 1:
             self.remove_evt_write(self.fileno)
             return
-        self.set_timeout(self.fileno, self.__TIMEOUT)
-        return
+        ''''''
 
     def __send_to_tunnel(self, packet_length, byte_data, action=over_tcp.ACT_DATA):
         """向加密发送数据"""
@@ -265,6 +270,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
     def tcp_timeout(self):
         # 回收IP资源,以便别的机器能够顺利连接
         self.__static_nat.recyle_ips()
+        self.set_timeout(self.__TIMEOUT)
 
     def print_access_log(self, string):
         t = time.strftime("time:%Y-%m-%d %H:%M:%S")
