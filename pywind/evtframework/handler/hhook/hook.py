@@ -84,11 +84,11 @@ class hook(object):
     def hook_exists(self, name):
         return self.__handler.hook_exists(name)
 
-    def handler_ctl(self, name, cmd, *args, **kwargs):
-        """控制创建hook的handler"""
-        return self.__handler.handler_ctl_from_hook(name, cmd, *args, **kwargs)
+    def sys_exit(self):
+        """结束这个请求"""
+        self.__handler.handler_exit_from_hook()
 
-    def wake_up_for_writable(self):
+    def wake_up(self):
         """当发生写入事件而数据并没有完全响应完毕的时候会调用这个函数
         需要在自己的handler类中手动调用此函数
         重写这个方法

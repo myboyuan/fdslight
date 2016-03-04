@@ -100,6 +100,14 @@ class handler(object):
         """
         pass
 
+    def handler_exit_from_hook(self):
+        """重写这个方法,当hook调用退出函数时"""
+        pass
+
+    def wake_up_hook(self, name):
+        """唤醒hook"""
+        self.__hooks[name].wake_up()
+
     def evt_read(self):
         """读事件,重写这个方法
         :return:
@@ -200,8 +208,4 @@ class handler(object):
         :param kwargs:
         :return:
         """
-        pass
-
-    def handler_ctl_from_hook(self,from_hook,cmd,*args,**kwargs):
-        """接收hook的控制命令,重写这个方法"""
         pass
