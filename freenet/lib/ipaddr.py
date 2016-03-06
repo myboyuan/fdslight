@@ -52,12 +52,14 @@ class ip4addr(object):
         :param addr:
         :return:
         """
-        if self.__recycle_ips: return self.__recycle_ips.pop(0)
+        if len(self.__recycle_ips) > 20:
+            return self.__recycle_ips.pop(0)
 
         n = self.__current_max_ipaddr + 1
         host_n = self.__base_ipaddr & self.__mask
 
         if host_n < n:
+            if self.__recycle_ips:return self.__recycle_ips.pop(0)
             raise IpaddrNoEnoughErr
 
         new_int_ip = self.__base_ipaddr + n

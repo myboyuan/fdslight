@@ -91,6 +91,8 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
     __TIMEOUT = 1 * 60
     # 是否已经发送过验证报文
     __is_sent_auth = False
+    # 是否验证成功
+    __auth_ok = False
 
     __timer = None
     __static_nat = None
@@ -129,7 +131,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
 
         self.__traffic_catch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read, whitelist)
         self.__traffic_send_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
-        self.set_timeout(self.fileno,self.__TIMEOUT)
+        self.set_timeout(self.fileno, self.__TIMEOUT)
 
         return self.fileno
 
@@ -175,6 +177,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
                 self.print_access_log("auth_failed")
                 self.delete_handler(self.fileno)
             else:
+                self.__auth_ok = True
                 self.print_access_log("auth_ok")
             return
         if over_tcp.ACT_CLOSE == action:
@@ -233,14 +236,16 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         self.writer.write(body)
 
     def message_from_handler(self, from_fd, byte_data):
+        # 没有验证成功的删除数据
+        if not self.__auth_ok: return
         if from_fd == self.__dns_fd:
             self.__send_to_tunnel(len(byte_data), byte_data, action=over_tcp.ACT_DNS)
             return
-        # 没发送验证数据包就丢弃网卡的数据包
-        if not self.__is_sent_auth: return
         # 防止内存过度消耗
-        if self.writer.size() > self.__MAX_BUFFER_SIZE: return
-        # 目前只支持IPv4
+        if self.writer.size() > self.__MAX_BUFFER_SIZE:
+            self.writer.flush()
+            return
+         # 目前只支持IPv4
         if (byte_data[0] & 0xf0) >> 4 != 4: return
         new_pkt = self.__static_nat.get_new_packet_to_tunnel(byte_data)
 
@@ -270,7 +275,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
     def tcp_timeout(self):
         # 回收IP资源,以便别的机器能够顺利连接
         self.__static_nat.recyle_ips()
-        self.set_timeout(self.fileno,self.__TIMEOUT)
+        self.set_timeout(self.fileno, self.__TIMEOUT)
 
     def print_access_log(self, string):
         t = time.strftime("time:%Y-%m-%d %H:%M:%S")

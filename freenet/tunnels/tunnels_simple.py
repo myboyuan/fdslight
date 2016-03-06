@@ -62,7 +62,10 @@ class tcp_tunnel(tunnels_base.tcp_tunnels_base):
 
     def fn_on_connect(self, sock, caddr):
         """客户端发生连接时调用此函数,一般不需要更改"""
-        self.create_handler(self.fileno, tcp_tunnel, s=sock, c_addr=caddr, debug=self.debug)
+        self.create_handler(self.fileno, tcp_tunnel, s=sock, c_addr=caddr,
+                            raw_socket_fd=self.raw_socket_fd,
+                            debug=self.debug)
+
         return True
 
     def fn_auth(self, byte_data):

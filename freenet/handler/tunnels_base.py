@@ -41,8 +41,9 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
     # 实现P2P打洞的相关变量
     __handler_manager = None
     __dns_proxy_fd = -1
+    __raw_socket_fd = -1
 
-    def init_func(self, creator_fd, s=None, c_addr=None, debug=False):
+    def init_func(self, creator_fd, s=None, c_addr=None, raw_socket_fd=-1, debug=False):
         """
         :param creator_fd:
         :param tun_dev_name:在作为监听套接字的时候需要这个参数
@@ -77,11 +78,13 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.set_timeout(self.fileno, self.__TIMEOUT)
             self.__handler_manager = traffic_pass.handler_manager()
             self.__debug = debug
+            self.__raw_socket_fd = raw_socket_fd
 
             return self.fileno
 
         self.__debug = debug
         bind_addr = config.get("tcp_bind_address", None)
+        self.__raw_socket_fd = self.create_handler(self.fileno,traffic_pass.traffic_send)
 
         if not bind_addr: bind_addr = ("0.0.0.0", 8964)
 
@@ -111,6 +114,10 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
 
         tun_fd = self.create_handler(self.fileno, tundev.tuns, fn_utils.TUN_DEV_NAME, subnet)
         global_vars["freenet.tun_fd"] = tun_fd
+
+    @property
+    def raw_socket_fd(self):
+        return self.__raw_socket_fd
 
     def __send_ping(self):
         """发送ping帧
@@ -219,7 +226,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         while 1:
             exists = self.__handler_manager.exists(ip, sport)
             if not exists:
-                fileno = self.create_handler(self.fileno, traffic_pass.udp_proxy)
+                fileno = self.create_handler(self.fileno, traffic_pass.udp_proxy, self.raw_socket_fd)
                 self.__handler_manager.add(ip, sport, fileno)
             else:
                 fileno = self.__handler_manager.get(ip, sport)
@@ -319,14 +326,15 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         self.__send_ping()
 
     def message_from_handler(self, from_fd, byte_data):
-        # 防止发送缓冲区过大以至于过度消耗内存
-        if self.writer.size() > self.__MAX_BUFFER_SIZE: return
+        if not self.__is_auth: return
+        # 缓冲数据过大那么就删除先前的数据
+        if self.writer.size() > self.__MAX_BUFFER_SIZE:
+            self.writer.flush()
+            return
         if from_fd == self.__dns_proxy_fd:
             self.send_data(over_tcp.ACT_DNS, len(byte_data), byte_data)
             return
-
         packet_length = (byte_data[2] << 8) | byte_data[3]
-
         if not self.fn_on_send(packet_length):
             self.delete_handler(self.fileno)
             return

@@ -5,9 +5,10 @@ import pywind.evtframework.handler.udp_handler as udp_handler
 import pywind.lib.timer as timer
 import socket, os
 import freenet.lib.fdsl_ctl as fdsl_ctl
-import fdslight_etc.fn_client as fn_config
+import fdslight_etc.fn_client as fnc_config
+import fdslight_etc.fn_server as fns_config
 import freenet.lib.utils as utils
-import freenet.lib.udp_parser as udp_parser
+import freenet.lib.checksum as checksum
 
 
 class traffic_read(handler.handler):
@@ -18,7 +19,7 @@ class traffic_read(handler.handler):
         dev_path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
         fileno = os.open(dev_path, os.O_RDONLY)
 
-        subnet, mask = fn_config.configs["udp_proxy_subnet"]
+        subnet, mask = fnc_config.configs["udp_proxy_subnet"]
         n = utils.ip4s_2_number(subnet)
 
         fdsl_ctl.set_subnet(fileno, n, mask)
@@ -31,8 +32,10 @@ class traffic_read(handler.handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
-        if fn_config.configs["global_udp"]:fdsl_ctl.udp_global(fileno)
-        else:fdsl_ctl.udp_part(fileno)
+        if fnc_config.configs["global_udp"]:
+            fdsl_ctl.udp_global(fileno)
+        else:
+            fdsl_ctl.udp_part(fileno)
 
         return self.fileno
 
@@ -110,8 +113,6 @@ class traffic_send(handler.handler):
         return
 
     def message_from_handler(self, from_fd, byte_data):
-        if from_fd != self.__creator_fd: return
-
         self.add_evt_write(self.fileno)
         self.__sent.append(byte_data)
 
@@ -167,9 +168,10 @@ class udp_proxy(udp_handler.udp_handler):
     __TIMEOUT = 4 * 60
 
     __timer = None
-    __udp_parser = None
 
-    def init_func(self, creator_fd):
+    __raw_socket_fd = -1
+
+    def init_func(self, creator_fd, raw_socket_fd):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         self.__creator_fd = creator_fd
@@ -177,13 +179,13 @@ class udp_proxy(udp_handler.udp_handler):
         self.bind(("0.0.0.0", 0))
         self.__bind_address = self.getsockname()
         self.__internet_ip = {}
+        self.__raw_socket_fd = raw_socket_fd
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
         self.set_timeout(self.fileno, self.__TIMEOUT)
         self.__timer = timer.timer()
-        self.__udp_parser = udp_parser.parser()
 
         return self.fileno
 
@@ -197,12 +199,25 @@ class udp_proxy(udp_handler.udp_handler):
         self.set_timeout(self.fileno, self.__TIMEOUT)
         daddr, dport = self.__lan_address
 
-        udp_packet = utils.build_udp_packet(saddr, daddr, sport, dport, message)
+        n_saddr = socket.inet_aton(saddr)
+        n_daddr = socket.inet_aton(daddr)
 
-        self.send_message_to_handler(self.fileno, self.__creator_fd, udp_packet)
+        udp_packets = utils.build_udp_packet(n_saddr, n_daddr, sport, dport, message)
+
+        for udp_pkt in udp_packets: self.send_message_to_handler(self.fileno, self.__creator_fd, udp_pkt)
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
+
+    def __modify_src_address(self, new_ip_pkt, pkt_list):
+        """修改源地址"""
+        old_checsum = (pkt_list[10] << 8) | pkt_list[11]
+        new_csum = checksum.calc_checksum_for_ip_change(
+            bytes(pkt_list[12:16]), new_ip_pkt, old_checsum
+        )
+
+        pkt_list[10:12] = ((new_csum & 0xff00) >> 8, new_csum & 0x00ff,)
+        pkt_list[12:16] = new_ip_pkt
 
     def message_from_handler(self, from_fd, byte_data):
         """接收到的数据是IP数据包"""
@@ -210,20 +225,56 @@ class udp_proxy(udp_handler.udp_handler):
         # 目前只支持IPv4
         if version != 4: return
 
-        self.add_evt_write(self.fileno)
-        self.__udp_parser.add_data(byte_data)
+        ihl = (byte_data[0] & 0x0f) * 4
+        # pkt_id = (byte_data[4] << 8) | byte_data[5]
+        flags = (byte_data[6] & 0xe0) >> 5
+        # flag_df = (flags & 0x2) >> 1
+        # flags_mf = flags & 0x1
+        offset = ((byte_data[6] & 0x1f) << 5) | byte_data[7]
 
-        while 1:
-            result = self.__udp_parser.get_packet()
-            if not result: break
-            src_addr, dst_addr, sport, dport, app_data = result
-            if dst_addr == "0.0.0.0": continue
-            if dport == 0: continue
+        bind_addr, bind_port = self.__bind_address
+        bind_addr_pkt = socket.inet_aton(bind_addr)
 
-            self.__lan_address = (src_addr, sport,)
-            self.__internet_ip[dst_addr] = sport
-            self.__timer.set_timeout(dst_addr, self.__UDP_SESSION_TIMEOUT)
-            self.sendto(app_data, (dst_addr, dport,))
+        L = list(byte_data)
+
+        if offset:
+            self.__modify_src_address(bind_addr_pkt, L)
+            message = bytes(L)
+            self.send_message_to_handler(self.fileno, self.__raw_socket_fd, message)
+            return
+
+        src_addr = socket.inet_ntoa(byte_data[12:16])
+        dst_addr = socket.inet_ntoa(byte_data[16:20])
+
+        b = ihl
+        e = ihl + 1
+        sport = (byte_data[b] << 8) | byte_data[e]
+
+        # 修改源端口
+        e = e + 1
+        L[b:e] = ((bind_port & 0xff00) >> 8, bind_port & 0x00ff,)
+
+
+        #b = e + 1
+        #e = b + 1
+        #dport = (byte_data[b] << 8) | byte_data[e]
+
+        b = ihl + 6
+        e = b + 2
+
+        # 改UDP校检和为0,即不计算校检和
+        L[b:e] = (0, 0,)
+
+        self.__modify_src_address(bind_addr_pkt, L)
+
+        message = bytes(L)
+
+        self.__lan_address = (src_addr, sport,)
+        self.__internet_ip[dst_addr] = sport
+        self.__timer.set_timeout(dst_addr, self.__UDP_SESSION_TIMEOUT)
+
+        self.send_message_to_handler(self.fileno, self.__raw_socket_fd, message)
+
         return
 
     def udp_error(self):
