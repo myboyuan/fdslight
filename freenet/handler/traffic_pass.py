@@ -290,7 +290,6 @@ class udp_proxy(udp_handler.udp_handler):
             if name in self.__internet_ip: del self.__internet_ip[name]
             self.__timer.drop(name)
 
-        self.__udp_parser.recycle_resouce()
         return
 
     def udp_timeout(self):
