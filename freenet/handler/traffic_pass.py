@@ -254,7 +254,6 @@ class udp_proxy(udp_handler.udp_handler):
         e = e + 1
         L[b:e] = ((bind_port & 0xff00) >> 8, bind_port & 0x00ff,)
 
-
         #b = e + 1
         #e = b + 1
         #dport = (byte_data[b] << 8) | byte_data[e]
