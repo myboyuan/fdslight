@@ -13,6 +13,7 @@ import freenet.handler.dns_proxy as dns_proxy
 import freenet.handler.tundev as tundev
 import freenet.lib.file_parser as file_parser
 import freenet.lib.fn_utils as fn_utils
+import freenet.handler.traffic_pass as traffic_pass
 
 FDSL_PID_FILE = "fdslight.pid"
 
@@ -47,11 +48,13 @@ def clear_pid_file():
 
 
 class fdslight(dispatcher.dispatcher):
-    __vir_nc_fileno = -1
     __tunnelc = None
     __tunnelc_fileno = -1
     __tunnels_fileno = -1
     __dns_fileno = -1
+
+    __traffic_fetch_fd = -1
+    __traffic_send_fd = -1
 
     __debug = True
 
@@ -67,33 +70,15 @@ class fdslight(dispatcher.dispatcher):
         return results
 
     def __create_fn_tcp_client(self, tunnelc):
-        os.chdir("driver")
-        if not os.path.isfile("fdslight.ko"):
-            print("you must install this software")
-            sys.exit(-1)
-
-        path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
-        if os.path.exists(path):
-            os.system("rmmod fdslight")
-
-        os.system("insmod fdslight.ko")
-
-        os.chdir("../")
-
-        whitelist = self.__client_get_whitelist()
-
         self.__tunnelc = tunnelc
-        self.__tunnelc_fileno = self.create_handler(-1, tunnelc.tcp_tunnel, whitelist, debug=self.__debug)
-        self.get_handler(self.__tunnelc_fileno).after(self.__vir_nc_fileno, self.__dns_fileno)
-
-    def __create_client_vir_nc(self):
-        """创建客户端虚拟网卡"""
-        nc_fileno = self.create_handler(-1, tundev.tunc, fn_utils.TUN_DEV_NAME)
-        self.__vir_nc_fileno = nc_fileno
+        self.__tunnelc_fileno = self.create_handler(-1, tunnelc.tcp_tunnel, debug=self.__debug)
+        self.get_handler(self.__tunnelc_fileno).after(self.__dns_fileno, self.__traffic_fetch_fd,
+                                                      self.__traffic_send_fd)
 
     def __create_dns_proxy(self):
         rules = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
-        self.__dns_fileno = self.create_handler(-1, dns_proxy.dnsc_proxy, rules, debug=self.__debug)
+        self.__dns_fileno = self.create_handler(-1, dns_proxy.dnsc_proxy, self.__traffic_fetch_fd, rules,
+                                                debug=self.__debug)
 
     def init_func(self, mode, debug=True):
         if mode == "server":
@@ -116,10 +101,29 @@ class fdslight(dispatcher.dispatcher):
     def ___create_client_service(self, tunnel):
         if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
         self.create_poll()
+
+        os.chdir("driver")
+        if not os.path.isfile("fdslight.ko"):
+            print("you must install this software")
+            sys.exit(-1)
+
+        path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
+        if os.path.exists(path):
+            os.system("rmmod fdslight")
+
+        os.system("insmod fdslight.ko")
+
+        os.chdir("../")
+
+        self.__traffic_fetch_fd = self.create_handler(-1, traffic_pass.traffic_read, self.__client_get_whitelist())
+        self.__traffic_send_fd = self.create_handler(-1, traffic_pass.traffic_send)
+
         self.__create_dns_proxy()
-        self.__create_client_vir_nc()
+
         self.__create_fn_tcp_client(tunnel)
-        self.get_handler(self.__vir_nc_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
+
+        self.get_handler(self.__traffic_fetch_fd).set_tunnel_fd(self.__tunnelc_fileno)
+
         self.get_handler(self.__dns_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
 
     def __create_server_service(self, tunnel):
@@ -156,10 +160,10 @@ class fdslight(dispatcher.dispatcher):
 
     def client_reconnect(self):
         """客户端断线重连"""
-        self.__tunnelc_fileno = self.create_handler(-1, self.__tunnelc.tcp_tunnel, [])
+        self.__tunnelc_fileno = self.create_handler(-1, self.__tunnelc.tcp_tunnel, debug=self.__debug)
+        self.get_handler(self.__tunnelc_fileno).after(self.__dns_fileno, self.__traffic_fetch_fd,
+                                                      self.__traffic_send_fd)
 
-        self.get_handler(self.__tunnelc_fileno).after(self.__vir_nc_fileno, self.__dns_fileno)
-        self.get_handler(self.__vir_nc_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
         self.get_handler(self.__dns_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
 
 

@@ -28,6 +28,19 @@ fdsl_add_whitelist_subnet(PyObject *self,PyObject *args)
 }
 
 static PyObject *
+fdsl_add_blacklist_subnet(PyObject *self,PyObject *args)
+// UDP白名单模式,在白名单内,将不走代理
+{
+	int fileno;
+	struct fdsl_subnet tmp;
+
+	if(!PyArg_ParseTuple(args,"iIi",&fileno,&tmp.ipaddr,&tmp.mask)) return NULL;
+
+	return PyLong_FromLong(ioctl(fileno,FDSL_IOC_ADD_BLACKLIST,&tmp));
+}
+
+
+static PyObject *
 fdsl_whitelist_exists(PyObject *self,PyObject *args)
 {
     int fileno;
@@ -35,6 +48,16 @@ fdsl_whitelist_exists(PyObject *self,PyObject *args)
 
     if(!PyArg_ParseTuple(args,"iI",&fileno,&ip4)) return NULL;
     return PyLong_FromLong(ioctl(fileno,FDSL_IOC_WHITELIST_EXISTS,&ip4));
+}
+
+static PyObject *
+fdsl_blacklist_exists(PyObject *self,PyObject *args)
+{
+    int fileno;
+    unsigned int ip4;
+
+    if(!PyArg_ParseTuple(args,"iI",&fileno,&ip4)) return NULL;
+    return PyLong_FromLong(ioctl(fileno,FDSL_IOC_BLACKLIST_EXISTS,&ip4));
 }
 
 static PyObject *
@@ -60,7 +83,9 @@ fdsl_udp_part(PyObject *self,PyObject *args)
 static PyMethodDef fdsl_ctl_methods[]={
 	{"set_subnet",fdsl_set_subnet,METH_VARARGS,"set subnet"},
 	{"add_whitelist_subnet",fdsl_add_whitelist_subnet,METH_VARARGS,"set whitelist subnet"},
+	{"add_blacklist_subnet",fdsl_add_blacklist_subnet,METH_VARARGS,"set blacklist subnet"},
 	{"whitelist_exists",fdsl_whitelist_exists,METH_VARARGS,"whitelist exists"},
+	{"blacklist_exists",fdsl_blacklist_exists,METH_VARARGS,"blacklist exists"},
 	{"udp_global",fdsl_udp_global,METH_VARARGS,"udp global proxy"},
 	{"udp_part",fdsl_udp_part,METH_VARARGS,"udp part proxy"},
 	{NULL,NULL,0,NULL}

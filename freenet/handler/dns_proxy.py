@@ -4,6 +4,8 @@ import pywind.lib.timer as timer
 import random, socket, os
 import dns.message
 import fdslight_etc.fn_client as fn_config
+import freenet.lib.fdsl_ctl as fdsl_ctl
+import freenet.lib.utils as utils
 
 
 class _DNSCache(object):
@@ -214,6 +216,8 @@ class dnsc_proxy(dns_base):
     __dns_cache = None
     __encrypt_dns_map = None
 
+    __dev_fd = -1
+
     def __check_ipaddr(self, sts):
         """检查是否是IP地址
         :param sts:
@@ -250,13 +254,15 @@ class dnsc_proxy(dns_base):
 
         if self.__timer.exists(dns_id): self.__timer.drop(dns_id)
 
-    def init_func(self, creator_fd, host_rules, debug=False):
+    def init_func(self, creator_fd, dev_fd, host_rules, debug=False):
         self.__transparent_dns = fn_config.configs["dns"]
 
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
         self.set_socket(s)
         self.__debug = debug
+        self.__dev_fd = dev_fd
 
         self.bind((fn_config.configs["dns_bind"], 53))
         self.set_timeout(self.fileno, self.__TIMEOUT)
@@ -343,8 +349,9 @@ class dnsc_proxy(dns_base):
                 if not self.__check_ipaddr(ip): continue
                 if ip in self.__route_table: continue
                 self.__route_table[ip] = None
-                cmd = "route add -host %s dev fdslight" % ip
-                os.system(cmd)
+                # cmd = "route add -host %s dev fdslight" % ip
+                # os.system(cmd)
+                fdsl_ctl.add_blacklist_subnet(self.__dev_fd, utils.ip4s_2_number(ip), 32)
 
         dns_id = (byte_data[0] << 8) | byte_data[1]
 

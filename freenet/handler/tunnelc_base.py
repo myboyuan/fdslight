@@ -103,12 +103,11 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
     __traffic_catch_fd = -1
     __traffic_send_fd = -1
 
-    __tun_fd = -1
     __dns_fd = -1
 
     __debug = None
 
-    def init_func(self, creator_fd, whitelist, debug=False):
+    def init_func(self, creator_fd, debug=False):
         server_addr = fnc_config.configs["tcp_server_address"]
 
         s = socket.socket()
@@ -129,15 +128,14 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
 
         self.__static_nat = _static_nat()
 
-        self.__traffic_catch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read, whitelist)
-        self.__traffic_send_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
         self.set_timeout(self.fileno, self.__TIMEOUT)
 
         return self.fileno
 
-    def after(self, tun_fd, dns_fileno):
-        self.__tun_fd = tun_fd
+    def after(self, dns_fileno, fetch_fd, send_fd):
         self.__dns_fd = dns_fileno
+        self.__traffic_send_fd = send_fd
+        self.__traffic_catch_fd = fetch_fd
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
@@ -193,14 +191,9 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
             return
         new_pkt = self.__static_nat.get_new_packet_for_lan(byte_data)
         if not new_pkt: return
-        proto = new_pkt[9]
+        # proto = new_pkt[9]
 
-        if 17 == proto:
-            t_fd = self.__traffic_send_fd
-        else:
-            t_fd = self.__tun_fd
-
-        self.send_message_to_handler(self.fileno, t_fd, new_pkt)
+        self.send_message_to_handler(self.fileno, self.__traffic_send_fd, new_pkt)
 
     def tcp_readable(self):
         rdata = self.reader.read()
@@ -245,7 +238,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         if self.writer.size() > self.__MAX_BUFFER_SIZE:
             self.writer.flush()
             return
-         # 目前只支持IPv4
+            # 目前只支持IPv4
         if (byte_data[0] & 0xf0) >> 4 != 4: return
         new_pkt = self.__static_nat.get_new_packet_to_tunnel(byte_data)
 
@@ -265,9 +258,6 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
     def tcp_delete(self):
         self.unregister(self.fileno)
         self.socket.close()
-
-        self.delete_handler(self.__traffic_catch_fd)
-        self.delete_handler(self.__traffic_send_fd)
 
         self.print_access_log("re_connect")
         self.dispatcher.client_reconnect()

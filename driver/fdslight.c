@@ -48,9 +48,14 @@ struct fdsl_poll *poll;
 static unsigned int subnet=0;
 static unsigned int mask=0;
 
+// 白名单
 static struct fdsl_route_table *fdsl_whitelist_rt;
+// 黑名单
+static struct fdsl_route_table *fdsl_blacklist_rt;
 // 白名单路由缓存
 static struct fdsl_route_cache *fdsl_wl_rc;
+// 黑名单路由缓存
+static struct fdsl_route_cache *fdsl_bl_rc;
 // UDP是否使用全局代理,默认不使用
 static char udp_global=0;
 
@@ -87,7 +92,7 @@ static int fdsl_set_subnet(unsigned long arg)
 
 }
 
-static int fdsl_add_to_whitelist_table(unsigned long arg)
+static int fdsl_add_to_table(struct fdsl_route_table *table,unsigned long arg)
 {
 	struct fdsl_subnet tmp;
 	int ret=0;
@@ -97,12 +102,12 @@ static int fdsl_add_to_whitelist_table(unsigned long arg)
 
 	tmp.ipaddr=ntohl(tmp.ipaddr);
 
-    ret=fdsl_route_table_add(fdsl_whitelist_rt,(unsigned char *)(&tmp.ipaddr),tmp.mask);
+    ret=fdsl_route_table_add(table,(unsigned char *)(&tmp.ipaddr),tmp.mask);
 
 	return ret;
 }
 
-static int fdsl_whitelist_exists(unsigned long arg)
+static int fdsl_table_exists(struct fdsl_route_table *table,unsigned long arg)
 {
     unsigned int ip4;
     int err=copy_from_user(&ip4,(unsigned int *)arg,sizeof(unsigned int));
@@ -110,7 +115,7 @@ static int fdsl_whitelist_exists(unsigned long arg)
 
     ip4=ntohl(ip4);
 
-    return fdsl_route_table_exists(fdsl_whitelist_rt,(unsigned char *)(&ip4));
+    return fdsl_route_table_exists(table,(unsigned char *)(&ip4));
 }
 
 static long chr_ioctl(struct file *f,unsigned int cmd,unsigned long arg)
@@ -123,16 +128,21 @@ static long chr_ioctl(struct file *f,unsigned int cmd,unsigned long arg)
 			ret=fdsl_set_subnet(arg);
 			break;
 		case FDSL_IOC_ADD_WHITELIST_SUBNET:
-			ret=fdsl_add_to_whitelist_table(arg);
+			ret=fdsl_add_to_table(fdsl_whitelist_rt,arg);
 			break;
+		case  FDSL_IOC_ADD_BLACKLIST:
+		    ret=fdsl_add_to_table(fdsl_blacklist_rt,arg);
 		 case FDSL_IOC_WHITELIST_EXISTS:
-		    ret=fdsl_whitelist_exists(arg);
+		    ret=fdsl_table_exists(fdsl_whitelist_rt,arg);
 		    break;
 		 case FDSL_IOC_GLOBAL_UDP_TRAFFIC:
 		    udp_global=1;
 		    break;
 		 case FDSL_IOC_PART_UDP_TRAFFIC:
 		    udp_global=0;
+		    break;
+		 case FDSL_IOC_BLACKLIST_EXISTS:
+            ret=fdsl_table_exists(fdsl_blacklist_rt,arg);
 		    break;
 		default:
 			ret=-EINVAL;
@@ -188,42 +198,14 @@ static unsigned int fdsl_push_packet_to_user(struct iphdr *ip_header)
     return NF_DROP;
 }
 
-
-static unsigned int nf_handle_in(
-// 处理流进的包
-#if LINUX_VERSION_CODE<=KERNEL_VERSION(3,1,2)
-        unsigned int hooknum,
-#endif
-        const struct nf_hook_ops *ops,
-		struct sk_buff *skb,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,1,0)
-        struct const struct nf_hook_state *state
-#else
-		const struct net_device *in,
-		const struct net_device *out,
-		int (*okfn)(struct sk_buff *)
-#endif
-		)
+static unsigned int hanle_udp_in(struct iphdr *ip_header)
+// 处理UDP流进出来的UDP
 {
-	struct iphdr *ip_header;
+    unsigned int saddr,daddr;
+    unsigned short sport,dport;
+    int cache_not_exists,table_exists;
 	struct udphdr *udp_header;
 	struct fdsl_route_cache_data *cdata;
-	unsigned short int dport,sport;
-	unsigned int saddr,daddr;
-	unsigned char protocol;
-	int cache_not_exists,table_exists;
-
-
-	if(!flock_flag) return NF_ACCEPT;
-	if(!skb) return NF_ACCEPT;
-	
-	ip_header=(struct iphdr *)skb_network_header(skb);
-
-	if(!ip_header) return NF_ACCEPT;
-
-	protocol=ip_header->protocol;
-
-	if(IPPROTO_UDP!=protocol) return NF_ACCEPT;
 
     udp_header=(struct udphdr *)((__u32 *)ip_header+ip_header->ihl);
     dport=ntohs((unsigned short int)udp_header->dest);
@@ -259,6 +241,78 @@ static unsigned int nf_handle_in(
 	fdsl_route_cache_add(fdsl_wl_rc,CACHE_FLAG_NO_TABLE,(unsigned char *)(&daddr));
 
     return fdsl_push_packet_to_user(ip_header);
+
+}
+
+static unsigned int handle_tcp_and_icmp_in(struct iphdr *ip_header)
+// TCP和ICMP处理
+{
+    unsigned int saddr,daddr;
+    int cache_not_exists,table_exists;
+    struct fdsl_route_cache_data *cdata;
+
+	saddr=htonl((unsigned int)ip_header->saddr);
+	daddr=(unsigned int)ip_header->daddr;
+
+	// 首先从缓存中查找数据是否存在
+    cdata=fdsl_route_cache_find(fdsl_bl_rc,(unsigned char *)(&daddr));
+    cache_not_exists=memcmp(cdata->ipaddr,(unsigned char *)(&daddr),4);
+
+    if(!cache_not_exists){
+        if(CACHE_FLAG_IN_TABLE==cdata->flags) return fdsl_push_packet_to_user(ip_header);
+        if(CACHE_FLAG_NO_TABLE==cdata->flags) return NF_ACCEPT;;
+    }
+
+    table_exists=fdsl_route_table_exists(fdsl_blacklist_rt,(unsigned char *)(&daddr));
+
+	if(table_exists){
+	    fdsl_route_cache_add(fdsl_bl_rc,CACHE_FLAG_IN_TABLE,(unsigned char *)(&daddr));
+	   return fdsl_push_packet_to_user(ip_header);
+	}
+
+	fdsl_route_cache_add(fdsl_bl_rc,CACHE_FLAG_NO_TABLE,(unsigned char *)(&daddr));
+
+    return NF_ACCEPT;
+}
+
+static unsigned int nf_handle_in(
+// 处理流进的包
+#if LINUX_VERSION_CODE<=KERNEL_VERSION(3,1,2)
+        unsigned int hooknum,
+#endif
+        const struct nf_hook_ops *ops,
+		struct sk_buff *skb,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,1,0)
+        struct const struct nf_hook_state *state
+#else
+		const struct net_device *in,
+		const struct net_device *out,
+		int (*okfn)(struct sk_buff *)
+#endif
+		)
+{
+	struct iphdr *ip_header;
+	unsigned char protocol;
+
+
+	if(!flock_flag) return NF_ACCEPT;
+	if(!skb) return NF_ACCEPT;
+	
+	ip_header=(struct iphdr *)skb_network_header(skb);
+
+	if(!ip_header) return NF_ACCEPT;
+
+	protocol=ip_header->protocol;
+
+	switch(protocol){
+	    case IPPROTO_UDP:
+	        return hanle_udp_in(ip_header);
+	    case IPPROTO_TCP:
+	        return handle_tcp_and_icmp_in(ip_header);
+	    case IPPROTO_ICMP:
+	        return handle_tcp_and_icmp_in(ip_header);
+	    default:return NF_ACCEPT;
+	}
 }
 
 static int create_dev(void)
@@ -324,6 +378,9 @@ static int fdsl_init(void)
 	fdsl_whitelist_rt=fdsl_route_table_init(IP_VERSION_4);
 	fdsl_wl_rc=fdsl_route_cache_init(IP_VERSION_4);
 
+	fdsl_blacklist_rt=fdsl_route_table_init(IP_VERSION_4);
+	fdsl_bl_rc=fdsl_route_cache_init(IP_VERSION_4);
+
 	return 0;
 }
 
@@ -335,6 +392,9 @@ static void fdsl_exit(void)
 
 	fdsl_route_table_release(fdsl_whitelist_rt);
 	fdsl_route_cache_release(fdsl_wl_rc);
+
+	fdsl_route_table_release(fdsl_blacklist_rt);
+	fdsl_route_cache_release(fdsl_bl_rc);
 
 	kfree(poll);
 }

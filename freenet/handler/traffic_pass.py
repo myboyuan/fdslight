@@ -13,7 +13,7 @@ import freenet.lib.checksum as checksum
 
 class traffic_read(handler.handler):
     """读取局域网的需要P2P的源数据包"""
-    __creator_fd = -1
+    __tunnel_fd = -1
 
     def init_func(self, creator_fd, whitelist):
         dev_path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
@@ -25,8 +25,6 @@ class traffic_read(handler.handler):
         fdsl_ctl.set_subnet(fileno, n, mask)
 
         self.set_fileno(fileno)
-        self.__creator_fd = creator_fd
-
         for ip, mask in whitelist: fdsl_ctl.add_whitelist_subnet(fileno, ip, mask)
 
         self.register(self.fileno)
@@ -39,6 +37,9 @@ class traffic_read(handler.handler):
 
         return self.fileno
 
+    def set_tunnel_fd(self, tunnel_fd):
+        self.__tunnel_fd = tunnel_fd
+
     def evt_read(self):
         """最多读取10个数据包,防止陷入死循环"""
         for i in range(10):
@@ -47,8 +48,8 @@ class traffic_read(handler.handler):
             except BlockingIOError:
                 break
 
-            if not self.handler_exists(self.__creator_fd): return
-            self.send_message_to_handler(self.fileno, self.__creator_fd, pkt)
+            if not self.handler_exists(self.__tunnel_fd): return
+            self.send_message_to_handler(self.fileno, self.__tunnel_fd, pkt)
         return
 
     def delete(self):
@@ -66,7 +67,8 @@ class traffic_send(handler.handler):
         self.__creator_fd = creator_fd
         self.__sent = []
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_UDP)
+        s = socket.socket(socket.AF_INET, socket.SOCK_RAW,
+                          socket.IPPROTO_UDP | socket.IPPROTO_ICMP | socket.IPPROTO_UDP)
         s.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
         s.setblocking(0)
 
@@ -254,9 +256,9 @@ class udp_proxy(udp_handler.udp_handler):
         e = e + 1
         L[b:e] = ((bind_port & 0xff00) >> 8, bind_port & 0x00ff,)
 
-        #b = e + 1
-        #e = b + 1
-        #dport = (byte_data[b] << 8) | byte_data[e]
+        # b = e + 1
+        # e = b + 1
+        # dport = (byte_data[b] << 8) | byte_data[e]
 
         b = ihl + 6
         e = b + 2
