@@ -11,13 +11,6 @@ class hook(object):
     def __init__(self, handler):
         self.__handler = handler
 
-    def add_task(self, t_id, func):
-        """添加新的任务"""
-        self.__handler.add_task(t_id, func)
-
-    def del_task(self, t_id):
-        self.__handler.del_task(t_id)
-
     def hook_init(self, fd, *args, **kwargs):
         """重写这个方法,hook初始化
         :param args:

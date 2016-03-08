@@ -283,7 +283,7 @@ static unsigned int nf_handle_in(
         const struct nf_hook_ops *ops,
 		struct sk_buff *skb,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,1,0)
-        struct const struct nf_hook_state *state
+        const struct nf_hook_state *state
 #else
 		const struct net_device *in,
 		const struct net_device *out,
