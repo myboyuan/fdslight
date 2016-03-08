@@ -318,7 +318,9 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         if self.__is_sent_ping or self.__is_sent_close:
             self.delete_handler(self.fileno)
             return
-
+        if self.__is_sent_ping:
+            self.delete_handler(self.fileno)
+            return
         self.set_timeout(self.fileno, self.__TIMEOUT)
         self.__send_ping()
 
