@@ -213,9 +213,6 @@ class dnsc_proxy(dns_base):
     __route_table = None
     __tunnel_fd = -1
 
-    __dns_cache = None
-    __encrypt_dns_map = None
-
     __dev_fd = -1
 
     def __check_ipaddr(self, sts):
@@ -270,9 +267,6 @@ class dnsc_proxy(dns_base):
         self.__host_match = _host_match()
         self.__timer = timer.timer()
         self.__route_table = {}
-
-        self.__dns_cache = _DNSCache()
-        self.__encrypt_dns_map = {}
 
         for rule in host_rules:
             self.__host_match.add_rule(rule)
@@ -330,15 +324,6 @@ class dnsc_proxy(dns_base):
             self.__send_to_dns_server(self.__transparent_dns, message)
             return
 
-
-        if self.__dns_cache.exists(host):
-            dns_msg = self.__dns_cache.get(host)
-            L = list(dns_msg)
-            L[0:2] = ((n_dns_id & 0xff00) >> 8, n_dns_id & 0x00ff,)
-            self.send_message_to_handler(self.fileno, self.fileno, bytes(L))
-            return
-
-        self.__encrypt_dns_map[n_dns_id] = host
         self.send_message_to_handler(self.fileno, self.__tunnel_fd, message)
 
     def message_from_handler(self, from_fd, byte_data):
@@ -354,13 +339,6 @@ class dnsc_proxy(dns_base):
                 # os.system(cmd)
                 fdsl_ctl.add_blacklist_subnet(self.__dev_fd, utils.ip4s_2_number(ip), 32)
 
-        dns_id = (byte_data[0] << 8) | byte_data[1]
-
-        if dns_id in self.__encrypt_dns_map:
-            host = self.__encrypt_dns_map[dns_id]
-            self.__dns_cache.put(host, byte_data)
-            del self.__encrypt_dns_map[dns_id]
-
         self.__send_to_client(byte_data)
 
     def udp_writable(self):
@@ -375,12 +353,10 @@ class dnsc_proxy(dns_base):
         dns_ids = self.__timer.get_timeout_names()
         for dns_id in dns_ids:
             if self.__timer.exists(dns_id): self.__timer.drop(dns_id)
-            if dns_id in self.__encrypt_dns_map: del self.__encrypt_dns_map[dns_id]
 
         self.recyle_resource(dns_ids)
         self.set_timeout(self.fileno, self.__TIMEOUT)
 
-        self.__dns_cache.recycle()
         return
 
     def udp_error(self):
