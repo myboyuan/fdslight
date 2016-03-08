@@ -116,7 +116,7 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
             s.connect(server_addr)
         except:
             self.print_access_log("connect_failed")
-            return
+            return -1
 
         self.set_socket(s)
         name = "freenet.lib.crypto.%s" % fnc_config.configs["tcp_crypto_module"]
@@ -167,7 +167,6 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         return
 
     def __handle_read_data(self, action, byte_data):
-        if self.__debug: self.print_access_log("received_data")
         if action not in over_tcp.ACTS: return
         if over_tcp.ACT_AUTH == action:
             ret = self.fn_auth_response(byte_data)
@@ -182,8 +181,10 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
             print("connection_close")
             self.delete_handler(self.fileno)
             return
-        if over_tcp.ACT_PONG == action: return
+        if over_tcp.ACT_PONG == action:
+            return
         if over_tcp.ACT_PING == action:
+            self.print_access_log("received_ping")
             self.__send_pong()
             return
         if over_tcp.ACT_DNS == action:
@@ -192,7 +193,6 @@ class tcp_tunnelc_base(tcp_handler.tcp_handler):
         new_pkt = self.__static_nat.get_new_packet_for_lan(byte_data)
         if not new_pkt: return
         # proto = new_pkt[9]
-
         self.send_message_to_handler(self.fileno, self.__traffic_send_fd, new_pkt)
 
     def tcp_readable(self):

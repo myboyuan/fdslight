@@ -330,6 +330,7 @@ class dnsc_proxy(dns_base):
             self.__send_to_dns_server(self.__transparent_dns, message)
             return
 
+
         if self.__dns_cache.exists(host):
             dns_msg = self.__dns_cache.get(host)
             L = list(dns_msg)

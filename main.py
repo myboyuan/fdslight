@@ -10,9 +10,7 @@ import fdslight_etc.fn_server as fns_config
 import fdslight_etc.fn_client as fnc_config
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.handler.dns_proxy as dns_proxy
-import freenet.handler.tundev as tundev
 import freenet.lib.file_parser as file_parser
-import freenet.lib.fn_utils as fn_utils
 import freenet.handler.traffic_pass as traffic_pass
 
 FDSL_PID_FILE = "fdslight.pid"
@@ -160,11 +158,19 @@ class fdslight(dispatcher.dispatcher):
 
     def client_reconnect(self):
         """客户端断线重连"""
+        if self.handler_exists(self.__traffic_fetch_fd): self.delete_handler(self.__traffic_fetch_fd)
         self.__tunnelc_fileno = self.create_handler(-1, self.__tunnelc.tcp_tunnel, debug=self.__debug)
+
+        if self.__tunnelc_fileno < 0:
+            self.client_reconnect()
+            return
+
+        self.__traffic_fetch_fd = self.create_handler(-1, traffic_pass.traffic_read, [])
         self.get_handler(self.__tunnelc_fileno).after(self.__dns_fileno, self.__traffic_fetch_fd,
                                                       self.__traffic_send_fd)
 
         self.get_handler(self.__dns_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
+        self.get_handler(self.__traffic_fetch_fd).set_tunnel_fd(self.__tunnelc_fileno)
 
 
 def stop_service():

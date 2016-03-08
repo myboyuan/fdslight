@@ -143,37 +143,6 @@ class tun_base(handler.handler):
         self.___ip_packets_for_write.append(n_ip_message)
 
 
-class tunc(tun_base):
-    __tunnel_fileno = -1
-
-    def dev_init(self, dev_name):
-        self.register(self.fileno)
-        self.add_evt_read(self.fileno)
-
-    def set_tunnel_fileno(self, fileno):
-        self.__tunnel_fileno = fileno
-
-    def handle_ip_packet_from_read(self, ip_packet):
-        if not self.handler_exists(self.__tunnel_fileno): return
-        self.send_message_to_handler(self.fileno, self.__tunnel_fileno, ip_packet)
-
-    def handle_ip_packet_for_write(self, ip_packet):
-        return ip_packet
-
-    def dev_delete(self):
-        pass
-
-    def dev_error(self):
-        pass
-
-    def dev_timeout(self):
-        pass
-
-    def message_from_handler(self, from_fd, byte_data):
-        self.add_evt_write(self.fileno)
-        self.add_to_sent_queue(byte_data)
-
-
 class tuns(tun_base):
     """服务端的tun数据处理
     """

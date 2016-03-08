@@ -54,7 +54,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
 
         self.decrypt_m = None
         self.encrypt_m = None
-        self.__client_ips = []
+        self.__client_ips = None
         config = fns_config.configs
 
         if s:
@@ -79,12 +79,13 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.__handler_manager = traffic_pass.handler_manager()
             self.__debug = debug
             self.__raw_socket_fd = raw_socket_fd
+            self.__client_ips = {}
 
             return self.fileno
 
         self.__debug = debug
         bind_addr = config.get("tcp_bind_address", None)
-        self.__raw_socket_fd = self.create_handler(self.fileno,traffic_pass.traffic_send)
+        self.__raw_socket_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
 
         if not bind_addr: bind_addr = ("0.0.0.0", 8964)
 
@@ -181,6 +182,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             return
 
         if action == over_tcp.ACT_PONG:
+            if self.__debug: self.print_access_log("received_pong")
             self.__is_sent_ping = False
             return
 
@@ -249,9 +251,7 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
 
         for i in range(n):
             packet_ip = ipalloc.get_addr()
-            self.__client_ips.append(
-                packet_ip
-            )
+            self.__client_ips[packet_ip] = None
         ips = []
         for packet_ip in self.__client_ips:
             ips.append(
@@ -262,13 +262,12 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
     def del_client_ips(self):
         """删除客户端分配到的IP地址"""
         ipalloc = global_vars["freenet.ipaddr"]
-        while 1:
-            try:
-                packet_ip = self.__client_ips.pop(0)
-            except IndexError:
-                break
+
+        for packet_ip in self.__client_ips:
             ipalloc.put_addr(packet_ip)
             self.ctl_handler(self.fileno, self.__tun_fd, "del_ip_map", packet_ip)
+
+        self.__client_ips = {}
         return
 
     def tcp_accept(self):
@@ -285,8 +284,6 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
         return
 
     def tcp_readable(self):
-        if self.__debug: self.print_access_log("received_data")
-
         rdata = self.reader.read()
         self.decrypt_m.add_data(rdata)
 
@@ -335,10 +332,13 @@ class tcp_tunnels_base(tcp_handler.tcp_handler):
             self.send_data(over_tcp.ACT_DNS, len(byte_data), byte_data)
             return
         packet_length = (byte_data[2] << 8) | byte_data[3]
+
         if not self.fn_on_send(packet_length):
             self.delete_handler(self.fileno)
             return
 
+        dst_addr_pkt = byte_data[16:20]
+        if dst_addr_pkt not in self.__client_ips: return
         self.send_data(over_tcp.ACT_DATA, packet_length, byte_data)
 
     def __build_access_log(self, text):
