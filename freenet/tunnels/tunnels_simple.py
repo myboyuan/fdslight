@@ -113,6 +113,7 @@ class tunnel(tunnels_base.tunnels_base):
             if not client_ips:
                 self.__response(STATUS_SERVER_BUSY, address)
                 return False
+
             session_id = self.register_session(address, client_ips)
             if not session_id:
                 self.__response(STATUS_SERVER_BUSY, address)
@@ -137,3 +138,4 @@ class tunnel(tunnels_base.tunnels_base):
         session_id, client_ips, username = self.__session_info[uniq_id]
 
         del self.__session_limit[username]
+        del self.__session_info[uniq_id]
