@@ -1,39 +1,11 @@
 #!/usr/bin/env python3
 import pywind.evtframework.handler.udp_handler as udp_handler
 import pywind.lib.timer as timer
-import random, socket, os
+import random, socket
 import dns.message
 import fdslight_etc.fn_client as fn_config
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.utils as utils
-
-
-class _DNSCache(object):
-    """缓存黑名单内的域名"""
-    __map = None
-    __TIMEOUT = 60 * 60
-    __timer = None
-
-    def __init__(self):
-        self.__map = {}
-        self.__timer = timer.timer()
-
-    def exists(self, host):
-        return host in self.__map
-
-    def put(self, host, v):
-        self.__map[host] = v
-        self.__timer.set_timeout(host, self.__TIMEOUT)
-
-    def get(self, host):
-        return self.__map[host]
-
-    def recycle(self):
-        hosts = self.__timer.get_timeout_names()
-        for host in hosts:
-            if host in self.__map: del self.__map[host]
-            if self.__timer.exists(host): self.__timer.drop(host)
-        return
 
 
 class _host_match(object):
@@ -128,83 +100,13 @@ class dns_base(udp_handler.udp_handler):
         return
 
 
-class dnsd_proxy(dns_base):
-    """服务器端的DNS代理"""
-    __TIMEOUT = 30
-    __timer = None
-    __DNS_QUERY_TIMEOUT = 10
-
-    def init_func(self, creator_fd, dns_server):
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.set_socket(s)
-        self.connect((dns_server, 53))
-
-        self.register(self.fileno)
-        self.add_evt_read(self.fileno)
-
-        self.set_timeout(self.fileno, self.__TIMEOUT)
-        self.__timer = timer.timer()
-
-        return s.fileno()
-
-    def udp_readable(self, message, address):
-        try:
-            dns_id = (message[0] << 8) | message[1]
-        except IndexError:
-            return
-
-        if not self.dns_id_exists(dns_id): return
-
-        new_dns_id, dst_fd = self.get_dns_id_map(dns_id)
-        self.del_dns_id_map(dns_id)
-        self.__timer.drop(dns_id)
-
-        L = list(message)
-        L[0:2] = ((new_dns_id & 0xff00) >> 8, new_dns_id & 0x00ff,)
-
-        if not self.handler_exists(dst_fd): return
-        self.send_message_to_handler(self.fileno, dst_fd, bytes(L))
-
-    def udp_writable(self):
-        self.remove_evt_write(self.fileno)
-
-    def message_from_handler(self, from_fd, byte_data):
-        try:
-            dns_id = (byte_data[0] << 8) | byte_data[1]
-        except IndexError:
-            return
-        # 避免DNS ID出现重复
-        n_dns_id = self.get_dns_id(dns_id)
-        L = list(byte_data)
-        L[0:2] = ((n_dns_id & 0xff00) >> 8, n_dns_id & 0x00ff,)
-
-        self.set_dns_id_map(n_dns_id, (dns_id, from_fd,))
-        self.__timer.set_timeout(n_dns_id, self.__DNS_QUERY_TIMEOUT)
-
-        self.add_evt_write(self.fileno)
-        self.send(bytes(L))
-
-    def udp_timeout(self):
-        names = self.__timer.get_timeout_names()
-        for name in names:
-            if self.__timer.exists(name): self.__timer.drop(name)
-        self.recyle_resource(names)
-        self.set_timeout(self.fileno, self.__TIMEOUT)
-
-    def udp_delete(self):
-        self.unregister(self.fileno)
-        self.socket.close()
-
-
-class dnsc_proxy(dns_base):
+class dns_proxy(dns_base):
     """客户端的DNS代理"""
     __host_match = None
     __timer = None
 
     __DNS_QUERY_TIMEOUT = 5
     __TIMEOUT = 10
-
-    __creator_fd = -1
 
     __debug = False
 
@@ -214,6 +116,10 @@ class dnsc_proxy(dns_base):
     __tunnel_fd = -1
 
     __dev_fd = -1
+    __tunnel_is_open = False
+
+    # 加密dns的网络序IP地址
+    __encrypt_dns_addrn = None
 
     def __check_ipaddr(self, sts):
         """检查是否是IP地址
@@ -251,7 +157,7 @@ class dnsc_proxy(dns_base):
 
         if self.__timer.exists(dns_id): self.__timer.drop(dns_id)
 
-    def init_func(self, creator_fd, dev_fd, host_rules, debug=False):
+    def init_func(self, creator_fd, host_rules, debug=False):
         self.__transparent_dns = fn_config.configs["dns"]
 
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -259,7 +165,6 @@ class dnsc_proxy(dns_base):
 
         self.set_socket(s)
         self.__debug = debug
-        self.__dev_fd = dev_fd
 
         self.bind((fn_config.configs["dns_bind"], 53))
         self.set_timeout(self.fileno, self.__TIMEOUT)
@@ -267,17 +172,17 @@ class dnsc_proxy(dns_base):
         self.__host_match = _host_match()
         self.__timer = timer.timer()
         self.__route_table = {}
+        self.__tunnel_fd = creator_fd
 
         for rule in host_rules:
             self.__host_match.add_rule(rule)
+
+        self.__encrypt_dns_addrn = socket.inet_aton(fn_config.configs["dns_encrypt"])
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
         return self.fileno
-
-    def set_tunnel_fileno(self, fileno):
-        self.__tunnel_fd = fileno
 
     def udp_readable(self, message, address):
         # dns至少有12个字节
@@ -324,10 +229,14 @@ class dnsc_proxy(dns_base):
             self.__send_to_dns_server(self.__transparent_dns, message)
             return
 
-        self.send_message_to_handler(self.fileno, self.__tunnel_fd, message)
+        pkts = utils.build_udp_packet(b"\0\0\0\0", self.__encrypt_dns_addrn, 53, 53, message)
+        self.send_message_to_handler(self.fileno, self.__tunnel_fd, pkts[0])
 
     def message_from_handler(self, from_fd, byte_data):
-        msg = dns.message.from_wire(byte_data)
+        ihl = (byte_data[0] & 0x0f) * 4
+        begin = ihl + 8
+        dns_body = byte_data[begin:]
+        msg = dns.message.from_wire(dns_body)
 
         for rrset in msg.answer:
             for cname in rrset:
@@ -337,9 +246,9 @@ class dnsc_proxy(dns_base):
                 self.__route_table[ip] = None
                 # cmd = "route add -host %s dev fdslight" % ip
                 # os.system(cmd)
-                fdsl_ctl.add_blacklist_subnet(self.__dev_fd, utils.ip4s_2_number(ip), 32)
+                if self.__tunnel_is_open: fdsl_ctl.add_blacklist_subnet(self.__dev_fd, utils.ip4s_2_number(ip), 32)
 
-        self.__send_to_client(byte_data)
+        self.__send_to_client(dns_body)
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
@@ -361,3 +270,9 @@ class dnsc_proxy(dns_base):
 
     def udp_error(self):
         self.delete_handler(self.fileno)
+
+    def handler_ctl(self, from_fd, cmd, filter_dev=None):
+        if cmd not in ("tunnel_close", "tunnel_open", "set_filter_dev_fd"): return False
+        if cmd == "tunnel_close": self.__tunnel_is_open = False
+        if cmd == "tunnel_open": self.__tunnel_is_open = True
+        if cmd == "set_filter_dev_fd": self.__dev_fd = filter_dev

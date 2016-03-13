@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-最简单的tunnel server,采用aes加密
+最简单的tunnel server,采用默认的aes128加密
 配置文件添加一个字段tunnels_simple
 最终形式例如这样
 {
@@ -13,118 +13,115 @@ tunnels_simple:[
 
 """
 
+import freenet.handler.tunnels_base as tunnels_base
+import freenet.lib.base_proto.tunnel as protocol
+import fdslight_etc.fn_server as fns_config
 import json, random
 
-import fdslight_etc.fn_server as fns_config
-import freenet.handler.tunnels_base as tunnels_base
-import freenet.lib.base_proto.over_tcp as over_tcp
+# 相应代码表
+STATUS_AUTH_OK = 1
+STATUS_SERVER_BUSY = 2
+STATUS_AUTH_FAIL = 3
 
 
-class tcp_tunnel(tunnels_base.tcp_tunnels_base):
-    __users = None
-    # 分配到的IP地址
-    __ipaddr = None
+class tunnel(tunnels_base.tunnels_base):
+    __session_info = None
 
-    def __send_auth_response(self, is_ok, aes_key=None, ips=None):
+    def __rand_key(self, length=16):
+        """生成随机KEY"""
+        sts = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"
+        size = len(sts)
+        tmplist = []
+        for i in range(length):
+            n = random.randint(0, size - 1)
+            tmplist.append(
+                sts[n]
+            )
+
+        return "".join(tmplist)
+
+    def __response(self, code, address, session_id=0, aes_key=None, client_ips=None):
+        pydict = {
+            "status": code,
+            "alloc_ip_list": client_ips,
+            "session_id": session_id,
+            "aes_key": aes_key,
+        }
+        text = json.dumps(pydict)
+        byte_data = text.encode()
+
+        self.send_auth(address, byte_data)
+
+        # 一定要在发送验证之后再重新设定aes key
+        if aes_key:
+            b_aes_key = aes_key.encode()
+            self.get_encrypt(address).set_aes_key(b_aes_key)
+            self.get_decrypt(address).set_aes_key(b_aes_key)
+        return
+
+    def fn_init(self):
+        self.__session_info = {}
+
+    def fn_auth(self, byte_data, address):
         """
-        :param is_ok:
-        :param aes_key:随机生成的 aes key
-        :param ips: 分配到的IP地址列表
+        :param byte_data:
+        :param address:
         :return:
         """
-        if is_ok:
-            pydict = {"status": True, "ips": ips, "key": aes_key}
-        else:
-            pydict = {"status": False}
+        uniq_id = "%s-%s" % address
 
-        auth_data = json.dumps(pydict).encode("utf-8")
-        pkt_size = len(auth_data)
+        # 由于UDP的无状态性,为了确保验证包能收到,可能同时会发送多个验证,或者验证顺序错乱,因此需要处理
+        if uniq_id in self.__session_info:
+            session_id, client_ips = self.__session_info[uniq_id]
+            self.__response(STATUS_AUTH_OK, address,
+                            session_id=session_id,
+                            aes_key=self.__rand_key(),
+                            client_ips=client_ips
+                            )
+            return True
 
-        # 向隧道发送数据
-        self.send_data(over_tcp.ACT_AUTH, pkt_size, auth_data)
-
-    def __gen_aes_key(self):
-        """生成随机AES KEY"""
-        sts = "1234567890asdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"
-        max_index = len(sts) - 1
-        seq = []
-
-        # 默认加密支持AES-128
-        for i in range(16):
-            n = random.randint(0, max_index)
-            seq.append(sts[n])
-
-        return "".join(seq)
-
-    def fn_handler_init(self):
-        """类初始化的时候调用此函数"""
-        self.__users = fns_config.configs["tunnels_simple"]
-
-    def fn_on_connect(self, sock, caddr):
-        """客户端发生连接时调用此函数,一般不需要更改"""
-        self.create_handler(self.fileno, tcp_tunnel, s=sock, c_addr=caddr,
-                            raw_socket_fd=self.raw_socket_fd,
-                            debug=self.debug)
-
-        return True
-
-    def fn_auth(self, byte_data):
-        """客户端发送验证的时候会调用此函数
-        :param byte_data: 客户端发送的验证数据
-        :return Boolean: True表示验证通过,False表示验证失败
-        """
+        text = byte_data.decode("iso-8859-1")
         try:
-            sts = byte_data.decode("utf-8")
-            auth_info = json.loads(sts)
-        except:
-            self.__send_auth_response(False)
+            pydict = json.loads(text)
+        except json.JSONDecodeError:
             return False
 
-        uname = auth_info.get("username", "")
-        upasswd = auth_info.get("password", "")
-
-        if not uname or not upasswd:
-            return False
+        username = pydict.get("user", "")
+        passwd = pydict.get("passwd", "")
 
         is_find = False
-        for name, passwd in self.__users:
-            if name == uname and passwd == upasswd:
+        users_info = fns_config.configs["tunnels_simple"]
+
+        for u, p in users_info:
+            if u == username and passwd == p:
                 is_find = True
                 break
-            continue
+            ''''''
 
-        if not is_find:
-            self.__send_auth_response(False)
-            return False
+        # 默认有5台机器可以同时在线
+        if is_find:
+            client_ips = self.get_client_ips(5)
+            if not client_ips:
+                self.__response(STATUS_SERVER_BUSY, address)
+                return False
+            session_id = self.register_session(address, client_ips)
+            if not session_id:
+                self.__response(STATUS_SERVER_BUSY, address)
+                return False
+            aes_key = self.__rand_key()
+            self.__response(STATUS_AUTH_OK, address, session_id=session_id, aes_key=aes_key, client_ips=client_ips)
+            self.__session_info[uniq_id] = (session_id, client_ips,)
+        else:
+            self.__response(STATUS_AUTH_FAIL, address)
 
-        # 一定要获取可以分配的IP地址，否则客户端没IP地址,无法进行流量代理
-        ips = self.get_client_ips(5)
-        aes_key = self.__gen_aes_key()
+        return is_find
 
-        self.__send_auth_response(True, aes_key, ips)
-        self.encrypt_m.set_aes_key(aes_key)
-        self.decrypt_m.set_aes_key(aes_key)
-
+    def fn_recv(self, data_len, address):
         return True
 
-    def fn_on_recv(self, recv_size):
-        """验证成功后客户端发送了数据包之后会调用此函数
-        :param recv_size: 客户端的数据包大小
-        :return Boolean:True表示继续执行,False表示不执行,即关闭连接
-        """
+    def fn_send(self, data_len, address):
         return True
 
-    def fn_on_send(self, send_size):
-        """服务器发送数据包调用此函数
-        :param send_size: 服务器发送的数据包大小
-        :return Boolean:True表示继续执行,False表示不执行,即关闭连接
-        """
-        return True
-
-    def fn_handler_clear(self):
-        """连接关闭后的资源回收
-        :return:
-        """
-        # 注意回收IP地址
-        self.del_client_ips()
-        return
+    def fn_delete(self, address):
+        uniq_id = "%s-%s" % address
+        if uniq_id in self.__session_info: del self.__session_info[uniq_id]

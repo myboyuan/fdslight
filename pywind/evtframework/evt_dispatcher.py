@@ -43,9 +43,6 @@ class dispatcher(object):
         del self.__handlers[fd]
 
     def set_timeout(self, fd, seconds):
-        if seconds < 0:
-            self.__timer.drop(fd)
-            return
         self.__timer.set_timeout(fd, seconds)
 
     def register(self, fd):
@@ -124,6 +121,7 @@ class dispatcher(object):
         for fd in fd_set:
             if fd in self.__handlers:
                 handler = self.__handlers[fd]
+                self.__timer.drop(fd)
                 handler.timeout()
             ''''''
         return
@@ -136,13 +134,13 @@ class dispatcher(object):
 
             handler = self.__handlers[fd]
 
-            if not self.handler_exists(fd):continue
+            if not self.handler_exists(fd): continue
             if is_err:
                 handler.error()
                 continue
-            if is_read:handler.evt_read()
+            if is_read: handler.evt_read()
             if not self.handler_exists(fd): continue
-            if is_write:handler.evt_write()
+            if is_write: handler.evt_write()
             ''''''
         return
 

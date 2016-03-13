@@ -35,6 +35,10 @@ class tun_base(handler.handler):
 
         return tun_fd
 
+    @property
+    def creator(self):
+        return self.__creator_fd
+
     def init_func(self, creator_fd, tun_dev_name, *args, **kwargs):
         """
         :param creator_fd:
@@ -146,8 +150,6 @@ class tun_base(handler.handler):
 class tuns(tun_base):
     """服务端的tun数据处理
     """
-    # 把目的IP与源IP进行关联
-    __dst_ip_to_fd = None
 
     def __add_route(self, dev_name, subnet):
         """给设备添加路由
@@ -174,8 +176,6 @@ class tuns(tun_base):
     def dev_init(self, tun_devname, subnet):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
-
-        self.__dst_ip_to_fd = {}
         self.__add_route(tun_devname, subnet)
 
     def dev_error(self):
@@ -186,13 +186,9 @@ class tuns(tun_base):
         pass
 
     def handle_ip_packet_from_read(self, ip_packet):
-        dst_ip = ip_packet[16:20]
-
-        from_fd = self.__dst_ip_to_fd.get(dst_ip, None)
         # 抛弃没有来源的IP数据包
-        if not from_fd: return
         try:
-            self.send_message_to_handler(self.fileno, from_fd, ip_packet)
+            self.send_message_to_handler(self.fileno, self.creator, ip_packet)
         except excepts.HandlerNotFoundErr:
             return
 
@@ -205,14 +201,5 @@ class tuns(tun_base):
         sys.exit(-1)
 
     def message_from_handler(self, from_fd, ip_packet):
-        src_ip = ip_packet[12:16]
-
-        if from_fd not in self.__dst_ip_to_fd: self.__dst_ip_to_fd[src_ip] = from_fd
-
         self.add_evt_write(self.fileno)
         self.add_to_sent_queue(ip_packet)
-
-    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd != "del_ip_map": return False
-        del_ip, = args
-        if del_ip in self.__dst_ip_to_fd: del self.__dst_ip_to_fd[del_ip]

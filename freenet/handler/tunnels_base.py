@@ -2,394 +2,463 @@
 import socket, sys, time
 import fdslight_etc.fn_server as fns_config
 import freenet.handler.tundev as tundev
-import freenet.lib.base_proto.over_tcp as over_tcp
+import freenet.lib.base_proto.tunnel as tunnel_proto
 import freenet.lib.ipaddr as ipaddr
-import pywind.evtframework.handler.tcp_handler as tcp_handler
-from  pywind.global_vars import global_vars
-import freenet.lib.fn_utils as fn_utils
+import pywind.evtframework.handler.udp_handler as udp_handler
 import freenet.handler.traffic_pass as traffic_pass
-import freenet.handler.dns_proxy as dns_proxy
+import pywind.lib.timer as timer
+import freenet.lib.checksum as checksum
 
 
-class tcp_tunnels_base(tcp_handler.tcp_handler):
-    # socket超时时间
-    # 当没有验证成功的时候保持的连接时间
-    __TIMEOUT = 60
-    # 是否已经授权
-    __is_auth = False
+class _udp_session(object):
+    session_id = 0
+    # sent ping计数
+    sent_ping_cnt = 0
+    client_ips = None
+    address = None
+    udp_nat_map = None
 
-    # 加密模块
-    encrypt_m = None
-    # 解密模块
     decrypt_m = None
+    encrypt_m = None
 
-    # 客户端分配到的IP列表
-    __client_ips = None
-    # 是否发送了ping帧
-    __is_sent_ping = False
-    # 是否发送了close帧
-    __is_sent_close = False
-    __tun_fd = -1
+    def __init__(self, sec_mod):
+        self.client_ips = {}
+        self.udp_nat_map = {}
+        self.decrypt_m = sec_mod.decrypt()
+        self.encrypt_m = sec_mod.encrypt()
 
-    __creator_fd = -1
-    # 最大缓冲区大小
-    __MAX_BUFFER_SIZE = 16 * 1024
-    __c_addr = None
 
+class tunnels_base(udp_handler.udp_handler):
     __debug = None
+    __dns_server = None
+    __raw_socket_fd = None
 
-    # 实现P2P打洞的相关变量
-    __handler_manager = None
-    __dns_proxy_fd = -1
+    __ipalloc = None
+
+    # 允许的客户端
+    # {ipaddr:(session_id,{})}
+    __sessions = None
+
+    # 空闲的session
+    __empty_sessions = None
+    # session id计数
+    __session_id_cnt = 1
+
+    # 通过客户端的虚拟IP获取真实的IP信息
+    __client_info_by_v_ip = None
+
+    __timer = None
+
+    __dns_fd = -1
+
+    # 会话检查时间
+    __SESSION_CHECK_TIMEOUT = 60
+    # 系统轮询检查时间
+    __TIMEOUT = 60
+
+    __tun_fd = -1
     __raw_socket_fd = -1
 
-    def init_func(self, creator_fd, s=None, c_addr=None, raw_socket_fd=-1, debug=False):
-        """
-        :param creator_fd:
-        :param tun_dev_name:在作为监听套接字的时候需要这个参数
-        :param s: 服务套接字
-        :param c_addr: 客户端地址
-        :return:
-        """
+    __crypto = None
 
-        self.decrypt_m = None
-        self.encrypt_m = None
-        self.__client_ips = None
+    __debug = False
+
+    def init_func(self, creator_fd, debug=True):
+        self.__debug = debug
         config = fns_config.configs
 
-        if s:
-            self.set_socket(s)
-            self.register(self.fileno)
-            self.add_evt_read(self.fileno)
-            self.fn_handler_init()
+        # 导入加入模块
+        name = "freenet.lib.crypto.%s" % config["crypto_module"]
+        __import__(name)
+        m = sys.modules.get(name, None)
 
-            name = "freenet.lib.crypto.%s" % config["tcp_crypto_module"]
-            __import__(name)
-            m = sys.modules.get(name, None)
+        self.__crypto = m
 
-            self.encrypt_m = m.encrypt()
-            self.decrypt_m = m.decrypt()
-
-            self.__creator_fd = creator_fd
-            self.__tun_fd = global_vars["freenet.tun_fd"]
-            self.__dns_proxy_fd = global_vars["freenet.dns_proxy_fd"]
-            self.__c_addr = c_addr
-            self.print_access_log("connect")
-            self.set_timeout(self.fileno, self.__TIMEOUT)
-            self.__handler_manager = traffic_pass.handler_manager()
-            self.__debug = debug
-            self.__raw_socket_fd = raw_socket_fd
-            self.__client_ips = {}
-
-            return self.fileno
-
+        self.__empty_sessions = []
+        self.__client_info_by_v_ip = {}
+        self.__timer = timer.timer()
         self.__debug = debug
-        bind_addr = config.get("tcp_bind_address", None)
-        self.__raw_socket_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
+        self.__sessions = {}
 
-        if not bind_addr: bind_addr = ("0.0.0.0", 8964)
-
-        listen_socket = socket.socket()
-        listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.set_fileno(listen_socket.fileno())
-        self.set_socket(listen_socket)
-        self.bind(bind_addr)
-
-        dns_server = config["dns"]
         subnet = config["subnet"]
-        global_vars["freenet.ipaddr"] = ipaddr.ip4addr(*subnet)
-        global_vars["freenet.dns_proxy_fd"] = self.create_handler(self.fileno, dns_proxy.dnsd_proxy, dns_server)
+        self.__ipalloc = ipaddr.ip4addr(*subnet)
+        bind_address = fns_config.configs["bind_address"]
 
-        return self.fileno
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    @property
-    def debug(self):
-        return self.__debug
-
-    def after(self):
-        self.listen(10)
+        self.set_socket(s)
+        self.bind(bind_address)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
-        subnet = fns_config.configs["subnet"]
+        self.set_timeout(self.fileno, self.__TIMEOUT)
 
-        tun_fd = self.create_handler(self.fileno, tundev.tuns, fn_utils.TUN_DEV_NAME, subnet)
-        global_vars["freenet.tun_fd"] = tun_fd
+        self.__tun_fd = self.create_handler(self.fileno, tundev.tuns, "fdslight", subnet)
+        self.__raw_socket_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
 
-    @property
-    def raw_socket_fd(self):
-        return self.__raw_socket_fd
+        self.fn_init()
 
-    def __send_ping(self):
-        """发送ping帧
-        :return:
+        return self.fileno
+
+    def __get_session_id(self):
+        session_id = 0
+        if len(self.__empty_sessions) > 20:
+            session_id = self.__empty_sessions.pop(0)
+            return session_id
+        if self.__session_id_cnt != 65535:
+            session_id = self.__session_id_cnt
+            self.__session_id_cnt += 1
+        return session_id
+
+    def __handle_auth(self, body_data, address):
+        """处理验证"""
+        if not self.fn_auth(body_data, address):
+            self.print_access_log("auth_failed", address)
+            return
+
+        self.print_access_log("auth_ok", address)
+
+    def register_session(self, address, ip_set):
+        """ 注册会话
+        :param address:客户端地址
+        :param ip_set  list(string): 客户端的IP地址集合
+        :return Boolean: True 表示注册成功,False表示注册失败
         """
-        if self.__debug: self.print_access_log("send_ping")
+        tmpdict = {}
+        uniq_id = "%s-%s" % address
 
-        ping = self.encrypt_m.build_ping()
+        for s in ip_set:
+            ippkt = socket.inet_aton(s)
+            tmpdict[ippkt] = None
+            self.__client_info_by_v_ip[ippkt] = address
+
+        session_id = self.__get_session_id()
+        if not session_id: return 0
+
+        session_cls = _udp_session(self.__crypto)
+
+        session_cls.session_id = session_id
+        session_cls.client_ips = tmpdict
+        session_cls.address = address
+        session_cls.encrypt_m.set_session_id(session_id)
+
+        self.__sessions[uniq_id] = session_cls
+        self.__timer.set_timeout(uniq_id, self.__SESSION_CHECK_TIMEOUT)
+
+        return session_id
+
+    def __unregister_session(self, address):
+        """注销会话"""
+        uniq_id = "%s-%s" % address
+        if uniq_id not in self.__sessions: return
+        session_cls = self.__sessions[uniq_id]
+
+        for client_ip in session_cls.client_ips:
+            self.__ipalloc.put_addr(client_ip)
+            if client_ip in self.__client_info_by_v_ip: del self.__client_info_by_v_ip[client_ip]
+
+        udp_nat_map = session_cls.udp_nat_map
+
+        for udp_nat_id in udp_nat_map:
+            fileno = udp_nat_map[udp_nat_id]
+            self.delete_handler(fileno)
+
+        session_cls.udp_nat_map = None
+        self.print_access_log("close", address)
+
+        del self.__sessions[uniq_id]
+
+    def __send_ping(self, address):
+        uniq_id = "%s-%s" % address
+        session_cls = self.__sessions[uniq_id]
+        session_cls.sent_ping_cnt += 1
+
+        ping = session_cls.encrypt_m.build_ping()
+        session_cls.encrypt_m.reset()
+
+        if self.__debug: self.print_access_log("send_ping", address)
+
         self.add_evt_write(self.fileno)
-        self.writer.write(ping)
+        self.sendto(ping, address)
 
-    def __send_pong(self):
-        """发送pong帧
-        :return:
-        """
-        if self.__debug: self.print_access_log("send_pong")
-        pong = self.encrypt_m.build_pong()
-        self.add_evt_write(self.fileno)
-        self.writer.write(pong)
+    def __send_pong(self, address):
+        uniq_id = "%s-%s" % address
+        session_cls = self.__sessions[uniq_id]
 
-    def __send_close(self):
-        """发送close帧
-        :return:
-        """
-        close = self.encrypt_m.build_close()
-        self.add_evt_write(self.fileno)
-        self.writer.write(close)
+        pong = session_cls.encrypt_m.build_pong()
+        session_cls.encrypt_m.reset()
 
-    def send_data(self, action, pkt_size, byte_data):
-        self.encrypt_m.set_body_size(pkt_size)
-
-        hdr = self.encrypt_m.wrap_header(action)
-        body = self.encrypt_m.wrap_body(byte_data)
-
-        self.encrypt_m.reset()
+        if self.__debug: self.print_access_log("send_pong", address)
 
         self.add_evt_write(self.fileno)
-        self.writer.write(hdr)
-        self.writer.write(body)
+        self.sendto(pong, address)
 
-    def __handle_read_data(self, action, byte_data):
-        if action not in over_tcp.ACTS:
-            self.print_access_log("not_found_action")
-            self.delete_handler(self.fileno)
-            return
-        # 在没有验证之前丢弃所有发过来的数据包
-        if not self.__is_auth and action != over_tcp.ACT_AUTH:
-            if self.__debug: self.print_access_log("drop_packet_because_of_not_auth")
-            return
-        if not self.__is_auth:
-            if not self.fn_auth(byte_data):
-                self.print_access_log("auth_fail")
-                self.delete_this_no_sent_data()
-                return
-            self.print_access_log("auth_ok")
-            self.__is_auth = True
-            return
+    def __handle_ping(self, address):
+        uniq_id = "%s-%s" % address
+        session_cls = self.__sessions[uniq_id]
 
-        if action == over_tcp.ACT_PING:
-            self.__send_pong()
-            return
+        pong = session_cls.encrypt_m.build_pong()
+        session_cls.encrypt_m.reset()
 
-        if action == over_tcp.ACT_PONG:
-            if self.__debug: self.print_access_log("received_pong")
-            self.__is_sent_ping = False
-            return
+        self.add_evt_write(self.fileno)
+        self.sendto(pong, address)
 
-        if action == over_tcp.ACT_CLOSE:
-            if self.__is_sent_close:
-                self.delete_handler(self.fileno)
-                return
-            self.__send_close()
-            self.__is_sent_close = True
-            return
+        if self.__debug: self.print_access_log("received_ping", address)
 
-        if action == over_tcp.ACT_DNS:
-            self.send_message_to_handler(self.fileno, self.__dns_proxy_fd, byte_data)
-            return
+    def __handle_pong(self, address):
+        uniq_id = "%s-%s" % address
+        session_cls = self.__sessions[uniq_id]
+        session_cls.sent_ping_cnt = 0
 
-        src_ip = byte_data[12:16]
-        # 丢弃不属于客户端分配到的IP的数据包
-        if src_ip not in self.__client_ips: return
+        if self.__debug: self.print_access_log("received_pong", address)
 
-        packet_length = (byte_data[2] << 8) | byte_data[3]
+    def __handle_close(self, address):
+        self.__unregister_session(address)
+
+    def __handle_data(self, byte_data, address):
         protocol = byte_data[9]
-
-        if len(byte_data) != packet_length:
-            self.print_access_log("wrong_ip_packet")
+        # 只支持 ICMP,TCP,UDP协议
+        if protocol not in (1, 6, 17,):
+            self.print_access_log("not_support_IP_protocol", address)
             return
 
-        if not self.fn_on_recv(packet_length):
-            self.delete_handler(self.fileno)
+        uniq_id = "%s-%s" % address
+        self.__timer.set_timeout(uniq_id, self.__SESSION_CHECK_TIMEOUT)
+
+        if protocol == 17:
+            self.__handle_udp_data(byte_data, address)
+            return
+        self.send_message_to_handler(self.fileno, self.__tun_fd, byte_data)
+
+    def __handle_udp_data(self, byte_data, address):
+        """对UDP协议进行特别处理,以实现CONE NAT模型
+        """
+        # flags = (byte_data[6] & 0xe0) >> 5
+        # flag_df = (flags & 0x2) >> 1
+        # flags_mf = flags & 0x1
+        offset = ((byte_data[6] & 0x1f) << 5) | byte_data[7]
+
+        # 说明不是第一个数据分包,那么就直接发送给raw socket
+        if offset:
+            L = list(byte_data)
+            checksum.modify_address(b"\0\0\0\0", L, checksum.FLAG_MODIFY_SRC_IP)
+            self.send_message_to_handler(self.fileno, self.__raw_socket_fd, bytes(L))
             return
 
-        if protocol != 17:
-            self.send_message_to_handler(self.fileno, self.__tun_fd, byte_data)
-            return
-
-        # 对UDP协议特别处理，以便支持UDP穿透
         ihl = (byte_data[0] & 0x0f) * 4
-        src_addr = byte_data[12:16]
-        b, e = (ihl, ihl + 1)
+        saddr = socket.inet_ntoa(byte_data[12:16])
+        b = ihl
+        e = ihl + 1
         sport = (byte_data[b] << 8) | byte_data[e]
 
-        ip = src_addr.decode("iso-8859-1")
+        uniq_id = "%s-%s" % address
+        session_cls = self.__sessions[uniq_id]
 
-        while 1:
-            exists = self.__handler_manager.exists(ip, sport)
-            if not exists:
-                fileno = self.create_handler(self.fileno, traffic_pass.udp_proxy, self.raw_socket_fd)
-                self.__handler_manager.add(ip, sport, fileno)
-            else:
-                fileno = self.__handler_manager.get(ip, sport)
-            if self.handler_exists(fileno):
-                break
-            else:
-                self.__handler_manager.delete(ip, sport)
-            continue
+        udp_nat_map = session_cls.udp_nat_map
+
+        uniq_nat_id = "%s-%s" % (saddr, sport)
+
+        if uniq_nat_id not in udp_nat_map:
+            fileno = self.create_handler(self.fileno, traffic_pass.udp_proxy,
+                                         self.__raw_socket_fd,
+                                         (saddr, sport,),
+                                         uniq_id)
+            udp_nat_map[uniq_nat_id] = fileno
+        else:
+            fileno = udp_nat_map[uniq_nat_id]
 
         self.send_message_to_handler(self.fileno, fileno, byte_data)
 
+    def send_data(self, client_address, data_len, byte_data, action=tunnel_proto.ACT_DATA):
+        pkt_len = (byte_data[2] << 8) | byte_data[3]
+        uniq_id = "%s-%s" % client_address
+
+        session_cls = self.__sessions[uniq_id]
+        pkts = session_cls.encrypt_m.build_packets(action, pkt_len, byte_data)
+        session_cls.encrypt_m.reset()
+
+        self.__timer.set_timeout(uniq_id, self.__SESSION_CHECK_TIMEOUT)
+
+        for pkt in pkts:
+            self.sendto(pkt, client_address)
+
+        self.add_evt_write(self.fileno)
+
+    def send_auth(self, address, byte_data):
+        tmp_encrypt = self.__crypto.encrypt()
+        pkts = tmp_encrypt.build_packets(tunnel_proto.ACT_AUTH, len(byte_data), byte_data)
+        self.print_access_log("send_auth", address)
+
+        for pkt in pkts:
+            self.sendto(pkt, address)
+        self.add_evt_write(self.fileno)
+
+    def udp_readable(self, message, address):
+        uniq_id = "%s-%s" % address
+        # 不允许的客户端只接丢弃包
+        # session不存在的时候构建一个临时session
+
+        if uniq_id not in self.__sessions:
+            session_cls = _udp_session(self.__crypto)
+        else:
+            session_cls = self.__sessions[uniq_id]
+        result = session_cls.decrypt_m.parse(message)
+        if not result: return
+        session_id, action, byte_data = result
+
+        if uniq_id not in self.__sessions and action != tunnel_proto.ACT_AUTH:
+            self.print_access_log("illegal_packet", address)
+            return
+
+        if action not in tunnel_proto.ACTS:
+            self.print_access_log("not_found_action", address)
+            return
+
+        if action == tunnel_proto.ACT_AUTH:
+            self.__handle_auth(byte_data, address)
+            return
+
+        if uniq_id not in self.__sessions:
+            self.print_access_log("illegal_packet", address)
+            return
+
+            # 会话ID与IP地址不一致,删除数据
+        if session_cls.session_id != session_id:
+            self.print_access_log("error_session_code_%s" % session_id, address)
+            return
+        if action == tunnel_proto.ACT_DATA:
+            # 目前只支持IPv4协议
+            ip_ver = (byte_data[0] & 0xf0) >> 4
+            if ip_ver != 4:
+                self.print_access_log("not_support_ipv%s" % ip_ver, address)
+                return
+            src_addr = byte_data[12:16]
+            # 检查客户端是否随意伪造分配到的IP
+            if src_addr not in session_cls.client_ips:
+                self.print_access_log("illegal_client_vlan_ip", address)
+                return
+
+        if action == tunnel_proto.ACT_PING: self.__handle_ping(address)
+        if action == tunnel_proto.ACT_PONG: self.__handle_pong(address)
+        if action == tunnel_proto.ACT_DATA: self.__handle_data(byte_data, address)
+
         return
 
-    def get_client_ips(self, n):
-        """设置客户端分配到的IP地址
-        :param n:需要获取的IP数量
-        :return:
-        """
-        ipalloc = global_vars["freenet.ipaddr"]
-
-        for i in range(n):
-            packet_ip = ipalloc.get_addr()
-            self.__client_ips[packet_ip] = None
-        ips = []
-        for packet_ip in self.__client_ips:
-            ips.append(
-                socket.inet_ntop(socket.AF_INET, packet_ip)
-            )
-        return ips
-
-    def del_client_ips(self):
-        """删除客户端分配到的IP地址"""
-        ipalloc = global_vars["freenet.ipaddr"]
-
-        for packet_ip in self.__client_ips:
-            ipalloc.put_addr(packet_ip)
-            self.ctl_handler(self.fileno, self.__tun_fd, "del_ip_map", packet_ip)
-
-        self.__client_ips = {}
-        return
-
-    def tcp_accept(self):
-        while 1:
-            try:
-                s, addr = self.socket.accept()
-            except BlockingIOError:
-                break
-            ret = self.fn_on_connect(s, addr)
-            if not ret:
-                s.close()
-                continue
-            ''''''
-        return
-
-    def tcp_readable(self):
-        rdata = self.reader.read()
-        self.decrypt_m.add_data(rdata)
-
-        while self.decrypt_m.have_data():
-            if not self.decrypt_m.is_ok(): break
-            action = self.decrypt_m.header_info()
-            byte_data = self.decrypt_m.body_data()
-            self.decrypt_m.reset()
-            self.__handle_read_data(action, byte_data)
-        return
-
-    def tcp_writable(self):
+    def udp_writable(self):
         self.remove_evt_write(self.fileno)
 
-    def tcp_delete(self):
-        self.print_access_log("close")
+    def udp_timeout(self):
+        names = self.__timer.get_timeout_names()
+        for name in names:
+            if self.__timer.exists(name): self.__timer.drop(name)
+            if name in self.__sessions:
+                session_cls = self.__sessions[name]
+                if session_cls.sent_ping_cnt > 8:
+                    self.__unregister_session(session_cls.address)
+                else:
+                    self.__send_ping(session_cls.address)
+                    self.__timer.set_timeout(name, self.__SESSION_CHECK_TIMEOUT)
+                ''''''
+            ''''''
+        self.set_timeout(self.fileno, self.__TIMEOUT)
+
+    def udp_delete(self):
         self.unregister(self.fileno)
         self.socket.close()
-        del_handlers = self.__handler_manager.get_all_fileno()
-        for fileno in del_handlers:
-            if self.handler_exists(fileno): self.delete_handler(fileno)
-        self.fn_handler_clear()
 
-    def tcp_error(self):
+    def udp_error(self):
         self.delete_handler(self.fileno)
 
-    def tcp_timeout(self):
-        if not self.__is_auth:
-            self.print_access_log("auth_timeout")
-            self.delete_handler(self.fileno)
-            return
-        if self.__is_sent_ping or self.__is_sent_close:
-            self.delete_handler(self.fileno)
-            return
-        if self.__is_sent_ping:
-            self.delete_handler(self.fileno)
-            return
-        self.set_timeout(self.fileno, self.__TIMEOUT)
-        self.__send_ping()
+    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
+        if cmd != "udp_nat_del": return False
+        uniq_id, vlan_address = args
+
+        uniq_nat_id = "%s-%s" % vlan_address
+        if uniq_id not in self.__sessions: return False
+        session_cls = self.__sessions[uniq_id]
+        udp_nat_map = session_cls.udp_nat_map
+
+        if uniq_nat_id in udp_nat_map:
+            fileno = udp_nat_map[uniq_nat_id]
+            self.delete_handler(fileno)
+            del udp_nat_map[uniq_nat_id]
+
+        return
+
+    def get_encrypt(self, address):
+        uniq_id = "%s-%s" % address
+        session_cls = self.__sessions.get(uniq_id, None)
+        if not session_cls: return None
+        return session_cls.encrypt_m
+
+    def get_decrypt(self, address):
+        uniq_id = "%s-%s" % address
+        session_cls = self.__sessions.get(uniq_id, None)
+        if not session_cls: return None
+        return session_cls.decrypt_m
+
+    def print_access_log(self, text, address):
+        t = time.strftime("%Y-%m-%d %H:%M:%S")
+        addr = "%s:%s" % address
+        echo = "%s        %s        %s" % (text, addr, t)
+        print(echo)
 
     def message_from_handler(self, from_fd, byte_data):
-        if not self.__is_auth: return
-        # 缓冲数据过大那么就删除先前的数据
-        if self.writer.size() > self.__MAX_BUFFER_SIZE:
-            self.writer.flush()
-            return
-        if from_fd == self.__dns_proxy_fd:
-            self.send_data(over_tcp.ACT_DNS, len(byte_data), byte_data)
-            return
-        packet_length = (byte_data[2] << 8) | byte_data[3]
+        dst_addr = byte_data[16:20]
+        if dst_addr not in self.__client_info_by_v_ip: return
+        address = self.__client_info_by_v_ip[dst_addr]
+        data_len = (byte_data[2] << 8) | byte_data[3]
+        self.send_data(address, data_len, byte_data)
 
-        if not self.fn_on_send(packet_length):
-            self.delete_handler(self.fileno)
-            return
+    def get_client_ips(self, n):
+        results = []
 
-        dst_addr_pkt = byte_data[16:20]
-        if dst_addr_pkt not in self.__client_ips: return
-        self.send_data(over_tcp.ACT_DATA, packet_length, byte_data)
+        for i in range(n):
+            try:
+                ippkt = self.__ipalloc.get_addr()
+            except ipaddr.IpaddrNoEnoughErr:
+                # 回收IP地址
+                for ip in results:
+                    pkt = socket.inet_aton(ip)
+                    self.__ipalloc.put_addr(pkt)
+                    results = None
+                break
+            results.append(
+                socket.inet_ntoa(ippkt)
+            )
 
-    def __build_access_log(self, text):
-        t = time.strftime("time:%Y-%m-%d %H:%M:%S")
-        ipaddr = "%s:%s" % (self.__c_addr)
+        return results
 
-        return "%s      %s      %s" % (text, ipaddr, t)
-
-    def print_access_log(self, text):
-        print(self.__build_access_log(text))
-
-    def fn_handler_init(self):
-        """当创建新的handler时候,将会调用这个函数进行一些初始化操作,重写这个方法
-        :return:
-        """
+    def fn_init(self):
+        """初始化一些设置,重写这个方法"""
         pass
 
-    def fn_on_connect(self, sock, caddr):
-        """重写这个方法,当连接刚刚建立成功的时候
-        注意:这个函数会在监听handler中调用,即还没有为这个socket创建新的服务handler
-        :param sock:客户端socket对象
-        :param caddr:客户端地址
-        :return Boolean:True表示继续执行,False表示不继续执行
+    def fn_auth(self, byte_data, address):
+        """重写验证方法
+        :param byte_data
+        :param address
+        :return Tuple: True表示验证通过,False表示验证失败
         """
         return True
 
-    def fn_auth(self, auth_info):
-        """重写这个方法,当用户需要验证的时候调用这个函数
-        :param auth_info:
-        :return Boolean: True表示验证成功,False表示验证失败
+    def fn_recv(self, data_len, address):
+        """接收客户端数据的时候调用此函数
+        :param data_len: 数据长度
+        :param address: 客户端地址
+        :return Boolean: True表示继续执行,False表示中断执行
         """
         return True
 
-    def fn_on_recv(self, recv_size):
-        """当有数据包来的时候会调用这个函数,主要用来统计进来的流量
-        :param recv_size:接收的数据包大小
-        :return Boolean： True表示继续执行，False表示中断执行
+    def fn_send(self, data_len, address):
+        """发送数据的时候调用此函数
+        :param data_len: 数据长度
+        :param address: 目标地址
+        :return Boolean: True表示继续执行,False表示中断执行
         """
         return True
 
-    def fn_on_send(self, send_size):
-        """当有数据包出去的时候会调用这个函数,主要用来统计出去的流量
-        :param send_size:发送的数据包大小
-        :return Boolean： True表示继续执行，False表示中断执行
-        """
-        return True
-
-    def fn_handler_clear(self):
-        """主要用来进行用户扩展的清理操作,这在调用self.tcp_delete的时候会调用此函数
-        :return:
+    def fn_delete(self, address):
+        """删除会话的时候会调用此函数,用于资源的释放
+        :param address :客户端地址
         """
         pass

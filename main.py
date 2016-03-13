@@ -9,9 +9,7 @@ import pywind.evtframework.evt_dispatcher as dispatcher
 import fdslight_etc.fn_server as fns_config
 import fdslight_etc.fn_client as fnc_config
 import freenet.lib.fdsl_ctl as fdsl_ctl
-import freenet.handler.dns_proxy as dns_proxy
 import freenet.lib.file_parser as file_parser
-import freenet.handler.traffic_pass as traffic_pass
 
 FDSL_PID_FILE = "fdslight.pid"
 
@@ -46,37 +44,36 @@ def clear_pid_file():
 
 
 class fdslight(dispatcher.dispatcher):
-    __tunnelc = None
-    __tunnelc_fileno = -1
-    __tunnels_fileno = -1
-    __dns_fileno = -1
-
-    __traffic_fetch_fd = -1
-    __traffic_send_fd = -1
-
     __debug = True
 
-    def __create_fn_tcp_server(self, tunnels):
-        fn_s_no = self.create_handler(-1, tunnels.tcp_tunnel, debug=self.__debug)
+    def __create_fn_server(self, tunnel):
+        if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
 
-        self.__tunnels_fileno = fn_s_no
-        self.get_handler(fn_s_no).after()
+        self.create_poll()
+        self.create_handler(-1, tunnel.tunnel, debug=self.__debug)
 
-    def __client_get_whitelist(self):
-        """获取白名单"""
-        results = file_parser.parse_ip_subnet_file("fdslight_etc/whitelist.txt")
-        return results
+    def __create_fn_client(self, tunnel):
+        if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
 
-    def __create_fn_tcp_client(self, tunnelc):
-        self.__tunnelc = tunnelc
-        self.__tunnelc_fileno = self.create_handler(-1, tunnelc.tcp_tunnel, debug=self.__debug)
-        self.get_handler(self.__tunnelc_fileno).after(self.__dns_fileno, self.__traffic_fetch_fd,
-                                                      self.__traffic_send_fd)
+        self.create_poll()
 
-    def __create_dns_proxy(self):
-        rules = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
-        self.__dns_fileno = self.create_handler(-1, dns_proxy.dnsc_proxy, self.__traffic_fetch_fd, rules,
-                                                debug=self.__debug)
+        os.chdir("driver")
+        if not os.path.isfile("fdslight.ko"):
+            print("you must install this software")
+            sys.exit(-1)
+
+        path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
+        if os.path.exists(path):
+            os.system("rmmod fdslight")
+
+        os.system("insmod fdslight.ko")
+
+        os.chdir("../")
+
+        whitelist = file_parser.parse_ip_subnet_file("fdslight_etc/whitelist.txt")
+        blacklist = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
+
+        self.create_handler(-1, tunnel.tunnel, whitelist, blacklist, debug=self.__debug)
 
     def init_func(self, mode, debug=True):
         if mode == "server":
@@ -96,42 +93,9 @@ class fdslight(dispatcher.dispatcher):
 
         self.__run(mode, tunnel)
 
-    def ___create_client_service(self, tunnel):
-        if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
-        self.create_poll()
-
-        os.chdir("driver")
-        if not os.path.isfile("fdslight.ko"):
-            print("you must install this software")
-            sys.exit(-1)
-
-        path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
-        if os.path.exists(path):
-            os.system("rmmod fdslight")
-
-        os.system("insmod fdslight.ko")
-
-        os.chdir("../")
-
-        self.__traffic_fetch_fd = self.create_handler(-1, traffic_pass.traffic_read, self.__client_get_whitelist())
-        self.__traffic_send_fd = self.create_handler(-1, traffic_pass.traffic_send)
-
-        self.__create_dns_proxy()
-
-        self.__create_fn_tcp_client(tunnel)
-
-        self.get_handler(self.__traffic_fetch_fd).set_tunnel_fd(self.__tunnelc_fileno)
-
-        self.get_handler(self.__dns_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
-
-    def __create_server_service(self, tunnel):
-        if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
-        self.create_poll()
-        self.__create_fn_tcp_server(tunnel)
-
     def __debug_run(self, mode, module):
-        if mode == "server": self.__create_server_service(module)
-        if mode == "client": self.___create_client_service(module)
+        if mode == "server": self.__create_fn_server(module)
+        if mode == "client": self.__create_fn_client(module)
 
     def __run(self, mode, module):
         pid = os.fork()
@@ -155,22 +119,6 @@ class fdslight(dispatcher.dispatcher):
             return
 
         return
-
-    def client_reconnect(self):
-        """客户端断线重连"""
-        if self.handler_exists(self.__traffic_fetch_fd): self.delete_handler(self.__traffic_fetch_fd)
-        self.__tunnelc_fileno = self.create_handler(-1, self.__tunnelc.tcp_tunnel, debug=self.__debug)
-
-        if self.__tunnelc_fileno < 0:
-            self.client_reconnect()
-            return
-
-        self.__traffic_fetch_fd = self.create_handler(-1, traffic_pass.traffic_read, [])
-        self.get_handler(self.__tunnelc_fileno).after(self.__dns_fileno, self.__traffic_fetch_fd,
-                                                      self.__traffic_send_fd)
-
-        self.get_handler(self.__dns_fileno).set_tunnel_fileno(self.__tunnelc_fileno)
-        self.get_handler(self.__traffic_fetch_fd).set_tunnel_fd(self.__tunnelc_fileno)
 
 
 def stop_service():

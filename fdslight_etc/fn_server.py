@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 configs = {
-    "tcp_bind_address": (
+    "bind_address": (
         "0.0.0.0",
         8964
     ),
@@ -10,10 +10,7 @@ configs = {
         "10.10.10.0",
         24
     ),
-    # DNS代理服务器
-    "dns": "8.8.8.8",
-    # TCP加密模块
-    "tcp_crypto_module": "aes_tcp",
+    "crypto_module": "aes",
     # 隧道模块
     "tunnels": "tunnels_simple",
     # 隧道模块配置

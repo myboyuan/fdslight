@@ -55,7 +55,7 @@ def __get_ip_subnet(line):
 
     n = (ip_packet[0] << 24) | (ip_packet[1] << 16) | (ip_packet[2] << 8) | ip_packet[3]
 
-    return (n, mask)
+    return (n, mask,)
 
 
 def parse_ip_subnet_file(fpath):

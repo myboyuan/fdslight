@@ -3,13 +3,15 @@
 隧道客户端基本类
 """
 import json, socket, sys, time
-
 import fdslight_etc.fn_client as fnc_config
-import freenet.lib.base_proto.over_tcp as over_tcp
-import pywind.evtframework.handler.tcp_handler as tcp_handler
+import pywind.evtframework.handler.udp_handler as udp_handler
 import pywind.lib.timer as timer
-import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.checksum as checksum
+import freenet.lib.base_proto.tunnel as tunnel_proto
+import freenet.handler.traffic_pass as traffic_pass
+import freenet.lib.fdsl_ctl as fdsl_ctl
+import freenet.lib.utils as utils
+import freenet.handler.dns_proxy as dns_proxy
 
 
 class _static_nat(object):
@@ -81,224 +83,286 @@ class _static_nat(object):
 
                 del self.__dst_nat_table[t]
                 del self.__src_nat_table[name]
-            self.__timer.drop(name)
+            if self.__timer.exists(name): self.__timer.drop(name)
         return
 
+    def reset(self):
+        self.__virtual_ips = []
+        self.__dst_nat_table = {}
+        self.__src_nat_table = {}
 
-class tcp_tunnelc_base(tcp_handler.tcp_handler):
-    __encrypt_m = None
-    __decrypt_m = None
-    __TIMEOUT = 1 * 60
-    # 是否已经发送过验证报文
-    __is_sent_auth = False
-    # 是否验证成功
-    __auth_ok = False
 
-    __timer = None
-    __static_nat = None
+class tunnelc_base(udp_handler.udp_handler):
+    __nat = None
+    __server = None
 
-    # 最大缓冲区大小
-    __MAX_BUFFER_SIZE = 16 * 1024
-
-    __traffic_catch_fd = -1
-    __traffic_send_fd = -1
-
+    __traffic_fetch_fd = -1
+    __traffic_send_fd = -2
     __dns_fd = -1
 
-    __debug = None
+    __encrypt_m = None
+    __decrypt_m = None
 
-    def init_func(self, creator_fd, debug=False):
-        server_addr = fnc_config.configs["tcp_server_address"]
+    __TIMEOUT = 45
+    __TIMEOUT_NO_AUTH = 5
+    __session_id = 0
 
-        s = socket.socket()
-        self.__debug = debug
-        try:
-            s.connect(server_addr)
-        except:
-            self.print_access_log("connect_failed")
-            return -1
+    # DNS server的网络序地址
+    __dns_server_addrn = None
+    __is_auth = False
 
-        self.set_socket(s)
-        name = "freenet.lib.crypto.%s" % fnc_config.configs["tcp_crypto_module"]
+    # 发送ping的次数
+    __sent_ping_cnt = 0
+
+    # 是否曾经打开过流量捕获设备
+    __is_open_fetch_fd_once = False
+    __whitelist = None
+
+    __debug = False
+
+    # 服务端IP地址
+    __server_ipaddr = None
+
+    def init_func(self, creator_fd, whitelist, blacklist, debug=False):
+        self.__nat = _static_nat()
+        self.__server = fnc_config.configs["server_address"]
+
+        name = "freenet.lib.crypto.%s" % fnc_config.configs["crypto_module"]
         __import__(name)
-        m = sys.modules[name]
+        m = sys.modules.get(name, None)
 
         self.__encrypt_m = m.encrypt()
         self.__decrypt_m = m.decrypt()
 
-        self.__static_nat = _static_nat()
+        self.__debug = debug
 
-        self.set_timeout(self.fileno, self.__TIMEOUT)
+        self.__traffic_send_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
 
-        return self.fileno
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    def after(self, dns_fileno, fetch_fd, send_fd):
-        self.__dns_fd = dns_fileno
-        self.__traffic_send_fd = send_fd
-        self.__traffic_catch_fd = fetch_fd
+        self.set_socket(s)
+        self.__dns_fd = self.create_handler(self.fileno, dns_proxy.dns_proxy, blacklist, debug=debug)
+
+        self.connect(self.__server)
+
+        ipaddr, _ = s.getpeername()
+
+        self.__server_ipaddr = ipaddr
+        self.__dns_server_addrn = socket.inet_aton(fnc_config.configs["dns_encrypt"])
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+
+        self.fn_init()
+        self.fn_auth_request()
+        self.__whitelist = whitelist
+        self.set_timeout(self.fileno, self.__TIMEOUT_NO_AUTH)
+
+        return self.fileno
+
+    def __handle_data(self, byte_data):
+        p = byte_data[9]
+
+        # 过滤到不支持的协议
+        if p not in (1, 6, 17,): return
+
+        new_pkt = self.__nat.get_new_packet_for_lan(byte_data)
+        if not new_pkt:
+            self.print_access_log("cant_not_send_packet_to_lan")
+            return
+
+        self.set_timeout(self.fileno, self.__TIMEOUT)
+
+        if p != 17:
+            self.send_message_to_handler(self.fileno, self.__traffic_send_fd, new_pkt)
+            return
+
+        # 需要特殊对待DNS的UDP数据包
+        src_addr = new_pkt[12:16]
+        if src_addr != self.__dns_server_addrn:
+            self.send_message_to_handler(self.fileno, self.__traffic_send_fd, new_pkt)
+            return
+
+        ihl = (new_pkt[0] & 0x0f) * 4
+        b = ihl
+        e = ihl + 1
+        sport = (new_pkt[b] << 8) | new_pkt[e]
+
+        if sport != 53:
+            self.send_message_to_handler(self.fileno, self.__traffic_send_fd, new_pkt)
+            return
+
+        self.send_message_to_handler(self.fileno, self.__dns_fd, new_pkt)
+
+    def __handle_close(self):
+        # 先删除流量过滤handler,保证其它流量能够走客户端默认路由
+        self.print_access_log("close_connect")
+        self.delete_handler(self.__traffic_fetch_fd)
+        self.__is_auth = False
+        self.__traffic_fetch_fd = -1
+        self.__nat.reset()
+        self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_close")
+        self.set_timeout(self.fileno, self.__TIMEOUT_NO_AUTH)
+
+    def __handle_auth_ok(self, session_id):
+        if self.__is_open_fetch_fd_once:
+            whitelist = []
+        else:
+            whitelist = self.__whitelist
+
+        self.__traffic_fetch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read, whitelist)
+
+        n = utils.ip4s_2_number(self.__server_ipaddr)
+        fdsl_ctl.add_whitelist_subnet(self.__traffic_fetch_fd, n, 32)
+
+        self.__is_auth = True
+        self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_open")
+        self.ctl_handler(self.fileno, self.__dns_fd, "set_filter_dev_fd", self.__traffic_fetch_fd)
+        self.set_timeout(self.fileno, self.__TIMEOUT)
+
+    def set_session_id(self, sid):
+        self.encrypt.set_session_id(sid)
+
+    def send_data(self, pkt_len, byte_data, action=tunnel_proto.ACT_DATA):
+        ippkts = self.__encrypt_m.build_packets(action, pkt_len, byte_data)
+        self.__encrypt_m.reset()
+
+        for ippkt in ippkts:
+            self.send(ippkt)
+
+        if self.__is_auth: self.set_timeout(self.fileno, self.__TIMEOUT)
+
+        self.add_evt_write(self.fileno)
+
+    def send_auth(self, auth_data):
+        self.print_access_log("send_auth")
+        self.send_data(len(auth_data), auth_data, action=tunnel_proto.ACT_AUTH)
+
+    def __send_ping(self):
+        if self.__debug: self.print_access_log("send_ping")
+
+        ping = self.__encrypt_m.build_ping()
+        self.__encrypt_m.reset()
+
+        self.__sent_ping_cnt += 1
+        self.send(ping)
         self.add_evt_write(self.fileno)
 
     def __send_pong(self):
-        """发送pong帧
-        :return:
-        """
         if self.__debug: self.print_access_log("send_pong")
-        pong = self.encrypt_m.build_pong()
+        pong = self.__encrypt_m.build_pong()
+        self.__encrypt_m.reset()
+
+        self.send(pong)
         self.add_evt_write(self.fileno)
-        self.writer.write(pong)
 
     def __send_close(self):
-        """发送close帧
-        :return:
-        """
         if self.__debug: self.print_access_log("send_close")
-        close = self.encrypt_m.build_close()
+        close = self.__encrypt_m.build_close()
+        self.__encrypt_m.reset()
+
+        self.send(close)
         self.add_evt_write(self.fileno)
-        self.writer.write(close)
 
-    def send_auth(self, auth_data):
-        self.__is_sent_auth = True
-        data_size = len(auth_data)
-        self.__send_to_tunnel(data_size, auth_data, action=over_tcp.ACT_AUTH)
-        self.print_access_log("send_auth")
-        return
+    def udp_readable(self, message, address):
+        result = self.__decrypt_m.parse(message)
+        if not result: return
+        session_id, action, byte_data = result
 
-    def __handle_read_data(self, action, byte_data):
-        if action not in over_tcp.ACTS: return
-        if over_tcp.ACT_AUTH == action:
+        if action not in tunnel_proto.ACTS:
+            self.print_access_log("can_not_found_action_%s" % action)
+            return
+
+        if action == tunnel_proto.ACT_AUTH:
             ret = self.fn_auth_response(byte_data)
             if not ret:
                 self.print_access_log("auth_failed")
-                self.delete_handler(self.fileno)
-            else:
-                self.__auth_ok = True
-                self.print_access_log("auth_ok")
-            return
-        if over_tcp.ACT_CLOSE == action:
-            print("connection_close")
-            self.delete_handler(self.fileno)
-            return
-        if over_tcp.ACT_PONG == action:
-            return
-        if over_tcp.ACT_PING == action:
+                return
+            self.print_access_log("auth_ok")
+            self.__handle_auth_ok(session_id)
+
+        if action == tunnel_proto.ACT_CLOSE: self.__handle_close()
+        if action == tunnel_proto.ACT_PING:
             self.print_access_log("received_ping")
             self.__send_pong()
-            return
-        if over_tcp.ACT_DNS == action:
-            self.send_message_to_handler(self.fileno, self.__dns_fd, byte_data)
-            return
-        new_pkt = self.__static_nat.get_new_packet_for_lan(byte_data)
-        if not new_pkt: return
-        # proto = new_pkt[9]
-        self.send_message_to_handler(self.fileno, self.__traffic_send_fd, new_pkt)
+        if action == tunnel_proto.ACT_PONG:
+            self.print_access_log("received_pong")
+            self.__sent_ping_cnt = 0
+        if action == tunnel_proto.ACT_DATA: self.__handle_data(byte_data)
 
-    def tcp_readable(self):
-        rdata = self.reader.read()
-        self.__decrypt_m.add_data(rdata)
+    def udp_writable(self):
+        self.remove_evt_write(self.fileno)
 
-        while self.__decrypt_m.have_data():
-            if not self.__decrypt_m.is_ok(): return
-            action = self.__decrypt_m.header_info()
-            body_data = self.__decrypt_m.body_data()
-            self.__decrypt_m.reset()
-            self.__handle_read_data(action, body_data)
+    def udp_error(self):
+        self.print_access_log("server_down")
+        sys.exit(-1)
 
-        return
+    def udp_timeout(self):
+        self.__nat.recyle_ips()
 
-    def tcp_writable(self):
-        if not self.__is_sent_auth:
+        if not self.__is_auth:
+            self.set_timeout(self.fileno, self.__TIMEOUT_NO_AUTH)
             self.fn_auth_request()
             return
-        if self.writer.size() < 1:
-            self.remove_evt_write(self.fileno)
+
+        self.set_timeout(self.fileno, self.__TIMEOUT)
+        # 尝试发送ping 5 次
+        if self.__sent_ping_cnt < 5:
+            self.__send_ping()
             return
-        ''''''
+        # 如果发送5次ping都没有响应,那么暂时取消会话
+        self.__sent_ping_cnt = 0
+        self.__handle_close()
 
-    def __send_to_tunnel(self, packet_length, byte_data, action=over_tcp.ACT_DATA):
-        """向加密发送数据"""
-        self.encrypt_m.set_body_size(packet_length)
-        hdr = self.encrypt_m.wrap_header(action)
-        body = self.encrypt_m.wrap_body(byte_data)
-
-        self.encrypt_m.reset()
-        self.add_evt_write(self.fileno)
-        self.writer.write(hdr)
-        self.writer.write(body)
-
-    def message_from_handler(self, from_fd, byte_data):
-        # 没有验证成功的删除数据
-        if not self.__auth_ok: return
-        if from_fd == self.__dns_fd:
-            self.__send_to_tunnel(len(byte_data), byte_data, action=over_tcp.ACT_DNS)
-            return
-        # 防止内存过度消耗
-        if self.writer.size() > self.__MAX_BUFFER_SIZE:
-            self.writer.flush()
-            return
-            # 目前只支持IPv4
-        if (byte_data[0] & 0xf0) >> 4 != 4: return
-        new_pkt = self.__static_nat.get_new_packet_to_tunnel(byte_data)
-
-        if not new_pkt: return
-
-        packet_length = (new_pkt[2] << 8) | new_pkt[3]
-        self.__send_to_tunnel(packet_length, new_pkt)
-
-    def tcp_error(self):
-        if not self.__is_sent_auth:
-            self.print_access_log("auth_timeout")
-        else:
-            self.print_access_log("server_closed")
-
-        self.delete_handler(self.fileno)
-
-    def tcp_delete(self):
+    def udp_delete(self):
         self.unregister(self.fileno)
         self.socket.close()
-
-        self.print_access_log("re_connect")
-        self.dispatcher.client_reconnect()
-
-    def tcp_timeout(self):
-        # 回收IP资源,以便别的机器能够顺利连接
-        self.__static_nat.recyle_ips()
-        self.set_timeout(self.fileno, self.__TIMEOUT)
-
-    def print_access_log(self, string):
-        t = time.strftime("time:%Y-%m-%d %H:%M:%S")
-        ipaddr = "%s:%s" % fnc_config.configs["tcp_server_address"]
-
-        text = "%s      %s      %s" % (string, ipaddr, t)
-        print(text)
+        sys.exit(-1)
 
     @property
-    def encrypt_m(self):
+    def encrypt(self):
         return self.__encrypt_m
 
     @property
-    def decrypt_m(self):
+    def decrypt(self):
         return self.__decrypt_m
 
+    def message_from_handler(self, from_fd, byte_data):
+        if from_fd == self.__dns_fd:
+            if not self.__is_auth:
+                self.send_message_to_handler(self.fileno, self.__traffic_send_fd, byte_data)
+                return
+
+        new_pkt = self.__nat.get_new_packet_to_tunnel(byte_data)
+        if not new_pkt: return
+
+        pkt_len = (new_pkt[2] << 8) | new_pkt[3]
+        self.send_data(pkt_len, new_pkt)
+
+    def alloc_vlan_ips(self, ips):
+        """分配虚拟IP地址"""
+        self.__nat.add_virtual_ips(ips)
+
+    def print_access_log(self, text):
+        t = time.strftime("%Y-%m-%d %H:%M:%S")
+        addr = "%s:%s" % self.__server
+        echo = "%s        %s         %s" % (text, addr, t)
+
+        print(echo)
+
+    def fn_init(self):
+        """初始化函数,重写这个方法"""
+        pass
+
     def fn_auth_request(self):
-        """
-        :return dict:返回一个字典对象
+        """重写这个方法,发送验证请求
+        :return Bytes
         """
         pass
 
-    def fn_auth_response(self, auth_resp_info):
+    def fn_auth_response(self, byte_data):
+        """处理验证响应,重写这个方法
+        :return Boolean: True表示验证成功,False表示验证失败
         """
-        验证响应之后调用该函数
-        :param
-        auth_resp_info:
-        :return Boolean: True表示系统继续执行, False则表示停止执行
-        """
-        return True
-
-    def set_virtual_ips(self, ips):
-        """
-        设置虚拟IP
-        """
-        self.__static_nat.add_virtual_ips(ips)
+        pass

@@ -63,6 +63,7 @@
 *.chinadigitaltimes.net
 *.reuters.com
 *.reutersmedia.net
+*.aboluowang.com
 
 # 网络存储
 *.dropbox.com
@@ -76,7 +77,6 @@
 *.chinadigitaltimes.net
 *.minghui.org
 *.zhengjian.org
-*.aboluowang.com
 *.xinsheng.net
 *.vpngate.net
 *.akamai.net

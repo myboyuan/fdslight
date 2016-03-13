@@ -23,6 +23,7 @@ class traffic_read(handler.handler):
         n = utils.ip4s_2_number(subnet)
 
         fdsl_ctl.set_subnet(fileno, n, mask)
+        self.__tunnel_fd = creator_fd
 
         self.set_fileno(fileno)
         for ip, mask in whitelist: fdsl_ctl.add_whitelist_subnet(fileno, ip, mask)
@@ -36,9 +37,6 @@ class traffic_read(handler.handler):
             fdsl_ctl.udp_part(fileno)
 
         return self.fileno
-
-    def set_tunnel_fd(self, tunnel_fd):
-        self.__tunnel_fd = tunnel_fd
 
     def evt_read(self):
         """最多读取10个数据包,防止陷入死循环"""
@@ -99,7 +97,6 @@ class traffic_send(handler.handler):
                 break
 
             ip_ver = (ippkt[0] & 0xf0) >> 4
-
             # 目前只支持IPv4
             if ip_ver != 4: continue
 
@@ -123,40 +120,6 @@ class traffic_send(handler.handler):
         self.__socket.close()
 
 
-class handler_manager(object):
-    """管理nat handler
-    """
-    __map = None
-
-    def __init__(self):
-        self.__map = {}
-
-    def __build_key(self, ip, port):
-        return "%s-%s" % (ip, port)
-
-    def add(self, ip, port, fileno):
-        name = self.__build_key(ip, port)
-        self.__map[name] = fileno
-
-    def exists(self, ip, port):
-        name = self.__build_key(ip, port)
-        return name in self.__map
-
-    def delete(self, ip, port):
-        name = self.__build_key(ip, port)
-        if name not in self.__map: return
-        del self.__map[name]
-
-    def get(self, ip, port):
-        name = self.__build_key(ip, port)
-        return self.__map[name]
-
-    def get_all_fileno(self):
-        vals = []
-        for key in self.__map: vals.append(self.__map[key])
-        return vals
-
-
 class udp_proxy(udp_handler.udp_handler):
     __creator_fd = -1
     __bind_address = None
@@ -171,9 +134,12 @@ class udp_proxy(udp_handler.udp_handler):
 
     __timer = None
 
+    # 会话uniq id,指明是哪个客户端创建的
+    __session_uniq_id = None
+
     __raw_socket_fd = -1
 
-    def init_func(self, creator_fd, raw_socket_fd):
+    def init_func(self, creator_fd, raw_socket_fd, vlan_address, session_uniq_id):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         self.__creator_fd = creator_fd
@@ -188,6 +154,8 @@ class udp_proxy(udp_handler.udp_handler):
 
         self.set_timeout(self.fileno, self.__TIMEOUT)
         self.__timer = timer.timer()
+        self.__lan_address = vlan_address
+        self.__session_uniq_id = session_uniq_id
 
         return self.fileno
 
@@ -204,6 +172,7 @@ class udp_proxy(udp_handler.udp_handler):
         n_saddr = socket.inet_aton(saddr)
         n_daddr = socket.inet_aton(daddr)
 
+        self.__timer.set_timeout(saddr,self.__UDP_SESSION_TIMEOUT)
         udp_packets = utils.build_udp_packet(n_saddr, n_daddr, sport, dport, message)
 
         for udp_pkt in udp_packets: self.send_message_to_handler(self.fileno, self.__creator_fd, udp_pkt)
@@ -228,24 +197,10 @@ class udp_proxy(udp_handler.udp_handler):
         if version != 4: return
 
         ihl = (byte_data[0] & 0x0f) * 4
-        # pkt_id = (byte_data[4] << 8) | byte_data[5]
-        flags = (byte_data[6] & 0xe0) >> 5
-        # flag_df = (flags & 0x2) >> 1
-        # flags_mf = flags & 0x1
-        offset = ((byte_data[6] & 0x1f) << 5) | byte_data[7]
-
         bind_addr, bind_port = self.__bind_address
         bind_addr_pkt = socket.inet_aton(bind_addr)
-
         L = list(byte_data)
 
-        if offset:
-            self.__modify_src_address(bind_addr_pkt, L)
-            message = bytes(L)
-            self.send_message_to_handler(self.fileno, self.__raw_socket_fd, message)
-            return
-
-        src_addr = socket.inet_ntoa(byte_data[12:16])
         dst_addr = socket.inet_ntoa(byte_data[16:20])
 
         b = ihl
@@ -255,10 +210,6 @@ class udp_proxy(udp_handler.udp_handler):
         # 修改源端口
         e = e + 1
         L[b:e] = ((bind_port & 0xff00) >> 8, bind_port & 0x00ff,)
-
-        # b = e + 1
-        # e = b + 1
-        # dport = (byte_data[b] << 8) | byte_data[e]
 
         b = ihl + 6
         e = b + 2
@@ -270,7 +221,6 @@ class udp_proxy(udp_handler.udp_handler):
 
         message = bytes(L)
 
-        self.__lan_address = (src_addr, sport,)
         self.__internet_ip[dst_addr] = sport
         self.__timer.set_timeout(dst_addr, self.__UDP_SESSION_TIMEOUT)
 
@@ -279,7 +229,7 @@ class udp_proxy(udp_handler.udp_handler):
         return
 
     def udp_error(self):
-        self.delete_handler(self.fileno)
+        self.ctl_handler(self.fileno, self.__creator_fd, "udp_nat_del", self.__session_uniq_id, self.__lan_address)
 
     def udp_delete(self):
         self.unregister(self.fileno)
@@ -290,10 +240,14 @@ class udp_proxy(udp_handler.udp_handler):
         names = self.__timer.get_timeout_names()
         for name in names:
             if name in self.__internet_ip: del self.__internet_ip[name]
-            self.__timer.drop(name)
+            if self.__timer.exists(name): self.__timer.drop(name)
 
         return
 
     def udp_timeout(self):
         self.__clear_timeout_session()
-        self.set_timeout(self.fileno, self.__TIMEOUT)
+        if self.__internet_ip:
+            self.set_timeout(self.fileno, self.__TIMEOUT)
+            return
+
+        self.ctl_handler(self.fileno, self.__creator_fd, "udp_nat_del", self.__session_uniq_id, self.__lan_address)
