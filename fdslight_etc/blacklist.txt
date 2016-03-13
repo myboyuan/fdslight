@@ -51,7 +51,7 @@
 # 论坛及讨论区
 *.bannedbook.org
 
-# 新闻媒体
+###  国际媒体
 *.dongtaiwang.com
 *.epochtimes.com
 *.secretchina.com
@@ -64,6 +64,8 @@
 *.reuters.com
 *.reutersmedia.net
 *.aboluowang.com
+# 梵蒂冈广播电台
+*.vaticanradio.org
 
 # 网络存储
 *.dropbox.com
@@ -75,12 +77,16 @@
 *.wikimedia.org
 *.akamaihd.net
 *.chinadigitaltimes.net
-*.minghui.org
-*.zhengjian.org
-*.xinsheng.net
 *.vpngate.net
 *.akamai.net
 *.doubleclick.net
+
+### 宗教及非政府机构
+# 香港教会
+*.hkchurch.org
+*.minghui.org
+*.zhengjian.org
+*.xinsheng.net
 
 # 色情网站
 *.sex.com
