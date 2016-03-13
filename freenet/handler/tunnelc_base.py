@@ -256,6 +256,8 @@ class tunnelc_base(udp_handler.udp_handler):
 
         self.send(pong)
         self.add_evt_write(self.fileno)
+        self.__sent_ping_cnt = 0
+        self.set_timeout(self.fileno, self.__TIMEOUT)
 
     def __send_close(self):
         if self.__debug: self.print_access_log("send_close")

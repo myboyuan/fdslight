@@ -189,21 +189,15 @@ class tunnels_base(udp_handler.udp_handler):
         session_cls.encrypt_m.reset()
 
         if self.__debug: self.print_access_log("send_pong", address)
+        session_cls.sent_ping_cnt = 0
+        self.__timer.set_timeout(uniq_id, self.__SESSION_CHECK_TIMEOUT)
 
         self.add_evt_write(self.fileno)
         self.sendto(pong, address)
 
     def __handle_ping(self, address):
-        uniq_id = "%s-%s" % address
-        session_cls = self.__sessions[uniq_id]
-
-        pong = session_cls.encrypt_m.build_pong()
-        session_cls.encrypt_m.reset()
-
-        self.add_evt_write(self.fileno)
-        self.sendto(pong, address)
-
         if self.__debug: self.print_access_log("received_ping", address)
+        self.__send_pong(address)
 
     def __handle_pong(self, address):
         uniq_id = "%s-%s" % address
