@@ -108,14 +108,14 @@ class fdslight(dispatcher.dispatcher):
         if pid != 0: sys.exit(0)
 
         if mode == "server":
+            self.__create_fn_server(module)
             sys.stdout = open(fns_config.configs["access_log"], "a+")
             sys.stderr = open(fns_config.configs["error_log"], "a+")
-            self.__create_server_service(module)
 
         if mode == "client":
+            self.__create_fn_client(module)
             sys.stdout = open(fnc_config.configs["access_log"], "a+")
             sys.stderr = open(fnc_config.configs["error_log"], "a+")
-            self.___create_client_service(module)
             return
 
         return
