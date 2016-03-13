@@ -26,6 +26,7 @@ STATUS_AUTH_FAIL = 3
 
 class tunnel(tunnels_base.tunnels_base):
     __session_info = None
+    __session_limit = None
 
     def __rand_key(self, length=16):
         """生成随机KEY"""
@@ -61,6 +62,7 @@ class tunnel(tunnels_base.tunnels_base):
 
     def fn_init(self):
         self.__session_info = {}
+        self.__session_limit = {}
 
     def fn_auth(self, byte_data, address):
         """
@@ -70,9 +72,9 @@ class tunnel(tunnels_base.tunnels_base):
         """
         uniq_id = "%s-%s" % address
 
-        # 由于UDP的无状态性,为了确保验证包能收到,可能同时会发送多个验证,或者验证顺序错乱,因此需要处理
+        # 重要:由于UDP的无状态性,为了确保验证包能收到,可能同时会发送多个验证,或者验证顺序错乱,因此需要处理
         if uniq_id in self.__session_info:
-            session_id, client_ips = self.__session_info[uniq_id]
+            session_id, client_ips, username = self.__session_info[uniq_id]
             self.__response(STATUS_AUTH_OK, address,
                             session_id=session_id,
                             aes_key=self.__rand_key(),
@@ -100,6 +102,13 @@ class tunnel(tunnels_base.tunnels_base):
 
         # 默认有5台机器可以同时在线
         if is_find:
+            # 重要：防止一个用户有多个连接,占用服务器的虚拟IP资源
+            if username in self.__session_limit:
+                # 获取旧的地址
+                old_address = self.__session_limit[username]
+                # 释放session
+                self.unregister_session(old_address)
+
             client_ips = self.get_client_ips(5)
             if not client_ips:
                 self.__response(STATUS_SERVER_BUSY, address)
@@ -110,7 +119,8 @@ class tunnel(tunnels_base.tunnels_base):
                 return False
             aes_key = self.__rand_key()
             self.__response(STATUS_AUTH_OK, address, session_id=session_id, aes_key=aes_key, client_ips=client_ips)
-            self.__session_info[uniq_id] = (session_id, client_ips,)
+            self.__session_info[uniq_id] = (session_id, client_ips, username,)
+            self.__session_limit[username] = address
         else:
             self.__response(STATUS_AUTH_FAIL, address)
 
@@ -124,4 +134,6 @@ class tunnel(tunnels_base.tunnels_base):
 
     def fn_delete(self, address):
         uniq_id = "%s-%s" % address
-        if uniq_id in self.__session_info: del self.__session_info[uniq_id]
+        session_id, client_ips, username = self.__session_info[uniq_id]
+
+        del self.__session_limit[username]

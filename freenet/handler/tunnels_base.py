@@ -147,7 +147,11 @@ class tunnels_base(udp_handler.udp_handler):
 
         return session_id
 
-    def __unregister_session(self, address):
+    def get_session(self, address):
+        uniq_id = "%s-%s" % address
+        return self.__sessions.get(uniq_id, None)
+
+    def unregister_session(self, address):
         """注销会话"""
         uniq_id = "%s-%s" % address
         if uniq_id not in self.__sessions: return
@@ -165,6 +169,7 @@ class tunnels_base(udp_handler.udp_handler):
 
         session_cls.udp_nat_map = None
         self.print_access_log("close", address)
+        self.fn_delete(address)
 
         del self.__sessions[uniq_id]
 
@@ -208,13 +213,18 @@ class tunnels_base(udp_handler.udp_handler):
         if self.__debug: self.print_access_log("received_pong", address)
 
     def __handle_close(self, address):
-        self.__unregister_session(address)
+        self.unregister_session(address)
 
     def __handle_data(self, byte_data, address):
         protocol = byte_data[9]
         # 只支持 ICMP,TCP,UDP协议
         if protocol not in (1, 6, 17,):
             self.print_access_log("not_support_IP_protocol", address)
+            return
+        pkt_len = (byte_data[2] << 8) | byte_data[3]
+
+        if not self.fn_recv(pkt_len, address):
+            self.unregister_session(address)
             return
 
         uniq_id = "%s-%s" % address
@@ -273,6 +283,10 @@ class tunnels_base(udp_handler.udp_handler):
         session_cls.encrypt_m.reset()
 
         self.__timer.set_timeout(uniq_id, self.__SESSION_CHECK_TIMEOUT)
+
+        if not self.fn_send(data_len, client_address):
+            self.unregister_session(client_address)
+            return
 
         for pkt in pkts:
             self.sendto(pkt, client_address)
@@ -349,7 +363,7 @@ class tunnels_base(udp_handler.udp_handler):
             if name in self.__sessions:
                 session_cls = self.__sessions[name]
                 if session_cls.sent_ping_cnt > 8:
-                    self.__unregister_session(session_cls.address)
+                    self.unregister_session(session_cls.address)
                 else:
                     self.__send_ping(session_cls.address)
                 ''''''
