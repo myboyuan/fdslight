@@ -64,7 +64,7 @@
 *.reuters.com
 *.reutersmedia.net
 *.aboluowang.com
-# 梵蒂冈广播电台
+#  梵蒂冈广播电台
 *.vaticanradio.org
 
 # 网络存储
