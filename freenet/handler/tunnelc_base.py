@@ -302,7 +302,7 @@ class tunnelc_base(udp_handler.udp_handler):
 
     def udp_timeout(self):
         self.__nat.recyle_ips()
-
+        
         if not self.__is_auth:
             self.set_timeout(self.fileno, self.__TIMEOUT_NO_AUTH)
             self.fn_auth_request()
