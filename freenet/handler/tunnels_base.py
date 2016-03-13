@@ -178,6 +178,7 @@ class tunnels_base(udp_handler.udp_handler):
 
         if self.__debug: self.print_access_log("send_ping", address)
 
+        self.__timer.set_timeout(uniq_id, self.__SESSION_CHECK_TIMEOUT)
         self.add_evt_write(self.fileno)
         self.sendto(ping, address)
 
@@ -351,7 +352,6 @@ class tunnels_base(udp_handler.udp_handler):
                     self.__unregister_session(session_cls.address)
                 else:
                     self.__send_ping(session_cls.address)
-                    self.__timer.set_timeout(name, self.__SESSION_CHECK_TIMEOUT)
                 ''''''
             ''''''
         self.set_timeout(self.fileno, self.__TIMEOUT)
