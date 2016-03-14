@@ -10,7 +10,15 @@ configs = {
         "10.10.10.0",
         24
     ),
-    "crypto_module": "aes",
+    "crypto_module": {
+        # 加密模块名
+        "name": "aes",
+        # 模块初始化参数
+        "args": (
+            #  fdslight为初始化的aes key值,该值只有在发送验证的时候才使用
+            "fdslight",
+        )
+    },
     # 隧道模块
     "tunnels": "tunnels_simple",
     # 隧道模块配置

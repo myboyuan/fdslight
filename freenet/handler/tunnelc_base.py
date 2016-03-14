@@ -127,12 +127,13 @@ class tunnelc_base(udp_handler.udp_handler):
         self.__nat = _static_nat()
         self.__server = fnc_config.configs["server_address"]
 
-        name = "freenet.lib.crypto.%s" % fnc_config.configs["crypto_module"]
+        name = "freenet.lib.crypto.%s" % fnc_config.configs["crypto_module"]["name"]
         __import__(name)
         m = sys.modules.get(name, None)
 
-        self.__encrypt_m = m.encrypt()
-        self.__decrypt_m = m.decrypt()
+        crypto_args = fnc_config.configs["crypto_module"].get("args", ())
+        self.__encrypt_m = m.encrypt(*crypto_args)
+        self.__decrypt_m = m.decrypt(*crypto_args)
 
         self.__debug = debug
 

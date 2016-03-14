@@ -21,11 +21,11 @@ class _udp_session(object):
     decrypt_m = None
     encrypt_m = None
 
-    def __init__(self, sec_mod):
+    def __init__(self, sec_mod, mod_args):
         self.client_ips = {}
         self.udp_nat_map = {}
-        self.decrypt_m = sec_mod.decrypt()
-        self.encrypt_m = sec_mod.encrypt()
+        self.decrypt_m = sec_mod.decrypt(*mod_args)
+        self.encrypt_m = sec_mod.encrypt(*mod_args)
 
 
 class tunnels_base(udp_handler.udp_handler):
@@ -68,7 +68,7 @@ class tunnels_base(udp_handler.udp_handler):
         config = fns_config.configs
 
         # 导入加入模块
-        name = "freenet.lib.crypto.%s" % config["crypto_module"]
+        name = "freenet.lib.crypto.%s" % config["crypto_module"]["name"]
         __import__(name)
         m = sys.modules.get(name, None)
 
@@ -135,7 +135,8 @@ class tunnels_base(udp_handler.udp_handler):
         session_id = self.__get_session_id()
         if not session_id: return 0
 
-        session_cls = _udp_session(self.__crypto)
+        crypto_args = fns_config.configs["crypto_module"].get("args", ())
+        session_cls = _udp_session(self.__crypto, crypto_args)
 
         session_cls.session_id = session_id
         session_cls.client_ips = tmpdict
@@ -294,7 +295,8 @@ class tunnels_base(udp_handler.udp_handler):
         self.add_evt_write(self.fileno)
 
     def send_auth(self, address, byte_data):
-        tmp_encrypt = self.__crypto.encrypt()
+        crypto_args = fns_config.configs["crypto_module"].get("args", ())
+        tmp_encrypt = self.__crypto.encrypt(*crypto_args)
         pkts = tmp_encrypt.build_packets(tunnel_proto.ACT_AUTH, len(byte_data), byte_data)
         self.print_access_log("send_auth", address)
 
@@ -307,8 +309,9 @@ class tunnels_base(udp_handler.udp_handler):
         # 不允许的客户端只接丢弃包
         # session不存在的时候构建一个临时session
 
+        crypto_args = fns_config.configs["crypto_module"].get("args", ())
         if uniq_id not in self.__sessions:
-            session_cls = _udp_session(self.__crypto)
+            session_cls = _udp_session(self.__crypto, crypto_args)
         else:
             session_cls = self.__sessions[uniq_id]
         result = session_cls.decrypt_m.parse(message)

@@ -2,14 +2,22 @@
 configs = {
     "server_address": (
         # 你的服务器的地址以及端口
-        "www.example.com", 8964
+        "example.com", 8964
     ),
     "tunnelc": "tunnelc_simple",
     "tunnelc_simple": {
         "username": "test",
         "password": "test"
     },
-    "crypto_module": "aes",
+    "crypto_module": {
+        # 加密模块名
+        "name": "aes",
+        # 模块初始化参数
+        "args": (
+            #  fdslight为初始化的aes key值,该值只有在发送验证的时候才使用
+            "fdslight",
+        )
+    },
     # 需要代理的子网范围,在该子网范围内,会进行UDP代理
     "udp_proxy_subnet": ("192.168.1.128", 25),
     # 全局UDP代理,默认为0表示不使用全局,改为1为全局UDP代理,在nat3的网络中你可能需要开启此项

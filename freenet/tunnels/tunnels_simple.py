@@ -30,7 +30,7 @@ class tunnel(tunnels_base.tunnels_base):
 
     def __rand_key(self, length=16):
         """生成随机KEY"""
-        sts = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"
+        sts = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM@!&*()-+~<>?{}\|/,.`"
         size = len(sts)
         tmplist = []
         for i in range(length):
@@ -55,9 +55,8 @@ class tunnel(tunnels_base.tunnels_base):
 
         # 一定要在发送验证之后再重新设定aes key
         if aes_key:
-            b_aes_key = aes_key.encode()
-            self.get_encrypt(address).set_aes_key(b_aes_key)
-            self.get_decrypt(address).set_aes_key(b_aes_key)
+            self.get_encrypt(address).set_aes_key(aes_key)
+            self.get_decrypt(address).set_aes_key(aes_key)
         return
 
     def fn_init(self):

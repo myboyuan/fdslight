@@ -47,13 +47,11 @@ class tunnel(tunnelc_base.tunnelc_base):
 
         if status != STATUS_AUTH_OK: return False
 
-        b_aes_key = aes_key.encode()
-
         # 验证成功之后必须要设置session id
         self.set_session_id(session_id)
 
         self.alloc_vlan_ips(client_ip_list)
-        self.encrypt.set_aes_key(b_aes_key)
-        self.decrypt.set_aes_key(b_aes_key)
+        self.encrypt.set_aes_key(aes_key)
+        self.decrypt.set_aes_key(aes_key)
 
         return True

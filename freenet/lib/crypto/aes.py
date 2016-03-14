@@ -7,10 +7,9 @@ sys.path.append("../../../")
 """
 
 from Crypto.Cipher import AES
-import random
+import random, hashlib
 import freenet.lib.base_proto.tunnel as tunnel
 
-default_key = b"0123456789123456"
 FIXED_HEADER_SIZE = 32
 
 
@@ -23,8 +22,8 @@ class encrypt(tunnel.builder):
     __real_size = 0
     __body_size = 0
 
-    def __init__(self):
-        self.__key = default_key
+    def __init__(self, aes_key):
+        self.__key = hashlib.md5(aes_key.encode()).digest()
 
         if tunnel.MIN_FIXED_HEADER_SIZE % 16 != 0:
             self.__const_fill_nuls = b"\0" * (16 - tunnel.MIN_FIXED_HEADER_SIZE % 16)
@@ -88,8 +87,7 @@ class encrypt(tunnel.builder):
         return r
 
     def set_aes_key(self, new_key):
-        if len(new_key) != 16: raise ValueError("the size of key must be 16")
-        self.__key = new_key
+        self.__key = hashlib.md5(new_key.encode()).digest()
 
     def reset(self):
         super(encrypt, self).reset()
@@ -103,8 +101,8 @@ class decrypt(tunnel.parser):
     # 向量字节的结束位置
     __iv_end_pos = 0
 
-    def __init__(self):
-        self.__key = default_key
+    def __init__(self, aes_key):
+        self.__key = hashlib.md5(aes_key.encode()).digest()
         self.__iv_begin_pos = 0
         self.__iv_end_pos = self.__iv_begin_pos + 16
         super(decrypt, self).__init__(FIXED_HEADER_SIZE)
@@ -121,8 +119,8 @@ class decrypt(tunnel.parser):
 
         return d[0:length]
 
-    def set_aes_key(self, new_key):
-        if len(new_key) != 16: raise ValueError("the size of key must be 16")
+    def set_aes_key(self, key):
+        new_key = hashlib.md5(key.encode()).digest()
         self.__key = new_key
 
     def reset(self):
