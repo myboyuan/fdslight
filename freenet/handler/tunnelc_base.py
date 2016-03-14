@@ -66,7 +66,7 @@ class _static_nat(object):
         if dst_addr not in self.__dst_nat_table: return None
 
         dst_lan = self.__dst_nat_table[dst_addr]
-        self.__timer.set_timeout(dst_lan, self.__IP_TIMEOUT)
+        self.__timer.set_timeout(dst_addr, self.__IP_TIMEOUT)
         pkt_list = list(pkt)
         checksum.modify_address(dst_lan, pkt_list, checksum.FLAG_MODIFY_DST_IP)
 
@@ -76,13 +76,13 @@ class _static_nat(object):
         """回收已经分配出去的IP地址"""
         names = self.__timer.get_timeout_names()
         for name in names:
-            if name in self.__src_nat_table:
-                t = self.__src_nat_table[name]
+            if name in self.__dst_nat_table:
+                t = self.__dst_nat_table[name]
                 # 重新加入到待分配的列表中
                 self.__virtual_ips.append(name)
 
-                del self.__dst_nat_table[t]
-                del self.__src_nat_table[name]
+                del self.__dst_nat_table[name]
+                del self.__src_nat_table[t]
             if self.__timer.exists(name): self.__timer.drop(name)
         return
 
