@@ -30,10 +30,19 @@ class timer(object):
             pydict = self.__timeout_info_reverse[t]
             for k in pydict: names.append(k)
 
-        return names
+        tmpdict = {}
+        for name in names:
+            if name in tmpdict: continue
+            tmpdict[name] = None
+
+        results = []
+        for k in tmpdict: results.append(k)
+
+        return results
 
     def set_timeout(self, name, seconds=0):
         t = int(time.time()) + seconds
+        old_t = 0
 
         if name in self.__timeout_info:
             old_t = self.__timeout_info[name]
@@ -46,7 +55,8 @@ class timer(object):
             self.__timeout_info_reverse[t] = {}
 
         self.__timeout_info_reverse[t][name] = None
-        self.__time_list.append(t)
+        # 防止过多的生成相同的timeout
+        if old_t != t: self.__time_list.append(t)
         self.__time_list.sort()
 
     def exists(self, name):

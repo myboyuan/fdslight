@@ -347,7 +347,7 @@ class tunnels_base(udp_handler.udp_handler):
             src_addr = byte_data[12:16]
             # 检查客户端是否随意伪造分配到的IP
             if src_addr not in session_cls.client_ips:
-                self.print_access_log("illegal_client_vlan_ip", address)
+                self.print_access_log("illegal_client_vlan_ip_%s" % socket.inet_ntoa(src_addr), address)
                 return
 
         if action == tunnel_proto.ACT_PING: self.__handle_ping(address)
