@@ -122,6 +122,8 @@ class tunnelc_base(udp_handler.udp_handler):
 
     # 服务端IP地址
     __server_ipaddr = None
+    # send auth次数
+    __sent_auth_cnt = 0
 
     def init_func(self, creator_fd, whitelist, blacklist, debug=False):
         self.__nat = _static_nat()
@@ -218,6 +220,7 @@ class tunnelc_base(udp_handler.udp_handler):
         fdsl_ctl.add_whitelist_subnet(self.__traffic_fetch_fd, n, 32)
 
         self.__is_auth = True
+        self.__sent_auth_cnt = 0
         self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_open")
         self.ctl_handler(self.fileno, self.__dns_fd, "set_filter_dev_fd", self.__traffic_fetch_fd)
         self.set_timeout(self.fileno, self.__TIMEOUT)
@@ -237,6 +240,7 @@ class tunnelc_base(udp_handler.udp_handler):
         self.add_evt_write(self.fileno)
 
     def send_auth(self, auth_data):
+        self.__sent_auth_cnt += 1
         self.print_access_log("send_auth")
         self.send_data(len(auth_data), auth_data, action=tunnel_proto.ACT_AUTH)
 
@@ -307,6 +311,9 @@ class tunnelc_base(udp_handler.udp_handler):
         self.__nat.recyle_ips()
 
         if not self.__is_auth:
+            if self.__sent_auth_cnt > 5:
+                self.error()
+                return
             self.set_timeout(self.fileno, self.__TIMEOUT_NO_AUTH)
             self.fn_auth_request()
             return
