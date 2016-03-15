@@ -32,4 +32,6 @@ configs = {
     "access_log": "/tmp/fdslight_access.log",
     # 故障日志
     "error_log": "/tmp/fdslight_error.log",
+    # 黑名单路由缓存,确保重启之后路由还是成功的
+    "route_cache": "/tmp/fdslight_blacklist_route.cache",
 }

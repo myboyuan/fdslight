@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import pywind.evtframework.handler.udp_handler as udp_handler
 import pywind.lib.timer as timer
-import random, socket
+import random, socket, os, json
 import dns.message
 import fdslight_etc.fn_client as fn_config
 import freenet.lib.fdsl_ctl as fdsl_ctl
@@ -112,7 +112,6 @@ class dns_proxy(dns_base):
 
     __transparent_dns = None
 
-    __route_table = None
     __tunnel_fd = -1
 
     __dev_fd = -1
@@ -120,6 +119,11 @@ class dns_proxy(dns_base):
 
     # 加密dns的网络序IP地址
     __encrypt_dns_addrn = None
+
+    # 黑名单的IP大全
+    __blacklist_ips = None
+    # 是否是第一次调用
+    __is_first = True
 
     def __check_ipaddr(self, sts):
         """检查是否是IP地址
@@ -171,7 +175,7 @@ class dns_proxy(dns_base):
 
         self.__host_match = _host_match()
         self.__timer = timer.timer()
-        self.__route_table = {}
+        self.__blacklist_ips = {}
         self.__tunnel_fd = creator_fd
 
         for rule in host_rules:
@@ -183,6 +187,26 @@ class dns_proxy(dns_base):
         self.add_evt_read(self.fileno)
 
         return self.fileno
+
+    def __add_to_blacklist_cache(self, ipaddr, mask):
+        cache_file = fn_config.configs["route_cache"]
+        dumps = json.dumps(self.__blacklist_ips)
+        fdst = open(cache_file, "w")
+        fdst.write(dumps)
+        fdst.close()
+
+    def __get_blacklist_cache(self):
+        cache_file = fn_config.configs["route_cache"]
+        if not os.path.isfile(cache_file): return {}
+        fdst = open(cache_file, "r")
+        rdata = fdst.read()
+        fdst.close()
+        try:
+            return json.loads(rdata)
+        except json.JSONDecodeError:
+            os.remove(cache_file)
+            return self.__get_blacklist_cache()
+        ''''''
 
     def udp_readable(self, message, address):
         # dns至少有12个字节
@@ -242,10 +266,9 @@ class dns_proxy(dns_base):
             for cname in rrset:
                 ip = cname.__str__()
                 if not self.__check_ipaddr(ip): continue
-                if ip in self.__route_table: continue
-                self.__route_table[ip] = None
-                # cmd = "route add -host %s dev fdslight" % ip
-                # os.system(cmd)
+                if ip not in self.__blacklist_ips:
+                    self.__blacklist_ips[ip] = None
+                    self.__add_to_blacklist_cache(ip, 32)
                 if self.__tunnel_is_open: fdsl_ctl.add_blacklist_subnet(self.__dev_fd, utils.ip4s_2_number(ip), 32)
 
         self.__send_to_client(dns_body)
@@ -275,4 +298,10 @@ class dns_proxy(dns_base):
         if cmd not in ("tunnel_close", "tunnel_open", "set_filter_dev_fd"): return False
         if cmd == "tunnel_close": self.__tunnel_is_open = False
         if cmd == "tunnel_open": self.__tunnel_is_open = True
-        if cmd == "set_filter_dev_fd": self.__dev_fd = filter_dev
+
+        if cmd == "set_filter_dev_fd":
+            self.__dev_fd = filter_dev
+            if not self.__is_first: return
+            self.__blacklist_ips = self.__get_blacklist_cache()
+            self.__is_first = False
+            for ip in self.__blacklist_ips: fdsl_ctl.add_blacklist_subnet(self.__dev_fd, utils.ip4s_2_number(ip), 32)
