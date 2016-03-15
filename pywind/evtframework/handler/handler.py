@@ -54,7 +54,7 @@ class handler(object):
         instance = hook(self)
         self.__hooks[name] = instance
 
-        instance.hook_init(*args, **kwargs)
+        instance.hook_init(name, *args, **kwargs)
 
         return True
 
@@ -104,36 +104,48 @@ class handler(object):
         """重写这个方法,当hook调用退出函数时"""
         pass
 
+    def call_from_hook(self, name, cmd, *args, **kwargs):
+        """来自于hook的调用,重写这个方法"""
+        pass
+
     def wake_up_hook(self, name):
-        """唤醒hook"""
+        """
+        唤醒hook
+        """
         self.__hooks[name].wake_up()
 
     def evt_read(self):
-        """读事件,重写这个方法
+        """
+        读事件, 重写这个方法
         :return:
         """
-        pass
+
+    pass
 
     def evt_write(self):
-        """写事件,重写这个方法
+        """
+        写事件, 重写这个方法
         :return:
         """
         pass
 
     def timeout(self):
-        """时间超时,重写这个方法
+        """
+        时间超时, 重写这个方法
         :return:
         """
         pass
 
     def error(self):
-        """故障,重写这个方法
+        """
+        故障, 重写这个方法
         :return:
         """
         pass
 
     def delete(self):
-        """最一些对象销毁的善后工作,重写这个方法
+        """
+        最一些对象销毁的善后工作, 重写这个方法
         :return:
         """
         pass
@@ -151,7 +163,8 @@ class handler(object):
         return self.dispatcher.send_message_to_handler(src_fd, dst_fd, byte_data)
 
     def message_from_handler(self, from_fd, byte_data):
-        """重写这个方法,当其他的处理者发送消息会调用这个函数
+        """
+        重写这个方法, 当其他的处理者发送消息会调用这个函数
         :return:
         """
         pass
@@ -179,33 +192,45 @@ class handler(object):
 
     @property
     def dispatcher(self):
-        """获取分发器
+        """
+        获取分发器
         :return:
         """
         return global_vars[consts.SERVER_INSTANCE_NAME]
 
     def reset(self):
-        """重置资源,用于实现对象的重复利用,重写这个方法
+        """
+        重置资源, 用于实现对象的重复利用, 重写这个方法
         :return:
         """
         pass
 
     def ctl_handler(self, src_fd, dst_fd, cmd, *args, **kwargs):
-        """控制其它handler的行为
-        :param dst_fd:
-        :param cmd:
-        :param args:
-        :param kwargs:
+        """
+        控制其它handler的行为
+        :param
+        dst_fd:
+        :param
+        cmd:
+        :param
+        args:
+        :param
+        kwargs:
         :return:
         """
         return self.dispatcher.ctl_handler(src_fd, dst_fd, cmd, *args, **kwargs)
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
-        """handler控制命令,当此其它handler需要控制此handler的时候,此函数将会被调用
-        :param dst_fd:
-        :param cmd:
-        :param args:
-        :param kwargs:
+        """
+        handler控制命令, 当此其它handler需要控制此handler的时候, 此函数将会被调用
+        :param
+        dst_fd:
+        :param
+        cmd:
+        :param
+        args:
+        :param
+        kwargs:
         :return:
         """
         pass

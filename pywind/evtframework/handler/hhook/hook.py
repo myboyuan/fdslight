@@ -11,8 +11,9 @@ class hook(object):
     def __init__(self, handler):
         self.__handler = handler
 
-    def hook_init(self, fd, *args, **kwargs):
+    def hook_init(self, name, *args, **kwargs):
         """重写这个方法,hook初始化
+        :param name:自身的hook名
         :param args:
         :param kwargs:
         :return:
@@ -58,12 +59,6 @@ class hook(object):
         """
         self.__handler.hook_output(name, byte_data)
 
-    def delete_hooks(self):
-        """删除所有hook
-        :return:
-        """
-        self.__handler.delete_hooks()
-
     def delete_hook(self, hook_name):
         """删除特定的hook"""
         self.__handler.delete_hook(hook_name)
@@ -87,3 +82,7 @@ class hook(object):
         重写这个方法
         """
         pass
+
+    def call_handler(self, name, cmd, *args, **kwargs):
+        """调用handler"""
+        return self.__handler.call_from_hook(name, cmd, *args, **kwargs)

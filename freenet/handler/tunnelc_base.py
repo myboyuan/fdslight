@@ -24,7 +24,7 @@ class _static_nat(object):
 
     __timer = None
     # IP地址租赁有效期,如果超过这个时间,IP地址将被回收,以便可以让别的客户端可以连接
-    __IP_TIMEOUT = 240
+    __IP_TIMEOUT = 120
 
     def __init__(self):
         self.__dst_nat_table = {}
@@ -172,7 +172,7 @@ class tunnelc_base(udp_handler.udp_handler):
 
         new_pkt = self.__nat.get_new_packet_for_lan(byte_data)
         if not new_pkt:
-            self.print_access_log("cant_not_send_packet_to_lan")
+            self.print_access_log("cant_not_send_packet_to_lan_%s" % socket.inet_ntoa(byte_data[16:20]))
             return
 
         self.set_timeout(self.fileno, self.__TIMEOUT)
@@ -347,7 +347,9 @@ class tunnelc_base(udp_handler.udp_handler):
                 return
 
         new_pkt = self.__nat.get_new_packet_to_tunnel(byte_data)
-        if not new_pkt: return
+        if not new_pkt:
+            self.print_access_log("can_not_send_to_tunnel")
+            return
 
         pkt_len = (new_pkt[2] << 8) | new_pkt[3]
         self.send_data(pkt_len, new_pkt)
