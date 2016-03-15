@@ -11,6 +11,9 @@ class udp_handler(handler.handler):
     __socket = None
     __is_connect = False
 
+    # 接收缓冲队列大小
+    __recv_buff_size = 20
+
     def __init__(self):
         super(udp_handler, self).__init__()
         self.__timer = timer.timer()
@@ -19,6 +22,10 @@ class udp_handler(handler.handler):
         self.__is_connect = True
         self.__sent = []
         self.socket.connect(address)
+
+    def set_recv_buf_qsize(self, size):
+        """设置接收缓冲队列大小"""
+        self.__recv_buff_size = size
 
     def get_id(self, address):
         """根据地址生成唯一id"""
@@ -66,7 +73,9 @@ class udp_handler(handler.handler):
         return
 
     def evt_read(self):
-        while 1:
+        recv_buf_q = []
+
+        for i in range(self.__recv_buff_size):
             try:
                 message, address = self.socket.recvfrom(16384)
             except BlockingIOError:
@@ -74,7 +83,15 @@ class udp_handler(handler.handler):
             except:
                 self.error()
                 break
+            recv_buf_q.append((message, address,))
+
+        while 1:
+            try:
+                message, address = recv_buf_q.pop(0)
+            except IndexError:
+                break
             self.udp_readable(message, address)
+
         return
 
     def evt_write(self):

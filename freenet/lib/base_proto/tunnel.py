@@ -22,8 +22,8 @@ ACTS = (
 
 MIN_FIXED_HEADER_SIZE = 8
 
-# 包大小为1500是最适合UDP协议的,丢包最小
-EVERY_PKT_SIZE = 556
+# 包建议设置在480到1280之间
+EVERY_PKT_SIZE = 1200
 
 
 class builder(object):
