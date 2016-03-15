@@ -269,7 +269,7 @@ class dns_proxy(dns_base):
                 if ip not in self.__blacklist_ips:
                     self.__blacklist_ips[ip] = None
                     self.__add_to_blacklist_cache(ip, 32)
-                if self.__tunnel_is_open and ip not in self.__blacklist_ips:
+                if self.__tunnel_is_open:
                     fdsl_ctl.add_blacklist_subnet(self.__dev_fd, utils.ip4s_2_number(ip), 32)
                 ''''''
         self.__send_to_client(dns_body)
