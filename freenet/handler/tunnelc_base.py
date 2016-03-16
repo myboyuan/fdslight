@@ -24,7 +24,7 @@ class _static_nat(object):
 
     __timer = None
     # IP地址租赁有效期,如果超过这个时间,IP地址将被回收,以便可以让别的客户端可以连接
-    __IP_TIMEOUT = 120
+    __IP_TIMEOUT = 600
 
     def __init__(self):
         self.__dst_nat_table = {}
@@ -103,7 +103,7 @@ class tunnelc_base(udp_handler.udp_handler):
     __encrypt_m = None
     __decrypt_m = None
 
-    __TIMEOUT = 45
+    __TIMEOUT = 25
     __TIMEOUT_NO_AUTH = 5
     __session_id = 0
 

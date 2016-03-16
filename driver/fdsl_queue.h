@@ -22,7 +22,7 @@
 #endif
 
 
-#define FDSL_MTU 1800
+#define FDSL_MTU 1520
 
 struct fdsl_queue_data{
 	ssize_t size;

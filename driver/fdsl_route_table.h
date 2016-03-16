@@ -8,7 +8,7 @@
 #define IP_VERSION_4 4
 #define IP_VERSION_6 6
 
-#define FDSL_ROUTE_CACHE_SIZE 1000
+#define FDSL_ROUTE_CACHE_SIZE 200
 
 #define FDSL_IP_LEN(ip_ver) IP_VERSION_6!=ip_ver?4:16
 

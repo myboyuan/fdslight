@@ -67,6 +67,9 @@
 *.ablwang.com
 #  梵蒂冈广播电台
 *.vaticanradio.org
+*.bbc.com
+*.rfi.fr
+*.soundofhope.org
 
 # 网络存储
 *.dropbox.com
