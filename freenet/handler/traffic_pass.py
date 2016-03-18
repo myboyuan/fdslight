@@ -15,19 +15,13 @@ class traffic_read(handler.handler):
     """读取局域网的需要P2P的源数据包"""
     __tunnel_fd = -1
 
-    def init_func(self, creator_fd, whitelist):
+    def init_func(self, creator_fd):
         dev_path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
         fileno = os.open(dev_path, os.O_RDONLY)
 
-        subnet, mask = fnc_config.configs["udp_proxy_subnet"]
-        n = utils.ip4s_2_number(subnet)
-
-        fdsl_ctl.set_subnet(fileno, n, mask)
         self.__tunnel_fd = creator_fd
 
         self.set_fileno(fileno)
-        for ip, mask in whitelist: fdsl_ctl.add_whitelist_subnet(fileno, ip, mask)
-
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 

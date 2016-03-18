@@ -3,70 +3,42 @@
 #include<sys/ioctl.h>
 #include<fcntl.h>
 #include "fdsl_dev_ctl.h"
-static PyObject *
-fdsl_set_subnet(PyObject *self,PyObject *args)
-//设置要执行代理策略的子网
-{
-	int fileno;
-	struct fdsl_subnet tmp;
-
-	if(!PyArg_ParseTuple(args,"iIi",&fileno,&tmp.ipaddr,&tmp.mask)) return NULL;
-	
-	return PyLong_FromLong(ioctl(fileno,FDSL_IOC_SET_SUBNET,&tmp));
-}
 
 static PyObject *
-fdsl_add_whitelist_subnet(PyObject *self,PyObject *args)
-// UDP白名单模式,在白名单内,将不走代理
-{
-	int fileno;
-	struct fdsl_subnet tmp;
-
-	if(!PyArg_ParseTuple(args,"iIi",&fileno,&tmp.ipaddr,&tmp.mask)) return NULL;
-
-	return PyLong_FromLong(ioctl(fileno,FDSL_IOC_ADD_WHITELIST_SUBNET,&tmp));
-}
-
-static PyObject *
-fdsl_add_blacklist_subnet(PyObject *self,PyObject *args)
-// UDP白名单模式,在白名单内,将不走代理
-{
-	int fileno;
-	struct fdsl_subnet tmp;
-
-	if(!PyArg_ParseTuple(args,"iIi",&fileno,&tmp.ipaddr,&tmp.mask)) return NULL;
-
-	return PyLong_FromLong(ioctl(fileno,FDSL_IOC_ADD_BLACKLIST,&tmp));
-}
-
-
-static PyObject *
-fdsl_whitelist_exists(PyObject *self,PyObject *args)
+fdsl_tf_record_add(PyObject *self,PyObject *args)
 {
     int fileno;
     unsigned int ip4;
 
     if(!PyArg_ParseTuple(args,"iI",&fileno,&ip4)) return NULL;
-    return PyLong_FromLong(ioctl(fileno,FDSL_IOC_WHITELIST_EXISTS,&ip4));
+    return PyLong_FromLong(ioctl(fileno,FDSL_IOC_TF_RECORD_ADD,&ip4));
 }
 
 static PyObject *
-fdsl_blacklist_exists(PyObject *self,PyObject *args)
+fdsl_tf_find(PyObject *self,PyObject *args)
 {
     int fileno;
     unsigned int ip4;
 
     if(!PyArg_ParseTuple(args,"iI",&fileno,&ip4)) return NULL;
-    return PyLong_FromLong(ioctl(fileno,FDSL_IOC_BLACKLIST_EXISTS,&ip4));
+    return PyLong_FromLong(ioctl(fileno,FDSL_IOC_TF_FIND,&ip4));
+}
+
+static PyObject *
+fdsl_set_tunnel(PyObject *self,PyObject *args)
+{
+    int fileno;
+    unsigned int ip4;
+
+    if(!PyArg_ParseTuple(args,"iI",&fileno,&ip4)) return NULL;
+    return PyLong_FromLong(ioctl(fileno,FDSL_IOC_SET_TUNNEL_IP,&ip4));
 }
 
 
 static PyMethodDef fdsl_ctl_methods[]={
-	{"set_subnet",fdsl_set_subnet,METH_VARARGS,"set subnet"},
-	{"add_whitelist_subnet",fdsl_add_whitelist_subnet,METH_VARARGS,"set whitelist subnet"},
-	{"add_blacklist_subnet",fdsl_add_blacklist_subnet,METH_VARARGS,"set blacklist subnet"},
-	{"whitelist_exists",fdsl_whitelist_exists,METH_VARARGS,"whitelist exists"},
-	{"blacklist_exists",fdsl_blacklist_exists,METH_VARARGS,"blacklist exists"},
+	{"tf_record_add",fdsl_tf_record_add,METH_VARARGS,"add to tcp filter"},
+	{"tf_find",fdsl_tf_find,METH_VARARGS,"find tcp filter record"},
+    {"set_tunnel",fdsl_set_tunnel,METH_VARARGS,"set tunnel"},
 	{NULL,NULL,0,NULL}
 };
 

@@ -13,16 +13,16 @@
 #else
 
 #include<linux/types.h>
-#include<linux/slab.h>
+#include<linux/vmalloc.h>
 #include<linux/string.h>
 
-#define MALLOC(size) kmalloc(size,GFP_ATOMIC)
-#define FREE(p) kfree(p)
+#define MALLOC(size) vmalloc(size)
+#define FREE(p) vfree(p)
 
 #endif
 
 
-#define FDSL_MTU 1520
+#define FDSL_MTU 1501
 
 struct fdsl_queue_data{
 	ssize_t size;

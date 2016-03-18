@@ -27,6 +27,7 @@
 *.googlesyndication.com
 *.yahoo.com
 *.googlesyndication.com
+*.googletagmanager.com
 
 #  社交网络
 *.facebook.com

@@ -18,15 +18,11 @@
 #include<linux/version.h>
 #include "fdsl_queue.h"
 #include "fdsl_dev_ctl.h"
-#include "fdsl_route_table.h"
+#include "fdsl_tcp_filter.h"
 
 #define DEV_NAME FDSL_DEV_NAME
 #define DEV_CLASS FDSL_DEV_NAME
 #define QUEUE_SIZE 10
-
-/* 缓存标志定义 */
-#define CACHE_FLAG_IN_TABLE 1    // 路由表中有该数据
-#define CACHE_FLAG_NO_TABLE 2 //路由表中没有该数据
 
 struct fdsl_poll{
 	struct fdsl_queue *r_queue;
@@ -42,20 +38,11 @@ struct class *dev_class;
 static struct file_operations chr_ops;
 
 static struct fdsl_queue *r_queue;
+static struct fdsl_tcp_filter *tcp_filter;
 
 struct fdsl_poll *poll;
 
-static unsigned int subnet=0;
-static unsigned int mask=0;
-
-// 白名单
-static struct fdsl_route_table *fdsl_whitelist_rt;
-// 黑名单
-static struct fdsl_route_table *fdsl_blacklist_rt;
-// 白名单路由缓存
-static struct fdsl_route_cache *fdsl_wl_rc;
-// 黑名单路由缓存
-static struct fdsl_route_cache *fdsl_bl_rc;
+static unsigned int tunnel=0;
 
 static int chr_open(struct inode *node,struct file *f)
 {
@@ -72,70 +59,37 @@ static int chr_open(struct inode *node,struct file *f)
 	return 0;
 }
 
-static int fdsl_set_subnet(unsigned long arg)
+static int fdsl_set_tunnel(unsigned long arg)
 {
-	struct fdsl_subnet tmp;
-	int err=copy_from_user(&tmp,(struct fdsl_subnet *)arg,sizeof(struct fdsl_subnet));
-
+	int err=copy_from_user(&tunnel,(unsigned int *)arg,sizeof(unsigned int));
 	if(err) return -EINVAL;
-	
-	mask=0;
 
-	for(int n=0;n<tmp.mask;n++){
-		mask|=1<<(31-n);
-	}
-
-	subnet=tmp.ipaddr;
+    tunnel=htonl(tunnel);
 	return 0;
-
-}
-
-static int fdsl_add_to_table(struct fdsl_route_table *table,unsigned long arg)
-{
-	struct fdsl_subnet tmp;
-	int ret=0;
-	int err=copy_from_user(&tmp,(struct fdsl_subnet *)arg,sizeof(struct fdsl_subnet));
-
-	if(err) return -EINVAL;
-
-	tmp.ipaddr=ntohl(tmp.ipaddr);
-
-    ret=fdsl_route_table_add(table,(unsigned char *)(&tmp.ipaddr),tmp.mask);
-
-	return ret;
-}
-
-static int fdsl_table_exists(struct fdsl_route_table *table,unsigned long arg)
-{
-    unsigned int ip4;
-    int err=copy_from_user(&ip4,(unsigned int *)arg,sizeof(unsigned int));
-    if(err) return -EINVAL;
-
-    ip4=ntohl(ip4);
-
-    return fdsl_route_table_exists(table,(unsigned char *)(&ip4));
 }
 
 static long chr_ioctl(struct file *f,unsigned int cmd,unsigned long arg)
 {
-	int ret=0;
+	int ret=0,err=0;
+	unsigned int ui_tmp;
 	if(_IOC_TYPE(cmd)!=FDSL_IOC_MAGIC) return -EINVAL;
 
 	switch(cmd){
-		case FDSL_IOC_SET_SUBNET:
-			ret=fdsl_set_subnet(arg);
-			break;
-		case FDSL_IOC_ADD_WHITELIST_SUBNET:
-			ret=fdsl_add_to_table(fdsl_whitelist_rt,arg);
-			break;
-		case  FDSL_IOC_ADD_BLACKLIST:
-		    ret=fdsl_add_to_table(fdsl_blacklist_rt,arg);
-		 case FDSL_IOC_WHITELIST_EXISTS:
-		    ret=fdsl_table_exists(fdsl_whitelist_rt,arg);
-		    break;
-		 case FDSL_IOC_BLACKLIST_EXISTS:
-            ret=fdsl_table_exists(fdsl_blacklist_rt,arg);
-		    break;
+        case FDSL_IOC_TF_RECORD_ADD:
+            err=copy_from_user(&ui_tmp,(unsigned int *)arg,sizeof(unsigned int));
+            if(err) return -EINVAL;
+            ui_tmp=ntohl(ui_tmp);
+            ret=fdsl_tf_add(tcp_filter,(const char *)(&ui_tmp));
+            break;
+        case FDSL_IOC_TF_FIND:
+            err=copy_from_user(&ui_tmp,(unsigned int *)arg,sizeof(unsigned int));
+            if(err) return -EINVAL;
+            ui_tmp=ntohl(ui_tmp);
+            ret=fdsl_tf_find(tcp_filter,(const char *)(&ui_tmp));
+            break;
+        case FDSL_IOC_SET_TUNNEL_IP:
+            ret=fdsl_set_tunnel(arg);
+            break;
 		default:
 			ret=-EINVAL;
 			break;
@@ -192,11 +146,8 @@ static unsigned int fdsl_push_packet_to_user(struct iphdr *ip_header)
 static unsigned int hanle_udp_in(struct iphdr *ip_header)
 // 处理UDP流进出来的UDP
 {
-    unsigned int saddr,daddr;
     unsigned short sport,dport;
-    int cache_not_exists,table_exists;
 	struct udphdr *udp_header;
-	struct fdsl_route_cache_data *cdata;
 
     udp_header=(struct udphdr *)((__u32 *)ip_header+ip_header->ihl);
     dport=ntohs((unsigned short int)udp_header->dest);
@@ -206,28 +157,8 @@ static unsigned int hanle_udp_in(struct iphdr *ip_header)
     if(53==dport) return NF_ACCEPT;
 	if(53==sport) return NF_ACCEPT;
 
-	saddr=htonl((unsigned int)ip_header->saddr);
-	daddr=(unsigned int)ip_header->daddr;
-
-	if(subnet!=(mask & saddr)) return NF_ACCEPT;
-
-	// 首先从缓存中查找数据是否存在
-    cdata=fdsl_route_cache_find(fdsl_wl_rc,(unsigned char *)(&daddr));
-    cache_not_exists=memcmp(cdata->ipaddr,(unsigned char *)(&daddr),4);
-
-    if(!cache_not_exists){
-        if(CACHE_FLAG_IN_TABLE==cdata->flags) return NF_ACCEPT;
-        if(CACHE_FLAG_NO_TABLE==cdata->flags) return fdsl_push_packet_to_user(ip_header);
-    }
-
-    table_exists=fdsl_route_table_exists(fdsl_whitelist_rt,(unsigned char *)(&daddr));
-
-	if(table_exists){
-	    fdsl_route_cache_add(fdsl_wl_rc,CACHE_FLAG_IN_TABLE,(unsigned char *)(&daddr));
-	    return NF_ACCEPT;
-	}
-
-	fdsl_route_cache_add(fdsl_wl_rc,CACHE_FLAG_NO_TABLE,(unsigned char *)(&daddr));
+	//saddr=htonl((unsigned int)ip_header->saddr);
+	//daddr=(unsigned int)ip_header->daddr;
 
     return fdsl_push_packet_to_user(ip_header);
 
@@ -236,32 +167,15 @@ static unsigned int hanle_udp_in(struct iphdr *ip_header)
 static unsigned int handle_tcp_and_icmp_in(struct iphdr *ip_header)
 // TCP和ICMP处理
 {
-    unsigned int saddr,daddr;
-    int cache_not_exists,table_exists;
-    struct fdsl_route_cache_data *cdata;
+    unsigned int daddr;
+	int find_r=0;
 
-	saddr=htonl((unsigned int)ip_header->saddr);
 	daddr=(unsigned int)ip_header->daddr;
+    find_r=fdsl_tf_find(tcp_filter,(const char *)(&daddr));
 
-	// 首先从缓存中查找数据是否存在
-    cdata=fdsl_route_cache_find(fdsl_bl_rc,(unsigned char *)(&daddr));
-    cache_not_exists=memcmp(cdata->ipaddr,(unsigned char *)(&daddr),4);
+	if (find_r < 1) return NF_ACCEPT;
 
-    if(!cache_not_exists){
-        if(CACHE_FLAG_IN_TABLE==cdata->flags) return fdsl_push_packet_to_user(ip_header);
-        if(CACHE_FLAG_NO_TABLE==cdata->flags) return NF_ACCEPT;;
-    }
-
-    table_exists=fdsl_route_table_exists(fdsl_blacklist_rt,(unsigned char *)(&daddr));
-
-	if(table_exists){
-	    fdsl_route_cache_add(fdsl_bl_rc,CACHE_FLAG_IN_TABLE,(unsigned char *)(&daddr));
-	   return fdsl_push_packet_to_user(ip_header);
-	}
-
-	fdsl_route_cache_add(fdsl_bl_rc,CACHE_FLAG_NO_TABLE,(unsigned char *)(&daddr));
-
-    return NF_ACCEPT;
+    return fdsl_push_packet_to_user(ip_header);
 }
 
 static unsigned int nf_handle_in(
@@ -282,6 +196,7 @@ static unsigned int nf_handle_in(
 {
 	struct iphdr *ip_header;
 	unsigned char protocol;
+	unsigned int daddr;
 
 	if(!flock_flag) return NF_ACCEPT;
 	if(!skb) return NF_ACCEPT;
@@ -289,6 +204,10 @@ static unsigned int nf_handle_in(
 	ip_header=(struct iphdr *)skb_network_header(skb);
 
 	if(!ip_header) return NF_ACCEPT;
+	daddr=(unsigned int)ip_header->daddr;
+
+	if (daddr==tunnel) return NF_ACCEPT;
+
 	protocol=ip_header->protocol;
 
 	switch(protocol){
@@ -360,13 +279,10 @@ static int fdsl_init(void)
 	init_waitqueue_head(&poll->inq);
 
 	r_queue=fdsl_queue_init(QUEUE_SIZE);
+    tcp_filter=fdsl_tf_init(FDSL_IP_VER4);
+    
 	poll->r_queue=r_queue;
 
-	fdsl_whitelist_rt=fdsl_route_table_init(IP_VERSION_4);
-	fdsl_wl_rc=fdsl_route_cache_init(IP_VERSION_4);
-
-	fdsl_blacklist_rt=fdsl_route_table_init(IP_VERSION_4);
-	fdsl_bl_rc=fdsl_route_cache_init(IP_VERSION_4);
 
 	return 0;
 }
@@ -376,13 +292,8 @@ static void fdsl_exit(void)
 	delete_dev();
 	nf_unregister_hook(&nf_ops);
 	fdsl_queue_release(r_queue);
-
-	fdsl_route_table_release(fdsl_whitelist_rt);
-	fdsl_route_cache_release(fdsl_wl_rc);
-
-	fdsl_route_table_release(fdsl_blacklist_rt);
-	fdsl_route_cache_release(fdsl_bl_rc);
-
+    fdsl_tf_release(tcp_filter);
+    
 	kfree(poll);
 }
 

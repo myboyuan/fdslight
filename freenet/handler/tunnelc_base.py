@@ -3,6 +3,7 @@
 隧道客户端基本类
 """
 import json, socket, sys, time
+
 import fdslight_etc.fn_client as fnc_config
 import pywind.evtframework.handler.udp_handler as udp_handler
 import pywind.lib.timer as timer
@@ -209,15 +210,9 @@ class tunnelc_base(udp_handler.udp_handler):
         self.set_timeout(self.fileno, self.__TIMEOUT_NO_AUTH)
 
     def __handle_auth_ok(self, session_id):
-        if self.__is_open_fetch_fd_once:
-            whitelist = []
-        else:
-            whitelist = self.__whitelist
-
-        self.__traffic_fetch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read, whitelist)
-
+        self.__traffic_fetch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read)
         n = utils.ip4s_2_number(self.__server_ipaddr)
-        fdsl_ctl.add_whitelist_subnet(self.__traffic_fetch_fd, n, 32)
+        fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
 
         self.__is_auth = True
         self.__sent_auth_cnt = 0
@@ -345,8 +340,8 @@ class tunnelc_base(udp_handler.udp_handler):
             if not self.__is_auth:
                 self.send_message_to_handler(self.fileno, self.__traffic_send_fd, byte_data)
                 return
-
         new_pkt = self.__nat.get_new_packet_to_tunnel(byte_data)
+
         if not new_pkt:
             self.print_access_log("can_not_send_to_tunnel")
             return

@@ -1,6 +1,6 @@
 ifneq ($(KERNELRELEASE),)
 obj-m := fdslight.o
-ccflags-y := -std=gnu99
+ccflags-y := -std=gnu99 -g -D FDSL_LINUX_KERNEL
 else
 		PWD  := $(shell pwd)
 		KVER := $(shell uname -r)

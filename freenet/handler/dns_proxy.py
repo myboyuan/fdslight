@@ -270,7 +270,7 @@ class dns_proxy(dns_base):
                     self.__blacklist_ips[ip] = None
                     self.__add_to_blacklist_cache(ip, 32)
                 if self.__tunnel_is_open:
-                    fdsl_ctl.add_blacklist_subnet(self.__dev_fd, utils.ip4s_2_number(ip), 32)
+                    fdsl_ctl.tf_record_add(self.__dev_fd, utils.ip4s_2_number(ip))
                 ''''''
         self.__send_to_client(dns_body)
 
@@ -305,4 +305,4 @@ class dns_proxy(dns_base):
             if not self.__is_first: return
             self.__blacklist_ips = self.__get_blacklist_cache()
             self.__is_first = False
-            for ip in self.__blacklist_ips: fdsl_ctl.add_blacklist_subnet(self.__dev_fd, utils.ip4s_2_number(ip), 32)
+            for ip in self.__blacklist_ips: fdsl_ctl.tf_record_add(self.__dev_fd, utils.ip4s_2_number(ip))
