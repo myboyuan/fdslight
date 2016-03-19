@@ -19,9 +19,10 @@ def __drop_comment(line):
 
 def __read_from_file(fpath):
     result = []
-    fdst = open(fpath, "r")
+    fdst = open(fpath, "rb")
 
     for line in fdst:
+        line = line.decode("iso-8859-1")
         line = __drop_comment(line)
         line = line.replace("\r", "")
         line = line.replace("\n", "")
@@ -48,14 +49,11 @@ def __get_ip_subnet(line):
     pos += 1
 
     try:
-        ip_packet = socket.inet_aton(ipaddr)
         mask = int(line[pos:])
     except:
         return None
 
-    n = (ip_packet[0] << 24) | (ip_packet[1] << 16) | (ip_packet[2] << 8) | ip_packet[3]
-
-    return (n, mask,)
+    return (ipaddr, mask,)
 
 
 def parse_ip_subnet_file(fpath):
@@ -68,4 +66,3 @@ def parse_ip_subnet_file(fpath):
         results.append(ret)
 
     return results
-

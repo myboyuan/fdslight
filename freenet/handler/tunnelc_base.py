@@ -2,7 +2,7 @@
 """
 隧道客户端基本类
 """
-import json, socket, sys, time
+import socket, sys, time
 
 import fdslight_etc.fn_client as fnc_config
 import pywind.evtframework.handler.udp_handler as udp_handler
@@ -93,6 +93,106 @@ class _static_nat(object):
         self.__src_nat_table = {}
 
 
+class _udp_whitelist(object):
+    """UDP白名单类"""
+    __tree = None
+    # 缓存回收超时
+    __CACHE_TIMEOUT = 180
+    __timer = None
+
+    __cache = None
+
+    def __init__(self):
+        self.__tree = {}
+        self.__timer = timer.timer()
+        self.__cache = {}
+
+    def add_rule(self, ipaddr, mask):
+        if mask < 1 or mask > 32: raise ValueError("the value of mask is wrong")
+        ippkt = socket.inet_aton(ipaddr)
+
+        tmp_dict = self.__tree
+
+        a = int(mask / 8)
+        r = mask % 8
+        if r: a += 1
+
+        for i in range(4):
+            n = ippkt[i]
+
+            if i + 1 == a:
+                if "values" not in tmp_dict: tmp_dict["values"] = {}
+                if mask not in tmp_dict["values"]: tmp_dict["values"][mask] = []
+                tmp_dict["values"][mask].append(n)
+                break
+
+            if n not in tmp_dict:
+                tmp_dict[n] = {}
+
+            tmp_dict = tmp_dict[n]
+
+        return
+
+    def __add_to_cache(self, ippkt, from_wl=True):
+        self.__cache[ippkt] = from_wl
+        self.__timer.set_timeout(ippkt, self.__CACHE_TIMEOUT)
+
+    def __get_subn(self, a_list, b):
+        cnt = 24
+        ret_v = 0
+
+        for n in a_list:
+            ret_v |= n << cnt
+            cnt -= 8
+
+        return ret_v | (b << cnt)
+
+    def find(self, ippkt):
+        if ippkt in self.__cache: return self.__cache[ippkt]
+
+        tmp_dict = self.__tree
+        t_net_v = utils.ip4b_2_number(ippkt)
+
+        values = []
+        _values = None
+
+        for n in ippkt:
+            if n not in tmp_dict:
+                if "values" not in tmp_dict:
+                    self.__add_to_cache(ippkt, from_wl=False)
+                    return False
+                _values = tmp_dict["values"]
+                break
+            values.append(n)
+            tmp_dict = tmp_dict[n]
+
+        is_find = False
+
+        for m in _values:
+            mask_v = 0
+            for i in range(m): mask_v |= 1 << (31 - i)
+            for t in _values[m]:
+                subn = self.__get_subn(values, t)
+                if t_net_v & mask_v == subn:
+                    is_find = True
+                    break
+                ''''''
+            ''''''
+        self.__add_to_cache(ippkt, from_wl=is_find)
+
+        return is_find
+
+    def recycle_cache(self):
+        names = self.__timer.get_timeout_names()
+        for name in names:
+            if name in self.__cache: del self.__cache[name]
+            if self.__timer.exists(name): self.__timer.drop(name)
+        return
+
+    def print_tree(self):
+        print(self.__tree)
+
+
 class tunnelc_base(udp_handler.udp_handler):
     __nat = None
     __server = None
@@ -117,14 +217,16 @@ class tunnelc_base(udp_handler.udp_handler):
 
     # 是否曾经打开过流量捕获设备
     __is_open_fetch_fd_once = False
-    __whitelist = None
-
     __debug = False
 
     # 服务端IP地址
     __server_ipaddr = None
     # send auth次数
     __sent_auth_cnt = 0
+
+    # UDP白名单部分相关变量
+    __udp_whitelist = None
+    __udp_proxy_map = None
 
     def init_func(self, creator_fd, whitelist, blacklist, debug=False):
         self.__nat = _static_nat()
@@ -158,9 +260,14 @@ class tunnelc_base(udp_handler.udp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
+        # 如果是非全局UDP代理,那么开启UDP白名单模式
+        if not fnc_config.configs["udp_global"]:
+            self.__udp_whitelist = _udp_whitelist()
+            self.__udp_proxy_map = {}
+            for subn, mask in whitelist: self.__udp_whitelist.add_rule(subn, mask)
+
         self.fn_init()
         self.fn_auth_request()
-        self.__whitelist = whitelist
         self.set_timeout(self.fileno, self.__TIMEOUT_NO_AUTH)
 
         return self.fileno
@@ -224,11 +331,11 @@ class tunnelc_base(udp_handler.udp_handler):
         self.encrypt.set_session_id(sid)
 
     def send_data(self, pkt_len, byte_data, action=tunnel_proto.ACT_DATA):
+        if self.__debug:self.print_access_log("send_data")
         ippkts = self.__encrypt_m.build_packets(action, pkt_len, byte_data)
         self.__encrypt_m.reset()
 
-        for ippkt in ippkts:
-            self.send(ippkt)
+        for ippkt in ippkts: self.send(ippkt)
 
         if self.__is_auth: self.set_timeout(self.fileno, self.__TIMEOUT)
 
@@ -304,6 +411,7 @@ class tunnelc_base(udp_handler.udp_handler):
 
     def udp_timeout(self):
         self.__nat.recyle_ips()
+        if fnc_config.configs["udp_global"]: self.__udp_whitelist.recycle_cache()
 
         if not self.__is_auth:
             if self.__sent_auth_cnt > 5:
@@ -335,13 +443,53 @@ class tunnelc_base(udp_handler.udp_handler):
     def decrypt(self):
         return self.__decrypt_m
 
+    def __udp_local_proxy_for_send(self, byte_data):
+        """当地UDP代理,该代理不经过加密隧道"""
+        ihl = (byte_data[0] & 0x0f) * 4
+        offset = ((byte_data[6] & 0x1f) << 5) | byte_data[7]
+
+        # 说明不是第一个数据分包,那么就直接发送给raw socket
+        if offset:
+            L = list(byte_data)
+            checksum.modify_address(b"\0\0\0\0", L, checksum.FLAG_MODIFY_SRC_IP)
+            self.send_message_to_handler(self.fileno, self.__traffic_send_fd, bytes(L))
+            return
+
+        b, e = (ihl, ihl + 1,)
+        sport = (byte_data[b] << 8) | byte_data[e]
+        saddr = socket.inet_ntoa(byte_data[12:16])
+        uniq_id = self.get_id((saddr, sport,))
+
+        fileno = 0
+        if uniq_id not in self.__udp_proxy_map:
+            fileno = self.create_handler(self.fileno, traffic_pass.udp_proxy,
+                                         self.__traffic_send_fd, (saddr, sport,),
+                                         uniq_id)
+            self.__udp_proxy_map[uniq_id] = fileno
+        else:
+            fileno = self.__udp_proxy_map[uniq_id]
+        self.send_message_to_handler(self.fileno, fileno, byte_data)
+
     def message_from_handler(self, from_fd, byte_data):
         if from_fd == self.__dns_fd:
             if not self.__is_auth:
                 self.send_message_to_handler(self.fileno, self.__traffic_send_fd, byte_data)
                 return
-        new_pkt = self.__nat.get_new_packet_to_tunnel(byte_data)
 
+        # 说明消息来自udp proxy
+        if from_fd not in (self.__dns_fd, self.__traffic_fetch_fd,):
+            self.send_message_to_handler(self.fileno, self.__traffic_send_fd, byte_data)
+            return
+
+        protocol = byte_data[9]
+        # 处理UDP代理
+        if protocol == 17 and fnc_config.configs["udp_global"] and from_fd != self.__dns_fd:
+            if self.__udp_whitelist.find(byte_data[16:20]):
+                self.__udp_local_proxy_for_send(byte_data)
+                return
+            ''''''
+
+        new_pkt = self.__nat.get_new_packet_to_tunnel(byte_data)
         if not new_pkt:
             self.print_access_log("can_not_send_to_tunnel")
             return
@@ -351,6 +499,7 @@ class tunnelc_base(udp_handler.udp_handler):
 
     def alloc_vlan_ips(self, ips):
         """分配虚拟IP地址"""
+        if self.__debug: self.print_access_log("alloc_ip_list:%s" % str(ips))
         self.__nat.add_virtual_ips(ips)
 
     def print_access_log(self, text):
@@ -359,6 +508,11 @@ class tunnelc_base(udp_handler.udp_handler):
         echo = "%s        %s         %s" % (text, addr, t)
 
         print(echo)
+
+    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
+        if cmd != "udp_nat_del": return False
+        uniq_id, lan_address = args
+        del self.__udp_proxy_map[uniq_id]
 
     def fn_init(self):
         """初始化函数,重写这个方法"""

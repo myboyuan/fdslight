@@ -10,6 +10,7 @@ class udp_handler(handler.handler):
     __sent = None
     __socket = None
     __is_connect = False
+    __peer_address = None
 
     # 接收缓冲队列大小
     __recv_buff_size = 20
@@ -22,6 +23,7 @@ class udp_handler(handler.handler):
         self.__is_connect = True
         self.__sent = []
         self.socket.connect(address)
+        self.__peer_address = self.socket.getpeername()
 
     def set_recv_buf_qsize(self, size):
         """设置接收缓冲队列大小"""
@@ -77,14 +79,17 @@ class udp_handler(handler.handler):
 
         for i in range(self.__recv_buff_size):
             try:
-                message, address = self.socket.recvfrom(16384)
+                if self.__is_connect:
+                    message = self.socket.recv(16384)
+                    address=self.__peer_address
+                else:
+                    message, address = self.socket.recvfrom(16384)
             except BlockingIOError:
                 break
             except:
                 self.error()
                 break
             recv_buf_q.append((message, address,))
-
         while 1:
             try:
                 message, address = recv_buf_q.pop(0)
@@ -104,7 +109,7 @@ class udp_handler(handler.handler):
                 sent_size = self.socket.send(byte_data)
                 remain = byte_data[sent_size:]
                 if remain:
-                    self.__sent.insert(0, remain)
+                    self.__sent.insert(0, byte_data)
                     return
                 continue
             ''''''
