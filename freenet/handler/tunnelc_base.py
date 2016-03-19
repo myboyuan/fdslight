@@ -283,6 +283,7 @@ class tunnelc_base(udp_handler.udp_handler):
             self.print_access_log("cant_not_send_packet_to_lan_%s" % socket.inet_ntoa(byte_data[16:20]))
             return
 
+        if self.__debug:self.print_access_log("recv_data")
         self.set_timeout(self.fileno, self.__TIMEOUT)
 
         if p != 17:

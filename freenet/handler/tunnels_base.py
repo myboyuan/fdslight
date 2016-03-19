@@ -217,7 +217,7 @@ class tunnels_base(udp_handler.udp_handler):
         self.unregister_session(address)
 
     def __handle_data(self, byte_data, address):
-        if self.__debug: self.print_access_log("recv_data",address)
+        if self.__debug: self.print_access_log("recv_data", address)
         protocol = byte_data[9]
         # 只支持 ICMP,TCP,UDP协议
         if protocol not in (1, 6, 17,):
@@ -290,8 +290,8 @@ class tunnels_base(udp_handler.udp_handler):
             self.unregister_session(client_address)
             return
 
-        for pkt in pkts:
-            self.sendto(pkt, client_address)
+        if self.__debug:self.print_access_log("send_data",client_address)
+        for pkt in pkts: self.sendto(pkt, client_address)
 
         self.add_evt_write(self.fileno)
 
