@@ -53,8 +53,9 @@ class _static_nat(object):
         checksum.modify_address(vir_ip, pkt_list, checksum.FLAG_MODIFY_SRC_IP)
 
         self.__timer.set_timeout(vir_ip, self.__IP_TIMEOUT)
-        self.__dst_nat_table[vir_ip] = src_addr
-        self.__src_nat_table[src_addr] = vir_ip
+
+        if vir_ip not in self.__dst_nat_table: self.__dst_nat_table[vir_ip] = src_addr
+        if src_addr not in self.__src_nat_table: self.__src_nat_table[src_addr] = vir_ip
 
         return bytes(pkt_list)
 
@@ -91,6 +92,20 @@ class _static_nat(object):
         self.__virtual_ips = []
         self.__dst_nat_table = {}
         self.__src_nat_table = {}
+
+    def bind(self, src_ippkt):
+        """把特定源地址域虚拟VLAN地址绑定起来"""
+        if self.__bind:
+            src, vsrc = self.__bind
+            self.__virtual_ips.append(vsrc)
+
+        try:
+            vsrc = self.__virtual_ips.pop(0)
+        except IndexError:
+            return False
+
+        self.__bind = (src_ippkt, vsrc,)
+        return True
 
 
 class _udp_whitelist(object):
@@ -283,7 +298,7 @@ class tunnelc_base(udp_handler.udp_handler):
             self.print_access_log("cant_not_send_packet_to_lan_%s" % socket.inet_ntoa(byte_data[16:20]))
             return
 
-        if self.__debug:self.print_access_log("recv_data")
+        if self.__debug: self.print_access_log("recv_data")
         self.set_timeout(self.fileno, self.__TIMEOUT)
 
         if p != 17:
@@ -332,7 +347,7 @@ class tunnelc_base(udp_handler.udp_handler):
         self.encrypt.set_session_id(sid)
 
     def send_data(self, pkt_len, byte_data, action=tunnel_proto.ACT_DATA):
-        if self.__debug:self.print_access_log("send_data")
+        if self.__debug: self.print_access_log("send_data")
         ippkts = self.__encrypt_m.build_packets(action, pkt_len, byte_data)
         self.__encrypt_m.reset()
 
@@ -501,6 +516,9 @@ class tunnelc_base(udp_handler.udp_handler):
     def alloc_vlan_ips(self, ips):
         """分配虚拟IP地址"""
         if self.__debug: self.print_access_log("alloc_ip_list:%s" % str(ips))
+        if len(ips) < 2:
+            print("server not alloc enough ip")
+            sys.exit(-1)
         self.__nat.add_virtual_ips(ips)
 
     def print_access_log(self, text):

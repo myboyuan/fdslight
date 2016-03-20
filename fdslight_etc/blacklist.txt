@@ -71,6 +71,8 @@
 *.bbc.com
 *.rfi.fr
 *.soundofhope.org
+# 纽约时报
+*.nytimes.com
 
 # 网络存储
 *.dropbox.com

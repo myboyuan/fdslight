@@ -108,6 +108,7 @@ class tunnel(tunnels_base.tunnels_base):
                 # 释放session
                 self.unregister_session(old_address)
 
+            # 你至少需要分配2个IP地址,有一个IP地址需要绑定DNS
             client_ips = self.get_client_ips(5)
             if not client_ips:
                 self.__response(STATUS_SERVER_BUSY, address)
