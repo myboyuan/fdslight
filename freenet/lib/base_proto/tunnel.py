@@ -22,14 +22,13 @@ ACTS = (
 
 MIN_FIXED_HEADER_SIZE = 8
 
-# 包建议设置在480到1280之间，但最好建议在1200左右，经测试可以减少丢包率
-EVERY_PKT_SIZE = 1216
-
 
 class builder(object):
     __session_id = 0
     __fixed_header_size = 0
     __pkt_id = 1
+    # 数据块大小
+    __block_size = 1210
 
     def __init__(self, fixed_header_size):
         if fixed_header_size < MIN_FIXED_HEADER_SIZE: raise ValueError(
@@ -38,6 +37,35 @@ class builder(object):
 
     def set_session_id(self, session_id):
         self.__session_id = session_id
+
+    @property
+    def block_size(self):
+        return self.__block_size
+
+    def __gen_raib(self, block_a, block_b):
+        """生成冗余数据块,类似于磁盘阵列的RAID5模式,较少丢包率
+        """
+        size_a = len(block_a)
+        size_b = len(block_b)
+
+        list_a = list(block_a)
+        list_b = list(block_b)
+
+        L = None
+        if size_a > size_b:
+            L = list_b
+        else:
+            L = list_a
+        n = abs(size_a - size_b)
+        for i in range(n): L.append(0)
+        csum_list = []
+        cnt = 0
+        for n in list_a:
+            csum = n ^ list_b[cnt]
+            cnt += 1
+            csum_list.append(csum)
+
+        return (bytes(list_a), bytes(list_b), bytes(csum_list),)
 
     def __build_proto_header(self, real_size, tot_seg, seq, action):
         if action not in ACTS: raise ValueError("not support action type")
@@ -63,39 +91,50 @@ class builder(object):
         if not b: return a
         return a + 1
 
-    def build_packets(self, action, data_len, byte_data):
-        max_data_size = self.get_max_body_size()
-        tot_seg = self.__calc_tot_seg(data_len, max_data_size)
-        seq = 1
-        b = 0
-        e = max_data_size
-        data_seq = []
+    def __get_sent_raw_data(self, data_len, byte_data):
+        """获取要发送的原始数据"""
+        data_block_size = self.__block_size - self.__fixed_header_size
+        tmplist = []
+        b, e = (0, data_block_size,)
 
-        if data_len == 0:
-            base_hdr = self.__build_proto_header(0, 1, 1, action)
-            header = self.wrap_header(base_hdr)
-            data_seq.append(header)
+        if data_len == 0: return [b"",]
 
         while b < data_len:
-            data = byte_data[b:e]
+            t = byte_data[b:e]
+            b = e
+            e += data_block_size
+            tmplist.append(t)
 
-            if seq == tot_seg:
-                size = len(data)
-            else:
-                size = max_data_size
+        ret_v = None
+        # 如果有2个数据块,那么启用数据冗余,减少丢包率
+        if len(tmplist) == 2:
+            a, b = tuple(tmplist)
+            ret_v = self.__gen_raib(a, b)
+        else:
+            # 只有一个数据块那么就不启用数据冗余
+            ret_v = tuple(tmplist)
+        return ret_v
 
-            base_hdr = self.__build_proto_header(size, tot_seg, seq, action)
-
-            header = self.wrap_header(base_hdr)
-            body = self.wrap_body(size, data)
-
-            data_seq.append(
-                b"".join((header, body,))
-            )
+    def build_packets(self, action, data_len, byte_data):
+        if data_len > 1500: raise ValueError("the value of data must be less than 1500")
+        data_seq = []
+        tmp_t = self.__get_sent_raw_data(data_len, byte_data)
+        tot_seq = len(tmp_t)
+        seq = 1
+        for block in tmp_t:
+            size = len(block)
+            base_header = self.__build_proto_header(size, tot_seq, seq, action)
+            e_hdr = self.wrap_header(base_header)
+            e_body = self.wrap_body(size, block)
+            data_seq.append(b"".join((e_hdr, e_body,)))
             seq += 1
-            b, e = (e, e + max_data_size,)
 
         return data_seq
+
+    def set_max_pkt_size(self, size):
+        min_size = 750 + self.__fixed_header_size
+        if size < min_size: raise ValueError("the value of size must not be less than %s" % min_size)
+        self.__block_size = size
 
     def wrap_header(self, base_hdr):
         """重写这个方法"""
@@ -104,10 +143,6 @@ class builder(object):
     def wrap_body(self, size, body_data):
         """重写这个方法"""
         pass
-
-    def get_max_body_size(self):
-        """重写这个这个方法,数据包内容所允许的最大大小"""
-        return EVERY_PKT_SIZE - self.__fixed_header_size
 
     @property
     def fixed_header_size(self):
@@ -141,8 +176,6 @@ class builder(object):
 class parser(object):
     __fixed_header_size = 0
     __pkt_id = 0
-    # 等待填充的序列号
-    __wait_fill_seq = None
     __data_area = None
     # 总共的段数
     __tot_seg = 0
@@ -154,6 +187,16 @@ class parser(object):
         self.__fixed_header_size = fixed_header_size
         self.__wait_fill_seq = []
         self.__data_area = {}
+
+    def __parse_raib(self, data_block, csum_block):
+        """从数据块和校检块中获取另一数据块内容"""
+        cnt = 0
+        tmp_list = []
+        for n in data_block:
+            tmp_list.append(n ^ csum_block[cnt])
+            cnt += 1
+
+        return bytes(tmp_list)
 
     def __parse_header(self, header):
         session_id = (header[0] << 8) | header[1]
@@ -173,29 +216,54 @@ class parser(object):
         session_id, length, pkt_id, tot_seg, seq, action = self.__parse_header(real_header)
         real_body = self.unwrap_body(length, packet[self.__fixed_header_size:])
 
-        # 丢弃混乱的数据包
-        if pkt_id != self.__pkt_id and seq != 1: return None
-        # 说明这是第一个数据包
-
-        if seq == 1:
+        if seq > 3: return b""
+        if pkt_id == 0: return b""
+        # 如果只有一个数据包,那么直接返回
+        if tot_seg == 1:
             self.reset()
-            self.__pkt_id = pkt_id
-            for i in range(tot_seg): self.__wait_fill_seq.append(i + 1)
+            return (session_id, action, real_body,)
+        if pkt_id != self.__pkt_id and self.__pkt_id != 0: self.reset()
+        # 最大分段只能是3段
+        if tot_seg > 3: return None
         self.__data_area[seq] = real_body
-        try:
-            self.__wait_fill_seq.remove(seq)
-        except ValueError:
-            pass
 
-        if self.__wait_fill_seq: return None
-        # 对数据进行组包
-        data_seq = []
-        for i in range(tot_seg):
-            n = i + 1
-            data = self.__data_area.get(n, b"")
-            data_seq.append(data)
+        if 1 in self.__data_area and 2 in self.__data_area:
+            pkt = b"".join((self.__data_area[1], self.__data_area[2],))
+            self.reset()
+            return (session_id, action, pkt,)
+        if len(self.__data_area) == 2:
+            result = self.__get_data_from_raib()
+            self.reset()
+            return (session_id, action, result,)
 
-        return (session_id, action, b"".join(data_seq),)
+        return None
+
+    def __get_data_from_raib(self):
+        data_a = None
+        n = 0
+
+        if 1 in self.__data_area:
+            data_a = self.__data_area[1]
+            n = 1
+
+        if 2 in self.__data_area:
+            data_a = self.__data_area[2]
+            n = 2
+
+        len_a = len(data_a)
+        data_b = self.__data_area[3]
+        len_b = len(data_b)
+
+        if len_a != len_b:
+            self.reset()
+            return b""
+
+        data_c = self.__parse_raib(data_a, data_b)
+        iter_obj = None
+        if n == 1: iter_obj = (data_a, data_c,)
+        if n == 2: iter_obj = (data_c, data_a,)
+
+        return b"".join(iter_obj)
 
     def unwrap_header(self, header_data):
         """
@@ -215,4 +283,4 @@ class parser(object):
         """
         self.__tot_seg = 0
         self.__data_area = {}
-        self.__wait_fill_seq = []
+        self.__pkt_id = 0

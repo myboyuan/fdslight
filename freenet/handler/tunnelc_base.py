@@ -288,8 +288,18 @@ class tunnelc_base(udp_handler.udp_handler):
         return self.fileno
 
     def __handle_data(self, byte_data):
+        try:
+            length = (byte_data[2] << 8) | byte_data[3]
+        except IndexError:
+            return
+        if length > 1500:
+            self.print_access_log("error_pkt_length")
+            return
+
+        byte_data = byte_data[0:length]
         p = byte_data[9]
 
+        #print("recv:",byte_data)
         # 过滤到不支持的协议
         if p not in (1, 6, 17,): return
 
@@ -351,6 +361,7 @@ class tunnelc_base(udp_handler.udp_handler):
         ippkts = self.__encrypt_m.build_packets(action, pkt_len, byte_data)
         self.__encrypt_m.reset()
 
+        #print("send:", byte_data)
         for ippkt in ippkts: self.send(ippkt)
 
         if self.__is_auth: self.set_timeout(self.fileno, self.__TIMEOUT)
@@ -393,6 +404,7 @@ class tunnelc_base(udp_handler.udp_handler):
     def udp_readable(self, message, address):
         result = self.__decrypt_m.parse(message)
         if not result: return
+
         session_id, action, byte_data = result
 
         if action not in tunnel_proto.ACTS:

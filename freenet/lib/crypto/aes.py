@@ -29,6 +29,7 @@ class encrypt(tunnel.builder):
             self.__const_fill_nuls = b"\0" * (16 - tunnel.MIN_FIXED_HEADER_SIZE % 16)
 
         super(encrypt, self).__init__(FIXED_HEADER_SIZE)
+        self.set_max_pkt_size(self.block_size - self.block_size % 16)
 
     def __rand(self, length=16):
         sset = "1234567890qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"
@@ -73,9 +74,6 @@ class encrypt(tunnel.builder):
         data = body_data + fill
 
         return cipher.encrypt(data)
-
-    def get_max_body_size(self):
-        return tunnel.EVERY_PKT_SIZE - FIXED_HEADER_SIZE - tunnel.EVERY_PKT_SIZE % 16
 
     def __get_body_size(self, real_size):
         a = real_size % 16
@@ -128,15 +126,22 @@ class decrypt(tunnel.parser):
 
 
 """
-data = bytes(800)
-size = len(data)
+length = 1500
+L = []
 
-builder = encrypt()
-packets = builder.build_packets(tunnel.ACT_DATA, size, data)
+for n in range(length):
+    L.append(33)
 
-parser = decrypt()
+builder = encrypt("hello")
+
+print(builder.build_ping())
+packets = builder.build_packets(tunnel.ACT_DATA, length, bytes(L))
+
+parser = decrypt("hello")
+
+packets.pop(1)
 
 for pkt in packets:
     ret = parser.parse(pkt)
-    if ret: print(ret, len(ret))
+    if ret: print(ret)
 """

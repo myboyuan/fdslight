@@ -218,6 +218,17 @@ class tunnels_base(udp_handler.udp_handler):
 
     def __handle_data(self, byte_data, address):
         if self.__debug: self.print_access_log("recv_data", address)
+        try:
+            length = (byte_data[2] << 8) | byte_data[3]
+        except IndexError:
+            return
+        if length > 1500:
+            self.print_access_log("error_pkt_length", address)
+            return
+
+        byte_data = byte_data[0:length]
+
+        #print("recv:",byte_data)
         protocol = byte_data[9]
         # 只支持 ICMP,TCP,UDP协议
         if protocol not in (1, 6, 17,):
@@ -280,6 +291,7 @@ class tunnels_base(udp_handler.udp_handler):
         pkt_len = (byte_data[2] << 8) | byte_data[3]
         uniq_id = "%s-%s" % client_address
 
+        #print("send:",byte_data)
         session_cls = self.__sessions[uniq_id]
         pkts = session_cls.encrypt_m.build_packets(action, pkt_len, byte_data)
         session_cls.encrypt_m.reset()
@@ -290,7 +302,7 @@ class tunnels_base(udp_handler.udp_handler):
             self.unregister_session(client_address)
             return
 
-        if self.__debug:self.print_access_log("send_data",client_address)
+        if self.__debug: self.print_access_log("send_data", client_address)
         for pkt in pkts: self.sendto(pkt, client_address)
 
         self.add_evt_write(self.fileno)
@@ -317,6 +329,7 @@ class tunnels_base(udp_handler.udp_handler):
             session_cls = self.__sessions[uniq_id]
         result = session_cls.decrypt_m.parse(message)
         if not result: return
+
         session_id, action, byte_data = result
 
         if uniq_id not in self.__sessions and action != tunnel_proto.ACT_AUTH:
@@ -332,7 +345,7 @@ class tunnels_base(udp_handler.udp_handler):
             return
 
         if uniq_id not in self.__sessions:
-            self.print_access_log("illegal_packet", address)
+            self.print_access_log("not_permit_session", address)
             return
 
             # 会话ID与IP地址不一致,删除数据
@@ -344,6 +357,9 @@ class tunnels_base(udp_handler.udp_handler):
             ip_ver = (byte_data[0] & 0xf0) >> 4
             if ip_ver != 4:
                 self.print_access_log("not_support_ipv%s" % ip_ver, address)
+                return
+            if len(byte_data) < 20:
+                self.print_access_log("error_ip_pkt", address)
                 return
             src_addr = byte_data[12:16]
             # 检查客户端是否随意伪造分配到的IP
