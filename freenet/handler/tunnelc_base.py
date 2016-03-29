@@ -299,7 +299,7 @@ class tunnelc_base(udp_handler.udp_handler):
         byte_data = byte_data[0:length]
         p = byte_data[9]
 
-        print("recv:",byte_data)
+        #print("recv:",byte_data)
         # 过滤到不支持的协议
         if p not in (1, 6, 17,): return
 
@@ -361,7 +361,7 @@ class tunnelc_base(udp_handler.udp_handler):
         ippkts = self.__encrypt_m.build_packets(action, pkt_len, byte_data)
         self.__encrypt_m.reset()
 
-        print("send:", byte_data)
+        #print("send:", byte_data)
         for ippkt in ippkts: self.send(ippkt)
 
         if self.__is_auth: self.set_timeout(self.fileno, self.__TIMEOUT)
