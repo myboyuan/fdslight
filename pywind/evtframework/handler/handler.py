@@ -26,34 +26,16 @@ class handler(object):
         """
         pass
 
-    def delete_hooks(self):
-        """根据需要重写这个方法,注意要调用父类 delete_hooks"""
-        for hk_name in self.__hooks:
-            hk = self.__hooks[hk_name]
-            hk.hook_delete()
-
-        self.__hooks = None
-
-    def delete_hook(self, hook_name):
-        """根据需要重写这个方法,注意要调用父类 delete_hook"""
-        hk = self.__hooks.get(hook_name, None)
-        if not hk:
-            return
-        hk.hook_delete()
-        del self.__hooks[hook_name]
-
     def hook_register(self, name, hook, *args, **kwargs):
         """注册handler的hook
         :param name:
         :param hook:
         :return:
         """
-        if name in self.__hooks:
-            return False
+        if name in self.__hooks: return False
 
         instance = hook(self)
         self.__hooks[name] = instance
-
         instance.hook_init(name, *args, **kwargs)
 
         return True
@@ -63,9 +45,7 @@ class handler(object):
         :param name:
         :return:
         """
-        if name not in self.__hooks:
-            return
-
+        if name not in self.__hooks: return
         hk = self.__hooks[name]
         hk.hook_delete()
 
@@ -74,7 +54,6 @@ class handler(object):
 
     def get_hook(self, name):
         hk = None
-
         try:
             hk = self.__hooks[name]
         except KeyError:

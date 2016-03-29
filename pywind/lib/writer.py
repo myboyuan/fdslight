@@ -26,14 +26,11 @@ class writer(object):
         begin = 0
 
         while 1:
-            if end >= bsize:
-                break
-
+            if end >= bsize: break
             if begin + slice_size > bsize:
                 end = bsize
             else:
                 end = begin + slice_size
-
             data = bdata[begin:end]
             begin = end
 
@@ -101,4 +98,3 @@ class writer(object):
 
     def size(self):
         return self.__size
-

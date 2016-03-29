@@ -228,7 +228,7 @@ class tunnels_base(udp_handler.udp_handler):
 
         byte_data = byte_data[0:length]
 
-        #print("recv:",byte_data)
+        print("recv:",byte_data)
         protocol = byte_data[9]
         # 只支持 ICMP,TCP,UDP协议
         if protocol not in (1, 6, 17,):
@@ -291,7 +291,7 @@ class tunnels_base(udp_handler.udp_handler):
         pkt_len = (byte_data[2] << 8) | byte_data[3]
         uniq_id = "%s-%s" % client_address
 
-        #print("send:",byte_data)
+        print("send:",byte_data)
         session_cls = self.__sessions[uniq_id]
         pkts = session_cls.encrypt_m.build_packets(action, pkt_len, byte_data)
         session_cls.encrypt_m.reset()

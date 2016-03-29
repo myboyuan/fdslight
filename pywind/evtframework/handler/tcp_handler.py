@@ -82,7 +82,6 @@ class tcp_handler(handler.handler):
                 if not recv_data:
                     self.error()
                     break
-
                 self.reader._putvalue(recv_data)
             except BlockingIOError:
                 self.tcp_readable()
@@ -107,12 +106,10 @@ class tcp_handler(handler.handler):
             self.set_timeout(self.fileno, -1)
             return
         sent_data = self.writer._getvalue()
-        if not sent_data:
-            self.tcp_writable()
+        if not sent_data: self.tcp_writable()
         try:
             sent_size = self.socket.send(sent_data)
             rest = sent_data[sent_size:]
-
             if rest:
                 self.writer.write(rest)
                 return
@@ -191,9 +188,7 @@ class tcp_handler(handler.handler):
         self.__connect_addr = address
         self.__connect_timeout = timeout
         self.__is_async_socket_client = True
-
         err = self.socket.connect_ex(address)
-
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         self.add_evt_write(self.fileno)

@@ -59,10 +59,6 @@ class hook(object):
         """
         self.__handler.hook_output(name, byte_data)
 
-    def delete_hook(self, hook_name):
-        """删除特定的hook"""
-        self.__handler.delete_hook(hook_name)
-
     def register(self, name, hook, *args, **kwargs):
         self.__handler.hook_register(name, hook, *args, **kwargs)
 

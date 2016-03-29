@@ -6,7 +6,7 @@ EV_TYPE_READ = 1
 EV_TYPE_WRITE = 2
 EV_TYPE_ERR = 4
 EV_TYPE_HUP = 8
-EV_TYPE_NO_EV=0
+EV_TYPE_NO_EV = 0
 
 
 class event(object):
@@ -39,7 +39,6 @@ class event(object):
 
     __users_data = {}
 
-
     def __init__(self):
         platform = sys.platform
 
@@ -58,7 +57,6 @@ class event(object):
             self.__iowait_func = self.__epoll_iowait
 
         return
-
 
     def __del_ev_write(self, fileno):
         if fileno in self.__wlist:
@@ -93,7 +91,6 @@ class event(object):
             ''''''
         return
 
-
     def __del_ev_read(self, fileno):
 
         if fileno in self.__rlist:
@@ -127,7 +124,6 @@ class event(object):
             ''''''
         return
 
-
     def __clean(self, fd):
         event_fd = fd
 
@@ -153,7 +149,6 @@ class event(object):
 
         return
 
-
     def __convert_epoll_events(self, events):
         """
         Convert epoll events to standard events
@@ -168,17 +163,10 @@ class event(object):
 
             std_event = 0
 
-            if is_read:
-                std_event |= EV_TYPE_READ
-
-            if is_write:
-                std_event |= EV_TYPE_WRITE
-
-            if is_hup:
-                std_event |= EV_TYPE_HUP
-
-            if is_err:
-                std_event |= EV_TYPE_ERR
+            if is_read: std_event |= EV_TYPE_READ
+            if is_write: std_event |= EV_TYPE_WRITE
+            if is_hup: std_event |= EV_TYPE_HUP
+            if is_err: std_event |= EV_TYPE_ERR
 
             std_events.append(
                 (
@@ -187,7 +175,6 @@ class event(object):
             )
 
         return std_events
-
 
     def __convert_kqueue_events(self, events):
         """
@@ -209,14 +196,9 @@ class event(object):
                        ((udata & EV_TYPE_WRITE) == EV_TYPE_WRITE)
             is_error = (flags & select.KQ_EV_ERROR) == select.KQ_EV_ERROR
 
-            if is_read:
-                std_event |= EV_TYPE_READ
-
-            if is_write:
-                std_event |= EV_TYPE_WRITE
-
-            if is_error:
-                std_event |= EV_TYPE_ERR
+            if is_read: std_event |= EV_TYPE_READ
+            if is_write: std_event |= EV_TYPE_WRITE
+            if is_error: std_event |= EV_TYPE_ERR
 
             self.__kqueue_event_map[ident] = kevent
 
@@ -229,7 +211,6 @@ class event(object):
             )
 
         return std_events
-
 
     def __convert_select_events(self, rlist, wlist, errlist):
         """
@@ -261,16 +242,13 @@ class event(object):
 
         return std_events
 
-
     def __handle_epoll_events(self, events):
         return self.__convert_epoll_events(events)
-
 
     def __epoll_iowait(self):
         events = self.__epoll_object.poll(10)
 
         return self.__handle_epoll_events(events)
-
 
     def __handle_kqueue_events(self, events):
         for kevent in events:
@@ -278,7 +256,6 @@ class event(object):
             self.__kqueue_event_map[ident] = ident
 
         return self.__convert_kqueue_events(events)
-
 
     def __kqueue_iowait(self):
         changelist = []
@@ -295,16 +272,13 @@ class event(object):
 
         return self.__handle_kqueue_events(events)
 
-
     def __handle_select_events(self, rlist, wlist, errlist):
         return self.__convert_select_events(rlist, wlist, errlist)
-
 
     def __select_iowait(self):
         rlist, wlist, errlist = select.select(self.__rlist, self.__wlist, self.__rlist, self.__poll_timeout)
 
         return self.__handle_select_events(rlist, wlist, errlist)
-
 
     def __add_ev_read(self, fileno):
         """
@@ -359,7 +333,6 @@ class event(object):
 
         return
 
-
     def __add_ev_write(self, fileno):
         if fileno not in self.__wlist and self.__async_mode == "select":
             self.__wlist.append(fileno)
@@ -409,12 +382,10 @@ class event(object):
 
         return
 
-
     def poll(self, timeout=0):
         self.__poll_timeout = timeout
 
         return self.__iowait_func()
-
 
     def register(self, fd, eventmask):
         """
@@ -422,29 +393,20 @@ class event(object):
         """
         is_register = self.__is_register.get(fd, False)
 
-        if is_register:
-            return
+        if is_register: return
 
         self.__is_register[fd] = True
         self.add_event(fd, eventmask)
-
 
     def add_event(self, fd, eventmask):
         """
         Note:if the event exists,it will not do anything
         """
-        if not self.__is_register.get(fd, False):
-            return
-
-
+        if not self.__is_register.get(fd, False): return
         is_read = (eventmask & EV_TYPE_READ) == EV_TYPE_READ
         is_write = (eventmask & EV_TYPE_WRITE) == EV_TYPE_WRITE
-
-        if is_read:
-            self.__add_ev_read(fd)
-
-        if is_write:
-            self.__add_ev_write(fd)
+        if is_read: self.__add_ev_read(fd)
+        if is_write: self.__add_ev_write(fd)
 
     def remove_event(self, fd, eventmask):
         """
@@ -454,14 +416,10 @@ class event(object):
         is_read = (eventmask & EV_TYPE_READ) == EV_TYPE_READ
         is_write = (eventmask & EV_TYPE_WRITE) == EV_TYPE_WRITE
 
-        if is_read:
-            self.__del_ev_read(fd)
-
-        if is_write:
-            self.__del_ev_write(fd)
+        if is_read: self.__del_ev_read(fd)
+        if is_write: self.__del_ev_write(fd)
 
         return
-
 
     def set_udata(self, fd, udata):
         """
@@ -469,21 +427,15 @@ class event(object):
         """
         self.__users_data[fd] = udata
 
-
     def unregister(self, fd):
         """
         Note:if the event not exists,it will not do anything
         """
-
-        if fd not in self.__is_register:
-            return
-
+        if fd not in self.__is_register: return
         self.__clean(fd)
-
 
     def is_register(self, fd):
         return self.__is_register.get(fd, False)
-
 
     def get_udata(self, fd):
         try:
@@ -491,20 +443,10 @@ class event(object):
         except KeyError:
             return -1
 
-
     def dbg_get_register_fds(self):
         retlist = [fd for fd in self.__is_register]
 
         return retlist
 
-
     def dbg_print_register_fds(self):
         print(self.dbg_get_register_fds())
-
-
-
-
-
-
-
-
