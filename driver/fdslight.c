@@ -18,7 +18,7 @@
 #include<linux/version.h>
 #include "fdsl_queue.h"
 #include "fdsl_dev_ctl.h"
-#include "fdsl_tcp_filter.h"
+#include "fdsl_ip_filter.h"
 
 #define DEV_NAME FDSL_DEV_NAME
 #define DEV_CLASS FDSL_DEV_NAME
@@ -38,7 +38,7 @@ struct class *dev_class;
 static struct file_operations chr_ops;
 
 static struct fdsl_queue *r_queue;
-static struct fdsl_tcp_filter *tcp_filter;
+static struct fdsl_ip_filter *ip_filter;
 
 struct fdsl_poll *poll;
 
@@ -50,7 +50,7 @@ static int chr_open(struct inode *node,struct file *f)
 	int major,minor;
 	major=MAJOR(node->i_rdev);
 	minor=MINOR(node->i_rdev);
-	
+
 	if(flock_flag) return -EBUSY;
 
 	flock_flag=1;
@@ -79,13 +79,13 @@ static long chr_ioctl(struct file *f,unsigned int cmd,unsigned long arg)
             err=copy_from_user(&ui_tmp,(unsigned int *)arg,sizeof(unsigned int));
             if(err) return -EINVAL;
             ui_tmp=ntohl(ui_tmp);
-            ret=fdsl_tf_add(tcp_filter,(const char *)(&ui_tmp));
+            ret=fdsl_tf_add(ip_filter,(const char *)(&ui_tmp));
             break;
         case FDSL_IOC_TF_FIND:
             err=copy_from_user(&ui_tmp,(unsigned int *)arg,sizeof(unsigned int));
             if(err) return -EINVAL;
             ui_tmp=ntohl(ui_tmp);
-            ret=fdsl_tf_find(tcp_filter,(const char *)(&ui_tmp));
+            ret=fdsl_tf_find(ip_filter,(const char *)(&ui_tmp));
             break;
         case FDSL_IOC_SET_TUNNEL_IP:
             ret=fdsl_set_tunnel(arg);
@@ -123,10 +123,10 @@ static unsigned int chr_poll(struct file *f,struct poll_table_struct *wait)
 	struct fdsl_poll *p;
 	unsigned int mask=0;
 	p=f->private_data;
-	
+
 	poll_wait(f,&p->inq,wait);
 	if(p->r_queue->have) mask|=POLLIN | POLLRDNORM;
-	
+
 	return mask;
 }
 
@@ -157,11 +157,15 @@ static unsigned int hanle_udp_in(struct iphdr *ip_header)
     if(53==dport) return NF_ACCEPT;
 	if(53==sport) return NF_ACCEPT;
 
-	//saddr=htonl((unsigned int)ip_header->saddr);
-	//daddr=(unsigned int)ip_header->daddr;
+    #ifdef FDSL_CLIENT
+    //saddr=htonl((unsigned int)ip_header->saddr);
+	daddr=(unsigned int)ip_header->daddr;
+    find_r=fdsl_tf_find(ip_filter,(const char *)(&daddr));
 
+    if(find_r<1) return NF_ACCEPT;
+
+    #endif
     return fdsl_push_packet_to_user(ip_header);
-
 }
 
 static unsigned int handle_tcp_and_icmp_in(struct iphdr *ip_header)
@@ -171,7 +175,7 @@ static unsigned int handle_tcp_and_icmp_in(struct iphdr *ip_header)
 	int find_r=0;
 
 	daddr=(unsigned int)ip_header->daddr;
-    find_r=fdsl_tf_find(tcp_filter,(const char *)(&daddr));
+    find_r=fdsl_tf_find(ip_filter,(const char *)(&daddr));
 
 	if (find_r < 1) return NF_ACCEPT;
 
@@ -200,7 +204,7 @@ static unsigned int nf_handle_in(
 
 	if(!flock_flag) return NF_ACCEPT;
 	if(!skb) return NF_ACCEPT;
-	
+
 	ip_header=(struct iphdr *)skb_network_header(skb);
 
 	if(!ip_header) return NF_ACCEPT;
@@ -236,7 +240,7 @@ static int create_dev(void)
 		printk("ERR:failed in creating class\r\n");
 		return -1;
 	}
-	
+
 	dev_major=MAJOR(ndev);
 	device_create(dev_class,NULL,ndev,"%s",DEV_NAME);
 
@@ -264,7 +268,13 @@ static struct file_operations chr_ops={
 
 static struct nf_hook_ops nf_ops={
 	.hook=nf_handle_in,
+    #ifdef FDSL_CLIENT
+    // 客户端模式
+    .hooknum=NF_INET_PRE_ROUTING,
+    #else
+    // 网关模式
 	.hooknum=NF_INET_FORWARD,
+    #endif
 	.pf=PF_INET,
 	.priority=NF_IP_PRI_FIRST
 };
@@ -279,8 +289,8 @@ static int fdsl_init(void)
 	init_waitqueue_head(&poll->inq);
 
 	r_queue=fdsl_queue_init(QUEUE_SIZE);
-    tcp_filter=fdsl_tf_init(FDSL_IP_VER4);
-    
+    ip_filter=fdsl_tf_init(FDSL_IP_VER4);
+
 	poll->r_queue=r_queue;
 
 
@@ -292,7 +302,7 @@ static void fdsl_exit(void)
 	delete_dev();
 	nf_unregister_hook(&nf_ops);
 	fdsl_queue_release(r_queue);
-    fdsl_tf_release(tcp_filter);
+    fdsl_tf_release(ip_filter);
     
 	kfree(poll);
 }

@@ -12,4 +12,9 @@
 // 设置隧道IP
 #define FDSL_IOC_SET_TUNNEL_IP _IOW(FDSL_IOC_MAGIC,3,int)
 
+// 关闭UDP代理
+#define FDSL_IOC_CLOSE_UDP_PROXY _IOW(FDSL_IOC_MAGIC,4,int)
+
+
+
 #endif
