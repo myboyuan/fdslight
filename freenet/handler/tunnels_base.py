@@ -246,6 +246,7 @@ class tunnels_base(udp_handler.udp_handler):
         if protocol == 17:
             self.__handle_udp_data(byte_data, address)
             return
+
         self.send_message_to_handler(self.fileno, self.__tun_fd, byte_data)
 
     def __handle_udp_data(self, byte_data, address):

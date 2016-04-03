@@ -18,7 +18,7 @@
 #include<linux/version.h>
 #include "fdsl_queue.h"
 #include "fdsl_dev_ctl.h"
-#include "fdsl_ip_filter.h"
+#include "fdsl_tcp_filter.h"
 
 #define DEV_NAME FDSL_DEV_NAME
 #define DEV_CLASS FDSL_DEV_NAME
@@ -38,7 +38,7 @@ struct class *dev_class;
 static struct file_operations chr_ops;
 
 static struct fdsl_queue *r_queue;
-static struct fdsl_ip_filter *ip_filter;
+static struct fdsl_tcp_filter *tcp_filter;
 
 struct fdsl_poll *poll;
 
@@ -79,13 +79,13 @@ static long chr_ioctl(struct file *f,unsigned int cmd,unsigned long arg)
             err=copy_from_user(&ui_tmp,(unsigned int *)arg,sizeof(unsigned int));
             if(err) return -EINVAL;
             ui_tmp=ntohl(ui_tmp);
-            ret=fdsl_tf_add(ip_filter,(const char *)(&ui_tmp));
+            ret=fdsl_tf_add(tcp_filter,(const char *)(&ui_tmp));
             break;
         case FDSL_IOC_TF_FIND:
             err=copy_from_user(&ui_tmp,(unsigned int *)arg,sizeof(unsigned int));
             if(err) return -EINVAL;
             ui_tmp=ntohl(ui_tmp);
-            ret=fdsl_tf_find(ip_filter,(const char *)(&ui_tmp));
+            ret=fdsl_tf_find(tcp_filter,(const char *)(&ui_tmp));
             break;
         case FDSL_IOC_SET_TUNNEL_IP:
             ret=fdsl_set_tunnel(arg);
@@ -160,7 +160,7 @@ static unsigned int hanle_udp_in(struct iphdr *ip_header)
     #ifdef FDSL_CLIENT
     //saddr=htonl((unsigned int)ip_header->saddr);
 	daddr=(unsigned int)ip_header->daddr;
-    find_r=fdsl_tf_find(ip_filter,(const char *)(&daddr));
+    find_r=fdsl_tf_find(tcp_filter,(const char *)(&daddr));
 
     if(find_r<1) return NF_ACCEPT;
 
@@ -175,7 +175,7 @@ static unsigned int handle_tcp_and_icmp_in(struct iphdr *ip_header)
 	int find_r=0;
 
 	daddr=(unsigned int)ip_header->daddr;
-    find_r=fdsl_tf_find(ip_filter,(const char *)(&daddr));
+    find_r=fdsl_tf_find(tcp_filter,(const char *)(&daddr));
 
 	if (find_r < 1) return NF_ACCEPT;
 
@@ -289,7 +289,7 @@ static int fdsl_init(void)
 	init_waitqueue_head(&poll->inq);
 
 	r_queue=fdsl_queue_init(QUEUE_SIZE);
-    ip_filter=fdsl_tf_init(FDSL_IP_VER4);
+    tcp_filter=fdsl_tf_init(FDSL_IP_VER4);
 
 	poll->r_queue=r_queue;
 
@@ -302,7 +302,7 @@ static void fdsl_exit(void)
 	delete_dev();
 	nf_unregister_hook(&nf_ops);
 	fdsl_queue_release(r_queue);
-    fdsl_tf_release(ip_filter);
+    fdsl_tf_release(tcp_filter);
     
 	kfree(poll);
 }
