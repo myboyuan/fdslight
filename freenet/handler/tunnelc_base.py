@@ -444,7 +444,7 @@ class tunnelc_base(udp_handler.udp_handler):
 
     def udp_timeout(self):
         self.__nat.recyle_ips()
-        if fnc_config.configs["udp_global"]: self.__udp_whitelist.recycle_cache()
+        if not fnc_config.configs["udp_global"]: self.__udp_whitelist.recycle_cache()
 
         if not self.__is_auth:
             if self.__sent_auth_cnt > 5:
