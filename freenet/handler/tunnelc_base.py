@@ -293,7 +293,8 @@ class tunnelc_base(udp_handler.udp_handler):
         except IndexError:
             return
         if length > 1500:
-            self.print_access_log("error_pkt_length:%s" % byte_data.decode("iso-8859-1"))
+            self.print_access_log("error_pkt_length:%s" % length)
+            sys.stderr.write(byte_data.decode("iso-8859-1"))
             return
 
         byte_data = byte_data[0:length]
@@ -308,7 +309,7 @@ class tunnelc_base(udp_handler.udp_handler):
             self.print_access_log("cant_not_send_packet_to_lan_%s" % socket.inet_ntoa(byte_data[16:20]))
             return
 
-        if self.__debug: self.print_access_log("recv_data")
+        # if self.__debug: self.print_access_log("recv_data")
         self.set_timeout(self.fileno, self.__TIMEOUT)
 
         if p != 17:
@@ -351,13 +352,18 @@ class tunnelc_base(udp_handler.udp_handler):
         self.__sent_auth_cnt = 0
         self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_open")
         self.ctl_handler(self.fileno, self.__dns_fd, "set_filter_dev_fd", self.__traffic_fetch_fd)
+
         self.set_timeout(self.fileno, self.__TIMEOUT)
+        if not self.__debug:
+            sys.stdout = open(fnc_config.configs["access_log"], "a+")
+            sys.stderr = open(fnc_config.configs["error_log"], "a+")
+        return
 
     def set_session_id(self, sid):
         self.encrypt.set_session_id(sid)
 
     def send_data(self, pkt_len, byte_data, action=tunnel_proto.ACT_DATA):
-        if self.__debug: self.print_access_log("send_data")
+        # if self.__debug: self.print_access_log("send_data")
         ippkts = self.__encrypt_m.build_packets(action, pkt_len, byte_data)
         self.__encrypt_m.reset()
 

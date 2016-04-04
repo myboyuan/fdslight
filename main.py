@@ -114,8 +114,6 @@ class fdslight(dispatcher.dispatcher):
 
         if mode == "client":
             self.__create_fn_client(module)
-            sys.stdout = open(fnc_config.configs["access_log"], "a+")
-            sys.stderr = open(fnc_config.configs["error_log"], "a+")
             return
 
         return
