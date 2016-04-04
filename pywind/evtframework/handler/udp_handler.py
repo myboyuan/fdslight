@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-"""UDP一定要设置超时，免得没有办法释放父类的资源
-"""
 import pywind.evtframework.handler.handler as handler
 import pywind.lib.timer as timer
 

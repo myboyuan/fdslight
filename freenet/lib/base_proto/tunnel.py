@@ -83,14 +83,6 @@ class builder(object):
 
         return bytes(L)
 
-    def __calc_tot_seg(self, data_len, max_seg_size):
-        """计算数据需要分成多少段"""
-        a = int(data_len / max_seg_size)
-        if not a: return 1
-        b = data_len % max_seg_size
-        if not b: return a
-        return a + 1
-
     def __get_sent_raw_data(self, data_len, byte_data):
         """获取要发送的原始数据"""
         data_block_size = self.__block_size - self.__fixed_header_size
@@ -218,6 +210,7 @@ class parser(object):
         session_id, length, pkt_id, tot_seg, seq, action = self.__parse_header(real_header)
         real_body = self.unwrap_body(length, packet[self.__fixed_header_size:])
 
+        if seq == 3 and not self.__pkt_id: return
         if seq > 3: return b""
         if pkt_id == 0: return b""
         # 如果只有一个数据包,那么直接返回
@@ -238,6 +231,7 @@ class parser(object):
             self.reset()
             return (session_id, action, result,)
 
+        self.__pkt_id = pkt_id
         return None
 
     def __get_data_from_raib(self):
@@ -278,10 +272,6 @@ class parser(object):
         重写这个方法
         """
         pass
-
-    def is_right_packet(self):
-        """重写这个方法,用来验证是否是未经修改的IP数据包"""
-        return True
 
     def reset(self):
         """

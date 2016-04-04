@@ -296,7 +296,6 @@ class tunnels_base(udp_handler.udp_handler):
         pkt_len = (byte_data[2] << 8) | byte_data[3]
         uniq_id = "%s-%s" % client_address
 
-        # print("send:",byte_data)
         session_cls = self.__sessions[uniq_id]
         pkts = session_cls.encrypt_m.build_packets(action, pkt_len, byte_data)
         session_cls.encrypt_m.reset()
