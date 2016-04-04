@@ -293,7 +293,7 @@ class tunnelc_base(udp_handler.udp_handler):
         except IndexError:
             return
         if length > 1500:
-            self.print_access_log("error_pkt_length:%s,protocol:%s" % (length, byte_data[9],))
+            self.print_access_log("error_pkt_length:%s,real_length:%s" % (length, len(byte_data),))
             return
 
         byte_data = byte_data[0:length]

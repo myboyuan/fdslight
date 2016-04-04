@@ -79,11 +79,6 @@ class tun_base(handler.handler):
             return
 
         self.__current_write_queue_n -= 1
-        ip_version = (ip_packet[0] & 0xf0) >> 4
-        # 放弃处理IP版本不是4的数据包
-        if ip_version != 4:
-            return
-
         try:
             os.write(self.fileno, ip_packet)
         except BlockingIOError:
@@ -186,7 +181,10 @@ class tuns(tun_base):
         pass
 
     def handle_ip_packet_from_read(self, ip_packet):
-        # 抛弃没有来源的IP数据包
+        ip_ver = (ip_packet[0] & 0xf0) >> 4
+        if ip_ver != 4: return
+        protocol = ip_packet[9]
+        if protocol not in (1, 6, 17, 132,): return
         try:
             self.send_message_to_handler(self.fileno, self.creator, ip_packet)
         except excepts.HandlerNotFoundErr:

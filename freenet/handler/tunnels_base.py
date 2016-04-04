@@ -440,9 +440,6 @@ class tunnels_base(udp_handler.udp_handler):
     def message_from_handler(self, from_fd, byte_data):
         dst_addr = byte_data[16:20]
         if dst_addr not in self.__client_info_by_v_ip: return
-        protocol = byte_data[9]
-        # 支持ICMP,TCP,UDP,SCTP
-        if protocol not in (1, 6, 17, 132,): return
         address = self.__client_info_by_v_ip[dst_addr]
         data_len = (byte_data[2] << 8) | byte_data[3]
 
