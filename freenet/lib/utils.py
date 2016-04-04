@@ -109,7 +109,7 @@ def build_udp_packet(saddr, daddr, sport, dport, message, mtu=1500):
             flags_mf = 1
 
         offset = n * every_offset
-        ippkt = build_ip_packet(slice_size + 20, 17,
+        ippkt = build_ip_packet(slice_size + __IP_HDR_SIZE, 17,
                                 saddr, daddr, bdata, pkt_id=pkt_id,
                                 flags_df=flags_df, flags_mf=flags_mf,
                                 offset=offset
