@@ -73,6 +73,8 @@
 *.soundofhope.org
 # 纽约时报
 *.nytimes.com
+# 美国之音
+*.voachinese.com
 
 # 网络存储
 *.dropbox.com

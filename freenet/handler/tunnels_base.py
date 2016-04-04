@@ -96,6 +96,10 @@ class tunnels_base(udp_handler.udp_handler):
         self.__tun_fd = self.create_handler(self.fileno, tundev.tuns, "fdslight", subnet)
         self.__raw_socket_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
 
+        if not self.__debug:
+            sys.stdout = open(fns_config.configs["access_log"], "a+")
+            sys.stderr = open(fns_config.configs["error_log"], "a+")
+
         self.fn_init()
 
         return self.fileno
@@ -230,8 +234,8 @@ class tunnels_base(udp_handler.udp_handler):
 
         # print("recv:",byte_data)
         protocol = byte_data[9]
-        # 只支持 ICMP,TCP,UDP协议
-        if protocol not in (1, 6, 17,):
+        # 只支持 ICMP,TCP,UDP,SCTP协议
+        if protocol not in (1, 6, 17, 132,):
             self.print_access_log("not_support_IP_protocol", address)
             return
         pkt_len = (byte_data[2] << 8) | byte_data[3]
@@ -431,10 +435,14 @@ class tunnels_base(udp_handler.udp_handler):
         addr = "%s:%s" % address
         echo = "%s        %s        %s" % (text, addr, t)
         print(echo)
+        sys.stdout.flush()
 
     def message_from_handler(self, from_fd, byte_data):
         dst_addr = byte_data[16:20]
         if dst_addr not in self.__client_info_by_v_ip: return
+        protocol = byte_data[9]
+        # 支持ICMP,TCP,UDP,SCTP
+        if protocol not in (1, 6, 17, 132,): return
         address = self.__client_info_by_v_ip[dst_addr]
         data_len = (byte_data[2] << 8) | byte_data[3]
         self.send_data(address, data_len, byte_data)

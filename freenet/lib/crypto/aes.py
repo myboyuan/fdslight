@@ -17,7 +17,7 @@ class encrypt(tunnel.builder):
     __key = b""
     __iv = b""
     # 需要补充的`\0`
-    __const_fill_nuls = b""
+    __const_fill = b""
 
     __real_size = 0
     __body_size = 0
@@ -26,7 +26,7 @@ class encrypt(tunnel.builder):
         self.__key = hashlib.md5(aes_key.encode()).digest()
 
         if tunnel.MIN_FIXED_HEADER_SIZE % 16 != 0:
-            self.__const_fill_nuls = b"\0" * (16 - tunnel.MIN_FIXED_HEADER_SIZE % 16)
+            self.__const_fill = b"f" * (16 - tunnel.MIN_FIXED_HEADER_SIZE % 16)
 
         super(encrypt, self).__init__(FIXED_HEADER_SIZE)
         self.set_max_pkt_size(self.block_size - self.block_size % 16)
@@ -62,7 +62,7 @@ class encrypt(tunnel.builder):
         self.__iv = iv
         seq = [
             base_hdr,
-            self.__const_fill_nuls
+            self.__const_fill
         ]
         e_data = cipher.encrypt(b"".join(seq))
 
@@ -98,18 +98,28 @@ class decrypt(tunnel.parser):
     __iv_begin_pos = 0
     # 向量字节的结束位置
     __iv_end_pos = 0
+    __const_fill = b""
 
     def __init__(self, aes_key):
         self.__key = hashlib.md5(aes_key.encode()).digest()
         self.__iv_begin_pos = 0
         self.__iv_end_pos = self.__iv_begin_pos + 16
+
+        if tunnel.MIN_FIXED_HEADER_SIZE % 16 != 0:
+            self.__const_fill = b"f" * (16 - tunnel.MIN_FIXED_HEADER_SIZE % 16)
+
         super(decrypt, self).__init__(FIXED_HEADER_SIZE)
 
     def unwrap_header(self, header_data):
         self.__iv = header_data[self.__iv_begin_pos:self.__iv_end_pos]
         cipher = AES.new(self.__key, AES.MODE_CFB, self.__iv)
+        data = cipher.decrypt(header_data[self.__iv_end_pos:FIXED_HEADER_SIZE])
+        real_hdr = data[0:tunnel.MIN_FIXED_HEADER_SIZE]
 
-        return cipher.decrypt(header_data[self.__iv_end_pos:FIXED_HEADER_SIZE])
+        # 丢弃误码的包
+        if self.__const_fill != data[tunnel.MIN_FIXED_HEADER_SIZE:]: return None
+
+        return real_hdr
 
     def unwrap_body(self, length, body_data):
         cipher = AES.new(self.__key, AES.MODE_CFB, self.__iv)

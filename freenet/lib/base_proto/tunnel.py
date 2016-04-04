@@ -97,7 +97,7 @@ class builder(object):
         tmplist = []
         b, e = (0, data_block_size,)
 
-        if data_len == 0: return [b"",]
+        if data_len == 0: return [b"", ]
 
         while b < data_len:
             t = byte_data[b:e]
@@ -132,7 +132,8 @@ class builder(object):
         return data_seq
 
     def set_max_pkt_size(self, size):
-        min_size = 750 + self.__fixed_header_size
+        """单个UDP数据包所能传输的数据大小"""
+        min_size = 1000 + self.__fixed_header_size
         if size < min_size: raise ValueError("the value of size must not be less than %s" % min_size)
         self.__block_size = size
 
@@ -213,6 +214,7 @@ class parser(object):
 
     def parse(self, packet):
         real_header = self.unwrap_header(packet[0:self.__fixed_header_size])
+        if not real_header: return
         session_id, length, pkt_id, tot_seg, seq, action = self.__parse_header(real_header)
         real_body = self.unwrap_body(length, packet[self.__fixed_header_size:])
 
@@ -276,6 +278,10 @@ class parser(object):
         重写这个方法
         """
         pass
+
+    def is_right_packet(self):
+        """重写这个方法,用来验证是否是未经修改的IP数据包"""
+        return True
 
     def reset(self):
         """

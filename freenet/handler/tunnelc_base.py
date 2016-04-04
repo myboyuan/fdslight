@@ -293,8 +293,7 @@ class tunnelc_base(udp_handler.udp_handler):
         except IndexError:
             return
         if length > 1500:
-            self.print_access_log("error_pkt_length:%s" % length)
-            sys.stderr.write(byte_data.decode("iso-8859-1"))
+            self.print_access_log("error_pkt_length:%s,protocol:%s" % (length, byte_data[9],))
             return
 
         byte_data = byte_data[0:length]
@@ -302,7 +301,7 @@ class tunnelc_base(udp_handler.udp_handler):
 
         # print("recv:",byte_data)
         # 过滤到不支持的协议
-        if p not in (1, 6, 17,): return
+        if p not in (1, 6, 17, 132,): return
 
         new_pkt = self.__nat.get_new_packet_for_lan(byte_data)
         if not new_pkt:
@@ -545,6 +544,7 @@ class tunnelc_base(udp_handler.udp_handler):
         echo = "%s        %s         %s" % (text, addr, t)
 
         print(echo)
+        sys.stdout.flush()
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
         if cmd != "udp_nat_del": return False
