@@ -95,7 +95,7 @@ class traffic_send(handler.handler):
             sent_len = self.__socket.sendto(ippkt, (dst_addr, 0))
 
             if pkt_len > sent_len:
-                self.__sent.index(0, ippkt)
+                self.__sent.insert(0, ippkt)
                 break
             ''''''
         return
