@@ -45,6 +45,8 @@
 *.nicovideo.jp
 *.spotify.com
 *.scdn.co
+*.soundcloud.com
+*.sndcdn.com
 
 # 博客
 *.wordpress.com
@@ -76,6 +78,7 @@
 *.nytimes.com
 # 美国之音
 *.voachinese.com
+*.voanews.com
 
 # 网络存储
 *.dropbox.com
@@ -90,6 +93,9 @@
 *.vpngate.net
 *.akamai.net
 *.doubleclick.net
+*.github.io
+*.github.com
+
 
 ### 宗教及非政府机构
 # 香港教会
