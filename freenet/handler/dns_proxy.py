@@ -190,9 +190,6 @@ class dns_proxy(dns_base):
     __dev_fd = -1
     __tunnel_is_open = False
 
-    # 加密dns的网络序IP地址
-    __encrypt_dns_addrn = None
-
     # 黑名单的IP大全
     __blacklist_ips = None
     # 是否是第一次调用
@@ -251,8 +248,6 @@ class dns_proxy(dns_base):
 
         for rule in host_rules:
             self.__host_match.add_rule(rule)
-
-        self.__encrypt_dns_addrn = socket.inet_aton(fn_config.configs["dns_encrypt"])
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)

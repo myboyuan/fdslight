@@ -270,7 +270,6 @@ class tunnelc_base(udp_handler.udp_handler):
         ipaddr, _ = s.getpeername()
 
         self.__server_ipaddr = ipaddr
-        self.__dns_server_addrn = socket.inet_aton(fnc_config.configs["dns_encrypt"])
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
