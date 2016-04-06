@@ -95,7 +95,7 @@
 *.doubleclick.net
 *.github.io
 *.github.com
-
+*.githubusercontent.com
 
 ### 宗教及非政府机构
 # 香港教会
