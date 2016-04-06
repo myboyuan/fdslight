@@ -296,6 +296,10 @@ class tunnelc_base(udp_handler.udp_handler):
             self.print_access_log("error_pkt_length:%s,real_length:%s" % (length, len(byte_data),))
             return
 
+        if length != len(byte_data):
+            self.print_access_log("error_length_not_match:%s,real_length:%s" % (length, len(byte_data),))
+            return
+
         byte_data = byte_data[0:length]
         p = byte_data[9]
 

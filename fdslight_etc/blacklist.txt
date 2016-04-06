@@ -96,6 +96,7 @@
 *.github.io
 *.github.com
 *.githubusercontent.com
+*.bit.ly
 
 ### 宗教及非政府机构
 # 香港教会

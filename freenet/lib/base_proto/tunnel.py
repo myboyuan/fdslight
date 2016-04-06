@@ -204,6 +204,10 @@ class parser(object):
 
         return (session_id, real_length, pkt_id, tot_seg, seq, action,)
 
+    def __get_ip4_pkt(self, pkt):
+        tot_len = (pkt[2] << 8) | pkt[3]
+        return pkt[0:tot_len]
+
     def parse(self, packet):
         real_header = self.unwrap_header(packet[0:self.__fixed_header_size])
         if not real_header: return
@@ -225,11 +229,11 @@ class parser(object):
         if 1 in self.__data_area and 2 in self.__data_area:
             pkt = b"".join((self.__data_area[1], self.__data_area[2],))
             self.reset()
-            return (session_id, action, pkt,)
+            return (session_id, action, self.__get_ip4_pkt(pkt),)
         if len(self.__data_area) == 2:
             result = self.__get_data_from_raib()
             self.reset()
-            return (session_id, action, result,)
+            return (session_id, action, self.__get_ip4_pkt(result),)
 
         self.__pkt_id = pkt_id
         return None

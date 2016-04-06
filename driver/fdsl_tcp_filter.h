@@ -3,7 +3,7 @@
 
 #define FDSL_IP_VER4 4
 #define FDSL_IP_VER6 16
-#define FDSL_TF_BUCKET_SIZE 500
+#define FDSL_TF_BUCKET_SIZE 1000
 
 #ifdef FDSL_LINUX_KERNEL
 #include<linux/vmalloc.h>
