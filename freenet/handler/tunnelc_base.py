@@ -236,9 +236,6 @@ class tunnelc_base(udp_handler.udp_handler):
 
     # 服务端IP地址
     __server_ipaddr = None
-    # send auth次数
-    __sent_auth_cnt = 0
-
     # UDP白名单部分相关变量
     __udp_whitelist = None
     __udp_proxy_map = None
@@ -351,7 +348,6 @@ class tunnelc_base(udp_handler.udp_handler):
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
 
         self.__is_auth = True
-        self.__sent_auth_cnt = 0
         self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_open")
         self.ctl_handler(self.fileno, self.__dns_fd, "set_filter_dev_fd", self.__traffic_fetch_fd)
 
@@ -377,7 +373,6 @@ class tunnelc_base(udp_handler.udp_handler):
         self.add_evt_write(self.fileno)
 
     def send_auth(self, auth_data):
-        self.__sent_auth_cnt += 1
         self.print_access_log("send_auth")
         self.send_data(len(auth_data), auth_data, action=tunnel_proto.ACT_AUTH)
 
@@ -451,11 +446,8 @@ class tunnelc_base(udp_handler.udp_handler):
         if not fnc_config.configs["udp_global"]: self.__udp_whitelist.recycle_cache()
 
         if not self.__is_auth:
-            if self.__sent_auth_cnt > 5:
-                self.error()
-                return
-            self.set_timeout(self.fileno, self.__TIMEOUT_NO_AUTH)
-            self.fn_auth_request()
+            self.print_access_log("not_get_server_response")
+            sys.exit(-1)
             return
 
         self.set_timeout(self.fileno, self.__TIMEOUT)
