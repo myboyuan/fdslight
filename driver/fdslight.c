@@ -276,13 +276,7 @@ static struct file_operations chr_ops={
 
 static struct nf_hook_ops nf_ops={
 	.hook=nf_handle_in,
-    #ifdef FDSL_CLIENT
-    // 客户端模式
-    .hooknum=NF_INET_PRE_ROUTING,
-    #else
-    // 网关模式
 	.hooknum=NF_INET_FORWARD,
-    #endif
 	.pf=PF_INET,
 	.priority=NF_IP_PRI_FIRST
 };
