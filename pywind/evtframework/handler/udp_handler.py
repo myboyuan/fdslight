@@ -178,3 +178,6 @@ class udp_handler(handler.handler):
     @property
     def socket(self):
         return self.__socket
+
+    def close(self):
+        self.socket.close()

@@ -30,4 +30,6 @@ configs = {
     "error_log": "/tmp/fdslight_error.log",
     # 访问日志
     "access_log": "/tmp/fdslight_access.log",
+    # 服务端的DNS代理服务器
+    "dns": "8.8.8.8"
 }

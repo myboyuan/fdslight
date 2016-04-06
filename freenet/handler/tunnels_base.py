@@ -4,6 +4,7 @@ import fdslight_etc.fn_server as fns_config
 import freenet.handler.tundev as tundev
 import freenet.lib.base_proto.tunnel as tunnel_proto
 import freenet.lib.ipaddr as ipaddr
+import freenet.handler.dns_proxy as dns_proxy
 import pywind.evtframework.handler.udp_handler as udp_handler
 import freenet.handler.traffic_pass as traffic_pass
 import pywind.lib.timer as timer
@@ -58,6 +59,7 @@ class tunnels_base(udp_handler.udp_handler):
 
     __tun_fd = -1
     __raw_socket_fd = -1
+    __dns_fd = -1
 
     __crypto = None
 
@@ -95,6 +97,7 @@ class tunnels_base(udp_handler.udp_handler):
 
         self.__tun_fd = self.create_handler(self.fileno, tundev.tuns, "fdslight", subnet)
         self.__raw_socket_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
+        self.__dns_fd = self.create_handler(self.fileno, dns_proxy.dnsd_proxy, config["dns"])
 
         if not self.__debug:
             sys.stdout = open(fns_config.configs["access_log"], "a+")
@@ -216,6 +219,10 @@ class tunnels_base(udp_handler.udp_handler):
         session_cls.sent_ping_cnt = 0
 
         if self.__debug: self.print_access_log("received_pong", address)
+
+    def __handle_dns(self, dns_msg, address):
+        uniq_id = "%s-%s" % address
+        self.ctl_handler(self.fileno, self.__dns_fd, "request_dns", uniq_id, dns_msg)
 
     def __handle_close(self, address):
         self.unregister_session(address)
@@ -374,6 +381,7 @@ class tunnels_base(udp_handler.udp_handler):
         if action == tunnel_proto.ACT_PING: self.__handle_ping(address)
         if action == tunnel_proto.ACT_PONG: self.__handle_pong(address)
         if action == tunnel_proto.ACT_DATA: self.__handle_data(byte_data, address)
+        if action == tunnel_proto.ACT_DNS: self.__handle_dns(byte_data, address)
 
         return
 
@@ -401,10 +409,33 @@ class tunnels_base(udp_handler.udp_handler):
     def udp_error(self):
         self.delete_handler(self.fileno)
 
-    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd != "udp_nat_del": return False
-        uniq_id, vlan_address = args
+    def __send_dns(self, uniq_id, dns_msg):
+        msg_len = len(dns_msg)
+        session_cls = self.__sessions[uniq_id]
+        pkts = session_cls.encrypt_m.build_packets(tunnel_proto.ACT_DNS, msg_len, dns_msg)
+        session_cls.encrypt_m.reset()
+        address = session_cls.address
 
+        self.__timer.set_timeout(uniq_id, self.__SESSION_CHECK_TIMEOUT)
+
+        if not self.fn_send(msg_len, address):
+            self.unregister_session(address)
+            return
+
+        if self.__debug: self.print_access_log("send_dns", address)
+        for pkt in pkts: self.sendto(pkt, address)
+        self.add_evt_write(self.fileno)
+
+    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
+        if cmd not in ("udp_nat_del", "response_dns",): return False
+
+        if cmd == "response_dns":
+            uniq_id, dns_msg = args
+            if uniq_id not in self.__sessions: return True
+            self.__send_dns(uniq_id, dns_msg)
+            return True
+
+        uniq_id, vlan_address = args
         uniq_nat_id = "%s-%s" % vlan_address
         if uniq_id not in self.__sessions: return False
         session_cls = self.__sessions[uniq_id]

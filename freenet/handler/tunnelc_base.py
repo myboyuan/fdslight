@@ -438,6 +438,7 @@ class tunnelc_base(udp_handler.udp_handler):
             self.print_access_log("received_pong")
             self.__sent_ping_cnt = 0
         if action == tunnel_proto.ACT_DATA: self.__handle_data(byte_data)
+        if action == tunnel_proto.ACT_DNS: self.send_message_to_handler(self.fileno, self.__dns_fd, byte_data)
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
@@ -508,11 +509,6 @@ class tunnelc_base(udp_handler.udp_handler):
         self.send_message_to_handler(self.fileno, fileno, byte_data)
 
     def message_from_handler(self, from_fd, byte_data):
-        if from_fd == self.__dns_fd:
-            if not self.__is_auth:
-                self.send_message_to_handler(self.fileno, self.__traffic_send_fd, byte_data)
-                return
-
         # 说明消息来自udp proxy
         if from_fd not in (self.__dns_fd, self.__traffic_fetch_fd,):
             self.send_message_to_handler(self.fileno, self.__traffic_send_fd, byte_data)
@@ -551,7 +547,12 @@ class tunnelc_base(udp_handler.udp_handler):
         sys.stdout.flush()
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd != "udp_nat_del": return False
+        if cmd not in ("udp_nat_del", "request_dns",): return False
+        if cmd == "request_dns":
+            dns_msg, = args
+            self.send_data(len(dns_msg), dns_msg, action=tunnel_proto.ACT_DNS)
+            return True
+
         uniq_id, lan_address = args
         del self.__udp_proxy_map[uniq_id]
 
