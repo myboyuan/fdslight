@@ -81,6 +81,12 @@ static long chr_ioctl(struct file *f,unsigned int cmd,unsigned long arg)
             ui_tmp=ntohl(ui_tmp);
             ret=fdsl_tf_add(tcp_filter,(const char *)(&ui_tmp));
             break;
+        case FDSL_IOC_TF_RECORD_DEL:
+             err=copy_from_user(&ui_tmp,(unsigned int *)arg,sizeof(unsigned int));
+             if(err) return -EINVAL;
+             ui_tmp=ntohl(ui_tmp);
+             ret=fdsl_tf_delete(tcp_filter,(const char *)(&ui_tmp));
+             break;
         case FDSL_IOC_TF_FIND:
             err=copy_from_user(&ui_tmp,(unsigned int *)arg,sizeof(unsigned int));
             if(err) return -EINVAL;

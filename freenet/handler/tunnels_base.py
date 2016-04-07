@@ -389,6 +389,7 @@ class tunnels_base(udp_handler.udp_handler):
         self.remove_evt_write(self.fileno)
 
     def udp_timeout(self):
+        self.fn_timeout()
         names = self.__timer.get_timeout_names()
         for name in names:
             if self.__timer.exists(name): self.__timer.drop(name)
@@ -525,5 +526,12 @@ class tunnels_base(udp_handler.udp_handler):
     def fn_delete(self, address):
         """删除会话的时候会调用此函数,用于资源的释放
         :param address :客户端地址
+        """
+        pass
+
+    def fn_timeout(self):
+        """超时函数调用,可用于一些数据统计
+        :param address:
+        :return:
         """
         pass

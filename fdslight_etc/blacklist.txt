@@ -71,7 +71,10 @@
 *.ablwang.com
 #  梵蒂冈广播电台
 *.vaticanradio.org
+# BBC
 *.bbc.com
+*.bbc.co.uk
+# 法广
 *.rfi.fr
 *.soundofhope.org
 # 纽约时报
@@ -79,6 +82,8 @@
 # 美国之音
 *.voachinese.com
 *.voanews.com
+# 自由亚洲电台
+*.rfa.org
 
 # 网络存储
 *.dropbox.com
@@ -97,6 +102,7 @@
 *.github.com
 *.githubusercontent.com
 *.bit.ly
+*.playstation.net
 
 ### 宗教及非政府机构
 # 香港教会

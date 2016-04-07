@@ -81,7 +81,7 @@ int fdsl_tf_add(struct fdsl_tcp_filter *f, const char *s)
 
 	int bucket_p = __times33(s, f->ip_ver) % FDSL_TF_BUCKET_SIZE;
 
-    // 避免加入相同的hash值
+    // 避免加入相同的value
 	if(1==fdsl_tf_find(f,s)) return 0;
 
 	if (NULL == f->elements[bucket_p]) {
@@ -105,6 +105,29 @@ int fdsl_tf_add(struct fdsl_tcp_filter *f, const char *s)
 	memcpy(tmp->value, s, f->ip_ver);
 
 	return 0;
+}
+
+int fdsl_tf_delete(struct fdsl_tcp_filter *f,const char *s)
+{
+    struct fdsl_tcp_filter_ele *tmp_ele,*tmp_pre_ele;
+    int bucket_p=__times33(s,f->ip_ver) % FDSL_TF_BUCKET_SIZE;
+    int is_find=0,cnt=0;
+    tmp_ele=f->elements[bucket_p];
+   
+    while(NULL!=tmp_ele){
+        is_find = (0 == memcmp(tmp_ele->value, s, f->ip_ver)) ? 1 : 0;
+        if(!is_find){
+            tmp_pre_ele=tmp_ele;
+            tmp_ele=tmp_ele->next;
+            cnt++;
+            continue;
+        }
+        if(0==cnt) f->elements[bucket_p]=NULL;
+        else tmp_pre_ele->next=NULL;
+        fdsl_free(tmp_ele);
+        break;
+    }
+    return 1;
 }
 
 void fdsl_tf_release(struct fdsl_tcp_filter *f)

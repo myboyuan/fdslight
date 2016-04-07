@@ -15,6 +15,16 @@ fdsl_tf_record_add(PyObject *self,PyObject *args)
 }
 
 static PyObject *
+fdsl_tf_record_del(PyObject *self,PyObject *args)
+{
+    int fileno;
+    unsigned int ip4;
+
+    if(!PyArg_ParseTuple(args,"iI",&fileno,&ip4)) return NULL;
+    return PyLong_FromLong(ioctl(fileno,FDSL_IOC_TF_RECORD_DEL,&ip4));
+}
+
+static PyObject *
 fdsl_tf_find(PyObject *self,PyObject *args)
 {
     int fileno;
@@ -37,6 +47,7 @@ fdsl_set_tunnel(PyObject *self,PyObject *args)
 
 static PyMethodDef fdsl_ctl_methods[]={
 	{"tf_record_add",fdsl_tf_record_add,METH_VARARGS,"add to tcp filter"},
+    {"tf_record_del",fdsl_tf_record_del,METH_VARARGS,"delete from tcp filter"},
 	{"tf_find",fdsl_tf_find,METH_VARARGS,"find tcp filter record"},
     {"set_tunnel",fdsl_set_tunnel,METH_VARARGS,"set tunnel"},
 	{NULL,NULL,0,NULL}

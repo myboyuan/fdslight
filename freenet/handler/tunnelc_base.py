@@ -223,15 +223,10 @@ class tunnelc_base(udp_handler.udp_handler):
     __TIMEOUT_NO_AUTH = 5
     __session_id = 0
 
-    # DNS server的网络序地址
-    __dns_server_addrn = None
     __is_auth = False
 
     # 发送ping的次数
     __sent_ping_cnt = 0
-
-    # 是否曾经打开过流量捕获设备
-    __is_open_fetch_fd_once = False
     __debug = False
 
     # 服务端IP地址
@@ -239,6 +234,10 @@ class tunnelc_base(udp_handler.udp_handler):
     # UDP白名单部分相关变量
     __udp_whitelist = None
     __udp_proxy_map = None
+
+    __timer = None
+    # 如果超过这个时间,那么将会从内核过滤器中删除
+    __IP_TIMEOUT = 300
 
     def init_func(self, creator_fd, whitelist, blacklist, debug=False):
         self.__nat = _static_nat()
@@ -253,6 +252,7 @@ class tunnelc_base(udp_handler.udp_handler):
         self.__decrypt_m = m.decrypt(*crypto_args)
 
         self.__debug = debug
+        self.__timer = timer.timer()
 
         self.__traffic_send_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
 
@@ -310,27 +310,10 @@ class tunnelc_base(udp_handler.udp_handler):
 
         # if self.__debug: self.print_access_log("recv_data")
         self.set_timeout(self.fileno, self.__TIMEOUT)
-
-        if p != 17:
-            self.send_message_to_handler(self.fileno, self.__traffic_send_fd, new_pkt)
-            return
-
-        # 需要特殊对待DNS的UDP数据包
         src_addr = new_pkt[12:16]
-        if src_addr != self.__dns_server_addrn:
-            self.send_message_to_handler(self.fileno, self.__traffic_send_fd, new_pkt)
-            return
-
-        ihl = (new_pkt[0] & 0x0f) * 4
-        b = ihl
-        e = ihl + 1
-        sport = (new_pkt[b] << 8) | new_pkt[e]
-
-        if sport != 53:
-            self.send_message_to_handler(self.fileno, self.__traffic_send_fd, new_pkt)
-            return
-
-        self.send_message_to_handler(self.fileno, self.__dns_fd, new_pkt)
+        self.__timer.set_timeout(src_addr, self.__IP_TIMEOUT)
+        self.send_message_to_handler(self.fileno, self.__traffic_send_fd, new_pkt)
+        return
 
     def __handle_close(self):
         # 先删除流量过滤handler,保证其它流量能够走客户端默认路由
@@ -355,6 +338,14 @@ class tunnelc_base(udp_handler.udp_handler):
         if not self.__debug:
             sys.stdout = open(fnc_config.configs["access_log"], "a+")
             sys.stderr = open(fnc_config.configs["error_log"], "a+")
+
+        """
+        rs=fdsl_ctl.tf_record_add(self.__traffic_fetch_fd,n)
+        print("add:",rs)
+        rs=fdsl_ctl.tf_record_del(self.__traffic_fetch_fd,n)
+        print("del",rs)
+        """
+
         return
 
     def set_session_id(self, sid):
@@ -444,6 +435,12 @@ class tunnelc_base(udp_handler.udp_handler):
     def udp_timeout(self):
         self.__nat.recyle_ips()
         if not fnc_config.configs["udp_global"]: self.__udp_whitelist.recycle_cache()
+        filter_ips = self.__timer.get_timeout_names()
+
+        for ip in filter_ips:
+            n = utils.ip4b_2_number(ip)
+            fdsl_ctl.tf_record_del(self.__traffic_fetch_fd, n)
+            if self.__timer.exists(ip): self.__timer.drop(ip)
 
         if not self.__is_auth:
             self.print_access_log("not_get_server_response")
@@ -507,17 +504,18 @@ class tunnelc_base(udp_handler.udp_handler):
 
         protocol = byte_data[9]
         # 处理UDP代理
-        if protocol == 17 and fnc_config.configs["udp_global"] and from_fd != self.__dns_fd:
+        if protocol == 17 and not fnc_config.configs["udp_global"]:
             if self.__udp_whitelist.find(byte_data[16:20]):
                 self.__udp_local_proxy_for_send(byte_data)
                 return
             ''''''
-
         new_pkt = self.__nat.get_new_packet_to_tunnel(byte_data)
         if not new_pkt:
             self.print_access_log("can_not_send_to_tunnel")
             return
 
+        dst_addr = new_pkt[16:20]
+        self.__timer.set_timeout(dst_addr, self.__IP_TIMEOUT)
         pkt_len = (new_pkt[2] << 8) | new_pkt[3]
         self.send_data(pkt_len, new_pkt)
 
