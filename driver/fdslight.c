@@ -199,7 +199,11 @@ static unsigned int nf_handle_in(
 #if LINUX_VERSION_CODE<=KERNEL_VERSION(3,1,2)
         unsigned int hooknum,
 #endif
+#if LINUX_VERSION_CODE>=KERNEL_VERSION(4,4,0)
+        void *priv,
+#else
         const struct nf_hook_ops *ops,
+#endif
 		struct sk_buff *skb,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,1,0)
         const struct nf_hook_state *state
