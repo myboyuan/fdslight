@@ -186,7 +186,6 @@ class dns_proxy(dns_base):
     __transparent_dns = None
 
     __tunnel_fd = -1
-
     __dev_fd = -1
     __tunnel_is_open = False
 
@@ -244,7 +243,6 @@ class dns_proxy(dns_base):
         self.__host_match = _host_match()
         self.__timer = timer.timer()
         self.__blacklist_ips = {}
-        self.__tunnel_fd = creator_fd
 
         for rule in host_rules:
             self.__host_match.add_rule(rule)
@@ -296,6 +294,11 @@ class dns_proxy(dns_base):
         self.__timer.set_timeout(n_dns_id, self.__TIMEOUT)
 
         message = bytes(L)
+
+        if not self.__tunnel_is_open:
+            self.__send_to_dns_server(self.__transparent_dns, message)
+            return
+
         msg = dns.message.from_wire(message)
 
         questions = msg.question
@@ -357,7 +360,7 @@ class dns_proxy(dns_base):
         self.delete_handler(self.fileno)
 
     def handler_ctl(self, from_fd, cmd, filter_dev=None):
-        if cmd not in ("tunnel_close", "tunnel_open", "set_filter_dev_fd"): return False
+        if cmd not in ("tunnel_close", "tunnel_open", "set_filter_dev_fd","as_tunnel_fd"): return False
         if cmd == "tunnel_close": self.__tunnel_is_open = False
         if cmd == "tunnel_open": self.__tunnel_is_open = True
 
@@ -367,4 +370,5 @@ class dns_proxy(dns_base):
             self.__blacklist_ips = self.__get_blacklist_cache()
             self.__is_first = False
             for ip in self.__blacklist_ips: fdsl_ctl.tf_record_add(self.__dev_fd, utils.ip4s_2_number(ip))
+        if cmd == "as_tunnel_fd": self.__tunnel_fd = from_fd
         return

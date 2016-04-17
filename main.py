@@ -10,10 +10,9 @@ import fdslight_etc.fn_server as fns_config
 import fdslight_etc.fn_client as fnc_config
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.file_parser as file_parser
+import freenet.handler.dns_proxy as dns_proxy
 
 FDSL_PID_FILE = "fdslight.pid"
-
-__mode = "client"
 
 
 def create_pid_file(fname, pid):
@@ -45,14 +44,19 @@ def clear_pid_file():
 
 class fdslight(dispatcher.dispatcher):
     __debug = True
+    # 客户端是否需要建立隧道,用于客户端模式
+    __need_establish_ctunnel = False
+    # DNS socket文件描述符
+    __dns_fd = -1
+    __tunnel = None
 
-    def __create_fn_server(self, tunnel):
+    def __create_fn_server(self):
         if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
 
         self.create_poll()
-        self.create_handler(-1, tunnel.tunnel, debug=self.__debug)
+        self.create_handler(-1, self.__tunnel.tunnel, debug=self.__debug)
 
-    def __create_fn_client(self, tunnel):
+    def __create_fn_client(self):
         if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
 
         self.create_poll()
@@ -73,7 +77,8 @@ class fdslight(dispatcher.dispatcher):
         whitelist = file_parser.parse_ip_subnet_file("fdslight_etc/whitelist.txt")
         blacklist = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
 
-        self.create_handler(-1, tunnel.tunnel, whitelist, blacklist, debug=self.__debug)
+        self.__dns_fd = self.create_handler(-1, dns_proxy.dns_proxy, blacklist, debug=self.__debug)
+        self.create_handler(-1, self.__tunnel.tunnel, self.__dns_fd, whitelist, debug=self.__debug)
 
     def init_func(self, mode, debug=True):
         if mode == "server":
@@ -94,10 +99,12 @@ class fdslight(dispatcher.dispatcher):
         self.__run(mode, tunnel)
 
     def __debug_run(self, mode, module):
-        if mode == "server": self.__create_fn_server(module)
-        if mode == "client": self.__create_fn_client(module)
+        self.__tunnel = module
+        if mode == "server": self.__create_fn_server()
+        if mode == "client": self.__create_fn_client()
 
     def __run(self, mode, module):
+        self.__tunnel = module
         pid = os.fork()
         if pid != 0: sys.exit(0)
 
@@ -107,9 +114,24 @@ class fdslight(dispatcher.dispatcher):
 
         if pid != 0: sys.exit(0)
 
-        if mode == "server": self.__create_fn_server(module)
-        if mode == "client": self.__create_fn_client(module)
+        if mode == "server": self.__create_fn_server()
+        if mode == "client": self.__create_fn_client()
 
+        return
+
+    def ctunnel_fail(self):
+        """客户端隧道建立失败"""
+        self.__need_establish_ctunnel = True
+
+    def ctunnel_ok(self):
+        """客户端隧道建立成功"""
+        self.__need_establish_ctunnel = False
+
+    def myloop(self):
+        if self.__need_establish_ctunnel:
+            self.__need_establish_ctunnel = False
+            self.create_handler(-1, self.__tunnel.tunnel, self.__dns_fd, [],
+                                debug=self.__debug)
         return
 
 
@@ -121,8 +143,11 @@ def stop_service():
 
 def main():
     help_doc = """
-    -m   client | server
-    -d   stop   | start | debug
+
+    -m
+    client | server
+    -d
+    stop | start | debug
     """
     try:
         opts, args = getopt.getopt(sys.argv[1:], "m:d:")
@@ -158,7 +183,6 @@ def main():
     if d == "debug": debug = True
 
     fdslight_ins = fdslight()
-    __mode = m
 
     try:
         fdslight_ins.ioloop(m, debug=debug)
