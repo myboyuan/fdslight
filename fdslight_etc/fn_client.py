@@ -2,7 +2,7 @@
 configs = {
     "udp_server_address": (
         # 你的服务器的地址以及端口
-        "example.com", 1989
+        "example.com", 1999
     ),
     # TCP隧道服务器地址以及端口
     "tcp_server_address": (
@@ -36,12 +36,12 @@ configs = {
         )
     },
     # 隧道类型,可选的值有"tcp","udp",推荐使用udp,请根据你的ISP选择适合你的隧道类型
-    "tunnel_type": "tcp",
+    "tunnel_type": "udp",
     # 是否开启UDP全局代理,一般情况请不要这样做,当你的网络不支持内网穿透的时候,请使用此项
     # 此项开启时网络一定会支持P2P
     "udp_global": 0,
-    # 不走代理流量的DNS服务器（注意用下一跳的地址,即代理客户端所在路由器地址,不要填公共dns,会出问题)
-    "dns": "192.168.1.1",
+    # 不走代理流量的DNS服务器
+    "dns": "223.5.5.5",
     # DNS绑定地址
     "dns_bind": "0.0.0.0",
     # 访问日志
