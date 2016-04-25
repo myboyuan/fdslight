@@ -329,6 +329,7 @@ class dns_proxy(dns_base):
         if not is_match or not self.handler_exists(self.__tunnel_fd):
             self.__send_to_dns_server(self.__transparent_dns, message)
             return
+
         self.__dns_flags[n_dns_id] = flags
         self.ctl_handler(self.fileno, self.__tunnel_fd, "request_dns", message)
 
