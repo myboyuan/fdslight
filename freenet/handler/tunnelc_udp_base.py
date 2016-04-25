@@ -240,6 +240,7 @@ class tunnelc_udp_base(udp_handler.udp_handler):
 
     def udp_error(self):
         self.print_access_log("server_down")
+        self.delete_handler(self.fileno)
 
     def udp_timeout(self):
         if not self.__is_auth:
