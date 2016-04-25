@@ -92,7 +92,11 @@ class traffic_send(handler.handler):
             dst_addr_pkt = ippkt[16:20]
             dst_addr = socket.inet_ntoa(dst_addr_pkt)
             pkt_len = (ippkt[2] << 8) | ippkt[3]
-            sent_len = self.__socket.sendto(ippkt, (dst_addr, 0))
+            try:
+                sent_len = self.__socket.sendto(ippkt, (dst_addr, 0))
+            except BlockingIOError:
+                self.__sent.insert(0, ippkt)
+                return
 
             if pkt_len > sent_len:
                 self.__sent.insert(0, ippkt)
@@ -161,7 +165,7 @@ class udp_proxy(udp_handler.udp_handler):
         n_saddr = socket.inet_aton(saddr)
         n_daddr = socket.inet_aton(daddr)
 
-        self.__timer.set_timeout(saddr,self.__UDP_SESSION_TIMEOUT)
+        self.__timer.set_timeout(saddr, self.__UDP_SESSION_TIMEOUT)
         udp_packets = utils.build_udp_packet(n_saddr, n_daddr, sport, dport, message)
 
         for udp_pkt in udp_packets: self.send_message_to_handler(self.fileno, self.__creator_fd, udp_pkt)
@@ -212,15 +216,14 @@ class udp_proxy(udp_handler.udp_handler):
 
         self.__internet_ip[dst_addr] = sport
         self.__timer.set_timeout(dst_addr, self.__UDP_SESSION_TIMEOUT)
-
         self.send_message_to_handler(self.fileno, self.__raw_socket_fd, message)
-
         return
 
     def udp_error(self):
-        self.ctl_handler(self.fileno, self.__creator_fd, "udp_nat_del", self.__session_uniq_id, self.__lan_address)
+        self.delete_handler(self.fileno)
 
     def udp_delete(self):
+        self.ctl_handler(self.fileno, self.__creator_fd, "udp_nat_del", self.__session_uniq_id, self.__lan_address)
         self.unregister(self.fileno)
         self.socket.close()
 
@@ -230,7 +233,6 @@ class udp_proxy(udp_handler.udp_handler):
         for name in names:
             if name in self.__internet_ip: del self.__internet_ip[name]
             if self.__timer.exists(name): self.__timer.drop(name)
-
         return
 
     def udp_timeout(self):
@@ -238,5 +240,4 @@ class udp_proxy(udp_handler.udp_handler):
         if self.__internet_ip:
             self.set_timeout(self.fileno, self.__TIMEOUT)
             return
-
-        self.ctl_handler(self.fileno, self.__creator_fd, "udp_nat_del", self.__session_uniq_id, self.__lan_address)
+        self.delete_handler(self.fileno)

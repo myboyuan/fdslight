@@ -25,7 +25,6 @@ class ip4addr(object):
         :param mask:25
         :return:
         """
-        self.__base_ipaddr = ipaddr
         self.__recycle_ips = []
 
         if mask_size < 1:
@@ -59,7 +58,7 @@ class ip4addr(object):
         host_n = self.__base_ipaddr & self.__mask
 
         if host_n < n:
-            if self.__recycle_ips:return self.__recycle_ips.pop(0)
+            if self.__recycle_ips: return self.__recycle_ips.pop(0)
             raise IpaddrNoEnoughErr
 
         new_int_ip = self.__base_ipaddr + n
@@ -77,7 +76,4 @@ class ip4addr(object):
         :param ipaddr:
         :return:
         """
-        if ipaddr not in self.__recycle_ips:
-            self.__recycle_ips.append(ipaddr)
-
-        return
+        if ipaddr not in self.__recycle_ips: self.__recycle_ips.append(ipaddr)

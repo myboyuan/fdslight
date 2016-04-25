@@ -103,7 +103,6 @@ class tcp_handler(handler.handler):
             ''''''
             self.__conn_ok = True
             self.connect_ok()
-            self.set_timeout(self.fileno, -1)
             return
         sent_data = self.writer._getvalue()
         if not sent_data: self.tcp_writable()
@@ -211,3 +210,6 @@ class tcp_handler(handler.handler):
     def delete_this_no_sent_data(self):
         """没有可发送的数据时候删除这个handler"""
         self.__delete_this_no_sent_data = True
+
+    def getpeername(self):
+        return self.socket.getpeername()

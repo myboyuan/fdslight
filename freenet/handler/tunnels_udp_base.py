@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 import socket, sys, time
 import fdslight_etc.fn_server as fns_config
-import freenet.handler.tundev as tundev
-import freenet.lib.base_proto.tunnel as tunnel_proto
+import freenet.lib.base_proto.tunnel_udp as tunnel_proto
 import freenet.lib.ipaddr as ipaddr
-import freenet.handler.dns_proxy as dns_proxy
 import pywind.evtframework.handler.udp_handler as udp_handler
 import freenet.handler.traffic_pass as traffic_pass
 import pywind.lib.timer as timer
@@ -29,7 +27,7 @@ class _udp_session(object):
         self.encrypt_m = sec_mod.encrypt(*mod_args)
 
 
-class tunnels_base(udp_handler.udp_handler):
+class tunnels_udp_base(udp_handler.udp_handler):
     __debug = None
     __dns_server = None
     __raw_socket_fd = None
@@ -65,12 +63,12 @@ class tunnels_base(udp_handler.udp_handler):
 
     __debug = False
 
-    def init_func(self, creator_fd, debug=True):
+    def init_func(self, creator_fd, tun_fd, dns_fd, raw_socket_fd, ip_pool, debug=True):
         self.__debug = debug
         config = fns_config.configs
 
         # 导入加入模块
-        name = "freenet.lib.crypto.%s" % config["crypto_module"]["name"]
+        name = "freenet.lib.crypto.%s" % config["udp_crypto_module"]["name"]
         __import__(name)
         m = sys.modules.get(name, None)
 
@@ -82,9 +80,8 @@ class tunnels_base(udp_handler.udp_handler):
         self.__debug = debug
         self.__sessions = {}
 
-        subnet = config["subnet"]
-        self.__ipalloc = ipaddr.ip4addr(*subnet)
-        bind_address = fns_config.configs["bind_address"]
+        self.__ipalloc = ip_pool
+        bind_address = fns_config.configs["udp_listen"]
 
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -95,9 +92,9 @@ class tunnels_base(udp_handler.udp_handler):
 
         self.set_timeout(self.fileno, self.__TIMEOUT)
 
-        self.__tun_fd = self.create_handler(self.fileno, tundev.tuns, "fdslight", subnet)
-        self.__raw_socket_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
-        self.__dns_fd = self.create_handler(self.fileno, dns_proxy.dnsd_proxy, config["dns"])
+        self.__tun_fd = tun_fd
+        self.__dns_fd = dns_fd
+        self.__raw_socket_fd = raw_socket_fd
 
         if not self.__debug:
             sys.stdout = open(fns_config.configs["access_log"], "a+")
@@ -142,7 +139,7 @@ class tunnels_base(udp_handler.udp_handler):
         session_id = self.__get_session_id()
         if not session_id: return 0
 
-        crypto_args = fns_config.configs["crypto_module"].get("args", ())
+        crypto_args = fns_config.configs["udp_crypto_module"].get("args", ())
         session_cls = _udp_session(self.__crypto, crypto_args)
 
         session_cls.session_id = session_id
@@ -319,7 +316,7 @@ class tunnels_base(udp_handler.udp_handler):
         self.add_evt_write(self.fileno)
 
     def send_auth(self, address, byte_data):
-        crypto_args = fns_config.configs["crypto_module"].get("args", ())
+        crypto_args = fns_config.configs["udp_crypto_module"].get("args", ())
         tmp_encrypt = self.__crypto.encrypt(*crypto_args)
         pkts = tmp_encrypt.build_packets(tunnel_proto.ACT_AUTH, len(byte_data), byte_data)
         self.print_access_log("send_auth", address)
@@ -333,7 +330,7 @@ class tunnels_base(udp_handler.udp_handler):
         # 不允许的客户端只接丢弃包
         # session不存在的时候构建一个临时session
 
-        crypto_args = fns_config.configs["crypto_module"].get("args", ())
+        crypto_args = fns_config.configs["udp_crypto_module"].get("args", ())
         if uniq_id not in self.__sessions:
             session_cls = _udp_session(self.__crypto, crypto_args)
         else:
@@ -442,11 +439,7 @@ class tunnels_base(udp_handler.udp_handler):
         session_cls = self.__sessions[uniq_id]
         udp_nat_map = session_cls.udp_nat_map
 
-        if uniq_nat_id in udp_nat_map:
-            fileno = udp_nat_map[uniq_nat_id]
-            self.delete_handler(fileno)
-            del udp_nat_map[uniq_nat_id]
-
+        if uniq_nat_id in udp_nat_map: del udp_nat_map[uniq_nat_id]
         return
 
     def get_encrypt(self, address):

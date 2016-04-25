@@ -12,7 +12,6 @@ dst_path_2 = "freenet/lib/fdsl_ctl.so"
 
 __mode = "client"
 
-
 def main():
     argv = sys.argv[1:]
     if len(argv) != 2:

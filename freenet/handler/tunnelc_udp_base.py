@@ -3,211 +3,19 @@
 隧道客户端基本类
 """
 import socket, sys, time, random
-
 import fdslight_etc.fn_client as fnc_config
 import pywind.evtframework.handler.udp_handler as udp_handler
 import pywind.lib.timer as timer
 import freenet.lib.checksum as checksum
-import freenet.lib.base_proto.tunnel as tunnel_proto
+import freenet.lib.base_proto.tunnel_udp as tunnel_proto
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.utils as utils
+import freenet.lib.static_nat as static_nat
+import freenet.lib.whitelist as udp_whitelist
 
 
-class _static_nat(object):
-    """静态nat类"""
-    # nat转换相关变量
-    __dst_nat_table = None
-    __src_nat_table = None
-    # 分配到的虚拟IP列表
-    __virtual_ips = None
-
-    __timer = None
-    # IP地址租赁有效期,如果超过这个时间,IP地址将被回收,以便可以让别的客户端可以连接
-    __IP_TIMEOUT = 600
-
-    def __init__(self):
-        self.__dst_nat_table = {}
-        self.__src_nat_table = {}
-        self.__virtual_ips = []
-        self.__timer = timer.timer()
-
-    def add_virtual_ips(self, ips):
-        for ip in ips:
-            ip_pkt = socket.inet_aton(ip)
-            self.__virtual_ips.append(ip_pkt)
-        return
-
-    def get_new_packet_to_tunnel(self, pkt):
-        """获取要发送到tunnel的IP包
-        :param pkt:从局域网机器读取过来的包
-        """
-        src_addr = pkt[12:16]
-        vir_ip = self.__src_nat_table.get(src_addr, None)
-
-        if not vir_ip and not self.__virtual_ips: return None
-        if not vir_ip: vir_ip = self.__virtual_ips.pop(0)
-
-        pkt_list = list(pkt)
-        checksum.modify_address(vir_ip, pkt_list, checksum.FLAG_MODIFY_SRC_IP)
-
-        self.__timer.set_timeout(vir_ip, self.__IP_TIMEOUT)
-
-        if vir_ip not in self.__dst_nat_table: self.__dst_nat_table[vir_ip] = src_addr
-        if src_addr not in self.__src_nat_table: self.__src_nat_table[src_addr] = vir_ip
-
-        return bytes(pkt_list)
-
-    def get_new_packet_for_lan(self, pkt):
-        """获取要发送给局域网机器的包
-        :param pkt:收到的要发给局域网机器的包
-        """
-        dst_addr = pkt[16:20]
-        # 如果没在nat表中,那么不执行转换
-        if dst_addr not in self.__dst_nat_table: return None
-
-        dst_lan = self.__dst_nat_table[dst_addr]
-        self.__timer.set_timeout(dst_addr, self.__IP_TIMEOUT)
-        pkt_list = list(pkt)
-        checksum.modify_address(dst_lan, pkt_list, checksum.FLAG_MODIFY_DST_IP)
-
-        return bytes(pkt_list)
-
-    def recyle_ips(self):
-        """回收已经分配出去的IP地址"""
-        names = self.__timer.get_timeout_names()
-        for name in names:
-            if name in self.__dst_nat_table:
-                t = self.__dst_nat_table[name]
-                # 重新加入到待分配的列表中
-                self.__virtual_ips.append(name)
-
-                del self.__dst_nat_table[name]
-                del self.__src_nat_table[t]
-            if self.__timer.exists(name): self.__timer.drop(name)
-        return
-
-    def reset(self):
-        self.__virtual_ips = []
-        self.__dst_nat_table = {}
-        self.__src_nat_table = {}
-
-    def bind(self, src_ippkt):
-        """把特定源地址域虚拟VLAN地址绑定起来"""
-        if self.__bind:
-            src, vsrc = self.__bind
-            self.__virtual_ips.append(vsrc)
-
-        try:
-            vsrc = self.__virtual_ips.pop(0)
-        except IndexError:
-            return False
-
-        self.__bind = (src_ippkt, vsrc,)
-        return True
-
-
-class _udp_whitelist(object):
-    """UDP白名单类"""
-    __tree = None
-    # 缓存回收超时
-    __CACHE_TIMEOUT = 180
-    __timer = None
-
-    __cache = None
-
-    def __init__(self):
-        self.__tree = {}
-        self.__timer = timer.timer()
-        self.__cache = {}
-
-    def add_rule(self, ipaddr, mask):
-        if mask < 1 or mask > 32: raise ValueError("the value of mask is wrong")
-        ippkt = socket.inet_aton(ipaddr)
-
-        tmp_dict = self.__tree
-
-        a = int(mask / 8)
-        r = mask % 8
-        if r: a += 1
-
-        for i in range(4):
-            n = ippkt[i]
-
-            if i + 1 == a:
-                if "values" not in tmp_dict: tmp_dict["values"] = {}
-                if mask not in tmp_dict["values"]: tmp_dict["values"][mask] = []
-                tmp_dict["values"][mask].append(n)
-                break
-
-            if n not in tmp_dict:
-                tmp_dict[n] = {}
-
-            tmp_dict = tmp_dict[n]
-
-        return
-
-    def __add_to_cache(self, ippkt, from_wl=True):
-        self.__cache[ippkt] = from_wl
-        self.__timer.set_timeout(ippkt, self.__CACHE_TIMEOUT)
-
-    def __get_subn(self, a_list, b):
-        cnt = 24
-        ret_v = 0
-
-        for n in a_list:
-            ret_v |= n << cnt
-            cnt -= 8
-
-        return ret_v | (b << cnt)
-
-    def find(self, ippkt):
-        if ippkt in self.__cache: return self.__cache[ippkt]
-
-        tmp_dict = self.__tree
-        t_net_v = utils.ip4b_2_number(ippkt)
-
-        values = []
-        _values = None
-
-        for n in ippkt:
-            if n not in tmp_dict:
-                if "values" not in tmp_dict:
-                    self.__add_to_cache(ippkt, from_wl=False)
-                    return False
-                _values = tmp_dict["values"]
-                break
-            values.append(n)
-            tmp_dict = tmp_dict[n]
-
-        is_find = False
-
-        for m in _values:
-            mask_v = 0
-            for i in range(m): mask_v |= 1 << (31 - i)
-            for t in _values[m]:
-                subn = self.__get_subn(values, t)
-                if t_net_v & mask_v == subn:
-                    is_find = True
-                    break
-                ''''''
-            ''''''
-        self.__add_to_cache(ippkt, from_wl=is_find)
-
-        return is_find
-
-    def recycle_cache(self):
-        names = self.__timer.get_timeout_names()
-        for name in names:
-            if name in self.__cache: del self.__cache[name]
-            if self.__timer.exists(name): self.__timer.drop(name)
-        return
-
-    def print_tree(self):
-        print(self.__tree)
-
-
-class tunnelc_base(udp_handler.udp_handler):
+class tunnelc_udp_base(udp_handler.udp_handler):
     __nat = None
     __server = None
 
@@ -242,14 +50,14 @@ class tunnelc_base(udp_handler.udp_handler):
         return random.randint(1, 30)
 
     def init_func(self, creator_fd, dns_fd, whitelist, debug=False):
-        self.__nat = _static_nat()
-        self.__server = fnc_config.configs["server_address"]
+        self.__nat = static_nat.nat()
+        self.__server = fnc_config.configs["udp_server_address"]
 
-        name = "freenet.lib.crypto.%s" % fnc_config.configs["crypto_module"]["name"]
+        name = "freenet.lib.crypto.%s" % fnc_config.configs["udp_crypto_module"]["name"]
         __import__(name)
         m = sys.modules.get(name, None)
 
-        crypto_args = fnc_config.configs["crypto_module"].get("args", ())
+        crypto_args = fnc_config.configs["udp_crypto_module"].get("args", ())
         self.__encrypt_m = m.encrypt(*crypto_args)
         self.__decrypt_m = m.decrypt(*crypto_args)
 
@@ -277,10 +85,10 @@ class tunnelc_base(udp_handler.udp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
+        self.__udp_proxy_map = {}
         # 如果是非全局UDP代理,那么开启UDP白名单模式
         if not fnc_config.configs["udp_global"]:
-            self.__udp_whitelist = _udp_whitelist()
-            self.__udp_proxy_map = {}
+            self.__udp_whitelist = udp_whitelist.whitelist()
             for subn, mask in whitelist: self.__udp_whitelist.add_rule(subn, mask)
 
         if not self.__debug:
@@ -434,6 +242,10 @@ class tunnelc_base(udp_handler.udp_handler):
         self.print_access_log("server_down")
 
     def udp_timeout(self):
+        if not self.__is_auth:
+            self.print_access_log("not_get_server_response")
+            self.dispatcher.ctunnel_fail()
+            return
         self.__nat.recyle_ips()
         if not fnc_config.configs["udp_global"]: self.__udp_whitelist.recycle_cache()
         filter_ips = self.__timer.get_timeout_names()
@@ -442,11 +254,6 @@ class tunnelc_base(udp_handler.udp_handler):
             n = utils.ip4b_2_number(ip)
             fdsl_ctl.tf_record_del(self.__traffic_fetch_fd, n)
             if self.__timer.exists(ip): self.__timer.drop(ip)
-
-        if not self.__is_auth:
-            self.print_access_log("not_get_server_response")
-            self.dispatcher.ctunnel_fail()
-            return
 
         self.set_timeout(self.fileno, self.__TIMEOUT)
         # 尝试发送ping 5 次
@@ -461,6 +268,10 @@ class tunnelc_base(udp_handler.udp_handler):
         self.unregister(self.fileno)
         self.socket.close()
         self.dispatcher.ctunnel_fail()
+
+        dels = []
+        for k, v in self.__udp_proxy_map.items(): dels.append(v)
+        for f in dels: self.delete_handler(f)
 
     @property
     def encrypt(self):
@@ -525,7 +336,8 @@ class tunnelc_base(udp_handler.udp_handler):
         if self.__debug: self.print_access_log("alloc_ip_list:%s" % str(ips))
         if len(ips) < 2:
             print("server not alloc enough ip")
-            sys.exit(-1)
+            self.delete_handler(self.fileno)
+            return
         self.__nat.add_virtual_ips(ips)
 
     def print_access_log(self, text):
@@ -544,6 +356,7 @@ class tunnelc_base(udp_handler.udp_handler):
             return True
 
         uniq_id, lan_address = args
+        if uniq_id not in self.__udp_proxy_map: return
         del self.__udp_proxy_map[uniq_id]
 
     def fn_init(self):

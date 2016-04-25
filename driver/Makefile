@@ -10,4 +10,3 @@ all:
 clean:
 		rm -rf .*.cmd *.o *.mod.c *.ko .tmp_versions modules.*  Module.*
 endif
-

@@ -14,7 +14,4 @@
 // 设置隧道IP
 #define FDSL_IOC_SET_TUNNEL_IP _IOW(FDSL_IOC_MAGIC,4,int)
 
-
-
-
 #endif

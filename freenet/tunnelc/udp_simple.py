@@ -11,7 +11,7 @@
 import json
 
 import fdslight_etc.fn_client as fnc_config
-import freenet.handler.tunnelc_base as tunnelc_base
+import freenet.handler.tunnelc_udp_base as tunnelc_base
 
 # 相应代码表
 STATUS_AUTH_OK = 1
@@ -19,7 +19,7 @@ STATUS_SERVER_BUSY = 2
 STATUS_AUTH_FAIL = 3
 
 
-class tunnel(tunnelc_base.tunnelc_base):
+class tunnel(tunnelc_base.tunnelc_udp_base):
     def fn_init(self):
         pass
 

@@ -4,6 +4,7 @@ import pywind.evtframework.excepts as excepts
 import os, sys, socket
 import pywind.evtframework.handler.handler as handler
 import freenet.lib.fn_utils as fn_utils
+import pywind.lib.timer as timer
 
 try:
     import fcntl
@@ -145,6 +146,10 @@ class tun_base(handler.handler):
 class tuns(tun_base):
     """服务端的tun数据处理
     """
+    __map = None
+    __timer = None
+    __MAP_TIMEOUT = 600
+    __TIMEOUT = 10
 
     def __add_route(self, dev_name, subnet):
         """给设备添加路由
@@ -172,21 +177,24 @@ class tuns(tun_base):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         self.__add_route(tun_devname, subnet)
+        self.__timer = timer.timer()
+        self.__map = {}
 
     def dev_error(self):
         print("error:server tun device error")
         self.delete_handler(self.fileno)
-
-    def dev_timeout(self):
-        pass
 
     def handle_ip_packet_from_read(self, ip_packet):
         ip_ver = (ip_packet[0] & 0xf0) >> 4
         if ip_ver != 4: return
         protocol = ip_packet[9]
         if protocol not in (1, 6, 17, 132,): return
+        daddr = ip_packet[16:20]
+        if daddr not in self.__map: return
+        fd = self.__map[daddr]
         try:
-            self.send_message_to_handler(self.fileno, self.creator, ip_packet)
+            self.send_message_to_handler(self.fileno, fd, ip_packet)
+            self.__timer.set_timeout(daddr, self.__MAP_TIMEOUT)
         except excepts.HandlerNotFoundErr:
             return
 
@@ -199,5 +207,19 @@ class tuns(tun_base):
         sys.exit(-1)
 
     def message_from_handler(self, from_fd, ip_packet):
+        ip_ver = (ip_packet[0] & 0xf0) >> 4
+        if ip_ver != 4: return
+
+        saddr = ip_packet[12:16]
+        if saddr not in self.__map: self.__map[saddr] = from_fd
+
+        self.__timer.set_timeout(saddr, self.__MAP_TIMEOUT)
         self.add_evt_write(self.fileno)
         self.add_to_sent_queue(ip_packet)
+
+    def dev_timeout(self):
+        names = self.__timer.get_timeout_names()
+        for name in names:
+            if name in self.__map: del self.__map[name]
+            if self.__timer.exists(name): self.__timer.drop(name)
+        self.set_timeout(self.fileno, self.__TIMEOUT)

@@ -44,7 +44,6 @@ fdsl_set_tunnel(PyObject *self,PyObject *args)
     return PyLong_FromLong(ioctl(fileno,FDSL_IOC_SET_TUNNEL_IP,&ip4));
 }
 
-
 static PyMethodDef fdsl_ctl_methods[]={
 	{"tf_record_add",fdsl_tf_record_add,METH_VARARGS,"add to tcp filter"},
     {"tf_record_del",fdsl_tf_record_del,METH_VARARGS,"delete from tcp filter"},

@@ -1,117 +1,130 @@
+### --------------重要说明--------------------------
+## 后面的 ":1" 表示解析DNS并且走代理,如果是":0"表示DNS走加密,并不走代理
+
 # 美国顶级网站
-*.google.com
-*.google.com.hk
-*.google.co.jp
-*.googledrive.com
-*.youtube.com
-*.googleapis.com
-*.gmail.com
-*.ytimg.com
-*.blogger.com
-*.blogspot.comn
-*.blogspot.hk
-*.blogspot.sg
-*.googlezip.net
-*.yahoo.com
-*.googleusercontent.com
-*.ytimg.com
-*.yimg.com
-*.gstatic.com
-*.ggpht.com
-*.googlevideo.com
-*.youtube-nocookie.com
-*.googleadservices.com
-*.gvt1.com
-*.gvt2.com
-*.gvt3.com
-*.google-analytics.com
-*.googlesyndication.com
-*.yahoo.com
-*.googlesyndication.com
-*.googletagmanager.com
+*.google.com:1
+*.google.com.hk:1
+*.google.co.jp:1
+*.googledrive.com:1
+*.youtube.com:1
+*.googleapis.com:1
+*.gmail.com:1
+*.ytimg.com:1
+*.blogger.com:1
+*.blogspot.com:1
+*.blogspot.hk:1
+*.blogspot.sg:1
+*.googlezip.net:1
+*.yahoo.com:1
+*.googleusercontent.com:1
+*.ytimg.com:1
+*.yimg.com:1
+*.gstatic.com:1
+*.ggpht.com:1
+*.googlevideo.com:1
+*.youtube-nocookie.com:1
+*.googleadservices.com:1
+*.gvt1.com:1
+*.gvt2.com:1
+*.gvt3.com:1
+*.google-analytics.com:1
+*.googlesyndication.com:1
+*.yahoo.com:1
+*.googlesyndication.com:1
+*.googletagmanager.com:1
 
 #  社交网络
-*.facebook.com
-*.fbcdn.net
-*.twitter.com
-*.twimg.com
-*.t.co
-*.instagram.com
-*.xing.com
-*.instagram.com
-*.line.me
+*.facebook.com:1
+*.fbcdn.net:1
+*.twitter.com:1
+*.twimg.com:1
+*.t.co:1
+*.instagram.com:1
+*.xing.com:1
+*.instagram.com:1
+*.line.me:1
+*.viber.com:1
 
 # 音视频媒体网站
-*.nicovideo.jp
-*.spotify.com
-*.scdn.co
-*.soundcloud.com
-*.sndcdn.com
+*.nicovideo.jp:1
+*.spotify.com:1
+*.scdn.co:1
+*.soundcloud.com:1
+*.sndcdn.com:1
 
 # 博客
-*.wordpress.com
-*.ameblo.jp
+*.wordpress.com:1
+*.ameblo.jp:1
 
 # 论坛及讨论区
-*.bannedbook.org
+*.bannedbook.org:1
 
 ###  国际媒体
-*.dongtaiwang.com
-*.epochtimes.com
-*.secretchina.com
-*.kanzhongguo.com
-*.renminbao.com
-*.ntdtv.com
-*.bcchinese.net
-*.ntdtv.com.tw
-*.chinadigitaltimes.net
-*.reuters.com
-*.reutersmedia.net
-*.aboluowang.com
-*.ablwang.com
+*.dongtaiwang.com:1
+*.epochtimes.com:1
+*.secretchina.com:1
+*.kanzhongguo.com:1
+*.renminbao.com:1
+*.ntdtv.com:1
+*.bcchinese.net:1
+*.ntdtv.com.tw:1
+*.chinadigitaltimes.net:1
+*.reuters.com:1
+*.reutersmedia.net:1
+*.aboluowang.com:1
+*.ablwang.com:1
 #  梵蒂冈广播电台
-*.vaticanradio.org
+*.vaticanradio.org:1
 # BBC
-*.bbc.com
-*.bbc.co.uk
+*.bbc.com:1
+*.bbc.co.uk:1
 # 法广
-*.rfi.fr
-*.soundofhope.org
+*.rfi.fr:1
+*.soundofhope.org:1
 # 纽约时报
-*.nytimes.com
+*.nytimes.com:1
 # 美国之音
-*.voachinese.com
-*.voanews.com
+*.voachinese.com:1
+*.voanews.com:1
 # 自由亚洲电台
-*.rfa.org
+*.rfa.org:1
 
 # 网络存储
-*.dropbox.com
-*.onedrive.com
-*.dropboxusercontent.com
+*.dropbox.com:1
+*.onedrive.com:1
+*.live.com:1
+*.dropboxusercontent.com:1
 
 # 其它网站
-*.wikipedia.org
-*.wikimedia.org
-*.akamaihd.net
-*.chinadigitaltimes.net
-*.vpngate.net
-*.akamai.net
-*.github.io
-*.github.com
-*.githubusercontent.com
-*.bit.ly
-*.playstation.net
-*.rockstargames.com
+*.wikipedia.org:1
+*.wikimedia.org:1
+*.akamaihd.net:1
+*.chinadigitaltimes.net:1
+*.vpngate.net:1
+*.akamai.net:1
+*.github.io:1
+*.github.com:1
+*.githubusercontent.com:1
+*.bit.ly:1
+
+### 游戏相关
+# PS4游戏机建议添加此主机,否则可能出现判断为PSN无法连接
+*.playstation.net:0
+*.rockstargames.com:0
+*.llnwd.net:0
+
+### 开发相关
+*.spice-space.org:1
+*.gnu.org:1
 
 ### 宗教及非政府机构
 # 香港教会
-*.hkchurch.org
-*.minghui.org
-*.zhengjian.org
-*.xinsheng.net
+*.hkchurch.org:1
+*.minghui.org:1
+*.zhengjian.org:1
+*.xinsheng.net:1
 
 # 色情网站
-*.sex.com
+*.sex.com:1
 
 #   详见： http://hikinggfw.org/blacklist/

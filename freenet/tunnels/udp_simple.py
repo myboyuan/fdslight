@@ -13,8 +13,7 @@ tunnels_simple:[
 
 """
 
-import freenet.handler.tunnels_base as tunnels_base
-import freenet.lib.base_proto.tunnel as protocol
+import freenet.handler.tunnels_udp_base as tunnels_base
 import fdslight_etc.fn_server as fns_config
 import json, random
 
@@ -24,7 +23,7 @@ STATUS_SERVER_BUSY = 2
 STATUS_AUTH_FAIL = 3
 
 
-class tunnel(tunnels_base.tunnels_base):
+class tunnel(tunnels_base.tunnels_udp_base):
     __session_info = None
     __session_limit = None
 
@@ -108,7 +107,7 @@ class tunnel(tunnels_base.tunnels_base):
                 # 释放session
                 self.unregister_session(old_address)
 
-            # 你至少需要分配2个IP地址,有一个IP地址需要绑定DNS
+            # 你至少需要分配1个IP地址
             client_ips = self.get_client_ips(5)
             if not client_ips:
                 self.__response(STATUS_SERVER_BUSY, address)

@@ -10,7 +10,11 @@ import fdslight_etc.fn_server as fns_config
 import fdslight_etc.fn_client as fnc_config
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.file_parser as file_parser
+import freenet.handler.tunnels_tcp_base as ts_tcp_base
+import freenet.handler.tundev as tundev
 import freenet.handler.dns_proxy as dns_proxy
+import freenet.handler.traffic_pass as traffic_pass
+import freenet.lib.ipaddr as ipaddr
 
 FDSL_PID_FILE = "fdslight.pid"
 
@@ -46,19 +50,34 @@ class fdslight(dispatcher.dispatcher):
     __debug = True
     # 客户端是否需要建立隧道,用于客户端模式
     __need_establish_ctunnel = False
-    # DNS socket文件描述符
-    __dns_fd = -1
-    __tunnel = None
+    # 客户端DNS socket文件描述符
+    __dnsc_fd = -1
+    __tunnelc = None
 
     def __create_fn_server(self):
+
+        name = "freenet.tunnels.%s" % fns_config.configs["udp_tunnel"]
+        __import__(name)
+        m = sys.modules[name]
         if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
 
+        subnet = fns_config.configs["subnet"]
+        ip_pool = ipaddr.ip4addr(*subnet)
+
         self.create_poll()
-        self.create_handler(-1, self.__tunnel.tunnel, debug=self.__debug)
+        subnet = fns_config.configs["subnet"]
+
+        tun_fd = self.create_handler(-1, tundev.tuns, "fdslight", subnet)
+        dns_fd = self.create_handler(-1, dns_proxy.dnsd_proxy, fns_config.configs["dns"])
+        raw_socket_fd = self.create_handler(-1, traffic_pass.traffic_send)
+
+        self.create_handler(-1, m.tunnel, tun_fd, dns_fd, raw_socket_fd, ip_pool, debug=self.__debug)
+        self.create_handler(-1, ts_tcp_base._tunnel_tcp_listen,
+                            tun_fd, dns_fd, raw_socket_fd, ip_pool,
+                            debug=self.__debug)
 
     def __create_fn_client(self):
         if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
-
         self.create_poll()
 
         os.chdir("driver")
@@ -77,34 +96,34 @@ class fdslight(dispatcher.dispatcher):
         whitelist = file_parser.parse_ip_subnet_file("fdslight_etc/whitelist.txt")
         blacklist = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
 
-        self.__dns_fd = self.create_handler(-1, dns_proxy.dns_proxy, blacklist, debug=self.__debug)
-        self.create_handler(-1, self.__tunnel.tunnel, self.__dns_fd, whitelist, debug=self.__debug)
+        self.__dnsc_fd = self.create_handler(-1, dns_proxy.dns_proxy, blacklist, debug=self.__debug)
+
+        name_tcp = "freenet.tunnelc.%s" % fnc_config.configs["tcp_tunnel"]
+        name_udp = "freenet.tunnelc.%s" % fnc_config.configs["udp_tunnel"]
+
+        if fnc_config.configs["tunnel_type"].lower() == "udp":
+            name = name_udp
+        else:
+            name = name_tcp
+
+        __import__(name)
+        self.__tunnelc = sys.modules[name]
+        self.create_handler(-1, self.__tunnelc.tunnel, self.__dnsc_fd, whitelist, debug=self.__debug)
 
     def init_func(self, mode, debug=True):
-        if mode == "server":
-            t = fns_config.configs["tunnels"]
-            name = "freenet.tunnels.%s" % t
-        if mode == "client":
-            t = fnc_config.configs["tunnelc"]
-            name = "freenet.tunnelc.%s" % t
-        __import__(name)
-        tunnel = sys.modules[name]
-
         self.__debug = debug
-
         if debug:
-            self.__debug_run(mode, tunnel)
+            self.__debug_run(mode)
             return
 
-        self.__run(mode, tunnel)
+        self.__run(mode)
 
-    def __debug_run(self, mode, module):
-        self.__tunnel = module
-        if mode == "server": self.__create_fn_server()
+    def __debug_run(self, mode):
+        if mode == "server":
+            self.__create_fn_server()
         if mode == "client": self.__create_fn_client()
 
-    def __run(self, mode, module):
-        self.__tunnel = module
+    def __run(self, mode):
         pid = os.fork()
         if pid != 0: sys.exit(0)
 
@@ -130,7 +149,7 @@ class fdslight(dispatcher.dispatcher):
     def myloop(self):
         if self.__need_establish_ctunnel:
             self.__need_establish_ctunnel = False
-            self.create_handler(-1, self.__tunnel.tunnel, self.__dns_fd, [],
+            self.create_handler(-1, self.__tunnelc.tunnel, self.__dnsc_fd, [],
                                 debug=self.__debug)
         return
 

@@ -7,6 +7,10 @@
 #include <errno.h>
 #include <net/route.h>
 #include <sys/ioctl.h>
+#include<sys/socket.h>
+#include<string.h>
+#include<sys/ioctl.h>
+#include<netinet/in.h>
 
 #define TUN_DEV_NAME "fdslight"
 
@@ -71,6 +75,33 @@ interface_up(char *interface_name)
 
 	return 0;
 
+}
+/** 获取网卡IP地址 **/
+int get_nc_ip(const char *eth, char *ipaddr)
+{
+	int sock_fd;
+	struct  sockaddr_in my_addr;
+	struct ifreq ifr;
+
+	/**//* Get socket file descriptor */
+	if ((sock_fd = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
+	{
+		return -1;
+	}
+
+	/**//* Get IP Address */
+	strncpy(ifr.ifr_name, eth, IFNAMSIZ);
+	ifr.ifr_name[IFNAMSIZ-1]='\0';
+
+	if (ioctl(sock_fd, SIOCGIFADDR, &ifr) < 0)
+	{
+		return -2;
+	}
+
+	memcpy(&my_addr, &ifr.ifr_addr, sizeof(my_addr));
+	strcpy(ipaddr, inet_ntoa(my_addr.sin_addr));
+	close(sock_fd);
+	return 0;
 }
 
 /**
@@ -224,6 +255,19 @@ calc_csum(PyObject *self,PyObject *args)
     return PyLong_FromLong(csum);
 }
 
+static PyObject *
+get_netcard_ip(PyObject *self,PyObject *args)
+{
+    const char *eth_name;
+    char eth_ip[20];
+    int err;
+    if (!PyArg_ParseTuple(args, "s", &eth_name)) return NULL;
+    err=get_nc_ip(eth_name,eth_ip);
+    if(err) return Py_None;
+
+    return Py_BuildValue("s",eth_ip);
+}
+
 static PyMethodDef UtilsMethods[] = {
 	{"tuntap_create",tuntap_create,METH_VARARGS,"create tuntap device"},
 	{"interface_up",tuntap_interface_up,METH_VARARGS,"interface up tuntap "},
@@ -231,6 +275,7 @@ static PyMethodDef UtilsMethods[] = {
 	{"tuntap_delete",tuntap_delete,METH_VARARGS,"delete tuntap device ,it equals close"},
 	{"calc_incre_csum",calc_incre_csum,METH_VARARGS,"calculate incremental checksum"},
 	{"calc_csum",calc_csum,METH_VARARGS,"calculate checksum"},
+	{"get_nc_ip",get_netcard_ip,METH_VARARGS,"get netcard ip address"},
 	{NULL,NULL,0,NULL}
 };
 

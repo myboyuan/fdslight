@@ -1,9 +1,9 @@
-#ifndef FDSL_tcp_filter_H
-#define FDSL_tcp_filter_H
+#ifndef FDSL_IP_FILTER_H
+#define FDSL_IP_FILTER_H
 
 #define FDSL_IP_VER4 4
 #define FDSL_IP_VER6 16
-#define FDSL_TF_BUCKET_SIZE 1000
+#define FDSL_IP_BUCKET_SIZE 1000
 
 #ifdef FDSL_LINUX_KERNEL
 #include<linux/vmalloc.h>
@@ -19,19 +19,19 @@
 #define fdsl_free(p) free(p)
 #endif
 
-struct fdsl_tcp_filter_ele {
-	struct fdsl_tcp_filter_ele *next;
+struct fdsl_ip_filter_ele {
+	struct fdsl_ip_filter_ele *next;
 	unsigned char value[16];
 	char have;
 };
 
-struct fdsl_tcp_filter {
-	struct fdsl_tcp_filter_ele *elements[FDSL_TF_BUCKET_SIZE];
+struct fdsl_ip_filter {
+	struct fdsl_ip_filter_ele *elements[FDSL_IP_BUCKET_SIZE];
 	int ip_ver;
 };
 
-#define FDSL_TF_ELE_SIZE sizeof(struct fdsl_tcp_filter_ele)
-#define FDSL_TF_SIZE sizeof(struct fdsl_tcp_filter)
+#define FDSL_IP_ELE_SIZE sizeof(struct fdsl_ip_filter_ele)
+#define FDSL_IP_SIZE sizeof(struct fdsl_ip_filter)
 
 
 unsigned int __times33(const char *s,int size)
@@ -44,22 +44,22 @@ unsigned int __times33(const char *s,int size)
 	return (hash & 0x7FFFFFFF);
 }
 
-struct fdsl_tcp_filter *fdsl_tf_init(int ip_ver)
+struct fdsl_ip_filter *fdsl_ip_filter_init(int ip_ver)
 {
-	struct fdsl_tcp_filter *f;
+	struct fdsl_ip_filter *f;
 	if (FDSL_IP_VER4 != ip_ver && FDSL_IP_VER6 != ip_ver) return NULL;
 
-	f = (struct fdsl_tcp_filter *)fdsl_malloc(FDSL_TF_SIZE);
-	memset(f, 0, FDSL_TF_SIZE);
+	f = (struct fdsl_ip_filter *)fdsl_malloc(FDSL_IP_SIZE);
+	memset(f, 0, FDSL_IP_SIZE);
 	f->ip_ver = ip_ver;
 
 	return f;
 }
 
-int fdsl_tf_find(struct fdsl_tcp_filter *f, const char *s)
+int fdsl_ip_filter_find(struct fdsl_ip_filter *f, const char *s)
 {
-	struct fdsl_tcp_filter_ele *tmp_ele;
-	int bucket_p = __times33(s, f->ip_ver) % FDSL_TF_BUCKET_SIZE;
+	struct fdsl_ip_filter_ele *tmp_ele;
+	int bucket_p = __times33(s, f->ip_ver) % FDSL_IP_BUCKET_SIZE;
 	int is_find = 0;
 
 	tmp_ele = f->elements[bucket_p];
@@ -75,18 +75,18 @@ int fdsl_tf_find(struct fdsl_tcp_filter *f, const char *s)
 	return is_find;
 }
 
-int fdsl_tf_add(struct fdsl_tcp_filter *f, const char *s)
+int fdsl_ip_filter_add(struct fdsl_ip_filter *f, const char *s)
 {
-	struct fdsl_tcp_filter_ele *tmp;
+	struct fdsl_ip_filter_ele *tmp;
 
-	int bucket_p = __times33(s, f->ip_ver) % FDSL_TF_BUCKET_SIZE;
+	int bucket_p = __times33(s, f->ip_ver) % FDSL_IP_BUCKET_SIZE;
 
     // 避免加入相同的value
-	if(1==fdsl_tf_find(f,s)) return 0;
+	if(1==fdsl_ip_filter_find(f,s)) return 0;
 
 	if (NULL == f->elements[bucket_p]) {
-		f->elements[bucket_p] = (struct fdsl_tcp_filter_ele *)fdsl_malloc(FDSL_TF_ELE_SIZE);
-		memset(f->elements[bucket_p], 0, FDSL_TF_ELE_SIZE);
+		f->elements[bucket_p] = (struct fdsl_ip_filter_ele *)fdsl_malloc(FDSL_IP_ELE_SIZE);
+		memset(f->elements[bucket_p], 0, FDSL_IP_ELE_SIZE);
 	}
 
 	tmp = f->elements[bucket_p];
@@ -96,8 +96,8 @@ int fdsl_tf_add(struct fdsl_tcp_filter *f, const char *s)
 	}
 
 	if (tmp->have) {
-		tmp->next = (struct fdsl_tcp_filter_ele *)fdsl_malloc(FDSL_TF_ELE_SIZE);
-		memset(tmp->next, 0, FDSL_TF_ELE_SIZE);
+		tmp->next = (struct fdsl_ip_filter_ele *)fdsl_malloc(FDSL_IP_ELE_SIZE);
+		memset(tmp->next, 0, FDSL_IP_ELE_SIZE);
 		tmp = tmp->next;
 	}
 
@@ -107,10 +107,10 @@ int fdsl_tf_add(struct fdsl_tcp_filter *f, const char *s)
 	return 0;
 }
 
-int fdsl_tf_delete(struct fdsl_tcp_filter *f,const char *s)
+int fdsl_ip_filter_delete(struct fdsl_ip_filter *f,const char *s)
 {
-    struct fdsl_tcp_filter_ele *tmp_ele,*tmp_pre_ele;
-    int bucket_p=__times33(s,f->ip_ver) % FDSL_TF_BUCKET_SIZE;
+    struct fdsl_ip_filter_ele *tmp_ele,*tmp_pre_ele;
+    int bucket_p=__times33(s,f->ip_ver) % FDSL_IP_BUCKET_SIZE;
     int is_find=0,cnt=0;
     tmp_ele=f->elements[bucket_p];
    
@@ -130,11 +130,11 @@ int fdsl_tf_delete(struct fdsl_tcp_filter *f,const char *s)
     return 1;
 }
 
-void fdsl_tf_release(struct fdsl_tcp_filter *f)
+void fdsl_ip_filter_release(struct fdsl_ip_filter *f)
 {
-	struct fdsl_tcp_filter_ele *tmp_ele_a,*tmp_ele_b;
+	struct fdsl_ip_filter_ele *tmp_ele_a,*tmp_ele_b;
 
-	for (int n = 0; n < FDSL_TF_BUCKET_SIZE; n++) {
+	for (int n = 0; n < FDSL_IP_BUCKET_SIZE; n++) {
 		tmp_ele_a = f->elements[n];
 		tmp_ele_b = tmp_ele_a;
 

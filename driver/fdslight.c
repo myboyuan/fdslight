@@ -18,11 +18,13 @@
 #include<linux/version.h>
 #include "fdsl_queue.h"
 #include "fdsl_dev_ctl.h"
-#include "fdsl_tcp_filter.h"
+#include "fdsl_ip_filter.h"
 
 #define DEV_NAME FDSL_DEV_NAME
 #define DEV_CLASS FDSL_DEV_NAME
 #define QUEUE_SIZE 10
+
+#define COPY_IP_FROM_USER  err=copy_from_user(&ui_tmp,(unsigned long *)arg,sizeof(unsigned int));if(err) return -EINVAL;ui_tmp=ntohl(ui_tmp);
 
 struct fdsl_poll{
 	struct fdsl_queue *r_queue;
@@ -38,7 +40,7 @@ struct class *dev_class;
 static struct file_operations chr_ops;
 
 static struct fdsl_queue *r_queue;
-static struct fdsl_tcp_filter *tcp_filter;
+static struct fdsl_ip_filter *dst_ip_filter;
 
 struct fdsl_poll *poll;
 
@@ -61,7 +63,7 @@ static int chr_open(struct inode *node,struct file *f)
 
 static int fdsl_set_tunnel(unsigned long arg)
 {
-	int err=copy_from_user(&tunnel,(unsigned int *)arg,sizeof(unsigned int));
+	int err=copy_from_user(&tunnel,(unsigned long *)arg,sizeof(unsigned int));
 	if(err) return -EINVAL;
 
     tunnel=htonl(tunnel);
@@ -76,22 +78,16 @@ static long chr_ioctl(struct file *f,unsigned int cmd,unsigned long arg)
 
 	switch(cmd){
         case FDSL_IOC_TF_RECORD_ADD:
-            err=copy_from_user(&ui_tmp,(unsigned int *)arg,sizeof(unsigned int));
-            if(err) return -EINVAL;
-            ui_tmp=ntohl(ui_tmp);
-            ret=fdsl_tf_add(tcp_filter,(const char *)(&ui_tmp));
+			COPY_IP_FROM_USER;
+            ret=fdsl_ip_filter_add(dst_ip_filter,(const char *)(&ui_tmp));
             break;
         case FDSL_IOC_TF_RECORD_DEL:
-             err=copy_from_user(&ui_tmp,(unsigned int *)arg,sizeof(unsigned int));
-             if(err) return -EINVAL;
-             ui_tmp=ntohl(ui_tmp);
-             ret=fdsl_tf_delete(tcp_filter,(const char *)(&ui_tmp));
+   			COPY_IP_FROM_USER;
+             ret=fdsl_ip_filter_delete(dst_ip_filter,(const char *)(&ui_tmp));
              break;
         case FDSL_IOC_TF_FIND:
-            err=copy_from_user(&ui_tmp,(unsigned int *)arg,sizeof(unsigned int));
-            if(err) return -EINVAL;
-            ui_tmp=ntohl(ui_tmp);
-            ret=fdsl_tf_find(tcp_filter,(const char *)(&ui_tmp));
+       		COPY_IP_FROM_USER;
+            ret=fdsl_ip_filter_find(dst_ip_filter,(const char *)(&ui_tmp));
             break;
         case FDSL_IOC_SET_TUNNEL_IP:
             ret=fdsl_set_tunnel(arg);
@@ -158,19 +154,10 @@ static unsigned int hanle_udp_in(struct iphdr *ip_header)
     udp_header=(struct udphdr *)((__u32 *)ip_header+ip_header->ihl);
     dport=ntohs((unsigned short int)udp_header->dest);
     sport=ntohs((unsigned short int)udp_header->source);
-
-    // DNS端口允许通过
-    if(53==dport) return NF_ACCEPT;
+	
+	if(53==dport) return NF_ACCEPT;
 	if(53==sport) return NF_ACCEPT;
 
-    #ifdef FDSL_CLIENT
-    //saddr=htonl((unsigned int)ip_header->saddr);
-	daddr=(unsigned int)ip_header->daddr;
-    find_r=fdsl_tf_find(tcp_filter,(const char *)(&daddr));
-
-    if(find_r<1) return NF_ACCEPT;
-
-    #endif
     return fdsl_push_packet_to_user(ip_header);
 }
 
@@ -180,14 +167,14 @@ static unsigned int handle_sctp_in(struct iphdr *ip_header)
     return fdsl_push_packet_to_user(ip_header);
 }
 
-static unsigned int handle_tcp_and_icmp_in(struct iphdr *ip_header)
+static unsigned int handle_ip_and_icmp_in(struct iphdr *ip_header)
 // TCP和ICMP处理
 {
     unsigned int daddr;
 	int find_r=0;
 
 	daddr=(unsigned int)ip_header->daddr;
-    find_r=fdsl_tf_find(tcp_filter,(const char *)(&daddr));
+    find_r=fdsl_ip_filter_find(dst_ip_filter,(const char *)(&daddr));
 
 	if (find_r < 1) return NF_ACCEPT;
 
@@ -229,14 +216,13 @@ static unsigned int nf_handle_in(
 	if (daddr==tunnel) return NF_ACCEPT;
 
 	protocol=ip_header->protocol;
-
 	switch(protocol){
 	    case IPPROTO_UDP:
 	        return hanle_udp_in(ip_header);
 	    case IPPROTO_TCP:
-	        return handle_tcp_and_icmp_in(ip_header);
+	        return handle_ip_and_icmp_in(ip_header);
 	    case IPPROTO_ICMP:
-	        return handle_tcp_and_icmp_in(ip_header);
+	        return handle_ip_and_icmp_in(ip_header);
         case IPPROTO_SCTP:
             return handle_sctp_in(ip_header);
 	    default:return NF_ACCEPT;
@@ -301,8 +287,7 @@ static int fdsl_init(void)
 	init_waitqueue_head(&poll->inq);
 
 	r_queue=fdsl_queue_init(QUEUE_SIZE);
-    tcp_filter=fdsl_tf_init(FDSL_IP_VER4);
-
+    dst_ip_filter=fdsl_ip_filter_init(FDSL_IP_VER4);
 	poll->r_queue=r_queue;
 
 
@@ -314,7 +299,7 @@ static void fdsl_exit(void)
 	delete_dev();
 	nf_unregister_hook(&nf_ops);
 	fdsl_queue_release(r_queue);
-    fdsl_tf_release(tcp_filter);
+    fdsl_ip_filter_release(dst_ip_filter);
     
 	kfree(poll);
 }

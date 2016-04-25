@@ -8,7 +8,7 @@ sys.path.append("../../../")
 
 from Crypto.Cipher import AES
 import random, hashlib
-import freenet.lib.base_proto.tunnel as tunnel
+import freenet.lib.base_proto.tunnel_udp as tunnel
 
 FIXED_HEADER_SIZE = 32
 

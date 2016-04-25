@@ -3,8 +3,6 @@
 文件格式:一条规则就是一行,#开头的表示注解:
 """
 
-import socket
-
 
 class FilefmtErr(Exception): pass
 
@@ -38,8 +36,18 @@ def __read_from_file(fpath):
 def parse_host_file(fpath):
     """解析主机文件,即域名规则文件"""
     lines = __read_from_file(fpath)
-    return lines
-
+    results = []
+    for line in lines:
+        find = line.find(":")
+        if find < 1: continue
+        a = line[0:find]
+        e = find + 1
+        try:
+            b = int(line[e:])
+        except ValueError:
+            continue
+        results.append((a, b,))
+    return results
 
 def __get_ip_subnet(line):
     """检查子网格式是否正确"""
@@ -66,3 +74,23 @@ def parse_ip_subnet_file(fpath):
         results.append(ret)
 
     return results
+
+
+def get_linux_host_nameservers(resolv_path="/etc/resolv.conf"):
+    """获取LINUX系统的所有nameservers
+    :param resolv_path: nameserver的配置文件
+    """
+    fdst = open(resolv_path, "r")
+    nameservers = []
+
+    for line in fdst:
+        ts = line.lstrip()
+        if ts[0] == "#": continue
+        if ts[0:10] != "nameserver": continue
+        replaces = ("\r", "\n", "nameserver")
+        for s in replaces: ts = ts.replace(s, "")
+        ts = ts.lstrip()
+        ts = ts.rstrip()
+        nameservers.append(ts)
+
+    return nameservers

@@ -133,3 +133,17 @@ def ip4s_2_number(string):
     """ipv4 字符串转换为数字"""
     ip_pkt = socket.inet_aton(string)
     return ip4b_2_number(ip_pkt)
+
+
+def rand_string(length):
+    """生成随机KEY"""
+    sts = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM@!&*()-+~<>?{}\|/,.`"
+    size = len(sts)
+    tmplist = []
+    for i in range(length):
+        n = random.randint(0, size - 1)
+        tmplist.append(
+            sts[n]
+        )
+
+    return "".join(tmplist)
