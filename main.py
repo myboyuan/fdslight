@@ -15,6 +15,7 @@ import freenet.handler.tundev as tundev
 import freenet.handler.dns_proxy as dns_proxy
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.ipaddr as ipaddr
+import time
 
 FDSL_PID_FILE = "fdslight.pid"
 
@@ -53,6 +54,10 @@ class fdslight(dispatcher.dispatcher):
     # 客户端DNS socket文件描述符
     __dnsc_fd = -1
     __tunnelc = None
+
+    __time = 0
+    # 重新建立连接的时间间隔
+    __RECONNECT_TIMEOUT = 60
 
     def __create_fn_server(self):
 
@@ -141,6 +146,7 @@ class fdslight(dispatcher.dispatcher):
     def ctunnel_fail(self):
         """客户端隧道建立失败"""
         self.__need_establish_ctunnel = True
+        self.__time = time.time()
 
     def ctunnel_ok(self):
         """客户端隧道建立成功"""
@@ -148,6 +154,9 @@ class fdslight(dispatcher.dispatcher):
 
     def myloop(self):
         if self.__need_establish_ctunnel:
+            t = time.time() - self.__time
+            if t < self.__RECONNECT_TIMEOUT: return
+            self.__time = time.time()
             self.__need_establish_ctunnel = False
             self.create_handler(-1, self.__tunnelc.tunnel, self.__dnsc_fd, [],
                                 debug=self.__debug)
