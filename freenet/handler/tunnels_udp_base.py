@@ -168,9 +168,11 @@ class tunnels_udp_base(udp_handler.udp_handler):
 
         udp_nat_map = session_cls.udp_nat_map
 
+        dels = []
         for udp_nat_id in udp_nat_map:
             fileno = udp_nat_map[udp_nat_id]
-            self.delete_handler(fileno)
+            dels.append(fileno)
+        for f in dels: self.delete_handler(f)
 
         session_cls.udp_nat_map = None
         self.print_access_log("close", address)
