@@ -1,10 +1,10 @@
-# ¸ü¶àÏêÇéÇë²é¿´ÏîÄ¿ÉÏ·½µÄwikiÒ³Ãæ
+# éƒ¨ç½²åœ¨ç½‘å…³çš„IPå±‚ä»£ç†è½¯ä»¶       æ›´å¤šè¯¦æƒ…è¯·æŸ¥çœ‹é¡¹ç›®ä¸Šæ–¹çš„wikié¡µé¢
 
-#Èí¼þ¹¦ÄÜËµÃ÷  
-1. Ö§³ÖUDP´©Í¸¼¼Êõ£¬¼´P2P¼¼Êõ¡£   
-2. TCPÊ¹ÓÃºÚÃûµ¥£ºÔÚÃûµ¥ÄÚµÄÊ¹ÓÃ´úÀí¡£UDPÊ¹ÓÃ°×Ãûµ¥£ºÔÚÃûµ¥ÍâµÄÊ¹ÓÃ´úÀí   
+#è½¯ä»¶åŠŸèƒ½è¯´æ˜Ž  
+1. æ”¯æŒUDPç©¿é€æŠ€æœ¯ï¼Œå³P2PæŠ€æœ¯ã€‚   
+2. TCPä½¿ç”¨é»‘åå•ï¼šåœ¨åå•å†…çš„ä½¿ç”¨ä»£ç†ã€‚UDPä½¿ç”¨ç™½åå•ï¼šåœ¨åå•å¤–çš„ä½¿ç”¨ä»£ç†   
 
-#Èí¼þ¼¼ÊõËµÃ÷
-1. LICENSEËµÃ÷ÔÚLICENSEÎÄ¼þÖÐ£¬Èç¹ûÄã×ö¶þ´Î¿ª·¢ÒÔ¼°ÆäËüÓÃÍ¾£¬Çë×ÐÏ¸ÔÄ¶ÁBSD LICENSE  
-2. Èí¼þ¼ÜÉèÒÔ¼°¶þ´Î¿ª·¢ÔÚ github µÄ wiki µ±ÖÐ
+#è½¯ä»¶æŠ€æœ¯è¯´æ˜Ž
+1. LICENSEè¯´æ˜Žåœ¨LICENSEæ–‡ä»¶ä¸­ï¼Œå¦‚æžœä½ åšäºŒæ¬¡å¼€å‘ä»¥åŠå…¶å®ƒç”¨é€”ï¼Œè¯·ä»”ç»†é˜…è¯»BSD LICENSE  
+2. è½¯ä»¶æž¶è®¾ä»¥åŠäºŒæ¬¡å¼€å‘åœ¨ github çš„ wiki å½“ä¸­
 
