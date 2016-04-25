@@ -244,6 +244,8 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):
+        self.unregister(self.fileno)
+
         if self.is_conn_ok():
             self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_close")
             self.unregister(self.fileno)
