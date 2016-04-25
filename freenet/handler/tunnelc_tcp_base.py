@@ -245,12 +245,10 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
 
     def tcp_delete(self):
         self.unregister(self.fileno)
-
         if self.is_conn_ok():
             self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_close")
             self.unregister(self.fileno)
             self.delete_handler(self.__traffic_fetch_fd)
-
         dels = []
         for k, v in self.__udp_proxy_map.items(): dels.append(v)
         for f in dels: self.delete_handler(f)
