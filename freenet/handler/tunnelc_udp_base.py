@@ -163,9 +163,11 @@ class tunnelc_udp_base(udp_handler.udp_handler):
 
     def send_data(self, pkt_len, byte_data, action=tunnel_proto.ACT_DATA):
         # if self.__debug: self.print_access_log("send_data")
-        ippkts = self.__encrypt_m.build_packets(action, pkt_len, byte_data)
-        self.__encrypt_m.reset()
-
+        try:
+            ippkts = self.__encrypt_m.build_packets(action, pkt_len, byte_data)
+            self.__encrypt_m.reset()
+        except ValueError:
+            return
         # print("send:", byte_data)
         for ippkt in ippkts: self.send(ippkt)
 

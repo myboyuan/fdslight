@@ -3,10 +3,10 @@ configs = {
     # UDP监听地址
     "udp_listen": (
         "0.0.0.0",
-        1999
+        8964
     ),
     # TCP套接字监听地址
-    "tcp_listen": ("0.0.0.0", 8964,),
+    "tcp_listen": ("0.0.0.0", 1999,),
     # 虚拟局域网IP分配范围
     # 更改了此选项，你需要更改server_nat_script.sh文件，让nat策略与此子网一致
     "subnet": (

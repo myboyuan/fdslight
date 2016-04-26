@@ -2,11 +2,11 @@
 configs = {
     "udp_server_address": (
         # 你的服务器的地址以及端口
-        "example.com", 1999
+        "example.com", 8964
     ),
     # TCP隧道服务器地址以及端口
     "tcp_server_address": (
-        "example.com", 8964
+        "example.com", 1999
     ),
     # 使用的TCP隧道模块
     "tcp_tunnel": "tcp_simple",
@@ -48,6 +48,4 @@ configs = {
     "access_log": "/tmp/fdslight_access.log",
     # 故障日志
     "error_log": "/tmp/fdslight_error.log",
-    # 黑名单路由缓存,确保重启之后路由还是成功的
-    "route_cache": "/tmp/fdslight_blacklist_route.cache",
 }

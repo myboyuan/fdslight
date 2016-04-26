@@ -106,6 +106,8 @@
 *.github.com:1
 *.githubusercontent.com:1
 *.bit.ly:1
+*.dyndns.org:1
+*.doubleclick.net
 
 ### 游戏相关
 # PS4游戏机建议添加此主机,否则可能出现判断为PSN无法连接

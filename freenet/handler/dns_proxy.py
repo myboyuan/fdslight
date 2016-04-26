@@ -260,26 +260,6 @@ class dns_proxy(dns_base):
 
         return self.fileno
 
-    def __add_to_blacklist_cache(self, ipaddr, mask):
-        cache_file = fn_config.configs["route_cache"]
-        dumps = json.dumps(self.__blacklist_ips)
-        fdst = open(cache_file, "w")
-        fdst.write(dumps)
-        fdst.close()
-
-    def __get_blacklist_cache(self):
-        cache_file = fn_config.configs["route_cache"]
-        if not os.path.isfile(cache_file): return {}
-        fdst = open(cache_file, "r")
-        rdata = fdst.read()
-        fdst.close()
-        try:
-            return json.loads(rdata)
-        except json.JSONDecodeError:
-            os.remove(cache_file)
-            return self.__get_blacklist_cache()
-        ''''''
-
     def udp_readable(self, message, address):
         # dns至少有12个字节
         if len(message) < 12: return
@@ -346,7 +326,6 @@ class dns_proxy(dns_base):
                 if not self.__check_ipaddr(ip): continue
                 if ip not in self.__blacklist_ips:
                     self.__blacklist_ips[ip] = None
-                    self.__add_to_blacklist_cache(ip, 32)
                 fdsl_ctl.tf_record_add(self.__dev_fd, utils.ip4s_2_number(ip))
                 ''''''
         self.__send_to_client(byte_data)
@@ -381,8 +360,6 @@ class dns_proxy(dns_base):
         if cmd == "set_filter_dev_fd":
             self.__dev_fd = filter_dev
             if not self.__is_first: return
-            self.__blacklist_ips = self.__get_blacklist_cache()
             self.__is_first = False
-            for ip in self.__blacklist_ips: fdsl_ctl.tf_record_add(self.__dev_fd, utils.ip4s_2_number(ip))
         if cmd == "as_tunnel_fd": self.__tunnel_fd = from_fd
         return
