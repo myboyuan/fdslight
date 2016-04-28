@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
-import socket
+import socket, random
 import freenet.lib.checksum as checksum
 import freenet.lib.fn_utils as fn_utils
-import random
 
 __IP_HDR_SIZE = 20
 

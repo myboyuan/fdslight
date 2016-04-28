@@ -20,14 +20,17 @@ configs = {
         # 模块初始化参数
         "args": (
             #  fdslight为初始化的aes key值,该值只有在发送验证的时候才使用
-            "fdslight",
+            #  建议修改它
+            "fdslight",# 此处逗号不能省略
         )
     },
     # udp加密模块
     "udp_crypto_module": {
         "name": "aes_udp",
         "args": (
-            "fdslight",
+            #  fdslight为初始化的aes key值,该值只有在发送验证的时候才使用
+            #  建议修改它
+            "fdslight",# 此处逗号不能省略
         )
     },
     # TCP隧道模块
