@@ -91,11 +91,12 @@ class fdslight(dispatcher.dispatcher):
             sys.exit(-1)
 
         path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
-        if os.path.exists(path):
-            os.system("rmmod fdslight")
-
+        if os.path.exists(path): os.system("rmmod fdslight")
+        # 开启ip forward
+        os.system("echo 1 > /proc/sys/net/ipv4/ip_forward")
+        # 禁止接收icmo redirect 包,防止客户端机器选择最佳路由
+        os.system("echo 0 | tee /proc/sys/net/ipv4/conf/*/send_redirects")
         os.system("insmod fdslight.ko")
-
         os.chdir("../")
 
         whitelist = file_parser.parse_ip_subnet_file("fdslight_etc/whitelist.txt")
