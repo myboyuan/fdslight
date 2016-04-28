@@ -126,7 +126,7 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
 
     def __handle_ping(self):
         self.__send_data(0, b"", action=tunnel_tcp.ACT_PONG)
-        self.print_access_log("send_pong")
+        if self.__debug: self.print_access_log("send_pong")
 
     def __handle_pong(self):
         self.__is_sent_ping = False

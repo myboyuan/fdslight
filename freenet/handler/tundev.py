@@ -148,7 +148,7 @@ class tuns(tun_base):
     """
     __map = None
     __timer = None
-    __MAP_TIMEOUT = 600
+    __MAP_TIMEOUT = 240
     __TIMEOUT = 10
 
     def __add_route(self, dev_name, subnet):

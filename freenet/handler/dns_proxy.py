@@ -295,13 +295,15 @@ class dns_proxy(dns_base):
             self.__send_to_dns_server(self.__transparent_dns, message)
             return
 
+        """
         q = questions[0]
         if q.rdtype != 1 or q.rdclass != 1:
             self.__send_to_dns_server(self.__transparent_dns, message)
             return
+        """
 
         q = questions[0]
-        host = b".".join(q.name[0:-1]).decode("utf-8")
+        host = b".".join(q.name[0:-1]).decode("iso-8859-1")
         pos = host.find(".")
 
         if pos > 0 and self.__debug: print(host)
