@@ -32,6 +32,7 @@
 *.yahoo.com:1
 *.googlesyndication.com:1
 *.googletagmanager.com:1
+dl.delivery.mp.microsoft.com:1
 
 #  社交网络
 *.facebook.com:1
@@ -107,7 +108,7 @@
 *.githubusercontent.com:1
 *.bit.ly:1
 *.dyndns.org:1
-*.doubleclick.net
+*.doubleclick.net:1
 
 ### 游戏相关
 # PS4游戏机建议添加此主机,否则可能出现判断为PSN无法连接
@@ -118,6 +119,7 @@
 ### 开发相关
 *.spice-space.org:1
 *.gnu.org:1
+*.android.com:1
 
 ### 宗教及非政府机构
 # 香港教会
