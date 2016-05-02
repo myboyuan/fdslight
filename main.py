@@ -95,7 +95,7 @@ class fdslight(dispatcher.dispatcher):
 
         # 开启ip forward
         os.system("echo 1 > /proc/sys/net/ipv4/ip_forward")
-        # 禁止接收icmo redirect 包,防止客户端机器选择最佳路由
+        # 禁止接收ICMP redirect 包,防止客户端机器选择最佳路由
         os.system("echo 0 | tee /proc/sys/net/ipv4/conf/*/send_redirects")
         os.system("insmod fdslight.ko")
         os.chdir("../")
