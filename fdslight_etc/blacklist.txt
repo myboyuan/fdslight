@@ -120,6 +120,8 @@ dl.delivery.mp.microsoft.com:1
 *.spice-space.org:1
 *.gnu.org:1
 *.android.com:1
+*.golang.org:1
+*.rockstargames.com:1
 
 ### 宗教及非政府机构
 # 香港教会
