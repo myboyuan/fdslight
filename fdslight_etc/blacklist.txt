@@ -113,7 +113,7 @@ dl.delivery.mp.microsoft.com:1
 ### 游戏相关
 # PS4游戏机建议添加此主机,否则可能出现判断为PSN无法连接
 *.playstation.net:0
-*.rockstargames.com:0
+*.rockstargames.com:1
 *.llnwd.net:0
 
 ### 开发相关
@@ -121,7 +121,6 @@ dl.delivery.mp.microsoft.com:1
 *.gnu.org:1
 *.android.com:1
 *.golang.org:1
-*.rockstargames.com:1
 
 ### 宗教及非政府机构
 # 香港教会
