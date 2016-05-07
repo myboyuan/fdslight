@@ -37,6 +37,7 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
     __IP_TIMEOUT = 300
 
     __force_udp_global_clients = None
+    __BUFSIZE = 16 * 1024
 
     def init_func(self, creator_fd, dns_fd, whitelist, debug=False):
         taddr = fnc_config.configs["tcp_server_address"]
@@ -96,7 +97,8 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
 
     def __send_data(self, pkt_len, sent_data, action=tunnel_tcp.ACT_DATA):
         sent_pkt = self.__encrypt.build_packet(action, pkt_len, sent_data)
-
+        # 丢弃阻塞的包
+        if self.writer.size() > self.__BUFSIZE: self.writer.flush()
         self.__encrypt.reset()
         self.writer.write(sent_pkt)
         self.add_evt_write(self.fileno)
