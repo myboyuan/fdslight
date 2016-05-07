@@ -36,6 +36,8 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
     # 走隧道的IP超时时间
     __IP_TIMEOUT = 300
 
+    __force_udp_global_clients = None
+
     def init_func(self, creator_fd, dns_fd, whitelist, debug=False):
         taddr = fnc_config.configs["tcp_server_address"]
         s = socket.socket()
@@ -68,6 +70,11 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         if not self.__debug:
             sys.stdout = open(fnc_config.configs["access_log"], "a+")
             sys.stderr = open(fnc_config.configs["error_log"], "a+")
+
+        self.__force_udp_global_clients = {}
+        for client_ip in fnc_config.configs["udp_force_global_clients"]:
+            saddr = socket.inet_aton(client_ip)
+            self.__force_udp_global_clients[saddr] = None
 
         return self.fileno
 
@@ -303,8 +310,14 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         if ip_ver != 4: return
         protocol = byte_data[9]
 
+        force_udp_global = False
+        saddr = byte_data[12:16]
+
+        if protocol == 17 and saddr in self.__force_udp_global_clients:
+            force_udp_global = True
+
         # 处理UDP代理
-        if protocol == 17 and not fnc_config.configs["udp_global"]:
+        if protocol == 17 and not fnc_config.configs["udp_global"] and not force_udp_global:
             if self.__udp_whitelist.find(byte_data[16:20]):
                 self.__local_udp_proxy_for_send(byte_data)
                 return
