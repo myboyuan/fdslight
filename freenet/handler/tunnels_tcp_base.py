@@ -142,6 +142,8 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
     __tun_fd = -1
     __udp_proxy_map = None
 
+    __BUFSIZE = 16 * 1024
+
     def __get_id(self, address):
         """根据地址生成唯一id"""
         return "%s-%s" % address
@@ -203,6 +205,8 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
         return self.fileno
 
     def __send_data(self, pkt_len, byte_data, action=tunnel_tcp.ACT_DATA):
+        # 清空还没有发送的数据
+        if self.writer.size() > self.__BUFSIZE: self.writer.flush()
         if action == tunnel_tcp.ACT_DATA:
             if not self.fn_send(pkt_len):
                 self.delete_handler(self.fileno)

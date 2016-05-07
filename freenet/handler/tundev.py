@@ -131,15 +131,16 @@ class tun_base(handler.handler):
 
     def add_to_sent_queue(self, ip_packet):
         # 丢到超出规定的数据包,防止内存过度消耗
+        n_ip_message = self.handle_ip_packet_for_write(ip_packet)
+        if not n_ip_message: return
+
         if self.__current_write_queue_n == self.__MAX_WRITE_QUEUE_SIZE:
+            # 删除第一个包,防止队列过多
+            self.__current_write_queue_n -= 1
+            self.___ip_packets_for_write.pop(0)
             return
 
         self.__current_write_queue_n += 1
-        n_ip_message = self.handle_ip_packet_for_write(ip_packet)
-
-        if not n_ip_message:
-            return
-
         self.___ip_packets_for_write.append(n_ip_message)
 
 
@@ -148,7 +149,7 @@ class tuns(tun_base):
     """
     __map = None
     __timer = None
-    __MAP_TIMEOUT = 240
+    __MAP_TIMEOUT = 300
     __TIMEOUT = 10
 
     def __add_route(self, dev_name, subnet):
