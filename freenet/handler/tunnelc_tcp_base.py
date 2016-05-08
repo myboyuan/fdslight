@@ -39,7 +39,7 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
     __force_udp_global_clients = None
     __BUFSIZE = 16 * 1024
 
-    def init_func(self, creator_fd, dns_fd, whitelist, debug=False):
+    def init_func(self, creator_fd, dns_fd, raw_socket_fd, whitelist, debug=False):
         taddr = fnc_config.configs["tcp_server_address"]
         s = socket.socket()
 
@@ -59,7 +59,7 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         self.__debug = debug
         self.__static_nat = static_nat.nat()
         self.__dns_fd = dns_fd
-        self.__traffic_send_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
+        self.__traffic_send_fd = raw_socket_fd
         self.__timer = timer.timer()
         self.__udp_proxy_map = {}
 
@@ -258,11 +258,6 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
             self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_close")
             self.unregister(self.fileno)
             self.delete_handler(self.__traffic_fetch_fd)
-        dels = []
-        for k, v in self.__udp_proxy_map.items(): dels.append(v)
-        for f in dels: self.delete_handler(f)
-
-        self.delete_handler(self.__traffic_send_fd)
         self.close()
         self.dispatcher.ctunnel_fail()
 

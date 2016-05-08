@@ -54,6 +54,7 @@ class fdslight(dispatcher.dispatcher):
     # 客户端DNS socket文件描述符
     __dnsc_fd = -1
     __tunnelc = None
+    __raw_socket_fd = -1
 
     __time = 0
     # 重新建立连接的时间间隔
@@ -104,6 +105,7 @@ class fdslight(dispatcher.dispatcher):
         blacklist = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
 
         self.__dnsc_fd = self.create_handler(-1, dns_proxy.dns_proxy, blacklist, debug=self.__debug)
+        self.__raw_socket_fd = self.create_handler(-1, traffic_pass.traffic_send)
 
         name_tcp = "freenet.tunnelc.%s" % fnc_config.configs["tcp_tunnel"]
         name_udp = "freenet.tunnelc.%s" % fnc_config.configs["udp_tunnel"]
@@ -115,7 +117,8 @@ class fdslight(dispatcher.dispatcher):
 
         __import__(name)
         self.__tunnelc = sys.modules[name]
-        self.create_handler(-1, self.__tunnelc.tunnel, self.__dnsc_fd, whitelist, debug=self.__debug)
+        self.create_handler(-1, self.__tunnelc.tunnel, self.__dnsc_fd, self.__raw_socket_fd,
+                            whitelist, debug=self.__debug)
 
     def init_func(self, mode, debug=True):
         self.__debug = debug

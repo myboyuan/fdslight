@@ -223,7 +223,8 @@ class udp_proxy(udp_handler.udp_handler):
         self.delete_handler(self.fileno)
 
     def udp_delete(self):
-        self.ctl_handler(self.fileno, self.__creator_fd, "udp_nat_del", self.__session_uniq_id, self.__lan_address)
+        if self.handler_exists(self.__creator_fd):
+            self.ctl_handler(self.fileno, self.__creator_fd, "udp_nat_del", self.__session_uniq_id, self.__lan_address)
         self.unregister(self.fileno)
         self.socket.close()
 

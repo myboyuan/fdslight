@@ -23,7 +23,6 @@ class dispatcher(object):
         """
         instance = handler()
         fd = instance.init_func(creator_fd, *args, **kwargs)
-        if fd < 0: return -1
         self.__handlers[fd] = instance
 
         return fd
@@ -34,16 +33,15 @@ class dispatcher(object):
         :return:
         """
         if fd not in self.__handlers: return
-
-        if self.__timer.exists(fd):
-            self.__timer.drop(fd)
-
+        if self.__timer.exists(fd): self.__timer.drop(fd)
         handler = self.__handlers[fd]
         handler.delete()
-
         del self.__handlers[fd]
 
     def set_timeout(self, fd, seconds):
+        if seconds < 0:
+            self.__timer.drop(fd)
+            return
         self.__timer.set_timeout(fd, seconds)
 
     def register(self, fd):
@@ -65,7 +63,7 @@ class dispatcher(object):
         self.__poll.unregister(fd)
 
     def myloop(self):
-        """在这里填写你自己的循环代码"""
+        """重写这个方法,添加你自己需要的循环执行代码"""
         pass
 
     def ioloop(self, *args, **kwargs):
@@ -81,6 +79,7 @@ class dispatcher(object):
         while 1:
             wait_time = self.__timer.get_min_time()
             if wait_time < 1: wait_time = 10
+
             event_set = self.__poll.poll(wait_time)
             self.__handle_events(event_set)
             self.__handle_timeout()
@@ -124,7 +123,6 @@ class dispatcher(object):
         for fd in fd_set:
             if fd in self.__handlers:
                 handler = self.__handlers[fd]
-                self.__timer.drop(fd)
                 handler.timeout()
             ''''''
         return
@@ -135,8 +133,9 @@ class dispatcher(object):
             is_write = (evt & evt_notify.EV_TYPE_WRITE) == evt_notify.EV_TYPE_WRITE
             is_err = (evt & evt_notify.EV_TYPE_ERR) == evt_notify.EV_TYPE_ERR
 
+            # 别的handler可能删除这个handler,因此需要检查
+            if fd not in self.__handlers: continue
             handler = self.__handlers[fd]
-
             if not self.handler_exists(fd): continue
             if is_err:
                 handler.error()

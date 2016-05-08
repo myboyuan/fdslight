@@ -49,7 +49,7 @@ class tunnelc_udp_base(udp_handler.udp_handler):
     def __TIMEOUT(self):
         return random.randint(1, 30)
 
-    def init_func(self, creator_fd, dns_fd, whitelist, debug=False):
+    def init_func(self, creator_fd, dns_fd, raw_socket_fd, whitelist, debug=False):
         self.__nat = static_nat.nat()
         self.__server = fnc_config.configs["udp_server_address"]
 
@@ -64,7 +64,7 @@ class tunnelc_udp_base(udp_handler.udp_handler):
         self.__debug = debug
         self.__timer = timer.timer()
 
-        self.__traffic_send_fd = self.create_handler(self.fileno, traffic_pass.traffic_send)
+        self.__traffic_send_fd = raw_socket_fd
 
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -276,10 +276,6 @@ class tunnelc_udp_base(udp_handler.udp_handler):
         self.unregister(self.fileno)
         self.socket.close()
         self.dispatcher.ctunnel_fail()
-
-        dels = []
-        for k, v in self.__udp_proxy_map.items(): dels.append(v)
-        for f in dels: self.delete_handler(f)
 
     @property
     def encrypt(self):
