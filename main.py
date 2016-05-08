@@ -163,7 +163,7 @@ class fdslight(dispatcher.dispatcher):
             if t < self.__RECONNECT_TIMEOUT: return
             self.__time = time.time()
             self.__need_establish_ctunnel = False
-            self.create_handler(-1, self.__tunnelc.tunnel, self.__dnsc_fd, [],
+            self.create_handler(-1, self.__tunnelc.tunnel, self.__dnsc_fd, self.__raw_socket_fd, [],
                                 debug=self.__debug)
         return
 
