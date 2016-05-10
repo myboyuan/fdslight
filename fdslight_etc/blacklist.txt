@@ -52,6 +52,7 @@ dl.delivery.mp.microsoft.com:1
 *.scdn.co:1
 *.soundcloud.com:1
 *.sndcdn.com:1
+*.netflix.com:1
 
 # 博客
 *.wordpress.com:1
