@@ -22,7 +22,6 @@
 struct fdsl_ip_filter_ele {
 	struct fdsl_ip_filter_ele *next;
 	unsigned char value[16];
-	char have;
 };
 
 struct fdsl_ip_filter {
@@ -78,8 +77,7 @@ int fdsl_ip_filter_find(struct fdsl_ip_filter *f, const char *s)
 int fdsl_ip_filter_add(struct fdsl_ip_filter *f, const char *s)
 {
 	struct fdsl_ip_filter_ele *tmp;
-
-	int bucket_p = __times33(s, f->ip_ver) % FDSL_IP_BUCKET_SIZE;
+	int bucket_p = __times33(s, f->ip_ver) % FDSL_IP_BUCKET_SIZE,is_first=1;
 
     // 避免加入相同的value
 	if(1==fdsl_ip_filter_find(f,s)) return 0;
@@ -92,16 +90,16 @@ int fdsl_ip_filter_add(struct fdsl_ip_filter *f, const char *s)
 	tmp = f->elements[bucket_p];
 
 	while (NULL != tmp->next) {
+	    is_first=0;
 		tmp = tmp->next;
 	}
 
-	if (tmp->have) {
+	if (!is_first) {
 		tmp->next = (struct fdsl_ip_filter_ele *)fdsl_malloc(FDSL_IP_ELE_SIZE);
 		memset(tmp->next, 0, FDSL_IP_ELE_SIZE);
 		tmp = tmp->next;
 	}
 
-	tmp->have = 1;
 	memcpy(tmp->value, s, f->ip_ver);
 
 	return 0;
@@ -123,7 +121,9 @@ int fdsl_ip_filter_delete(struct fdsl_ip_filter *f,const char *s)
             continue;
         }
         if(0==cnt) f->elements[bucket_p]=NULL;
-        else tmp_pre_ele->next=NULL;
+        else{
+            tmp_pre_ele->next=tmp_ele->next;
+        }
         fdsl_free(tmp_ele);
         break;
     }
