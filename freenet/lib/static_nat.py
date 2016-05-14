@@ -81,17 +81,3 @@ class nat(object):
         self.__virtual_ips = []
         self.__dst_nat_table = {}
         self.__src_nat_table = {}
-
-    def bind(self, src_ippkt):
-        """把特定源地址域虚拟VLAN地址绑定起来"""
-        if self.__bind:
-            src, vsrc = self.__bind
-            self.__virtual_ips.append(vsrc)
-
-        try:
-            vsrc = self.__virtual_ips.pop(0)
-        except IndexError:
-            return False
-
-        self.__bind = (src_ippkt, vsrc,)
-        return True
