@@ -85,6 +85,8 @@ int fdsl_ip_filter_add(struct fdsl_ip_filter *f, const char *s)
 	if (NULL == f->elements[bucket_p]) {
 		f->elements[bucket_p] = (struct fdsl_ip_filter_ele *)fdsl_malloc(FDSL_IP_ELE_SIZE);
 		memset(f->elements[bucket_p], 0, FDSL_IP_ELE_SIZE);
+	}else{
+	    is_first=0;
 	}
 
 	tmp = f->elements[bucket_p];
