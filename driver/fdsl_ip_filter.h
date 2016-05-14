@@ -122,7 +122,10 @@ int fdsl_ip_filter_delete(struct fdsl_ip_filter *f,const char *s)
             cnt++;
             continue;
         }
-        if(0==cnt) f->elements[bucket_p]=NULL;
+        if(0==cnt){
+            f->elements[bucket_p]=NULL;
+            if(NULL!=tmp_ele->next) f->elements[bucket_p]=tmp_ele->next;
+        }
         else{
             tmp_pre_ele->next=tmp_ele->next;
         }
