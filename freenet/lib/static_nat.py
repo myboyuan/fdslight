@@ -14,7 +14,7 @@ class nat(object):
 
     __timer = None
     # IP地址租赁有效期,如果超过这个时间,IP地址将被回收,以便可以让别的客户端可以连接
-    __IP_TIMEOUT = 600
+    __IP_TIMEOUT = 3600
 
     def __init__(self):
         self.__dst_nat_table = {}
