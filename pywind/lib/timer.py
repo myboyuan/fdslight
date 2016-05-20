@@ -40,10 +40,10 @@ class timer(object):
 
         return results
 
-    def set_timeout(self, name, seconds=0):
+    def set_timeout(self, name, seconds=1):
         t = int(time.time()) + seconds
         old_t = 0
-
+        if seconds < 1: return
         if name in self.__timeout_info:
             old_t = self.__timeout_info[name]
             del self.__timeout_info_reverse[old_t][name]
