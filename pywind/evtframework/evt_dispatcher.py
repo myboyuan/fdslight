@@ -121,6 +121,7 @@ class dispatcher(object):
         fd_set = self.__timer.get_timeout_names()
 
         for fd in fd_set:
+            if self.__timer.exists(fd): self.__timer.drop(fd)
             if fd in self.__handlers:
                 handler = self.__handlers[fd]
                 handler.timeout()
