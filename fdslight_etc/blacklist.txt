@@ -94,7 +94,7 @@ dl.delivery.mp.microsoft.com:1
 # 网络存储
 *.dropbox.com:1
 *.onedrive.com:0
-*.live.com:0
+*.live.com:1
 *.dropboxusercontent.com:1
 
 # 其它网站

@@ -5,11 +5,7 @@ import pywind.evtframework.consts as consts
 
 
 class handler(object):
-    __hooks = None
     __fileno = -1
-
-    def __init__(self):
-        self.__hooks = {}
 
     def set_fileno(self, fd):
         """设置这个处理者所对应的fd"""
@@ -25,73 +21,6 @@ class handler(object):
         :return fd:文件描述符,注意此描述符必须唯一
         """
         pass
-
-    def hook_register(self, name, hook, *args, **kwargs):
-        """注册handler的hook
-        :param name:
-        :param hook:
-        :return:
-        """
-        if name in self.__hooks: return False
-
-        instance = hook(self)
-        self.__hooks[name] = instance
-        instance.hook_init(name, *args, **kwargs)
-
-        return True
-
-    def hook_unregister(self, name):
-        """取消handler中的hook
-        :param name:
-        :return:
-        """
-        if name not in self.__hooks: return
-        hk = self.__hooks[name]
-        hk.hook_delete()
-
-    def hook_exists(self, name):
-        return name in self.__hooks
-
-    def get_hook(self, name):
-        hk = None
-        try:
-            hk = self.__hooks[name]
-        except KeyError:
-            pass
-        return hk
-
-    def ctl_hook(self, name, cmd, *args, **kwargs):
-        hk = self.__hooks[name]
-
-        return hk.hook_ctl(cmd, *args, **kwargs)
-
-    def hook_input(self, name, byte_data):
-        """向hook输入数据,重写这个方法
-        :param byte_data:
-        :return:
-        """
-        self.__hooks[name].hook_input(byte_data)
-
-    def hook_output(self, name, byte_data):
-        """输出hook数据,重写这个方法
-        :param byte_data:
-        :return:
-        """
-        pass
-
-    def handler_exit_from_hook(self):
-        """重写这个方法,当hook调用退出函数时"""
-        pass
-
-    def call_from_hook(self, name, cmd, *args, **kwargs):
-        """来自于hook的调用,重写这个方法"""
-        pass
-
-    def wake_up_hook(self, name):
-        """
-        唤醒hook
-        """
-        self.__hooks[name].wake_up()
 
     def evt_read(self):
         """
