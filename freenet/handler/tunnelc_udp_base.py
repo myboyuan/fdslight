@@ -141,12 +141,7 @@ class tunnelc_udp_base(udp_handler.udp_handler):
     def __handle_close(self):
         # 先删除流量过滤handler,保证其它流量能够走客户端默认路由
         self.print_access_log("close_connect")
-        self.delete_handler(self.__traffic_fetch_fd)
-        self.__is_auth = False
-        self.__traffic_fetch_fd = -1
-        self.__nat.reset()
-        self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_close")
-        self.set_timeout(self.fileno, self.__TIMEOUT_NO_AUTH)
+        self.delete_handler(self.fileno)
 
     def __handle_auth_ok(self, session_id):
         self.__traffic_fetch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read)
@@ -274,6 +269,9 @@ class tunnelc_udp_base(udp_handler.udp_handler):
 
     def udp_delete(self):
         self.unregister(self.fileno)
+        self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_close")
+        self.unregister(self.fileno)
+        self.delete_handler(self.__traffic_fetch_fd)
         self.socket.close()
         self.dispatcher.ctunnel_fail()
 

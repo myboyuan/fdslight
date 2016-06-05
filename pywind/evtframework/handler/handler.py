@@ -116,14 +116,10 @@ class handler(object):
     def ctl_handler(self, src_fd, dst_fd, cmd, *args, **kwargs):
         """
         控制其它handler的行为
-        :param
-        dst_fd:
-        :param
-        cmd:
-        :param
-        args:
-        :param
-        kwargs:
+        :param dst_fd:
+        :param cmd:
+        :param args:
+        :param kwargs:
         :return:
         """
         return self.dispatcher.ctl_handler(src_fd, dst_fd, cmd, *args, **kwargs)
@@ -131,14 +127,10 @@ class handler(object):
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
         """
         handler控制命令, 当此其它handler需要控制此handler的时候, 此函数将会被调用
-        :param
-        dst_fd:
-        :param
-        cmd:
-        :param
-        args:
-        :param
-        kwargs:
+        :param dst_fd:
+        :param cmd:
+        :param args:
+        :param kwargs:
         :return:
         """
         pass
