@@ -45,6 +45,7 @@ dl.delivery.mp.microsoft.com:1
 *.instagram.com:1
 *.line.me:1
 *.viber.com:1
+*.whatsapp.net:0
 
 # 音视频媒体网站
 *.nicovideo.jp:1
@@ -110,6 +111,7 @@ dl.delivery.mp.microsoft.com:1
 *.bit.ly:1
 *.dyndns.org:1
 *.doubleclick.net:1
+*.fastly.net:1
 
 ### 游戏相关
 # PS4游戏机建议添加此主机,否则可能出现判断为PSN无法连接
