@@ -208,7 +208,7 @@ class udp_proxy(udp_handler.udp_handler):
         b = ihl + 4
         e = b + 1
         udp_len = (byte_data[b] << 8) | byte_data[e]
-        if udp_len != pkt_len: return
+        if udp_len >= pkt_len: return
 
         b = ihl + 6
         e = b + 2
