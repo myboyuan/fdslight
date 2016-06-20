@@ -146,7 +146,7 @@ static unsigned int fdsl_push_packet_to_user(struct iphdr *ip_header)
 }
 
 static unsigned int hanle_udp_in(struct iphdr *ip_header)
-// 处理UDP流进出来的UDP
+// 处理UDP
 {
     unsigned short sport,dport;
 	struct udphdr *udp_header;
