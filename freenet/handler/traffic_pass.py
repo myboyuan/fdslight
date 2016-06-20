@@ -199,10 +199,16 @@ class udp_proxy(udp_handler.udp_handler):
         b = ihl
         e = ihl + 1
         sport = (byte_data[b] << 8) | byte_data[e]
-
         # 修改源端口
         e = e + 1
         L[b:e] = ((bind_port & 0xff00) >> 8, bind_port & 0x00ff,)
+
+        # 检查长度是否合法
+        pkt_len = (byte_data[2] << 8) | byte_data[3]
+        b = ihl + 4
+        e = b + 1
+        udp_len = (byte_data[b] << 8) | byte_data[e]
+        if udp_len != pkt_len: return
 
         b = ihl + 6
         e = b + 2

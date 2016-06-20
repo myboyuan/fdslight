@@ -33,6 +33,7 @@
 *.googlesyndication.com:1
 *.googletagmanager.com:1
 dl.delivery.mp.microsoft.com:1
+*.g.co:1
 
 #  社交网络
 *.facebook.com:1

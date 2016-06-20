@@ -323,8 +323,7 @@ class tunnels_udp_base(udp_handler.udp_handler):
         pkts = tmp_encrypt.build_packets(tunnel_proto.ACT_AUTH, len(byte_data), byte_data)
         self.print_access_log("send_auth", address)
 
-        for pkt in pkts:
-            self.sendto(pkt, address)
+        for pkt in pkts:self.sendto(pkt, address)
         self.add_evt_write(self.fileno)
 
     def udp_readable(self, message, address):
