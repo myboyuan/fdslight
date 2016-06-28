@@ -338,7 +338,6 @@ class tunnelc_udp_base(udp_handler.udp_handler):
         if not new_pkt:
             self.print_access_log("can_not_send_to_tunnel")
             return
-
         dst_addr = new_pkt[16:20]
         self.__timer.set_timeout(dst_addr, self.__IP_TIMEOUT)
         pkt_len = (new_pkt[2] << 8) | new_pkt[3]
