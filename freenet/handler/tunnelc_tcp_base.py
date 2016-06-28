@@ -74,6 +74,7 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
             sys.stderr = open(fnc_config.configs["error_log"], "a+")
 
         self.__force_udp_global_clients = {}
+        self.__udp_no_proxy_clients = {}
         for client_ip in fnc_config.configs["udp_force_global_clients"]:
             saddr = socket.inet_aton(client_ip)
             self.__force_udp_global_clients[saddr] = None
