@@ -159,13 +159,10 @@ class udp_proxy(udp_handler.udp_handler):
         # 检查源IP是否合法,如果客户机没有发送过,那么丢弃这个UDP包
         if saddr not in self.__internet_ip: return
 
-        self.set_timeout(self.fileno, self.__TIMEOUT)
         daddr, dport = self.__lan_address
-
         n_saddr = socket.inet_aton(saddr)
         n_daddr = socket.inet_aton(daddr)
 
-        self.__timer.set_timeout(saddr, self.__UDP_SESSION_TIMEOUT)
         udp_packets = utils.build_udp_packet(n_saddr, n_daddr, sport, dport, message)
 
         for udp_pkt in udp_packets: self.send_message_to_handler(self.fileno, self.__creator_fd, udp_pkt)
@@ -208,11 +205,11 @@ class udp_proxy(udp_handler.udp_handler):
         b = ihl + 4
         e = b + 1
         udp_len = (byte_data[b] << 8) | byte_data[e]
-        # offset = ((byte_data[6] & 0x1f) << 5) | byte_data[7]
+        offset = ((byte_data[6] & 0x1f) << 5) | byte_data[7]
         flags = ((byte_data[6]) & 0xe0) >> 5
         df = (flags & 0x2) >> 1
         if df and udp_len >= pkt_len: return
-        # if offset == 0 and (udp_len > pkt_len and pkt_len < 1500): return
+        if offset == 0 and (udp_len > pkt_len and pkt_len < 1280): return
         # if offset == 0 and udp_len > pkt_len: return
 
         b = ihl + 6
