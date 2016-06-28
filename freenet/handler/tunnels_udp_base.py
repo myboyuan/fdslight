@@ -393,7 +393,7 @@ class tunnels_udp_base(udp_handler.udp_handler):
             if self.__timer.exists(name): self.__timer.drop(name)
             if name in self.__sessions:
                 session_cls = self.__sessions[name]
-                if session_cls.sent_ping_cnt > 8:
+                if session_cls.sent_ping_cnt > 3:
                     self.unregister_session(session_cls.address)
                 else:
                     self.__send_ping(session_cls.address)
