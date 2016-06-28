@@ -37,6 +37,7 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
     __IP_TIMEOUT = 300
 
     __force_udp_global_clients = None
+    __udp_no_proxy_clients = None
     __BUFSIZE = 16 * 1024
 
     def init_func(self, creator_fd, dns_fd, raw_socket_fd, whitelist, debug=False):
@@ -76,6 +77,9 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         for client_ip in fnc_config.configs["udp_force_global_clients"]:
             saddr = socket.inet_aton(client_ip)
             self.__force_udp_global_clients[saddr] = None
+        for client_ip in fnc_config.configs["udp_no_proxy_clients"]:
+            saddr = socket.inet_aton(client_ip)
+            self.__udp_no_proxy_clients[saddr] = None
 
         return self.fileno
 
@@ -307,15 +311,14 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         if ip_ver != 4: return
         protocol = byte_data[9]
 
-        force_udp_global = False
+        udp_proxy = False
         saddr = byte_data[12:16]
 
-        if protocol == 17 and saddr in self.__force_udp_global_clients:
-            force_udp_global = True
+        if protocol == 17 and saddr in self.__force_udp_global_clients: udp_proxy = True
 
         # 处理UDP代理
-        if protocol == 17 and not fnc_config.configs["udp_global"] and not force_udp_global:
-            if self.__udp_whitelist.find(byte_data[16:20]):
+        if protocol == 17 and not fnc_config.configs["udp_global"] and not udp_proxy:
+            if self.__udp_whitelist.find(byte_data[16:20]) or (saddr in self.__udp_no_proxy_clients):
                 self.__local_udp_proxy_for_send(byte_data)
                 return
             ''''''

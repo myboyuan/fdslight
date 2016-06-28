@@ -44,6 +44,8 @@ class tunnelc_udp_base(udp_handler.udp_handler):
     __timer = None
     # 如果超过这个时间,那么将会从内核过滤器中删除
     __IP_TIMEOUT = 300
+    __force_udp_global_clients = None
+    __udp_no_proxy_clients = None
 
     @property
     def __TIMEOUT(self):
@@ -99,6 +101,9 @@ class tunnelc_udp_base(udp_handler.udp_handler):
         for client_ip in fnc_config.configs["udp_force_global_clients"]:
             saddr = socket.inet_aton(client_ip)
             self.__force_udp_global_clients[saddr] = None
+        for client_ip in fnc_config.configs["udp_no_proxy_clients"]:
+            saddr = socket.inet_aton(client_ip)
+            self.__udp_no_proxy_clients[saddr] = None
 
         self.fn_init()
         self.fn_auth_request()
@@ -318,15 +323,13 @@ class tunnelc_udp_base(udp_handler.udp_handler):
 
         protocol = byte_data[9]
 
-        force_udp_global = False
+        udp_proxy = False
         saddr = byte_data[12:16]
 
-        if protocol == 17 and saddr in self.__force_udp_global_clients:
-            force_udp_global = True
-
+        if protocol == 17 and saddr in self.__force_udp_global_clients: udp_proxy = True
         # 处理UDP代理
-        if protocol == 17 and not fnc_config.configs["udp_global"] and not force_udp_global:
-            if self.__udp_whitelist.find(byte_data[16:20]):
+        if protocol == 17 and not fnc_config.configs["udp_global"] and not udp_proxy:
+            if self.__udp_whitelist.find(byte_data[16:20]) or (saddr in self.__udp_no_proxy_clients):
                 self.__udp_local_proxy_for_send(byte_data)
                 return
             ''''''

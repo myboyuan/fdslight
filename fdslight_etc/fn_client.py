@@ -48,6 +48,9 @@ configs = {
     "udp_force_global_clients": [
         # "192.169.1.2","192.168.1.3",
     ],
+    # 不要进行UDP代理的客户端,此项在udp_global为0时有效
+    "udp_no_proxy_clients": [
+    ],
     # 不走代理流量的DNS服务器
     "dns": "223.5.5.5",
     # DNS绑定地址
