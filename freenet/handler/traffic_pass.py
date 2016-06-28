@@ -211,7 +211,9 @@ class udp_proxy(udp_handler.udp_handler):
         mf = flags & 0x1
 
         if df and udp_len >= pkt_len: return
-        if df == 0 and mf == 0 and offset == 0 and udp_len > pkt_len: return
+        if df == 0 and offset == 0 and udp_len > pkt_len: return
+        if offset == 0 and df == 0 and mf == 0 and udp_len < 1200: return
+        if udp_len == 0: return
 
         b = ihl + 6
         e = b + 2
