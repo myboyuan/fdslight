@@ -113,6 +113,9 @@ dl.delivery.mp.microsoft.com:1
 *.dyndns.org:1
 *.doubleclick.net:1
 *.fastly.net:1
+*.blogsmithmedia.com:1
+*.aolcdn.com:1
+*.apkpure.com:1
 
 ### 游戏相关
 # PS4游戏机建议添加此主机,否则可能出现判断为PSN无法连接
