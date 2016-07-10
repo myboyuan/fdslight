@@ -11,6 +11,3 @@ class HandlerFoundErr(Exception):
 class ConflictErr(Exception):
     pass
 
-
-class HookNotExistsErr(Exception):
-    pass
