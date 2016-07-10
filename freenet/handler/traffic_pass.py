@@ -121,7 +121,7 @@ class udp_proxy(udp_handler.udp_handler):
     __internet_ip = None
 
     # UDP会话超时时间,如果超过这个时间,将从认证会话中删除
-    __UDP_SESSION_TIMEOUT = 60
+    __UDP_SESSION_TIMEOUT = 180
     # handler超时时间
     __TIMEOUT = 10
 
