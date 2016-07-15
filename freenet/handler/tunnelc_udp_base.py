@@ -43,13 +43,10 @@ class tunnelc_udp_base(udp_handler.udp_handler):
 
     __timer = None
     # 如果超过这个时间,那么将会从内核过滤器中删除
-    __IP_TIMEOUT = 300
+    __IP_TIMEOUT = 1200
     __force_udp_global_clients = None
     __udp_no_proxy_clients = None
-
-    @property
-    def __TIMEOUT(self):
-        return random.randint(1, 30)
+    __TIMEOUT = 120
 
     def init_func(self, creator_fd, dns_fd, raw_socket_fd, whitelist, debug=False):
         self.__nat = static_nat.nat()
@@ -138,7 +135,6 @@ class tunnelc_udp_base(udp_handler.udp_handler):
             return
 
         # if self.__debug: self.print_access_log("recv_data")
-        self.set_timeout(self.fileno, self.__TIMEOUT)
         src_addr = new_pkt[12:16]
         self.__timer.set_timeout(src_addr, self.__IP_TIMEOUT)
         self.send_message_to_handler(self.fileno, self.__traffic_send_fd, new_pkt)
@@ -177,8 +173,6 @@ class tunnelc_udp_base(udp_handler.udp_handler):
         # print("send:", byte_data)
         for ippkt in ippkts: self.send(ippkt)
 
-        if self.__is_auth: self.set_timeout(self.fileno, self.__TIMEOUT)
-
         self.add_evt_write(self.fileno)
 
     def send_auth(self, auth_data):
@@ -203,7 +197,6 @@ class tunnelc_udp_base(udp_handler.udp_handler):
         self.send(pong)
         self.add_evt_write(self.fileno)
         self.__sent_ping_cnt = 0
-        self.set_timeout(self.fileno, self.__TIMEOUT)
 
     def __send_close(self):
         if self.__debug: self.print_access_log("send_close")

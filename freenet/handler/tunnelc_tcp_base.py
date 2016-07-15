@@ -15,7 +15,7 @@ import pywind.lib.timer as timer
 class tunnelc_tcp_base(tcp_handler.tcp_handler):
     # 验证超时时间
     __AUTH_TIMEOUT = 10
-    __TIMEOUT = 60
+    __TIMEOUT = 120
 
     __encrypt = None
     __decrypt = None
@@ -34,7 +34,7 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
 
     __timer = None
     # 走隧道的IP超时时间
-    __IP_TIMEOUT = 300
+    __IP_TIMEOUT = 900
 
     __force_udp_global_clients = None
     __udp_no_proxy_clients = None
@@ -98,7 +98,6 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         self.ctl_handler(self.fileno, self.__dns_fd, "as_tunnel_fd")
         self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_open")
         self.ctl_handler(self.fileno, self.__dns_fd, "set_filter_dev_fd", self.__traffic_fetch_fd)
-        self.set_timeout(self.fileno, self.__TIMEOUT)
 
     def __send_data(self, pkt_len, sent_data, action=tunnel_tcp.ACT_DATA):
         sent_pkt = self.__encrypt.build_packet(action, pkt_len, sent_data)
