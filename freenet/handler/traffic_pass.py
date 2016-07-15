@@ -36,6 +36,7 @@ class traffic_read(handler.handler):
                 break
 
             if not self.handler_exists(self.__tunnel_fd): return
+            if not pkt: continue
             self.send_message_to_handler(self.fileno, self.__tunnel_fd, pkt)
         return
 
