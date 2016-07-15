@@ -92,6 +92,8 @@ dl.delivery.mp.microsoft.com:1
 *.voanews.com:1
 # 自由亚洲电台
 *.rfa.org:1
+*.udn.com:1
+*.udn.com.tw:1
 
 # 网络存储
 *.dropbox.com:1
