@@ -51,7 +51,7 @@ class tunnels_udp_base(udp_handler.udp_handler):
     __dns_fd = -1
 
     # 会话检查时间
-    __SESSION_CHECK_TIMEOUT = 180
+    __SESSION_CHECK_TIMEOUT = 60
     # 系统轮询检查时间
     __TIMEOUT = 10
 
