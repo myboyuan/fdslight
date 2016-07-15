@@ -46,7 +46,7 @@ class tunnelc_udp_base(udp_handler.udp_handler):
     __IP_TIMEOUT = 1200
     __force_udp_global_clients = None
     __udp_no_proxy_clients = None
-    __TIMEOUT = 120
+    __TIMEOUT = 30
 
     def init_func(self, creator_fd, dns_fd, raw_socket_fd, whitelist, debug=False):
         self.__nat = static_nat.nat()
