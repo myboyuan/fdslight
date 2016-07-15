@@ -51,9 +51,9 @@ class tunnels_udp_base(udp_handler.udp_handler):
     __dns_fd = -1
 
     # 会话检查时间
-    __SESSION_CHECK_TIMEOUT = 60
+    __SESSION_CHECK_TIMEOUT = 180
     # 系统轮询检查时间
-    __TIMEOUT = 60
+    __TIMEOUT = 10
 
     __tun_fd = -1
     __raw_socket_fd = -1
@@ -323,7 +323,7 @@ class tunnels_udp_base(udp_handler.udp_handler):
         pkts = tmp_encrypt.build_packets(tunnel_proto.ACT_AUTH, len(byte_data), byte_data)
         self.print_access_log("send_auth", address)
 
-        for pkt in pkts:self.sendto(pkt, address)
+        for pkt in pkts: self.sendto(pkt, address)
         self.add_evt_write(self.fileno)
 
     def udp_readable(self, message, address):
