@@ -96,6 +96,7 @@ class decoder(object):
 
     __payload = 0
     __read_size = 0
+    __fin = 0
 
     def __init__(self, server_side=False):
         self.__reader = reader.reader()
@@ -120,6 +121,14 @@ class decoder(object):
 
     def get_data(self):
         pass
+
+    def is_frame_finish(self):
+        """单个数据帧是否结束"""
+        return self.__read_size == self.__read_size
+
+    def is_all_finish(self):
+        """所有的分帧数据是否结束"""
+        return self.__fin
 
 
 class wrap_socket(object):
@@ -190,9 +199,6 @@ class wrap_socket(object):
 
     def setsockopt(self, *args, **kwargs):
         return self.__socket.setsockopt(*args, **kwargs)
-
-    def makefile(self, *args, **kwargs):
-        return self.__socket.makefile(*args, **kwargs)
 
     def close(self):
         return self.__socket.close()

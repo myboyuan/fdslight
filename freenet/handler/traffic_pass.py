@@ -155,6 +155,7 @@ class udp_proxy(udp_handler.udp_handler):
 
     def udp_readable(self, message, address):
         if not self.__lan_address: return
+        if not self.handler_exists(self.__creator_fd): return
         saddr, sport = address
 
         # 检查源IP是否合法,如果客户机没有发送过,那么丢弃这个UDP包
