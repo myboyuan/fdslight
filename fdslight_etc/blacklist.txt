@@ -140,5 +140,7 @@ dl.delivery.mp.microsoft.com:1
 
 # 色情网站
 *.sex.com:1
+zh.foxtube.com:1
+*.fxtimg.com":1
 
 #   详见： http://hikinggfw.org/blacklist/
