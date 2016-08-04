@@ -32,7 +32,6 @@
 *.yahoo.com:1
 *.googlesyndication.com:1
 *.googletagmanager.com:1
-dl.delivery.mp.microsoft.com:1
 *.g.co:1
 
 #  社交网络
@@ -120,6 +119,10 @@ dl.delivery.mp.microsoft.com:1
 *.aolcdn.com:1
 *.apkpure.com:1
 static.adzerk.net:1
+*.akadns.net:1
+*.data.microsoft.com:1
+*.wns.windows.com:1
+dl.delivery.mp.microsoft.com:1
 
 ### 游戏相关
 # PS4游戏机建议添加此主机,否则可能出现判断为PSN无法连接
