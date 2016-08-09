@@ -136,6 +136,7 @@ register.mesh.com:1
 *.gnu.org:1
 *.android.com:1
 *.golang.org:1
+*.python-excel.org:1
 
 ### 宗教及非政府机构
 # 香港教会
