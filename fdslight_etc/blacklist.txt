@@ -49,6 +49,9 @@
 *.viber.com:1
 *.whatsapp.net:0
 
+# 防止skype重定向到gmw.cn
+*.skype.com:1
+
 # 音视频媒体网站
 *.nicovideo.jp:1
 *.spotify.com:1
