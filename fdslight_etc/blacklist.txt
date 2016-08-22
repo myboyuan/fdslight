@@ -103,6 +103,7 @@
 *.dropbox.com:1
 *.onedrive.com:0
 *.dropboxusercontent.com:1
+*.livefilestore.com:1
 
 # 其它网站
 *.wikipedia.org:1
