@@ -49,7 +49,10 @@
 *.viber.com:1
 *.whatsapp.net:0
 
-# 音视频媒体网站
+# 防止skype重定向到gmw.cn
+*.skype.com:1
+
+### 音视频媒体网站
 *.nicovideo.jp:1
 *.spotify.com:1
 *.scdn.co:1
@@ -100,6 +103,7 @@
 *.dropbox.com:1
 *.onedrive.com:0
 *.dropboxusercontent.com:1
+*.livefilestore.com:1
 
 # 其它网站
 *.wikipedia.org:1
@@ -138,6 +142,7 @@ register.mesh.com:1
 *.android.com:1
 *.golang.org:1
 *.python-excel.org:1
+*.freebsd.org:0
 
 ### 宗教及非政府机构
 # 香港教会
