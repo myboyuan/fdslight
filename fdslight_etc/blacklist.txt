@@ -122,7 +122,7 @@
 *.blogsmithmedia.com:1
 *.aolcdn.com:1
 *.apkpure.com:1
-static.adzerk.net:1ubi
+static.adzerk.net:1
 dl.delivery.mp.microsoft.com:1
 *.wns.windows.com:1
 *.data.microsoft.com:1
