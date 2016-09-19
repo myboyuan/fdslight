@@ -114,6 +114,7 @@ class decoder(object):
             mask = (n & 0x80) >> 7
             payload = n & 0x7f
 
+
         return seq
 
     def input(self, byte_data):
@@ -185,6 +186,7 @@ class wrap_socket(object):
 
     def recv(self, bufsize, *args, **kwargs):
         recv_data = self.__socket.recv(bufsize, *args, **kwargs)
+        self.decoder.input(recv_data)
 
         return recv_data
 
