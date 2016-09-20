@@ -42,11 +42,3 @@ class jsonrpc_builder(object):
 
 class jsonrpc_parser(object):
     pass
-
-
-class rpc_builder(object):
-    pass
-
-
-class rpc_parser(object):
-    pass
