@@ -130,6 +130,7 @@ dl.delivery.mp.microsoft.com:1
 *.telemetry.microsoft.com:1
 register.mesh.com:1
 *.akadns.net:1
+*.mengniang.org:0
 
 ### 游戏相关
 # PS4游戏机建议添加此主机,否则可能出现判断为PSN无法连接
