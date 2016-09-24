@@ -21,7 +21,9 @@ class jsonrpc_builder(object):
     def __init__(self, rpc_id):
         self.__rpc_id = int(rpc_id)
 
-    def build_call(self, method, params=None):
+    def build_call(self, method, *args, **kwargs):
+        if args: params = args
+        if kwargs: params = kwargs
         pydict = {
             "jsonrpc": VERSION,
             "method": str(method),
