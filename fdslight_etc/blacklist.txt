@@ -49,6 +49,7 @@
 *.viber.com:1
 *.whatsapp.net:0
 *.naver.jp:0
+*.telegram.org:0
 
 # 防止skype重定向到gmw.cn
 *.skype.com:1
