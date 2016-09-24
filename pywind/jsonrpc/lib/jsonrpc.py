@@ -58,6 +58,10 @@ class jsonrpc_parser(object):
         self.__rpc_id = int(rpc_id)
 
     def __check_call(self, pydict):
+        if "params" not in pydict: return False
+        params = pydict["params"]
+        if not isinstance(params, list) and not isinstance(params, dict): return False
+
         return True
 
     def __check_return_error(self, pydict):
@@ -138,5 +142,3 @@ class jsonrpc_parser(object):
         self.__is_call = False
         self.__is_return_error = False
         self.__is_return_ok = False
-
-
