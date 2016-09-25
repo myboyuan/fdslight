@@ -49,7 +49,7 @@ class parser(object):
     def __init__(self):
         self.__reader = reader.reader()
 
-    def __parse(self):
+    def parse(self):
         if self.__reader.size() < 4: return False
         rdata = self.__reader.read(4)
         direction = rdata[0]
@@ -75,7 +75,5 @@ class parser(object):
         self.__reader._putvalue(byte_data)
 
     def get_result(self):
-        if not self.__parse(): return None
-
         return self.__result
 

@@ -32,7 +32,7 @@ class sock_rpc_client(object):
     __sock_parser = None
     __sock_builder = None
 
-    def __init__(self, address, is_ipv6=False, is_ssl=False, ssl_cert=None):
+    def __init__(self, address, passwd, is_ipv6=False):
         if is_ipv6:
             self.__socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         else:
@@ -42,9 +42,29 @@ class sock_rpc_client(object):
         self.__sock_parser = socket_proto.parser()
         self.__sock_builder = socket_proto.builder()
 
-    def __rpc_handshake(self):
+    def __send(self, byte_data):
+        while 1:
+            data_size = len(byte_data)
+            sent_size = self.__socket.send(byte_data)
+            if sent_size == data_size: break
+            byte_data = byte_data[sent_size:]
+        return
+
+    def __recv(self):
+        while 1:
+            recv_data = self.__socket.recv(2048)
+            self.__sock_parser.input(recv_data)
+            self.__sock_parser.parse()
+            if self.__sock_parser.direction != 1: break
+            return self.__sock_parser.get_result()
+
+    def __rpc_do_handshake(self, passwd):
         self.__js_parser = jsonrpc.jsonrpc_parser(0)
         self.__js_builder = jsonrpc.jsonrpc_builder(0)
+
+        pydict = {"passwd": passwd}
+        byte_data = json.dumps(pydict).encode()
+        self.__send(byte_data)
 
     def get_module(self, mod_name=""):
         """获取函数命名空间"""
@@ -55,6 +75,6 @@ class sock_rpc_client(object):
         sts = json.dumps(pyobj)
 
         byte_data = sts.encode()
-        self.__socket.send(byte_data)
+        self.__send(byte_data)
 
         return func_name
