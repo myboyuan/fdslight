@@ -54,11 +54,13 @@ class fdslight(dispatcher.dispatcher):
     # 客户端DNS socket文件描述符
     __dnsc_fd = -1
     __tunnelc = None
+    __tunnelc_fd = -1
     __raw_socket_fd = -1
 
     __time = 0
     # 重新建立连接的时间间隔
     __RECONNECT_TIMEOUT = 60
+    __mode = ""
 
     def __create_fn_server(self):
 
@@ -81,6 +83,7 @@ class fdslight(dispatcher.dispatcher):
         self.create_handler(-1, ts_tcp_base._tunnel_tcp_listen,
                             tun_fd, dns_fd, raw_socket_fd, ip_pool,
                             debug=self.__debug)
+        self.__mode = "server"
 
     def __create_fn_client(self):
         if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
@@ -104,7 +107,7 @@ class fdslight(dispatcher.dispatcher):
         whitelist = file_parser.parse_ip_subnet_file("fdslight_etc/whitelist.txt")
         blacklist = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
 
-        self.__dnsc_fd = self.create_handler(-1, dns_proxy.dns_proxy, blacklist, debug=self.__debug)
+        self.__dnsc_fd = self.create_handler(-1, dns_proxy.dnsc_proxy, blacklist, debug=self.__debug)
         self.__raw_socket_fd = self.create_handler(-1, traffic_pass.traffic_send)
 
         name_tcp = "freenet.tunnelc.%s" % fnc_config.configs["tcp_tunnel"]
@@ -117,8 +120,17 @@ class fdslight(dispatcher.dispatcher):
 
         __import__(name)
         self.__tunnelc = sys.modules[name]
-        self.create_handler(-1, self.__tunnelc.tunnel, self.__dnsc_fd, self.__raw_socket_fd,
-                            whitelist, debug=self.__debug)
+        self.__tunnelc_fd = self.create_handler(-1, self.__tunnelc.tunnel, self.__dnsc_fd, self.__raw_socket_fd,
+                                                whitelist, debug=self.__debug)
+
+        signal.signal(signal.SIGUSR1, self.__update_blacklist)
+        self.__mode = "client"
+
+    def __update_blacklist(self, signum, frame):
+        if self.__mode != "client": return
+
+        blacklist = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
+        self.get_handler(self.__dnsc_fd).update_blacklist(blacklist)
 
     def init_func(self, mode, debug=True):
         self.__debug = debug
@@ -163,8 +175,9 @@ class fdslight(dispatcher.dispatcher):
             if t < self.__RECONNECT_TIMEOUT: return
             self.__time = time.time()
             self.__need_establish_ctunnel = False
-            self.create_handler(-1, self.__tunnelc.tunnel, self.__dnsc_fd, self.__raw_socket_fd, [],
-                                debug=self.__debug)
+            self.__tunnelc_fd = self.create_handler(-1, self.__tunnelc.tunnel,
+                                                    self.__dnsc_fd, self.__raw_socket_fd, [],
+                                                    debug=self.__debug)
         return
 
 
@@ -174,27 +187,56 @@ def stop_service():
     os.kill(pid, signal.SIGINT)
 
 
+def update_blacklist():
+    """更新黑名单"""
+    pid = get_process_id(FDSL_PID_FILE)
+    if pid < 1:
+        print("cannot found fdslight process")
+        return
+    os.kill(pid, signal.SIGUSR1)
+
+
 def main():
     help_doc = """
-
-    -m
-    client | server
-    -d
-    stop | start | debug
+    -u blacklist                update blacklist
+    -m client | server          client or server
+    -d stop | start | debug     stop,start,debug
+    -h                          print help
     """
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "m:d:")
+        opts, args = getopt.getopt(sys.argv[1:], "u:m:d:")
     except getopt.GetoptError:
         print(help_doc)
         return
     m = ""
     d = ""
+    u = ""
+
+    size = len(opts)
+
     for k, v in opts:
         if k == "-d":
             d = v
         if k == "-m":
             m = v
+        if k == "-u":
+            u = v
+        if k == "-h":
+            print(help_doc)
+            return
         continue
+
+    if u not in ("blacklist", "whitelist",) and u != "":
+        print(help_doc)
+        return
+
+    if u and size != 1:
+        print(help_doc)
+        return
+
+    if u == "blacklist" and size == 1:
+        update_blacklist()
+        return
 
     if not m or not d:
         print(help_doc)
@@ -227,6 +269,4 @@ def main():
 
     return
 
-
-if __name__ == '__main__':
-    main()
+if __name__ == '__main__': main()

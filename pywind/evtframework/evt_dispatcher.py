@@ -147,9 +147,9 @@ class dispatcher(object):
             ''''''
         return
 
-    def ctl_handler(self, src_fd, dst_fd, *args, **kwargs):
+    def ctl_handler(self, src_fd, dst_fd, cmd, *args, **kwargs):
         if dst_fd not in self.__handlers:
             raise excepts.HandlerNotFoundErr
 
         h = self.get_handler(dst_fd)
-        return h.handler_ctl(src_fd, *args, **kwargs)
+        return h.handler_ctl(src_fd, cmd, *args, **kwargs)

@@ -21,8 +21,7 @@ class _host_match(object):
         tmplist = host.split(".")
         tmplist.reverse()
 
-        if not tmplist:
-            return
+        if not tmplist: return
 
         lsize = len(tmplist)
         n = 0
@@ -71,6 +70,9 @@ class _host_match(object):
             tmpdict = v
 
         return (is_match, flags,)
+
+    def clear(self):
+        self.__rules = {}
 
 
 class dns_base(udp_handler.udp_handler):
@@ -178,7 +180,7 @@ class dnsd_proxy(dns_base):
         sys.exit(-1)
 
 
-class dns_proxy(dns_base):
+class dnsc_proxy(dns_base):
     """客户端的DNS代理"""
     __host_match = None
     __timer = None
@@ -259,6 +261,11 @@ class dns_proxy(dns_base):
         self.add_evt_read(self.fileno)
 
         return self.fileno
+
+    def update_blacklist(self, host_rules):
+        """更新黑名单"""
+        self.__host_match.clear()
+        for rule in host_rules: self.__host_match.add_rule(rule)
 
     def udp_readable(self, message, address):
         # dns至少有12个字节
