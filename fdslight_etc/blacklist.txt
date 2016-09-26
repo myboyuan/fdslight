@@ -100,6 +100,10 @@
 *.rfa.org:1
 *.udn.com:1
 *.udn.com.tw:1
+# 苹果日报
+*.nextmedia.com:1
+# 华尔街日报
+*.wsj.com:1
 
 # 网络存储
 *.dropbox.com:1
