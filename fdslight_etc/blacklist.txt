@@ -151,7 +151,6 @@ register.mesh.com:1
 *.golang.org:1
 *.python-excel.org:1
 *.freebsd.org:0
-*.brew.sh:1
 
 ### 宗教及非政府机构
 # 香港教会
