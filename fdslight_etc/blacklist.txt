@@ -137,6 +137,8 @@ register.mesh.com:1
 *.akadns.net:1
 *.mengniang.org:0
 *.v2ex.com:0
+*.uukanshu.com:1
+*.in-addr.arpa:0
 
 ### 游戏相关
 # PS4游戏机建议添加此主机,否则可能出现判断为PSN无法连接
