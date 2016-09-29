@@ -141,8 +141,8 @@ register.mesh.com:1
 *.in-addr.arpa:0
 
 ### 游戏相关
-# PS4游戏机建议添加此主机,否则可能出现判断为PSN无法连接
 *.rockstargames.com:1
+# PS4
 *.llnwd.net:0
 *.ubisoft.com:1
 
