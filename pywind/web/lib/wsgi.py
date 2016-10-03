@@ -158,6 +158,7 @@ class wsgi(object):
 
         self.__resp_status = status
         self.__resp_headers = response_headers
+        self.__has_hdr = True
 
         for name, value in response_headers:
             name = name.lower()
