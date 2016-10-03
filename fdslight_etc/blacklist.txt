@@ -107,6 +107,7 @@
 
 # 网络存储
 *.dropbox.com:1
+*.dropboxstatic.com:0
 *.onedrive.com:0
 *.dropboxusercontent.com:1
 *.livefilestore.com:1
