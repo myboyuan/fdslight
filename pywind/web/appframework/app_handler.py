@@ -44,15 +44,28 @@ class _request(object):
     __tmpfile_fd = None
     __tmpfile_name = ""
 
-    def __init__(self, env):
+    __args = None
+    __kwargs = None
+
+    def __init__(self, env, *args, **kwargs):
         self.__qs_params = {}
         self.__stream_params = {}
         self.__env = env
         self.__files = {}
         self.__allow_request_methods = ["GET", "POST", ]
         self.__reader = reader.reader()
+        self.__args = args
+        self.__kwargs = kwargs
 
         self.__init()
+
+    @property
+    def args(self):
+        return self.__args
+
+    @property
+    def kwargs(self):
+        return self.__kwargs
 
     def __init(self):
         m = self.environ["REQUEST_METHOD"].lower()
@@ -292,12 +305,12 @@ class handler(object):
     # 块相应是否结束
     __chunked_finish = False
 
-    def __init__(self, environ, start_response):
+    def __init__(self, environ, start_response, *args, **kwargs):
         self.__wait_sent = []
         self.__start_response = start_response
         self.__resp_headers = []
         self.__resp_status = "200 OK"
-        self.__request = _request(environ)
+        self.__request = _request(environ, *args, **kwargs)
 
         self.__continue = self.initialize()
 
