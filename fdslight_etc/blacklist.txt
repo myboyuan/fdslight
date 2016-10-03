@@ -100,6 +100,10 @@
 *.rfa.org:1
 *.udn.com:1
 *.udn.com.tw:1
+# 苹果日报
+*.nextmedia.com:1
+# 华尔街日报
+*.wsj.com:1
 
 # 网络存储
 *.dropbox.com:1
@@ -133,10 +137,12 @@ register.mesh.com:1
 *.akadns.net:1
 *.mengniang.org:0
 *.v2ex.com:0
+*.uukanshu.com:1
+*.in-addr.arpa:0
 
 ### 游戏相关
-# PS4游戏机建议添加此主机,否则可能出现判断为PSN无法连接
 *.rockstargames.com:1
+# PS4
 *.llnwd.net:0
 *.ubisoft.com:1
 
@@ -154,6 +160,10 @@ register.mesh.com:1
 *.minghui.org:1
 *.zhengjian.org:1
 *.xinsheng.net:1
+
+### 政府机构
+# 中华民国政府
+*.gov.tw:0
 
 # 色情网站
 *.sex.com:1
