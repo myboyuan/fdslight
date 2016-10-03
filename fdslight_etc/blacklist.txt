@@ -141,6 +141,8 @@ register.mesh.com:1
 *.v2ex.com:0
 *.uukanshu.com:1
 *.in-addr.arpa:0
+*.jsdelivr.net:0
+*.cloudfront.net:0
 
 ### 游戏相关
 *.rockstargames.com:1
