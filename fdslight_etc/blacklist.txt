@@ -46,6 +46,7 @@
 *.xing.com:1
 *.instagram.com:1
 *.line.me:1
+*.line-scdn.net:0
 *.viber.com:1
 *.whatsapp.net:0
 *.naver.jp:0
