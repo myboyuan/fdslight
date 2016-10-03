@@ -361,7 +361,9 @@ class handler(object):
             stcode = int(self.__resp_status[0:3])
             self.__start_response(self.__resp_status, self.__resp_headers)
             if stcode not in (100, 101, 102,): self.__is_response_header = True
-        self.__handle()
+            return
+        if self.__is_start_response and not self.request.recv_ok(): self.on_recv_stream()
+        if self.__is_start_response and self.request.recv_ok(): self.handle()
 
     def __iter__(self):
         if not self.__continue: return self

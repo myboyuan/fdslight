@@ -157,8 +157,8 @@ class scgid(tcp_handler.tcp_handler):
     def __resp_header(self, status, resp_headers):
         tmplist = ["Status: %s\r\n" % status, ]
 
-        for name, value in tmplist:
-            sts = "%s: %s\r\n"(name, value, )
+        for name, value in resp_headers:
+            sts = "%s: %s\r\n" % (name, value, )
             tmplist.append(sts)
         tmplist.append("\r\n")
 
