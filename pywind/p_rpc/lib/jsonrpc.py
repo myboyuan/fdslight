@@ -22,20 +22,20 @@ class jsonrpc_builder(object):
         self.__rpc_id = int(rpc_id)
 
     def build_call(self, method, *args, **kwargs):
+        params = []
         if args: params = args
         if kwargs: params = kwargs
         pydict = {
-            "jsonrpc": VERSION,
+            "rpc": VERSION,
             "method": str(method),
             "id": self.__rpc_id
         }
-        if params: pydict["params"] = params
-
+        pydict["params"] = params
         return pydict
 
     def build_return_ok(self, result):
         pydict = {
-            "jsonrpc": VERSION,
+            "rpc": VERSION,
             "result": result,
             "id": self.__rpc_id
         }
@@ -43,7 +43,7 @@ class jsonrpc_builder(object):
 
     def build_return_error(self, code, message, data=None):
         pydict = {
-            "jsonrpc": VERSION,
+            "rpc": VERSION,
             "error": {"code": int(code), "message": message, "data": data},
             "id": self.__rpc_id
         }
@@ -89,30 +89,29 @@ class jsonrpc_parser(object):
 
     def parse(self, message):
         self.__reset()
-
         try:
             pydict = json.loads(message)
         except json.JSONDecoder:
             raise jsonrpcErr(message)
 
-        if "jsonrpc" not in pydict: raise jsonrpcErr(message)
+        if "rpc" not in pydict: raise jsonrpcErr(message)
         if "id" not in pydict: raise jsonrpcErr(message)
 
         if not self.__check_conflict(pydict): raise jsonrpcErr(message)
 
         try:
-            rpc_version = float(pydict["jsonrpc"])
+            rpc_version = float(pydict["rpc"])
         except ValueError:
             raise jsonrpcErr(message)
 
-        if rpc_version != float(VERSION): raise jsonrpcErr("wrong jsonrpc version:%s" % rpc_version)
+        if rpc_version != float(VERSION): raise jsonrpcErr("wrong rpc version:%s" % rpc_version)
 
         try:
             rpc_id = int(pydict["id"])
         except ValueError:
             raise jsonrpcErr(message)
 
-        if rpc_id != self.__rpc_id: raise jsonrpcErr("wrong jsonrpc id:%s" % rpc_id)
+        if rpc_id != self.__rpc_id: raise jsonrpcErr("wrong rpc id:%s" % rpc_id)
 
         if "method" in pydict:
             self.__is_call = True

@@ -50,7 +50,7 @@ class func_call(object):
 
     def __get_func(self, name):
         pos = name.find("::")
-        if pos <= 0: return (None, name,)
+        if pos < 0: return (None, name,)
 
         mod_name = name[0:pos]
         pos += 2

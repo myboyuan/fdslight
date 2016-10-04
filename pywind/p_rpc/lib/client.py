@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
+"""进程RPC通信客户端"""
 
 import socket, json
-import pywind.jsonrpc.lib.sock_proto as socket_proto
-import pywind.jsonrpc.lib.jsonrpc as jsonrpc
+import pywind.p_rpc.lib.proto as socket_proto
+import pywind.p_rpc.lib.jsonrpc as jsonrpc
 
 
 class rpc_module(object):
@@ -25,14 +26,14 @@ class rpc_module(object):
         return self.__rpc__
 
 
-class sock_rpc_client(object):
+class rpc_client(object):
     __socket = None
     __js_parser = None
     __js_builder = None
     __sock_parser = None
     __sock_builder = None
 
-    def __init__(self, address, passwd, is_ipv6=False):
+    def __init__(self, address, is_ipv6=False):
         if is_ipv6:
             self.__socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         else:
@@ -41,6 +42,8 @@ class sock_rpc_client(object):
 
         self.__sock_parser = socket_proto.parser()
         self.__sock_builder = socket_proto.builder()
+        self.__js_parser = jsonrpc.jsonrpc_parser(0)
+        self.__js_builder = jsonrpc.jsonrpc_builder(0)
 
     def __send(self, byte_data):
         while 1:
@@ -55,16 +58,8 @@ class sock_rpc_client(object):
             recv_data = self.__socket.recv(2048)
             self.__sock_parser.input(recv_data)
             self.__sock_parser.parse()
-            if self.__sock_parser.direction != 1: break
+            # if self.__sock_parser.direction != 1: break
             return self.__sock_parser.get_result()
-
-    def __rpc_do_handshake(self, passwd):
-        self.__js_parser = jsonrpc.jsonrpc_parser(0)
-        self.__js_builder = jsonrpc.jsonrpc_builder(0)
-
-        pydict = {"passwd": passwd}
-        byte_data = json.dumps(pydict).encode()
-        self.__send(byte_data)
 
     def get_module(self, mod_name=""):
         """获取函数命名空间"""
@@ -76,5 +71,7 @@ class sock_rpc_client(object):
 
         byte_data = sts.encode()
         self.__send(byte_data)
+        recv_data = self.__recv()
+        pydict = self.__js_parser.parse(recv_data)
 
-        return func_name
+        return pydict["result"]
