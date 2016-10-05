@@ -37,15 +37,13 @@ class func_call(object):
 
         result = None
 
-        if isinstance(params, dict):
-            try:
+        try:
+            if isinstance(params, dict):
                 result = func(**params)
-            except TypeError:
-                raise RPCInvalidParamsErr("function %s params error" % name)
-            return result
-
-        result = func(*params)
-
+            else:
+                result = func(*params)
+        except TypeError:
+            raise RPCInvalidParamsErr("function %s params error" % name)
         return result
 
     def __get_func(self, name):

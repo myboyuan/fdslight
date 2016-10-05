@@ -72,11 +72,28 @@ class rpcd(tcp_handler.tcp_handler):
         return
 
     def __handle_rpc(self, rpc_data):
-        pydict = self.__js_parser.parse(rpc_data)
+        try:
+            pydict = self.__js_parser.parse(rpc_data)
+        except jsonrpc.jsonrpcErr:
+            self.delete_handler(self.fileno)
+            return
         method = pydict["method"]
-        result = self.__rpc_func.call_func(method, pydict["params"])
+        ok = True
 
-        pydict = self.__js_builder.build_return_ok(result)
+        try:
+            result = self.__rpc_func.call_func(method, pydict["params"])
+        except rpc_func.RPCNotFoundMethodErr:
+            pydict = self.__js_builder.build_return_error(
+                jsonrpc.E_NOT_FOUND_METHOD, "cannot found method %s" % method)
+            ok = False
+        except rpc_func.RPCInvalidParamsErr:
+            pydict = self.__js_builder.build_return_error(
+                jsonrpc.E_INVALID_PARAMS, "invalid method params on function %s" % method
+            )
+            ok = False
+
+        if ok: pydict = self.__js_builder.build_return_ok(result)
+
         resp_data = self.__proto_builder.build_response(json.dumps(pydict))
 
         self.add_evt_write(self.fileno)
