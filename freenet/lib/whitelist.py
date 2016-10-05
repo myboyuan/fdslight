@@ -40,6 +40,8 @@ class whitelist(object):
         self.__timer.set_timeout(ippkt, self.__CACHE_TIMEOUT)
 
     def __calc_subnet(self, ipaddr, prefix):
+        if prefix == 32: return ipaddr
+
         q = int(prefix / 8)
         r = prefix % 8
 
