@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 import pywind.lib.timer as timer
 import socket
-import freenet.lib.utils as utils
+
 
 class whitelist(object):
     """UDP白名单类"""
-    __tree = None
+    __prefix = None
+    __subnets = None
     # 缓存回收超时
     __CACHE_TIMEOUT = 180
     __timer = None
@@ -13,83 +14,61 @@ class whitelist(object):
     __cache = None
 
     def __init__(self):
-        self.__tree = {}
         self.__timer = timer.timer()
         self.__cache = {}
+        self.__prefix = ([], {})
+        self.__subnets = {}
 
-    def add_rule(self, ipaddr, mask):
-        if mask < 1 or mask > 32: raise ValueError("the value of mask is wrong")
-        ippkt = socket.inet_aton(ipaddr)
+    def add_rule(self, ipaddr, prefix):
+        if prefix < 1 or prefix > 32: raise ValueError("the value of prefix is wrong")
+        msk_list, msk_map = self.__prefix
 
-        tmp_dict = self.__tree
+        if prefix not in msk_list:
+            msk_list.append(int(prefix))
+            msk_list.reverse()
 
-        a = int(mask / 8)
-        r = mask % 8
-        if r: a += 1
-
-        for i in range(4):
-            n = ippkt[i]
-
-            if i + 1 == a:
-                if "values" not in tmp_dict: tmp_dict["values"] = {}
-                if mask not in tmp_dict["values"]: tmp_dict["values"][mask] = []
-                tmp_dict["values"][mask].append(n)
-                break
-
-            if n not in tmp_dict:
-                tmp_dict[n] = {}
-
-            tmp_dict = tmp_dict[n]
-
+        name = "%s/%s" % (ipaddr, prefix,)
+        self.__subnets[name] = None
+        if prefix not in msk_map:
+            msk_map[prefix] = 1
+        else:
+            msk_map[prefix] += 1
         return
 
     def __add_to_cache(self, ippkt, from_wl=True):
         self.__cache[ippkt] = from_wl
         self.__timer.set_timeout(ippkt, self.__CACHE_TIMEOUT)
 
-    def __get_subn(self, a_list, b):
-        cnt = 24
-        ret_v = 0
+    def __calc_subnet(self, ipaddr, prefix):
+        q = int(prefix / 8)
+        r = prefix % 8
 
-        for n in a_list:
-            ret_v |= n << cnt
-            cnt -= 8
+        byte_ipaddr = socket.inet_aton(ipaddr)
+        results = list(bytes(4))
 
-        return ret_v | (b << cnt)
+        results[0:q] = byte_ipaddr[0:q]
+        v = 0
+        for n in range(r + 1):
+            if n == 0: continue
+            v += 2 ** (8 - n)
+
+        results[q] = results[q] = byte_ipaddr[q] & v
+        return socket.inet_ntoa(bytes(results))
 
     def find(self, ippkt):
         if ippkt in self.__cache: return self.__cache[ippkt]
-
-        tmp_dict = self.__tree
-        t_net_v = utils.ip4b_2_number(ippkt)
-
-        values = []
-        _values = None
-
-        for n in ippkt:
-            if n not in tmp_dict:
-                if "values" not in tmp_dict:
-                    self.__add_to_cache(ippkt, from_wl=False)
-                    return False
-                _values = tmp_dict["values"]
-                break
-            values.append(n)
-            tmp_dict = tmp_dict[n]
-
         is_find = False
+        ipaddr = socket.inet_ntoa(ippkt)
+        msk_list, _ = self.__prefix
 
-        for m in _values:
-            mask_v = 0
-            for i in range(m): mask_v |= 1 << (31 - i)
-            for t in _values[m]:
-                subn = self.__get_subn(values, t)
-                if t_net_v & mask_v == subn:
-                    is_find = True
-                    break
-                ''''''
-            ''''''
+        for prefix in msk_list:
+            subnet = self.__calc_subnet(ipaddr, prefix)
+            name = "%s/%s" % (subnet, prefix,)
+            if name not in self.__subnets: continue
+            is_find = True
+            break
+
         self.__add_to_cache(ippkt, from_wl=is_find)
-
         return is_find
 
     def recycle_cache(self):
@@ -100,4 +79,15 @@ class whitelist(object):
         return
 
     def print_tree(self):
-        print(self.__tree)
+        print((self.__prefix, self.__subnets,))
+
+    def delete(self, ipaddr, prefix):
+        name = "%s/%s" % (ipaddr, prefix,)
+        if name not in self.__subnets: return
+        msk_list, msk_map = self.__prefix
+        msk_map[prefix] -= 1
+
+        if msk_map[prefix] == 0:
+            msk_list.remove(prefix)
+            del msk_map[prefix]
+        del self.__subnets[name]
