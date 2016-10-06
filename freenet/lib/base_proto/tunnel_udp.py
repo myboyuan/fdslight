@@ -2,12 +2,13 @@
 """协议帧格式
 session_id: 2 bytes 会话ID
 real_length:2 bytes 实际的数据长度
-pkt_id: 2 bytes 包ID
+md5-hash:16 bytes 没有分包之前的MD5值
 tot_seg: 4 bit 全部的分包个数
 seq: 4 bit 当前分包序号
 reverse:4 bit 保留
 action:4bit 动作
 """
+import hashlib
 
 ACT_AUTH = 1
 ACT_PING = 2
@@ -21,13 +22,12 @@ ACTS = (
     ACT_CLOSE, ACT_DATA, ACT_DNS,
 )
 
-MIN_FIXED_HEADER_SIZE = 8
+MIN_FIXED_HEADER_SIZE = 22
 
 
 class builder(object):
     __session_id = 0
     __fixed_header_size = 0
-    __pkt_id = 1
     # 数据块大小
     __block_size = 1210
 
@@ -68,19 +68,14 @@ class builder(object):
 
         return (bytes(list_a), bytes(list_b), bytes(csum_list),)
 
-    def __build_proto_header(self, real_size, tot_seg, seq, action):
+    def __build_proto_header(self, real_size, md5_hash, tot_seg, seq, action):
         if action not in ACTS: raise ValueError("not support action type")
-        L = (
+        L = [
             (self.__session_id & 0xff00) >> 8, self.__session_id & 0x00ff,
             (real_size & 0xff00) >> 8, real_size & 0x00ff,
-            (self.__pkt_id & 0xff00) >> 8, self.__pkt_id & 0x00ff,
-            (tot_seg << 4) | seq,
-            action,
-        )
-
-        if tot_seg == seq:
-            if self.__pkt_id == 65535: self.__pkt_id = 0
-            self.__pkt_id += 1
+        ]
+        L += list(md5_hash)
+        L += [(tot_seg << 4) | seq, action, ]
 
         return bytes(L)
 
@@ -113,10 +108,11 @@ class builder(object):
         data_seq = []
         tmp_t = self.__get_sent_raw_data(data_len, byte_data)
         tot_seq = len(tmp_t)
+        md5_hash = hashlib.md5(byte_data).digest()
         seq = 1
         for block in tmp_t:
             size = len(block)
-            base_header = self.__build_proto_header(size, tot_seq, seq, action)
+            base_header = self.__build_proto_header(size, md5_hash, tot_seq, seq, action)
             e_hdr = self.wrap_header(base_header)
             e_body = self.wrap_body(size, block)
             data_seq.append(b"".join((e_hdr, e_body,)))
@@ -132,11 +128,11 @@ class builder(object):
 
     def wrap_header(self, base_hdr):
         """重写这个方法"""
-        pass
+        return base_hdr
 
     def wrap_body(self, size, body_data):
         """重写这个方法"""
-        pass
+        return body_data
 
     @property
     def fixed_header_size(self):
@@ -169,7 +165,7 @@ class builder(object):
 
 class parser(object):
     __fixed_header_size = 0
-    __pkt_id = 0
+    __pkt_md5 = None
     __data_area = None
     # 总共的段数
     __tot_seg = 0
@@ -195,34 +191,31 @@ class parser(object):
     def __parse_header(self, header):
         session_id = (header[0] << 8) | header[1]
         real_length = (header[2] << 8) | header[3]
-        pkt_id = (header[4] << 8) | header[5]
-        seg_info = header[6]
+        pkt_md5 = header[4:20]
+        seg_info = header[20]
 
         tot_seg = (seg_info & 0xf0) >> 4
         seq = seg_info & 0x0f
+        action = header[21] & 0x0f
 
-        action = header[7] & 0x0f
-
-        return (session_id, real_length, pkt_id, tot_seg, seq, action,)
+        return (session_id, real_length, pkt_md5, tot_seg, seq, action,)
 
     def __get_ip4_pkt(self, pkt):
         tot_len = (pkt[2] << 8) | pkt[3]
+
         return pkt[0:tot_len]
 
     def parse(self, packet):
         real_header = self.unwrap_header(packet[0:self.__fixed_header_size])
         if not real_header: return
-        session_id, length, pkt_id, tot_seg, seq, action = self.__parse_header(real_header)
+        session_id, length, pkt_md5, tot_seg, seq, action = self.__parse_header(real_header)
         real_body = self.unwrap_body(length, packet[self.__fixed_header_size:])
-
-        if seq == 3 and not self.__pkt_id: return
-        if seq > 3: return b""
-        if pkt_id == 0: return b""
+        if seq > 3: return None
         # 如果只有一个数据包,那么直接返回
         if tot_seg == 1:
             self.reset()
             return (session_id, action, real_body,)
-        if pkt_id != self.__pkt_id and self.__pkt_id != 0: self.reset()
+        if pkt_md5 != self.__pkt_md5 and self.__data_area: self.reset()
         # 最大分段只能是3段
         if tot_seg > 3: return None
         self.__data_area[seq] = real_body
@@ -236,7 +229,7 @@ class parser(object):
             self.reset()
             return (session_id, action, self.__get_ip4_pkt(result),)
 
-        self.__pkt_id = pkt_id
+        self.__pkt_md5 = pkt_md5
         return None
 
     def __get_data_from_raib(self):
@@ -270,13 +263,13 @@ class parser(object):
         """
         解包头, 重写这个方法
         """
-        pass
+        return header_data
 
     def unwrap_body(self, real_size, body_data):
         """
         重写这个方法
         """
-        pass
+        return body_data
 
     def reset(self):
         """
@@ -284,4 +277,17 @@ class parser(object):
         """
         self.__tot_seg = 0
         self.__data_area = {}
-        self.__pkt_id = 0
+
+
+p = parser(MIN_FIXED_HEADER_SIZE)
+b = builder(MIN_FIXED_HEADER_SIZE)
+
+data = list(bytes(1400))
+data.append(69)
+
+edata = b.build_packets(ACT_AUTH, 1401, bytes(data))
+edata.pop(1)
+
+for t in edata:
+    rs = p.parse(t)
+    if rs:print(rs)
