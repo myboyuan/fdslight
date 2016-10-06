@@ -278,7 +278,7 @@ class parser(object):
         self.__tot_seg = 0
         self.__data_area = {}
 
-
+"""
 p = parser(MIN_FIXED_HEADER_SIZE)
 b = builder(MIN_FIXED_HEADER_SIZE)
 
@@ -291,3 +291,4 @@ edata.pop(1)
 for t in edata:
     rs = p.parse(t)
     if rs:print(rs)
+"""
