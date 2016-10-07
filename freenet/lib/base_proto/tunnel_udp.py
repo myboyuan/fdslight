@@ -205,6 +205,10 @@ class parser(object):
 
         return pkt[0:tot_len]
 
+    def __check_data_is_modify(self, md5, byte_data):
+        n_md5 = hashlib.md5(byte_data).digest()
+        return md5 == n_md5
+
     def parse(self, packet):
         real_header = self.unwrap_header(packet[0:self.__fixed_header_size])
         if not real_header: return
@@ -214,6 +218,7 @@ class parser(object):
         # 如果只有一个数据包,那么直接返回
         if tot_seg == 1:
             self.reset()
+            if not self.__check_data_is_modify(pkt_md5, real_body): return None
             return (session_id, action, real_body,)
         if pkt_md5 != self.__pkt_md5 and self.__data_area: self.reset()
         # 最大分段只能是3段
@@ -223,11 +228,15 @@ class parser(object):
         if 1 in self.__data_area and 2 in self.__data_area:
             pkt = b"".join((self.__data_area[1], self.__data_area[2],))
             self.reset()
-            return (session_id, action, self.__get_ip4_pkt(pkt),)
+            body_data = self.__get_ip4_pkt(pkt)
+            if not self.__check_data_is_modify(pkt_md5, body_data): return None
+            return (session_id, action, body_data,)
         if len(self.__data_area) == 2:
             result = self.__get_data_from_raib()
             self.reset()
-            return (session_id, action, self.__get_ip4_pkt(result),)
+            body_data = self.__get_ip4_pkt(result)
+            if not self.__check_data_is_modify(pkt_md5, body_data): return None
+            return (session_id, action, body_data,)
 
         self.__pkt_md5 = pkt_md5
         return None
@@ -277,6 +286,7 @@ class parser(object):
         """
         self.__tot_seg = 0
         self.__data_area = {}
+
 
 """
 p = parser(MIN_FIXED_HEADER_SIZE)
