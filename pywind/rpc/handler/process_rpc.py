@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
-"""提供进程间RPC通信的服务端"""
+"""进程之间的RPC通信"""
 import pywind.evtframework.handler.tcp_handler as tcp_handler
-import pywind.p_rpc.lib.rpc_func as rpc_func
-import pywind.p_rpc.lib.proto as rpc_proto
-import pywind.p_rpc.lib.jsonrpc as jsonrpc
+import pywind.rpc.lib.rpc_func as rpc_func
+import pywind.rpc.lib.proto as rpc_proto
+import pywind.rpc.lib.jsonrpc as jsonrpc
 
 import socket, json
+
+
+class _wrap_socket(object):
+    """进程间通讯协议"""
+    __socket = None
+
+    def __init__(self, s):
+        self.__socket = s
 
 
 class rpcd(tcp_handler.tcp_handler):
@@ -123,3 +131,8 @@ class rpcd(tcp_handler.tcp_handler):
     def tcp_delete(self):
         self.unregister(self.fileno)
         self.socket.close()
+
+
+class rpcc(tcp_handler.tcp_handler):
+    """客户端"""
+    pass
