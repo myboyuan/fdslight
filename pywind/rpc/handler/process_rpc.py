@@ -5,16 +5,6 @@ import pywind.rpc.lib.rpc_func as rpc_func
 import pywind.rpc.lib.proto as rpc_proto
 import pywind.rpc.lib.jsonrpc as jsonrpc
 
-import socket, json
-
-
-class _wrap_socket(object):
-    """进程间通讯协议"""
-    __socket = None
-
-    def __init__(self, s):
-        self.__socket = s
-
 
 class rpcd(tcp_handler.tcp_handler):
     __rpc_func = None
