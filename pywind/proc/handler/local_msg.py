@@ -11,6 +11,15 @@ class _msg_base(tcp_handler.tcp_handler):
         """重写这个方法"""
         pass
 
+    def evt_read(self):
+        try:
+            return super(_msg_base, self).evt_read()
+        except msg_socket.MsgSocketWantReadErr:
+            pass
+
+    def handle_tcp_received_data(self, received_data):
+        pass
+
 
 class _msgs(_msg_base):
     def init_func(self, fileno, cs, address):

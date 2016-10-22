@@ -1,6 +1,10 @@
 import pywind.lib.reader as reader
 
+
 class ProtocolErr(Exception): pass
+
+
+class MsgSocketWantReadErr(Exception): pass
 
 
 class wrap_socket(object):
@@ -64,7 +68,7 @@ class wrap_socket(object):
             if not read_ok:
                 recv_data = callback(*args, **kwargs)
                 self.__reader._putvalue(recv_data)
-                self.__recv_data(callback, *args, **kwargs)
+                raise MsgSocketWantReadErr
 
             result_data = b"".join(self.__received_data)
             self.__reset()
@@ -80,7 +84,7 @@ class wrap_socket(object):
             result_data = b"".join(self.__received_data)
             self.__reset()
             return result_data
-        self.__recv_data(callback, *args, **kwargs)
+        raise MsgSocketWantReadErr
 
     def recv(self, bufsize, *args, **kwargs):
         bufsize += 10

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import pywind.evtframework.handler.handler as handler
-import ssl
 import pywind.lib.reader as reader
 import pywind.lib.writer as writer
 
@@ -82,14 +81,9 @@ class tcp_handler(handler.handler):
                 if not recv_data:
                     self.error()
                     break
-                self.reader._putvalue(recv_data)
+                self.reader._putvalue(self.handle_tcp_received_data(recv_data))
             except BlockingIOError:
                 self.tcp_readable()
-                break
-            except ssl.SSLWantReadError:
-                break
-            except:
-                self.error()
                 break
             ''''''
         return
@@ -116,9 +110,7 @@ class tcp_handler(handler.handler):
                 self.delete_handler(self.fileno)
                 return
             self.tcp_writable()
-        except ssl.SSLWantWriteError:
-            return
-        except:
+        except ConnectionError:
             self.error()
 
     def timeout(self):
@@ -213,3 +205,10 @@ class tcp_handler(handler.handler):
 
     def getpeername(self):
         return self.socket.getpeername()
+
+    def handle_tcp_received_data(self, received_data):
+        """处理刚刚接收过来的数据包,该函数在socket.recv调用之后被调用
+        :param received_data:
+        :return bytes:
+        """
+        return received_data
