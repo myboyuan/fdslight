@@ -1,6 +1,4 @@
-import socket
 import pywind.lib.reader as reader
-
 
 class ProtocolErr(Exception): pass
 
