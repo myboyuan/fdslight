@@ -18,7 +18,8 @@ class _msg_base(tcp_handler.tcp_handler):
             pass
 
     def handle_tcp_received_data(self, received_data):
-        pass
+        self.msg_readable(received_data)
+        return b""
 
 
 class _msgs(_msg_base):
