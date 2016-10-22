@@ -6,7 +6,13 @@ import pywind.proc.lib.msg_socket as msg_socket
 import socket
 
 
-class _msgs(tcp_handler.tcp_handler):
+class _msg_base(tcp_handler.tcp_handler):
+    def msg_readable(self, message):
+        """重写这个方法"""
+        pass
+
+
+class _msgs(_msg_base):
     def init_func(self, fileno, cs, address):
         cs = msg_socket.wrap_socket(cs)
 
@@ -18,11 +24,8 @@ class _msgs(tcp_handler.tcp_handler):
         """重写这个方法"""
         pass
 
-    def tcp_readable(self):
-        pass
 
-
-class msgd(tcp_handler.tcp_handler):
+class msgd(_msg_base):
     """本地进程消息服务端"""
 
     def init_func(self, fileno, addr_family, address):
@@ -37,11 +40,8 @@ class msgd(tcp_handler.tcp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
-    def tcp_accept(self):
-        pass
 
-
-class msgc(tcp_handler.tcp_handler):
+class msgc(_msg_base):
     """本地进程消息客户端"""
 
     def init_func(self, fileno, addr_family, address):
