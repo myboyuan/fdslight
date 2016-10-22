@@ -5,7 +5,7 @@ import pywind.lib.reader as reader
 class ProtocolErr(Exception): pass
 
 
-class msg_socket(socket.socket):
+class wrap_socket(object):
     """进程间通讯协议
     sync_code:8 bytes,每个字节固定为 0x00
     payload_length:2 bytes 内容长度
@@ -20,13 +20,14 @@ class msg_socket(socket.socket):
     __read_length = 0
 
     __received_data = None
+    __socket = None
 
-    def __init__(self, family):
-        super(msg_socket, self).__init__(family, socket.SOCK_STREAM)
+    def __init__(self, s):
         self.__frame_finish = True
         self.__reader = reader.reader()
         self.__sync_code = bytes(8)
         self.__reset()
+        self.__socket = s
 
     def __wrap_sent_data(self, byte_data):
         size = len(byte_data)
@@ -62,7 +63,6 @@ class msg_socket(socket.socket):
         if self.__frame_finish and self.__reader.size() >= 10:
             read_ok, byte_data = self.__parse_recv_data()
             self.__received_data.append(byte_data)
-
             if not read_ok:
                 recv_data = callback(*args, **kwargs)
                 self.__reader._putvalue(recv_data)
@@ -76,6 +76,7 @@ class msg_socket(socket.socket):
         recv_data = callback(*args, **kwargs)
         self.__reader._putvalue(recv_data)
         read_ok, byte_data = self.__parse_recv_data()
+        self.__received_data.append(byte_data)
 
         if read_ok:
             result_data = b"".join(self.__received_data)
@@ -85,17 +86,53 @@ class msg_socket(socket.socket):
 
     def recv(self, bufsize, *args, **kwargs):
         bufsize += 10
-        args = tuple(list(args).insert(0, bufsize))
+        args = list(args)
 
-        return self.__recv_data(super(msg_socket, self).recv, *args, **kwargs)
+        if args:
+            args.insert(0, bufsize)
+        else:
+            args.append(bufsize)
+
+        args = tuple(args)
+
+        return self.__recv_data(self.__socket.recv, *args, **kwargs)
 
     def send(self, byte_data, *args, **kwargs):
         sent_data = self.__wrap_sent_data(byte_data)
 
         return self.__socket.send(sent_data, *args, **kwargs)
 
+    def sendall(self, data, flags=None):
+        sent_data = self.__wrap_sent_data(data)
+
+        return self.__socket.sendall(sent_data, flags=flags)
+
     def __reset(self):
         self.__payload_length = 0
         self.__read_length = 0
         self.__frame_finish = True
         self.__received_data = []
+
+    def bind(self, address):
+        return self.__socket.bind(address)
+
+    def accept(self):
+        return self.__socket.accept()
+
+    def listen(self, backlog):
+        return self.__socket.listen(backlog)
+
+    def connect(self, address):
+        return self.__socket.connect(address)
+
+    def connect_ex(self, address):
+        return self.__socket.connect_ex(address)
+
+    def setblocking(self, flag):
+        return self.__socket.setblocking(flag)
+
+    def setsockopt(self, level, option, value):
+        return self.__socket.setsockopt(level, option, value)
+
+    def settimeout(self, timeout):
+        return self.__socket.settimeout(timeout)
