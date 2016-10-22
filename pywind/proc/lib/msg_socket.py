@@ -38,9 +38,7 @@ class msg_socket(socket.socket):
 
         return sent_data
 
-    def __parse_recv_data(self, byte_data):
-        self.__reader._putvalue(byte_data)
-
+    def __parse_recv_data(self):
         if self.__frame_finish:
             if self.__reader.size() < 10: return (False, b"",)
             sync_code = self.__reader.read(8)
@@ -56,22 +54,40 @@ class msg_socket(socket.socket):
         read_data = self.__reader.read(read_length)
         self.__read_length += read_length
         read_ok = self.__payload_length == self.__read_length
+        self.__frame_finish = read_ok
 
         return (read_ok, read_data,)
 
+    def __recv_data(self, callback, *args, **kwargs):
+        if self.__frame_finish and self.__reader.size() >= 10:
+            read_ok, byte_data = self.__parse_recv_data()
+            self.__received_data.append(byte_data)
+
+            if not read_ok:
+                recv_data = callback(*args, **kwargs)
+                self.__reader._putvalue(recv_data)
+                self.__recv_data(callback, *args, **kwargs)
+
+            result_data = b"".join(self.__received_data)
+            self.__reset()
+
+            return result_data
+
+        recv_data = callback(*args, **kwargs)
+        self.__reader._putvalue(recv_data)
+        read_ok, byte_data = self.__parse_recv_data()
+
+        if read_ok:
+            result_data = b"".join(self.__received_data)
+            self.__reset()
+            return result_data
+        self.__recv_data(callback, *args, **kwargs)
+
     def recv(self, bufsize, *args, **kwargs):
         bufsize += 10
-        recv_data = self.recv(bufsize, *args, **kwargs)
+        args = tuple(list(args).insert(0, bufsize))
 
-        read_ok, byte_data = self.__parse_recv_data()
-        self.__received_data.append(byte_data)
-
-        if not read_ok: self.recv(bufsize, *args, **kwargs)
-
-        ret_data = b"".join(self.__received_data)
-        self.__reset()
-
-        return ret_data
+        return self.__recv_data(super(msg_socket, self).recv, *args, **kwargs)
 
     def send(self, byte_data, *args, **kwargs):
         sent_data = self.__wrap_sent_data(byte_data)
