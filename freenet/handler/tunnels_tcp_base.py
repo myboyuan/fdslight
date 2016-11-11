@@ -126,7 +126,7 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
     __debug = None
     __caddr = None
     __TIMEOUT_NO_AUTH = 10
-    __TIMEOUT = 120
+    __TIMEOUT = 240
 
     __encrypt = None
     __decrypt = None

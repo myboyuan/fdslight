@@ -15,7 +15,7 @@ import pywind.lib.timer as timer
 class tunnelc_tcp_base(tcp_handler.tcp_handler):
     # 验证超时时间
     __AUTH_TIMEOUT = 10
-    __TIMEOUT = 90
+    __TIMEOUT = 180
 
     __encrypt = None
     __decrypt = None
@@ -158,6 +158,7 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         saddr = npkt[12:16]
         self.__timer.set_timeout(saddr, self.__IP_TIMEOUT)
         self.send_message_to_handler(self.fileno, self.__traffic_send_fd, npkt)
+        self.__static_nat.recyle_ips()
 
     def __handle_dns(self, dns_msg):
         self.send_message_to_handler(self.fileno, self.__dns_fd, dns_msg)
