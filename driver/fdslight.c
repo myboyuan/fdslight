@@ -161,13 +161,7 @@ static unsigned int hanle_udp_in(struct iphdr *ip_header)
     return fdsl_push_packet_to_user(ip_header);
 }
 
-static unsigned int handle_sctp_in(struct iphdr *ip_header)
-// 处理SCTP协议
-{
-    return fdsl_push_packet_to_user(ip_header);
-}
-
-static unsigned int handle_ip_and_icmp_in(struct iphdr *ip_header)
+static unsigned int handle_tcp_sctp_icmp_in(struct iphdr *ip_header)
 // TCP和ICMP处理
 {
     unsigned int daddr;
@@ -219,12 +213,14 @@ static unsigned int nf_handle_in(
 	switch(protocol){
 	    case IPPROTO_UDP:
 	        return hanle_udp_in(ip_header);
+	    case IPPROTO_UDPLITE:
+	        return hanle_udp_in(ip_header);
 	    case IPPROTO_TCP:
-	        return handle_ip_and_icmp_in(ip_header);
+	        return handle_tcp_sctp_icmp_in(ip_header);
 	    case IPPROTO_ICMP:
-	        return handle_ip_and_icmp_in(ip_header);
+	        return handle_tcp_sctp_icmp_in(ip_header);
         case IPPROTO_SCTP:
-            return handle_sctp_in(ip_header);
+            return handle_tcp_sctp_icmp_in(ip_header);
 	    default:return NF_ACCEPT;
 	}
 }
