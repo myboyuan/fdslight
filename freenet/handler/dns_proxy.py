@@ -196,8 +196,6 @@ class dnsc_proxy(dns_base):
     __dev_fd = -1
     __tunnel_is_open = False
 
-    # 黑名单的IP大全
-    __blacklist_ips = None
     # 是否是第一次调用
     __is_first = True
     # dns flags集合
@@ -252,7 +250,6 @@ class dnsc_proxy(dns_base):
 
         self.__host_match = _host_match()
         self.__timer = timer.timer()
-        self.__blacklist_ips = {}
         self.__dns_flags = {}
 
         for rule in host_rules: self.__host_match.add_rule(rule)
@@ -290,10 +287,6 @@ class dnsc_proxy(dns_base):
 
         message = bytes(L)
 
-        if not self.__tunnel_is_open:
-            self.__send_to_dns_server(self.__transparent_dns, message)
-            return
-
         msg = dns.message.from_wire(message)
 
         questions = msg.question
@@ -315,9 +308,11 @@ class dnsc_proxy(dns_base):
 
         if pos > 0 and self.__debug: print(host)
         is_match, flags = self.__host_match.match(host)
-        if not is_match or not self.handler_exists(self.__tunnel_fd):
+        if not is_match:
             self.__send_to_dns_server(self.__transparent_dns, message)
             return
+        # 如果隧道没有打开,那么抛弃黑名单内的DNS请求包
+        if not self.__tunnel_is_open: return
 
         self.__dns_flags[n_dns_id] = flags
         self.ctl_handler(self.fileno, self.__tunnel_fd, "request_dns", message)
@@ -333,8 +328,6 @@ class dnsc_proxy(dns_base):
             for cname in rrset:
                 ip = cname.__str__()
                 if not self.__check_ipaddr(ip): continue
-                if ip not in self.__blacklist_ips:
-                    self.__blacklist_ips[ip] = None
                 fdsl_ctl.tf_record_add(self.__dev_fd, utils.ip4s_2_number(ip))
                 ''''''
         self.__send_to_client(byte_data)
