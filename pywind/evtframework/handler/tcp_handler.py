@@ -85,6 +85,10 @@ class tcp_handler(handler.handler):
             except BlockingIOError:
                 self.tcp_readable()
                 break
+            except ConnectionResetError:
+                self.error()
+                break
+
             ''''''
         return
 

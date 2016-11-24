@@ -12,6 +12,8 @@ class dispatcher(object):
     __poll = None
     __timer = None
 
+    __loop_tasks = None
+
     def __init__(self):
         global_vars["pyw.ioevtfw.dispatcher"] = self
 
@@ -36,6 +38,8 @@ class dispatcher(object):
         if self.__timer.exists(fd): self.__timer.drop(fd)
         handler = self.__handlers[fd]
         handler.delete()
+        self.del_loop_task(fd)
+
         del self.__handlers[fd]
 
     def set_timeout(self, fd, seconds):
@@ -81,8 +85,11 @@ class dispatcher(object):
             if wait_time < 1: wait_time = 10
 
             event_set = self.__poll.poll(wait_time)
+
             self.__handle_events(event_set)
             self.__handle_timeout()
+            self.__handle_loop_tasks()
+
             self.myloop()
 
         return
@@ -147,9 +154,24 @@ class dispatcher(object):
             ''''''
         return
 
+    def __handle_loop_tasks(self):
+        if not self.__loop_tasks: return
+        for fileno, _ in self.__loop_tasks.items(): self.get_handler(fileno).task_loop()
+
     def ctl_handler(self, src_fd, dst_fd, cmd, *args, **kwargs):
         if dst_fd not in self.__handlers:
             raise excepts.HandlerNotFoundErr
 
         h = self.get_handler(dst_fd)
         return h.handler_ctl(src_fd, cmd, *args, **kwargs)
+
+    def add_to_loop_task(self, fileno):
+        """加入循环任务,即系统会循环调用handler.task_loop()"""
+        if not self.__loop_tasks: self.__loop_tasks = {}
+        if fileno in self.__loop_tasks: return
+        self.__loop_tasks[fileno] = None
+
+    def del_loop_task(self, fileno):
+        """删除循环任务"""
+        if not self.__loop_tasks: return
+        if fileno in self.__loop_tasks: del self.__loop_tasks[fileno]

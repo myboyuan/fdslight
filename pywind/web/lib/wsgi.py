@@ -76,8 +76,8 @@ class wsgi(object):
 
     def __handle_error(self, status, resp_headers, err_data=""):
         if self.__is_resp_hdr:
-            self.__finish_func()
             sys.stderr.write(err_data.decode())
+            self.__finish_func()
             return
         self.__response_error(status, resp_headers, err_data)
 
@@ -96,20 +96,19 @@ class wsgi(object):
 
     def __response_body(self, body_data):
         if not self.__is_chunked:
-            if self.__resp_content_length == self.__responsed_content_length:
-                self.__is_finish = True
-                return
             n = self.__resp_content_length - self.__responsed_content_length
             resp_data = body_data[0:n]
+
             self.__responsed_content_length += len(resp_data)
             self.__output_body_func(resp_data)
+            if self.__resp_content_length == self.__responsed_content_length: self.__is_finish = True
             return
 
         self.__chunked.input(body_data)
         try:
             self.__chunked.parse()
         except httpchunked.chunkedErr:
-            self.__response_error("500 Internal Server Error", [], traceback.format_exc())
+            self.__handle_error("500 Internal Server Error", [], traceback.format_exc())
             return
 
         chunk_data = self.__chunked.get_chunk_with_length()
@@ -118,7 +117,10 @@ class wsgi(object):
         self.__output_body_func(chunk_data)
 
     def finish(self):
-        if hasattr(self.__app, "close"): self.__app.close()
+        try:
+            if hasattr(self.__app, "close"): self.__app.close()
+        except:
+            self.__handle_error("500 Internal Server Error", [], traceback.format_exc())
 
     def input(self, byte_data):
         # 如果响应结束,那么丢弃所有的数据包
@@ -134,10 +136,16 @@ class wsgi(object):
         if self.__is_finish:
             self.__finish_func()
             return
-        for resp_data in self.__app:
-            if not self.__has_hdr: break
-            if not self.__is_resp_hdr: self.__output_hdr_func(self.__resp_status, self.__resp_headers)
-            self.__response_body(resp_data)
+        try:
+            for resp_data in self.__app:
+                if not self.__has_hdr: continue
+                if not self.__is_resp_hdr:
+                    self.__output_hdr_func(self.__resp_status, self.__resp_headers)
+                    self.__is_resp_hdr = True
+                self.__response_body(resp_data)
+        except:
+            self.__handle_error("500 Internal Server Error", [], traceback.format_exc())
+            return
         if self.__is_finish: self.__finish_func()
         return
 
@@ -145,15 +153,24 @@ class wsgi(object):
         try:
             self.__resp_stcode = int(status[0:3])
         except ValueError:
-            self.__response_error("500 Internal Server Error", [], traceback.format_exc())
+            self.__handle_error("500 Internal Server Error", [], traceback.format_exc())
+            return
+        if self.__resp_stcode < 100:
+            self.__handle_error("500 Internal Server Error", [], "wrong http status code %s" % self.__resp_stcode)
             return
 
-        if self.__resp_stcode in (100, 101, 102,):
+        if self.__resp_stcode >= 100 and self.__resp_stcode < 200:
             self.__output_hdr_func(status, response_headers)
             return
-        if self.__resp_stcode != 200:
+
+        if self.__is_resp_hdr:
+            self.__handle_error("500 Internal Server Error", [], "http header has responsed!")
+            return
+
+        if self.__resp_stcode >= 300:
             self.__output_hdr_func(status, response_headers, )
             self.__is_finish = True
+            self.__is_resp_hdr = True
             return
 
         self.__resp_status = status
@@ -173,4 +190,5 @@ class wsgi(object):
                 self.__is_chunked = True
                 self.__chunked = httpchunked.parser()
                 break
-        return
+        if self.__is_chunked: return
+        if self.__resp_content_length == 0: self.__is_finish = True

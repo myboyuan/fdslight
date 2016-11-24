@@ -134,3 +134,13 @@ class handler(object):
         :return:
         """
         pass
+
+    def add_to_loop_task(self, fileno):
+        self.dispatcher.add_to_loop_task(fileno)
+
+    def del_loop_task(self, fileno):
+        self.dispatcher.del_loop_task(fileno)
+
+    def task_loop(self):
+        """任务循环函数,当把handler加入道task loop,就会循环调用此函数"""
+        pass

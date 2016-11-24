@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import urllib.parse, time, os, random, shutil
+import urllib.parse, time, os, random, hashlib, shutil
 import pywind.lib.reader as reader
 import pywind.web.lib.multipart as http_multipart
 
@@ -68,7 +68,7 @@ class _request(object):
         return self.__kwargs
 
     def __init(self):
-        m = self.environ["REQUEST_METHOD"].lower()
+        m = self.environ["REQUEST_METHOD"].upper()
         if m not in self.__allow_request_methods: raise MethodNotAllowErr("not allow method %s" % m)
         self.__content_length = int(self.environ["CONTENT_LENGTH"])
 
@@ -286,8 +286,6 @@ class _request(object):
 
 class handler(object):
     __wait_sent = None
-    args = None
-    kwargs = None
     __request = None
 
     __is_start_response = False
@@ -354,7 +352,7 @@ class handler(object):
         self.__resp_status = status
 
     def set_header(self, name, value):
-        self.__resp_headers.append(name, value)
+        self.__resp_headers.append((name, value,))
 
     def set_headers(self, seq):
         self.__resp_headers += seq
@@ -370,17 +368,21 @@ class handler(object):
         pass
 
     def __handle(self):
-        if self.__is_start_response and not self.__is_response_header:
-            stcode = int(self.__resp_status[0:3])
-            self.__start_response(self.__resp_status, self.__resp_headers)
-            if stcode not in (100, 101, 102,): self.__is_response_header = True
+        if not self.__is_start_response and not self.request.recv_ok():
+            self.on_recv_stream()
             return
-        if self.__is_start_response and not self.request.recv_ok(): self.on_recv_stream()
-        if self.__is_start_response and self.request.recv_ok(): self.handle()
+        if self.request.recv_ok(): self.handle()
 
     def __iter__(self):
         if not self.__continue: return self
         if not self.__is_finish: self.__handle()
+
+        if self.__is_start_response and not self.__is_response_header:
+            stcode = int(self.__resp_status[0:3])
+            self.__start_response(self.__resp_status, self.__resp_headers)
+            if stcode >= 200:
+                self.__is_response_header = True
+
         return self
 
     def __next__(self):
@@ -406,7 +408,7 @@ class handler(object):
         if self.chunked_response:
             self.__write_chunked(byte_data)
             return
-        if not byte_data: return
+        if byte_data == b"": return
         self.__wait_sent.append(byte_data)
 
     def finish(self, byte_data=b""):
@@ -418,3 +420,26 @@ class handler(object):
         content_length = len(byte_data)
         self.set_header("Content-Length", content_length)
         self.__wait_sent.append(byte_data)
+
+    def get_header_date(self, seconds):
+        """生成WEB常用的GMT时间格式"""
+        return time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime(seconds))
+
+    def get_time_from_header_date(self, s):
+        """把web请求头中的date解析成本地的秒时间"""
+        try:
+            struct_time = time.strptime(s, "%a, %d %b %Y %H:%M:%S GMT")
+        except ValueError:
+            return None
+
+        return time.mktime(time.localtime(time.mktime(struct_time)))
+
+    def calc_file_md5(self, fpath):
+        """计算文件md5"""
+        obj = hashlib.md5()
+        with open(fpath, "rb") as f:
+            while 1:
+                rdata = f.read(8192)
+                if not rdata: break
+                obj.update(rdata)
+        return obj.digest()

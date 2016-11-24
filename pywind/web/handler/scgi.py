@@ -2,7 +2,7 @@
 
 import pywind.evtframework.handler.tcp_handler as tcp_handler
 import pywind.web.lib.wsgi as wsgi
-import socket
+import socket, os, time
 
 
 class scgiErr(Exception): pass
@@ -18,10 +18,16 @@ class scgid_listen(tcp_handler.tcp_handler):
     def init_func(self, creator_fd, configs):
         self.__configs = configs
         self.__max_conns = configs.get("max_conns", 10)
-        s = socket.socket()
-        self.set_socket(s)
+        use_unix_socket = configs.get("use_unix_socket", False)
+        if use_unix_socket:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        else:
+            s = socket.socket()
         listen = configs.get("listen", ("127.0.0.1", 8000,))
 
+        if use_unix_socket and os.path.exists(listen): os.remove(listen)
+
+        self.set_socket(s)
         self.bind(listen)
         return self.fileno
 
@@ -46,6 +52,10 @@ class scgid_listen(tcp_handler.tcp_handler):
         if cmd != "close_conn": return
         self.__current_conns -= 1
 
+    def tcp_delete(self):
+        self.unregister(self.fileno)
+        self.close()
+
 
 class scgid(tcp_handler.tcp_handler):
     __creator = -1
@@ -53,6 +63,7 @@ class scgid(tcp_handler.tcp_handler):
     __timeout = 0
     __header_ok = False
     __wsgi = None
+    __mtime = None
 
     def __parse_scgi_header(self):
         size = self.reader.size()
@@ -112,6 +123,7 @@ class scgid(tcp_handler.tcp_handler):
         self.set_socket(cs)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+        self.__mtime = time.time()
 
         return self.fileno
 
@@ -130,16 +142,25 @@ class scgid(tcp_handler.tcp_handler):
                                 self.__resp_body_data,
                                 self.__finish_request)
         self.__wsgi.input(body_data)
-        self.add_evt_write(self.fileno)
+        self.__mtime = time.time()
+        self.__wsgi.handle()
+        self.add_to_loop_task(self.fileno)
 
     def tcp_writable(self):
-        self.__wsgi.handle()
+        self.__mtime = time.time()
+        self.remove_evt_write(self.fileno)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
 
     def tcp_timeout(self):
-        self.delete_handler(self.fileno)
+        t = time.time()
+
+        if self.__mtime + self.__timeout < t:
+            self.delete_handler(self.fileno)
+            return
+
+        self.set_timeout(self.fileno, self.__timeout)
 
     def tcp_delete(self):
         self.unregister(self.fileno)
@@ -148,18 +169,23 @@ class scgid(tcp_handler.tcp_handler):
 
         if self.__wsgi: self.__wsgi.finish()
 
+    def task_loop(self):
+        self.__wsgi.handle()
+
     def __finish_request(self):
         self.delete_this_no_sent_data()
 
     def __resp_body_data(self, body_data):
+        self.add_evt_write(self.fileno)
         self.writer.write(body_data)
 
     def __resp_header(self, status, resp_headers):
         tmplist = ["Status: %s\r\n" % status, ]
 
         for name, value in resp_headers:
-            sts = "%s: %s\r\n" % (name, value, )
+            sts = "%s: %s\r\n" % (name, value,)
             tmplist.append(sts)
         tmplist.append("\r\n")
 
+        self.add_evt_write(self.fileno)
         self.writer.write("".join(tmplist).encode())
