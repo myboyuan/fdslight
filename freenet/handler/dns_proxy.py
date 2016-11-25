@@ -308,7 +308,6 @@ class dnsc_proxy(dns_base):
 
         if pos > 0 and self.__debug: print(host)
         is_match, flags = self.__host_match.match(host)
-        print(is_match)
         if not is_match:
             self.__send_to_dns_server(self.__transparent_dns, message)
             return
