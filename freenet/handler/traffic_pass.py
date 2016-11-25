@@ -5,21 +5,45 @@ import pywind.evtframework.handler.udp_handler as udp_handler
 import pywind.lib.timer as timer
 import socket, os
 import freenet.lib.fdsl_ctl as fdsl_ctl
-import fdslight_etc.fn_client as fnc_config
-import fdslight_etc.fn_server as fns_config
 import freenet.lib.utils as utils
 import freenet.lib.checksum as checksum
 
 
+class _qos(object):
+    __queue = None
+
+    def __init__(self):
+        self.__queue = {}
+
+    def add_data(self, ip_data):
+        saddr = ip_data[12:16]
+        if saddr not in self.__queue: self.__queue[saddr] = []
+        self.__queue[saddr].append(ip_data)
+
+    def get_data(self):
+        results = []
+        for saddr in self.__queue:
+            t = self.__queue[saddr]
+            if t: results.append(t.pop(0))
+            if not t: del self.__queue[saddr]
+
+        return results
+
+    def has_data(self):
+        return bool(self.__queue)
+
+
 class traffic_read(handler.handler):
-    """读取局域网的需要P2P的源数据包"""
+    """读取局域网的源数据包"""
     __tunnel_fd = -1
+    __qos = None
 
     def init_func(self, creator_fd):
         dev_path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
         fileno = os.open(dev_path, os.O_RDONLY)
 
         self.__tunnel_fd = creator_fd
+        self.__qos = _qos()
 
         self.set_fileno(fileno)
         self.register(self.fileno)
@@ -28,21 +52,32 @@ class traffic_read(handler.handler):
         return self.fileno
 
     def evt_read(self):
-        """最多读取10个数据包,防止陷入死循环"""
-        for i in range(10):
+        sent_list = self.__qos.get_data()
+
+        if not self.handler_exists(self.__tunnel_fd): return
+        for ip_data in sent_list:
+            self.send_message_to_handler(self.fileno, self.__tunnel_fd, ip_data)
+
+        self.add_to_loop_task(self.fileno)
+        """最多读取20个数据包,防止陷入死循环"""
+        for i in range(20):
             try:
                 pkt = os.read(self.fileno, 8192)
             except BlockingIOError:
                 break
-
-            if not self.handler_exists(self.__tunnel_fd): return
             if not pkt: continue
-            self.send_message_to_handler(self.fileno, self.__tunnel_fd, pkt)
+            self.__qos.add_data(pkt)
         return
 
     def delete(self):
         self.unregister(self.fileno)
         os.close(self.fileno)
+
+    def task_loop(self):
+        if not self.__qos.has_data():
+            self.del_loop_task(self.fileno)
+            return
+        self.evt_read()
 
 
 class traffic_send(handler.handler):
