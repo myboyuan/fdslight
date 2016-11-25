@@ -22,10 +22,14 @@ class _qos(object):
 
     def get_data(self):
         results = []
+        names = []
+
         for saddr in self.__queue:
             t = self.__queue[saddr]
             if t: results.append(t.pop(0))
-            if not t: del self.__queue[saddr]
+            if not t: names.append(saddr)
+
+        for saddr in names: del self.__queue[saddr]
 
         return results
 
