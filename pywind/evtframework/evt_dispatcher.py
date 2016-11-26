@@ -156,7 +156,12 @@ class dispatcher(object):
 
     def __handle_loop_tasks(self):
         if not self.__loop_tasks: return
-        for fileno, _ in self.__loop_tasks.items(): self.get_handler(fileno).task_loop()
+        fd_set = []
+        for fileno in self.__loop_tasks: fd_set.append(fileno)
+        for fileno in fd_set:
+            handler = self.get_handler(fileno)
+            handler.task_loop()
+        return
 
     def ctl_handler(self, src_fd, dst_fd, cmd, *args, **kwargs):
         if dst_fd not in self.__handlers:

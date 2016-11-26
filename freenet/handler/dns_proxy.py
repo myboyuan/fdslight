@@ -320,9 +320,6 @@ class dnsc_proxy(dns_base):
     def message_from_handler(self, from_fd, byte_data):
         dns_id = byte_data[0] << 8 | byte_data[1]
         if dns_id not in self.__dns_flags: return
-        if not self.__dns_flags[dns_id] or not self.__tunnel_is_open:
-            self.__send_to_client(byte_data)
-            return
         msg = dns.message.from_wire(byte_data)
         for rrset in msg.answer:
             for cname in rrset:
