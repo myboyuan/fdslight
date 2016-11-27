@@ -62,7 +62,6 @@ class sql_helper(object):
                 break
         tmplist.append(";")
         return "".join(tmplist)
-        return "".join(tmplist)
 
     def append(self, sts):
         self.__data_list.append(" %s" % sts)
