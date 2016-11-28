@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import pywind.lib.timer as timer
-import socket
 import freenet.lib.checksum as checksum
 import freenet.lib.ipaddr as ipaddr
 
