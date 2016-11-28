@@ -32,7 +32,7 @@ class tunnels_udp_base(udp_handler.udp_handler):
     __dns_server = None
     __raw_socket_fd = None
 
-    __ipalloc = None
+    __nat = None
 
     # 允许的客户端
     # {ipaddr:(session_id,{})}
@@ -63,7 +63,7 @@ class tunnels_udp_base(udp_handler.udp_handler):
 
     __debug = False
 
-    def init_func(self, creator_fd, tun_fd, dns_fd, raw_socket_fd, ip_pool, debug=True):
+    def init_func(self, creator_fd, tun_fd, dns_fd, raw_socket_fd, nat, debug=True):
         self.__debug = debug
         config = fns_config.configs
 
@@ -80,7 +80,7 @@ class tunnels_udp_base(udp_handler.udp_handler):
         self.__debug = debug
         self.__sessions = {}
 
-        self.__ipalloc = ip_pool
+        self.__nat = nat
         bind_address = fns_config.configs["udp_listen"]
 
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -163,7 +163,7 @@ class tunnels_udp_base(udp_handler.udp_handler):
         session_cls = self.__sessions[uniq_id]
 
         for client_ip in session_cls.client_ips:
-            self.__ipalloc.put_addr(client_ip)
+            self.__nat.put_addr(client_ip)
             if client_ip in self.__client_info_by_v_ip: del self.__client_info_by_v_ip[client_ip]
 
         udp_nat_map = session_cls.udp_nat_map
@@ -475,12 +475,12 @@ class tunnels_udp_base(udp_handler.udp_handler):
 
         for i in range(n):
             try:
-                ippkt = self.__ipalloc.get_addr()
+                ippkt = self.__nat.get_addr()
             except ipaddr.IpaddrNoEnoughErr:
                 # 回收IP地址
                 for ip in results:
                     pkt = socket.inet_aton(ip)
-                    self.__ipalloc.put_addr(pkt)
+                    self.__nat.put_addr(pkt)
                     results = None
                 break
             results.append(

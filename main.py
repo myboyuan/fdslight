@@ -14,7 +14,7 @@ import freenet.handler.tunnels_tcp_base as ts_tcp_base
 import freenet.handler.tundev as tundev
 import freenet.handler.dns_proxy as dns_proxy
 import freenet.handler.traffic_pass as traffic_pass
-import freenet.lib.ipaddr as ipaddr
+import freenet.lib.static_nat as static_nat
 import time
 
 FDSL_PID_FILE = "fdslight.pid"
@@ -70,7 +70,7 @@ class fdslight(dispatcher.dispatcher):
         if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
 
         subnet = fns_config.configs["subnet"]
-        ip_pool = ipaddr.ip4addr(*subnet)
+        nat=static_nat.nat(subnet)
 
         self.create_poll()
         subnet = fns_config.configs["subnet"]
@@ -79,9 +79,9 @@ class fdslight(dispatcher.dispatcher):
         dns_fd = self.create_handler(-1, dns_proxy.dnsd_proxy, fns_config.configs["dns"])
         raw_socket_fd = self.create_handler(-1, traffic_pass.traffic_send)
 
-        self.create_handler(-1, m.tunnel, tun_fd, dns_fd, raw_socket_fd, ip_pool, debug=self.__debug)
+        self.create_handler(-1, m.tunnel, tun_fd, dns_fd, raw_socket_fd, nat, debug=self.__debug)
         self.create_handler(-1, ts_tcp_base._tunnel_tcp_listen,
-                            tun_fd, dns_fd, raw_socket_fd, ip_pool,
+                            tun_fd, dns_fd, raw_socket_fd, nat,
                             debug=self.__debug)
         self.__mode = "server"
 

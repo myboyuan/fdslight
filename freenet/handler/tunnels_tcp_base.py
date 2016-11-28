@@ -5,7 +5,7 @@ import fdslight_etc.fn_server as fns_config
 import freenet.lib.base_proto.tunnel_tcp as tunnel_tcp
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.checksum as checksum
-import freenet.lib.ipaddr as ipaddr
+import freenet.lib.base_proto.utils as proto_utils
 
 
 class _tunnel_tcp_listen(tcp_handler.tcp_handler):
@@ -15,10 +15,10 @@ class _tunnel_tcp_listen(tcp_handler.tcp_handler):
     __dns_fd = None
 
     __support_protos = (
-        socket.IPPROTO_UDP, socket.IPPROTO_TCP, socket.IPPROTO_ICMP, 132,
+        socket.IPPROTO_UDP, socket.IPPROTO_TCP, socket.IPPROTO_ICMP
     )
     __dns_fd = None
-    __ip_pool = None
+    __nat = None
 
     # 最大连接数
     __max_conns = 10
@@ -27,14 +27,14 @@ class _tunnel_tcp_listen(tcp_handler.tcp_handler):
 
     __raw_socket_fd = -1
 
-    def init_func(self, creator_fd, tun_fd, dns_fd, raw_socket_fd, ip_pool, debug=True):
+    def init_func(self, creator_fd, tun_fd, dns_fd, raw_socket_fd, nat, debug=True):
         self.__debug = debug
         self.__max_conns = fns_config.configs["max_tcp_conns"]
 
         name = "freenet.tunnels.%s" % fns_config.configs["tcp_tunnel"]
         __import__(name)
         self.__module = sys.modules[name]
-        self.__ip_pool = ip_pool
+        self.__nat = nat
 
         self.__tun_fd = tun_fd
         self.__dns_fd = dns_fd
@@ -62,7 +62,7 @@ class _tunnel_tcp_listen(tcp_handler.tcp_handler):
             self.__curr_conns += 1
             self.create_handler(self.fileno, self.__module.tunnel, self.__raw_socket_fd,
                                 self.__tun_fd,
-                                cs, caddr,
+                                cs, caddr, self.__nat,
                                 debug=self.__debug
                                 )
             ''''''
@@ -84,25 +84,8 @@ class _tunnel_tcp_listen(tcp_handler.tcp_handler):
         self.unregister(self.fileno)
         self.close()
 
-    def __get_vlan_ips(self, n):
-        results = []
-        for i in range(n):
-            try:
-                ippkt = self.__ip_pool.get_addr()
-            except ipaddr.IpaddrNoEnoughErr:
-                # 回收IP地址
-                for ip in results:
-                    self.__ip_pool.put_addr(ip)
-                results = []
-                break
-            results.append(ippkt)
-        return results
-
-    def __put_vlan_ips(self, ips):
-        for ip in ips: self.__ip_pool.put_addr(ip)
-
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd not in ("request_dns", "response_dns", "del_conn", "get_vlan_ips", "put_vlan_ips",): return None
+        if cmd not in ("request_dns", "response_dns", "del_conn",): return None
         if cmd == "del_conn": self.__curr_conns -= 1
         if cmd == "request_dns":
             dns_msg, = args
@@ -111,13 +94,6 @@ class _tunnel_tcp_listen(tcp_handler.tcp_handler):
             t_fd, resp_dns_msg, = args
             if not self.handler_exists(t_fd): return None
             self.ctl_handler(self.fileno, t_fd, "response_dns", resp_dns_msg)
-        if cmd == "get_vlan_ips":
-            n, = args
-            return self.__get_vlan_ips(n)
-        if cmd == "put_vlan_ips":
-            ips, = args
-            self.__put_vlan_ips(ips)
-            return
 
         return None
 
@@ -125,24 +101,27 @@ class _tunnel_tcp_listen(tcp_handler.tcp_handler):
 class tunnels_tcp_base(tcp_handler.tcp_handler):
     __debug = None
     __caddr = None
-    __TIMEOUT_NO_AUTH = 10
-    __TIMEOUT = 240
+    __LOOP_TIMEOUT = 10
+
+    # 连接超时
+    __conn_timeout = 1200
+    __conn_time = 0
 
     __encrypt = None
     __decrypt = None
-    __auth_ok = False
 
     __creator_fd = None
-    __is_sent_ping = False
 
     # ip,port到文件描述符的映射
     __udp_natp_to_fd = None
-    __vlan_ips = None
     __traffic_send_fd = -1
     __tun_fd = -1
     __udp_proxy_map = None
 
     __BUFSIZE = 16 * 1024
+    __session_id = None
+
+    __nat = None
 
     def __get_id(self, address):
         """根据地址生成唯一id"""
@@ -175,7 +154,7 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
             fileno = self.__udp_natp_to_fd[uniq_id]
         self.send_message_to_handler(self.fileno, fileno, byte_data)
 
-    def init_func(self, creator_fd, raw_socket_fd, tun_fd, cs, caddr, debug=True):
+    def init_func(self, creator_fd, raw_socket_fd, tun_fd, cs, caddr, nat, debug=True):
         self.__debug = debug
         self.__caddr = caddr
 
@@ -190,16 +169,19 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
         self.__decrypt = crypto.decrypt(*args)
         self.__creator_fd = creator_fd
         self.__traffic_send_fd = raw_socket_fd
-        self.__vlan_ips = []
         self.__udp_natp_to_fd = {}
         self.__tun_fd = tun_fd
+        self.__nat = nat
+        self.__conn_time = time.time()
+
+        self.fn_init()
 
         self.set_socket(cs)
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
-        self.set_timeout(self.fileno, self.__TIMEOUT_NO_AUTH)
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
         self.print_access_log("connect")
 
         return self.fileno
@@ -208,43 +190,23 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
         # 清空还没有发送的数据
         if self.writer.size() > self.__BUFSIZE: self.writer.flush()
         if action == tunnel_tcp.ACT_DATA:
-            if not self.fn_send(pkt_len):
+            if not self.fn_send(self.__session_id,pkt_len):
                 self.delete_handler(self.fileno)
                 return
             ''''''
+        self.__conn_time = time.time()
         sent_data = self.encrypt.build_packet(action, pkt_len, byte_data)
         self.writer.write(sent_data)
         self.add_evt_write(self.fileno)
         self.encrypt.reset()
 
-    def send_auth(self, byte_data):
-        size = len(byte_data)
-        self.__send_data(size, byte_data, action=tunnel_tcp.ACT_AUTH)
-
-    def __send_ping(self):
-        if self.__debug: self.print_access_log("send_ping")
-        self.__send_data(0, b"", action=tunnel_tcp.ACT_PING)
-        self.__is_sent_ping = True
-
-    def __send_pong(self):
-        if self.__debug: self.print_access_log("send_pong")
-        self.__send_data(0, b"", action=tunnel_tcp.ACT_PONG)
-
-    def __handle_data(self, byte_data):
-        # 限制只支持IPv4
-        ip_ver = (byte_data[0] & 0xf0) >> 4
-        if ip_ver != 4: return
+    def __handle_ipv4_data(self, byte_data):
         pkt_len = (byte_data[2] << 8) | byte_data[3]
         if len(byte_data) != pkt_len:
             self.print_access_log("error_pkt_length:real:%s,protocol:%s" % (len(byte_data), pkt_len,))
             self.delete_handler(self.fileno)
             return
-        # 检查客户端的VLAN是否合法
-        src_addr = byte_data[12:16]
-        if not self.__vlan_ips or src_addr not in self.__vlan_ips:
-            self.print_access_log("not_permit_vlan_ip")
-            return
-        if not self.fn_recv(pkt_len):
+        if not self.fn_recv(self.__session_id,pkt_len):
             self.delete_handler(self.fileno)
             return
         protocol = byte_data[9]
@@ -253,33 +215,26 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
             return
         self.send_message_to_handler(self.fileno, self.__tun_fd, byte_data)
 
-    def __handle_auth(self, auth_data):
-        if not self.fn_auth(auth_data):
-            self.print_access_log("auth_failed")
-            self.delete_handler(self.fileno)
-            return
-        self.set_timeout(self.fileno, self.__TIMEOUT)
-        self.print_access_log("auth_ok")
-        self.__auth_ok = True
+    def __handle_data(self, byte_data):
+        ip_ver = (byte_data[0] & 0xf0) >> 4
+        if ip_ver not in (4, 6,): return
+        self.__conn_time = time.time()
 
-    def __handle_ping(self):
-        self.__send_pong()
-
-    def __handle_pong(self):
-        self.__is_sent_ping = False
+        if ip_ver == 4: self.__handle_ipv4_data(byte_data)
 
     def __handle_dns(self, dns_msg):
         self.ctl_handler(self.fileno, self.__creator_fd, "request_dns", dns_msg)
 
-    def __handle_read(self, action, byte_data):
+    def __handle_read(self, session_id, action, byte_data):
         if action not in tunnel_tcp.ACTS:
             self.print_access_log("not_support_action_type")
             return
-        if not self.__auth_ok and action != tunnel_tcp.ACT_AUTH: self.delete_handler(self.fileno)
-        if action == tunnel_tcp.ACT_AUTH: self.__handle_auth(byte_data)
+
+        # 对session的处理
+        if not self.__session_id: self.__session_id = session_id
+        if session_id != self.__session_id: return
+
         if action == tunnel_tcp.ACT_DNS: self.__handle_dns(byte_data)
-        if action == tunnel_tcp.ACT_PING: self.__handle_ping()
-        if action == tunnel_tcp.ACT_PONG: self.__handle_pong()
         if action == tunnel_tcp.ACT_DATA: self.__handle_data(byte_data)
 
     def tcp_readable(self):
@@ -288,7 +243,7 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
         while self.__decrypt.can_continue_parse():
             try:
                 self.__decrypt.parse()
-            except tunnel_tcp.ProtoError:
+            except proto_utils.ProtoError:
                 self.print_access_log("wrong_format_packet")
                 self.delete_handler(self.fileno)
                 return
@@ -314,18 +269,14 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
         self.delete_handler(self.fileno)
 
     def tcp_timeout(self):
-        if self.__auth_ok and self.__is_sent_ping:
-            self.print_access_log("conn_timeout")
+        self.__nat.recycle()
+
+        t = time.time()
+        if t - self.__conn_time > self.__conn_timeout:
             self.delete_handler(self.fileno)
             return
 
-        if not self.__auth_ok:
-            self.print_access_log("auth_timeout")
-            self.delete_handler(self.fileno)
-            return
-
-        self.set_timeout(self.fileno, self.__TIMEOUT)
-        self.__send_ping()
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def tcp_delete(self):
         # 对创建的UDP Handler进行清理
@@ -338,27 +289,22 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
         self.close()
         self.fn_close()
         self.ctl_handler(self.fileno, self.__creator_fd, "del_conn")
-        self.__put_alloc_vlan_ips()
 
     def message_from_handler(self, from_fd, byte_data):
         pkt_len = (byte_data[2] << 8) | byte_data[3]
-        dst_addr = byte_data[16:20]
-        if dst_addr not in self.__vlan_ips: return
         self.__send_data(pkt_len, byte_data, action=tunnel_tcp.ACT_DATA)
 
-    def fn_auth(self, auth_data):
-        """处理验证请求
-        :return Boolean, True表示验证成功,False表示验证失败
-        """
-        return False
+    def fn_init(self):
+        """重写这个方法"""
+        pass
 
-    def fn_recv(self, pkt_len):
+    def fn_recv(self, session_id, pkt_len):
         """处理接收
         ：:return Boolean, True表示继续,False表示不继续执行
         """
         return True
 
-    def fn_send(self, pkt_len):
+    def fn_send(self, session_id, pkt_len):
         """处理发送
         :return Boolean,True表示继续,False表示不继续执行
         """
@@ -392,14 +338,3 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
         echo = "%s        %s        %s" % (text, addr, t)
         print(echo)
         sys.stdout.flush()
-
-    def get_alloc_vlan_ips(self, cnt):
-        """获取分配到的VLAN IP"""
-        self.__vlan_ips = self.ctl_handler(self.fileno, self.__creator_fd, "get_vlan_ips", cnt)
-        ips = []
-        if not self.__vlan_ips: return None
-        for ippkt in self.__vlan_ips: ips.append(socket.inet_ntoa(ippkt))
-        return ips
-
-    def __put_alloc_vlan_ips(self):
-        self.ctl_handler(self.fileno, self.__creator_fd, "put_vlan_ips", self.__vlan_ips)

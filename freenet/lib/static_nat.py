@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import freenet.lib.checksum as checksum
 import freenet.lib.ipaddr as ipaddr
+import pywind.lib.timer as timer
 
 
 class _nat_base(object):
@@ -62,13 +63,21 @@ class _nat_base(object):
         """
         pass
 
+    def recycle(self):
+        """回收资源,重写这个方法"""
+        pass
+
 
 class nat(_nat_base):
     __ip_alloc = None
+    __timer = None
+    # 映射IP的有效时间
+    __VALID_TIME = 900
 
     def __init__(self, subnet):
         super(nat, self).__init__()
         self.__ip_alloc = ipaddr.ip4addr(*subnet)
+        self.__timer = timer.timer()
 
     def get_ippkt2sLan_from_cLan(self, session_id, ippkt):
         clan_saddr = ippkt[12:16]
@@ -80,6 +89,7 @@ class nat(_nat_base):
 
         data_list = list(ippkt)
         checksum.modify_address(slan_saddr, data_list, checksum.FLAG_MODIFY_SRC_IP)
+        self.__timer.set_timeout(slan_saddr,self.__VALID_TIME)
 
         return bytes(data_list)
 
@@ -89,10 +99,16 @@ class nat(_nat_base):
 
         if not clan_addr: return None
 
-        data_list=list(ippkt)
-        checksum.modify_address(clan_addr,data_list,checksum.FLAG_MODIFY_DST_IP)
+        data_list = list(ippkt)
+        checksum.modify_address(clan_addr, data_list, checksum.FLAG_MODIFY_DST_IP)
+        self.__timer.set_timeout(slan_daddr,self.__VALID_TIME)
 
         return bytes(data_list)
 
-
-
+    def recycle(self):
+        names = self.__timer.get_timeout_names()
+        for name in names:
+            if self.__timer.exists(name): self.__timer.drop(name)
+            self.delLan(name)
+            self.__ip_alloc.put_addr(name)
+        return
