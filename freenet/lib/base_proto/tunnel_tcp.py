@@ -1,29 +1,25 @@
 #!/usr/bin/env python3
 """TCP隧道
 协议格式如下:
-version:4bit 协议版本
+session_id:16 byte 会话ID,16 bytes的MD5值
+payload_md5:16 byte 未加密的内容的MD5值
+reverse:4bit 保留
 action:4 bit 包动作
 tot_length: 2 bytes 包的总长度
 real_length: 2 bytes 加密前的长度
 """
-ACT_AUTH = 1
-ACT_PING = 2
-ACT_PONG = 3
-ACT_DATA = 4
-ACT_DNS = 5
+
+ACT_DATA = 1
+ACT_DNS = 2
 
 ACTS = (
-    ACT_AUTH, ACT_PING, ACT_PONG,
     ACT_DATA, ACT_DNS,
 )
 
-MIN_FIXED_HEADER_SIZE = 5
+MIN_FIXED_HEADER_SIZE = 37
 
 import pywind.lib.reader as reader
-
-
-class ProtoError(Exception): pass
-
+import freenet.lib.base_proto.utils as proto_utils
 
 class builder(object):
     __fixed_hdr_size = 0
@@ -31,19 +27,30 @@ class builder(object):
     def __init__(self, fixed_hdr_size):
         self.__fixed_hdr_size = fixed_hdr_size
 
-    def __build_proto_headr(self, tot_len, real_size, action):
+    def __build_proto_headr(self, session_id, payload_m5, tot_len, real_size, action):
+        seq = [
+            session_id, payload_m5,
+        ]
+
         T = (
-            (1 << 4) | (action & 0x0f),
+            action & 0x0f,
             (tot_len & 0xff00) >> 8,
             tot_len & 0x00ff,
             (real_size & 0xff00) >> 8,
             real_size & 0x00ff,
         )
-        return bytes(T)
 
-    def build_packet(self, action, pkt_len, byte_data):
+        seq.append(bytes(T))
+
+        return b"".join(seq)
+
+    def build_packet(self, session_id, action, byte_data):
+        if len(session_id) != 16: raise proto_utils.ProtoError("the size of session_id must be 16")
+
+        pkt_len = len(byte_data)
         tot_len = self.get_payload_length(pkt_len)
-        base_hdr = self.__build_proto_headr(tot_len, pkt_len, action)
+        payload_md5 = proto_utils.calc_content_md5(byte_data)
+        base_hdr = self.__build_proto_headr(session_id, payload_md5, tot_len, pkt_len, action)
 
         e_hdr = self.wrap_header(base_hdr)
         e_body = self.wrap_body(pkt_len, byte_data)
@@ -52,11 +59,11 @@ class builder(object):
 
     def wrap_header(self, base_hdr):
         """重写这个方法"""
-        pass
+        return base_hdr
 
     def wrap_body(self, size, body_data):
         """重写这个方法"""
-        pass
+        return body_data
 
     def reset(self):
         pass
@@ -69,6 +76,8 @@ class builder(object):
 class parser(object):
     __reader = None
     __fixed_hdr_size = MIN_FIXED_HEADER_SIZE
+    __session_id = None
+    __payload_md5 = None
     # 数据负荷大小
     __tot_length = 0
     # 解密后的数据大小
@@ -86,13 +95,15 @@ class parser(object):
         self.__results = []
 
     def __parse_header(self, hdr):
-        n = hdr[0]
-        version = (n & 0xf0) >> 4
-        action = n & 0x0f
-        tot_len = (hdr[1] << 8) | hdr[2]
-        real_size = (hdr[3] << 8) | hdr[4]
+        session_id = hdr[0:16]
+        paylod_md5 = hdr[16:32]
 
-        return (action, tot_len, real_size,)
+        n = hdr[32]
+        action = n & 0x0f
+        tot_len = (hdr[33] << 8) | hdr[34]
+        real_size = (hdr[35] << 8) | hdr[36]
+
+        return (session_id, paylod_md5, action, tot_len, real_size,)
 
     def input(self, byte_data):
         self.__reader._putvalue(byte_data)
@@ -104,7 +115,10 @@ class parser(object):
             if size < self.__tot_length: return
             e_body = self.__reader.read(self.__tot_length)
             body = self.unwrap_body(self.__real_length, e_body)
-            self.__results.append((self.__action, body,))
+
+            if proto_utils.calc_content_md5(body)!=self.__payload_md5:raise proto_utils.ProtoError("data has been modified")
+
+            self.__results.append((self.__session_id, self.__action, body,))
             self.reset()
             return
         if self.__reader.size() < self.__fixed_hdr_size: return
@@ -112,16 +126,17 @@ class parser(object):
         if not hdr:
             self.reset()
             return
+        self.__session_id, self.__payload_md5, \
         self.__action, self.__tot_length, self.__real_length = self.__parse_header(hdr)
         self.__header_ok = True
 
     def unwrap_header(self, header):
         """重写这个方法"""
-        pass
+        return header
 
     def unwrap_body(self, real_size, body_data):
         """重写这个方法"""
-        pass
+        return body_data
 
     def reset(self):
         self.__tot_length = 0

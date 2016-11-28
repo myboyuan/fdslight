@@ -1,28 +1,24 @@
 #!/usr/bin/env python3
 """协议帧格式
-session_id: 2 bytes 会话ID
-real_length:2 bytes 实际的数据长度
-md5-hash:16 bytes 没有分包之前的MD5值
+session_id: 16bytes 会话ID,为MD5值
+packet_md5:16 bytes 没有分包之前的内容MD5值
+tot_len:2 bytes 未分包前的数据长度
+payload_length:2 bytes 实际负载数据长度
 tot_seg: 4 bit 全部的分包个数
 seq: 4 bit 当前分包序号
 reverse:4 bit 保留
 action:4bit 动作
 """
-import hashlib
+import freenet.lib.base_proto.utils as proto_utils
 
-ACT_AUTH = 1
-ACT_PING = 2
-ACT_PONG = 3
-ACT_CLOSE = 4
-ACT_DATA = 5
-ACT_DNS = 6
+ACT_DATA = 1
+ACT_DNS = 2
 
 ACTS = (
-    ACT_AUTH, ACT_PING, ACT_PONG,
-    ACT_CLOSE, ACT_DATA, ACT_DNS,
+    ACT_DATA, ACT_DNS,
 )
 
-MIN_FIXED_HEADER_SIZE = 22
+MIN_FIXED_HEADER_SIZE = 38
 
 
 class builder(object):
@@ -68,16 +64,21 @@ class builder(object):
 
         return (bytes(list_a), bytes(list_b), bytes(csum_list),)
 
-    def __build_proto_header(self, real_size, md5_hash, tot_seg, seq, action):
+    def __build_proto_header(self, session_id, pkt_md5, pkt_len, real_size, tot_seg, seq, action):
         if action not in ACTS: raise ValueError("not support action type")
         L = [
-            (self.__session_id & 0xff00) >> 8, self.__session_id & 0x00ff,
-            (real_size & 0xff00) >> 8, real_size & 0x00ff,
+            session_id, pkt_md5,
         ]
-        L += list(md5_hash)
-        L += [(tot_seg << 4) | seq, action, ]
 
-        return bytes(L)
+        T = [
+            (pkt_len & 0xff00) >> 8, pkt_len & 0x00ff,
+            (real_size & 0xff00) >> 8, real_size & 0x00ff,
+            (tot_seg << 4) | seq, action,
+        ]
+
+        L.append(bytes(T))
+
+        return b"".join(L)
 
     def __get_sent_raw_data(self, data_len, byte_data):
         """获取要发送的原始数据"""
@@ -103,16 +104,18 @@ class builder(object):
             ret_v = tuple(tmplist)
         return ret_v
 
-    def build_packets(self, action, data_len, byte_data):
-        if data_len > 1500: raise ValueError("the value of data must be less than 1500")
+    def build_packets(self, session_id, action, byte_data):
+        if len(session_id) != 16: raise proto_utils.ProtoError("the size of session_id must be 16")
+
+        data_len = len(byte_data)
         data_seq = []
         tmp_t = self.__get_sent_raw_data(data_len, byte_data)
         tot_seq = len(tmp_t)
-        md5_hash = hashlib.md5(byte_data).digest()
+        md5_hash = proto_utils.calc_content_md5(byte_data)
         seq = 1
         for block in tmp_t:
             size = len(block)
-            base_header = self.__build_proto_header(size, md5_hash, tot_seq, seq, action)
+            base_header = self.__build_proto_header(session_id, md5_hash, data_len, size, tot_seq, seq, action)
             e_hdr = self.wrap_header(base_header)
             e_body = self.wrap_body(size, block)
             data_seq.append(b"".join((e_hdr, e_body,)))
@@ -123,7 +126,7 @@ class builder(object):
     def set_max_pkt_size(self, size):
         """单个UDP数据包所能传输的数据大小"""
         min_size = 1000 + self.__fixed_header_size
-        if size < min_size: raise ValueError("the value of size must not be less than %s" % min_size)
+        if size < min_size: raise proto_utils.ProtoError("the value of size must not be less than %s" % min_size)
         self.__block_size = size
 
     def wrap_header(self, base_hdr):
@@ -137,24 +140,6 @@ class builder(object):
     @property
     def fixed_header_size(self):
         return self.__fixed_header_size
-
-    def build_ping(self):
-        """
-        重写这个方法
-        """
-        pass
-
-    def build_pong(self):
-        """
-        重写这个方法
-        """
-        pass
-
-    def build_close(self):
-        """
-        重写这个方法
-         """
-        pass
 
     def reset(self):
         """
@@ -170,8 +155,10 @@ class parser(object):
     # 总共的段数
     __tot_seg = 0
 
+    __pkt_len = 0
+
     def __init__(self, fixed_header_size):
-        if fixed_header_size < MIN_FIXED_HEADER_SIZE: raise ValueError(
+        if fixed_header_size < MIN_FIXED_HEADER_SIZE: raise proto_utils.ProtoError(
             "the header size can not less than %s" % MIN_FIXED_HEADER_SIZE)
 
         self.__fixed_header_size = fixed_header_size
@@ -189,38 +176,49 @@ class parser(object):
         return bytes(tmp_list)
 
     def __parse_header(self, header):
-        session_id = (header[0] << 8) | header[1]
-        real_length = (header[2] << 8) | header[3]
-        pkt_md5 = header[4:20]
-        seg_info = header[20]
+        session_id = header[0:16]
+        pkt_md5 = header[16:32]
+
+        pkt_len = (header[32] << 8) | header[33]
+        payload_len = (header[34] << 8) | header[35]
+
+        seg_info = header[36]
 
         tot_seg = (seg_info & 0xf0) >> 4
         seq = seg_info & 0x0f
-        action = header[21] & 0x0f
+        action = header[37] & 0x0f
 
-        return (session_id, real_length, pkt_md5, tot_seg, seq, action,)
+        return (session_id, pkt_md5, pkt_len, payload_len, tot_seg, seq, action,)
 
-    def __get_ip4_pkt(self, pkt):
-        tot_len = (pkt[2] << 8) | pkt[3]
+    def __get_pkt(self, pkt):
+        if len(pkt) < self.__pkt_len: raise proto_utils.ProtoError("wrong packet length")
 
-        return pkt[0:tot_len]
+        return pkt[0:self.__pkt_len]
 
     def __check_data_is_modify(self, md5, byte_data):
-        n_md5 = hashlib.md5(byte_data).digest()
+        n_md5 = proto_utils.calc_content_md5(byte_data)
         return md5 == n_md5
 
     def parse(self, packet):
         real_header = self.unwrap_header(packet[0:self.__fixed_header_size])
         if not real_header: return
-        session_id, length, pkt_md5, tot_seg, seq, action = self.__parse_header(real_header)
-        real_body = self.unwrap_body(length, packet[self.__fixed_header_size:])
+
+        session_id, pkt_md5, pkt_len, payload_len, tot_seg, seq, action = self.__parse_header(real_header)
+        real_body = self.unwrap_body(payload_len, packet[self.__fixed_header_size:])
+
+        self.__pkt_len = pkt_len
+
         if seq > 3: return None
         # 如果只有一个数据包,那么直接返回
         if tot_seg == 1:
             self.reset()
             if not self.__check_data_is_modify(pkt_md5, real_body): return None
             return (session_id, action, real_body,)
-        if pkt_md5 != self.__pkt_md5 and self.__data_area: self.reset()
+
+        if pkt_md5 != self.__pkt_md5 and self.__data_area:
+            self.reset()
+            return None
+
         # 最大分段只能是3段
         if tot_seg > 3: return None
         self.__data_area[seq] = real_body
@@ -228,13 +226,13 @@ class parser(object):
         if 1 in self.__data_area and 2 in self.__data_area:
             pkt = b"".join((self.__data_area[1], self.__data_area[2],))
             self.reset()
-            body_data = self.__get_ip4_pkt(pkt)
+            body_data = self.__get_pkt(pkt)
             if not self.__check_data_is_modify(pkt_md5, body_data): return None
             return (session_id, action, body_data,)
         if len(self.__data_area) == 2:
             result = self.__get_data_from_raib()
+            body_data = self.__get_pkt(result)
             self.reset()
-            body_data = self.__get_ip4_pkt(result)
             if not self.__check_data_is_modify(pkt_md5, body_data): return None
             return (session_id, action, body_data,)
 
@@ -295,10 +293,11 @@ b = builder(MIN_FIXED_HEADER_SIZE)
 data = list(bytes(1400))
 data.append(69)
 
-edata = b.build_packets(ACT_AUTH, 1401, bytes(data))
+edata = b.build_packets(bytes(16), ACT_DATA, bytes(data))
 edata.pop(1)
+# print(edata)
 
 for t in edata:
     rs = p.parse(t)
-    if rs:print(rs)
+    if rs: print(rs)
 """

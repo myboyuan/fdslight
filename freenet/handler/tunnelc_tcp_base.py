@@ -15,7 +15,7 @@ import pywind.lib.timer as timer
 class tunnelc_tcp_base(tcp_handler.tcp_handler):
     # 验证超时时间
     __AUTH_TIMEOUT = 10
-    __TIMEOUT = 180
+    __TIMEOUT = 20
 
     __encrypt = None
     __decrypt = None
