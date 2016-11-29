@@ -9,24 +9,6 @@ import pywind.lib.timer as timer
 import freenet.lib.checksum as checksum
 
 
-class _udp_session(object):
-    session_id = 0
-    # sent ping计数
-    sent_ping_cnt = 0
-    client_ips = None
-    address = None
-    udp_nat_map = None
-
-    decrypt_m = None
-    encrypt_m = None
-
-    def __init__(self, sec_mod, mod_args):
-        self.client_ips = {}
-        self.udp_nat_map = {}
-        self.decrypt_m = sec_mod.decrypt(*mod_args)
-        self.encrypt_m = sec_mod.encrypt(*mod_args)
-
-
 class tunnels_udp_base(udp_handler.udp_handler):
     __debug = None
     __dns_server = None
@@ -53,7 +35,7 @@ class tunnels_udp_base(udp_handler.udp_handler):
     # 会话检查时间
     __SESSION_CHECK_TIMEOUT = 60
     # 系统轮询检查时间
-    __TIMEOUT = 10
+    __LOOP_TIMEOUT = 10
 
     __tun_fd = -1
     __raw_socket_fd = -1
@@ -90,7 +72,7 @@ class tunnels_udp_base(udp_handler.udp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
-        self.set_timeout(self.fileno, self.__TIMEOUT)
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
         self.__tun_fd = tun_fd
         self.__dns_fd = dns_fd
@@ -122,51 +104,26 @@ class tunnels_udp_base(udp_handler.udp_handler):
 
         self.print_access_log("auth_ok", address)
 
-    def register_session(self, address, ip_set):
+    def register_session(self, session_id, address):
         """ 注册会话
         :param address:客户端地址
         :param ip_set  list(string): 客户端的IP地址集合
         :return Boolean: True 表示注册成功,False表示注册失败
         """
-        tmpdict = {}
-        uniq_id = "%s-%s" % address
-
-        for s in ip_set:
-            ippkt = socket.inet_aton(s)
-            tmpdict[ippkt] = None
-            self.__client_info_by_v_ip[ippkt] = address
 
         session_id = self.__get_session_id()
         if not session_id: return 0
 
-        crypto_args = fns_config.configs["udp_crypto_module"].get("args", ())
-        session_cls = _udp_session(self.__crypto, crypto_args)
-
-        session_cls.session_id = session_id
-        session_cls.client_ips = tmpdict
-        session_cls.address = address
-        session_cls.encrypt_m.set_session_id(session_id)
-
-        self.__sessions[uniq_id] = session_cls
-        self.__timer.set_timeout(uniq_id, self.__SESSION_CHECK_TIMEOUT)
+        self.__sessions[session_id] = {"udp_nat_map": {}, "address": address}
 
         return session_id
 
-    def get_session(self, address):
-        uniq_id = "%s-%s" % address
-        return self.__sessions.get(uniq_id, None)
-
-    def unregister_session(self, address):
+    def unregister_session(self, session_id):
         """注销会话"""
-        uniq_id = "%s-%s" % address
-        if uniq_id not in self.__sessions: return
-        session_cls = self.__sessions[uniq_id]
+        if session_id not in self.__sessions: return
 
-        for client_ip in session_cls.client_ips:
-            self.__nat.put_addr(client_ip)
-            if client_ip in self.__client_info_by_v_ip: del self.__client_info_by_v_ip[client_ip]
-
-        udp_nat_map = session_cls.udp_nat_map
+        session=self.__sessions[session_id]
+        udp_nat_map = session["udp_nat_map"]
 
         dels = []
         for udp_nat_id in udp_nat_map:
@@ -174,50 +131,11 @@ class tunnels_udp_base(udp_handler.udp_handler):
             dels.append(fileno)
         for f in dels: self.delete_handler(f)
 
-        session_cls.udp_nat_map = None
-        self.print_access_log("close", address)
-        self.fn_delete(address)
+        sts="%s:%s" % session["address"]
+        self.print_access_log("close", sts)
+        self.fn_delete(session_id)
 
-        del self.__sessions[uniq_id]
-
-    def __send_ping(self, address):
-        uniq_id = "%s-%s" % address
-        session_cls = self.__sessions[uniq_id]
-        session_cls.sent_ping_cnt += 1
-
-        ping = session_cls.encrypt_m.build_ping()
-        session_cls.encrypt_m.reset()
-
-        if self.__debug: self.print_access_log("send_ping", address)
-
-        self.__timer.set_timeout(uniq_id, self.__SESSION_CHECK_TIMEOUT)
-        self.add_evt_write(self.fileno)
-        self.sendto(ping, address)
-
-    def __send_pong(self, address):
-        uniq_id = "%s-%s" % address
-        session_cls = self.__sessions[uniq_id]
-
-        pong = session_cls.encrypt_m.build_pong()
-        session_cls.encrypt_m.reset()
-
-        if self.__debug: self.print_access_log("send_pong", address)
-        session_cls.sent_ping_cnt = 0
-        self.__timer.set_timeout(uniq_id, self.__SESSION_CHECK_TIMEOUT)
-
-        self.add_evt_write(self.fileno)
-        self.sendto(pong, address)
-
-    def __handle_ping(self, address):
-        if self.__debug: self.print_access_log("received_ping", address)
-        self.__send_pong(address)
-
-    def __handle_pong(self, address):
-        uniq_id = "%s-%s" % address
-        session_cls = self.__sessions[uniq_id]
-        session_cls.sent_ping_cnt = 0
-
-        if self.__debug: self.print_access_log("received_pong", address)
+        del self.__sessions[session_id]
 
     def __handle_dns(self, dns_msg, address):
         uniq_id = "%s-%s" % address
@@ -240,18 +158,14 @@ class tunnels_udp_base(udp_handler.udp_handler):
 
         # print("recv:",byte_data)
         protocol = byte_data[9]
-        # 只支持 ICMP,TCP,UDP,SCTP协议
-        if protocol not in (1, 6, 17, 132,):
-            self.print_access_log("not_support_IP_protocol", address)
-            return
+        # 只支持 ICMP,TCP,UDP协议
+        if protocol not in (1, 6, 17,): return
+        
         pkt_len = (byte_data[2] << 8) | byte_data[3]
 
         if not self.fn_recv(pkt_len, address):
             self.unregister_session(address)
             return
-
-        uniq_id = "%s-%s" % address
-        self.__timer.set_timeout(uniq_id, self.__SESSION_CHECK_TIMEOUT)
 
         if protocol == 17:
             self.__handle_udp_data(byte_data, address)
@@ -317,15 +231,6 @@ class tunnels_udp_base(udp_handler.udp_handler):
 
         self.add_evt_write(self.fileno)
 
-    def send_auth(self, address, byte_data):
-        crypto_args = fns_config.configs["udp_crypto_module"].get("args", ())
-        tmp_encrypt = self.__crypto.encrypt(*crypto_args)
-        pkts = tmp_encrypt.build_packets(tunnel_proto.ACT_AUTH, len(byte_data), byte_data)
-        self.print_access_log("send_auth", address)
-
-        for pkt in pkts: self.sendto(pkt, address)
-        self.add_evt_write(self.fileno)
-
     def udp_readable(self, message, address):
         uniq_id = "%s-%s" % address
         # 不允许的客户端只接丢弃包
@@ -357,10 +262,6 @@ class tunnels_udp_base(udp_handler.udp_handler):
             self.print_access_log("not_permit_session", address)
             return
 
-            # 会话ID与IP地址不一致,删除数据
-        if session_cls.session_id != session_id:
-            self.print_access_log("error_session_code_%s" % session_id, address)
-            return
         if action == tunnel_proto.ACT_DATA:
             # 目前只支持IPv4协议
             ip_ver = (byte_data[0] & 0xf0) >> 4
@@ -370,14 +271,7 @@ class tunnels_udp_base(udp_handler.udp_handler):
             if len(byte_data) < 20:
                 self.print_access_log("error_ip_pkt", address)
                 return
-            src_addr = byte_data[12:16]
-            # 检查客户端是否随意伪造分配到的IP
-            if src_addr not in session_cls.client_ips:
-                self.print_access_log("illegal_client_vlan_ip_%s" % socket.inet_ntoa(src_addr), address)
-                return
 
-        if action == tunnel_proto.ACT_PING: self.__handle_ping(address)
-        if action == tunnel_proto.ACT_PONG: self.__handle_pong(address)
         if action == tunnel_proto.ACT_DATA: self.__handle_data(byte_data, address)
         if action == tunnel_proto.ACT_DNS: self.__handle_dns(byte_data, address)
 
@@ -391,15 +285,9 @@ class tunnels_udp_base(udp_handler.udp_handler):
         names = self.__timer.get_timeout_names()
         for name in names:
             if self.__timer.exists(name): self.__timer.drop(name)
-            if name in self.__sessions:
-                session_cls = self.__sessions[name]
-                if session_cls.sent_ping_cnt > 3:
-                    self.unregister_session(session_cls.address)
-                else:
-                    self.__send_ping(session_cls.address)
-                ''''''
+            if name in self.__sessions: pass
             ''''''
-        self.set_timeout(self.fileno, self.__TIMEOUT)
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def udp_delete(self):
         self.unregister(self.fileno)

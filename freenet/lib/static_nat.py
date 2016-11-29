@@ -49,19 +49,19 @@ class _nat_base(object):
         if slan_addr not in self.__sLan2cLan: return None
         t = self.__sLan2cLan[slan_addr]
 
-        return t["clan_addr"]
+        return t
 
     def get_ippkt2sLan_from_cLan(self, session_id, ippkt):
         """重写这个方法
         把客户端局域网中的数据包转换成服务器虚拟局域网的包
         """
-        pass
+        return b""
 
     def get_ippkt2cLan_from_sLan(self, session_id, ippkt):
         """重写这个方法
         把服务端虚拟局域网中的包转换为客户端局域网中的数据包
         """
-        pass
+        return (bytes(16), b"",)
 
     def recycle(self):
         """回收资源,重写这个方法"""
@@ -89,21 +89,21 @@ class nat(_nat_base):
 
         data_list = list(ippkt)
         checksum.modify_address(slan_saddr, data_list, checksum.FLAG_MODIFY_SRC_IP)
-        self.__timer.set_timeout(slan_saddr,self.__VALID_TIME)
+        self.__timer.set_timeout(slan_saddr, self.__VALID_TIME)
 
         return bytes(data_list)
 
     def get_ippkt2cLan_from_sLan(self, ippkt):
         slan_daddr = ippkt[16:20]
-        clan_addr = self.find_cLanAddr_by_sLanAddr(slan_daddr)
+        rs = self.find_cLanAddr_by_sLanAddr(slan_daddr)
 
-        if not clan_addr: return None
+        if not rs: return None
 
         data_list = list(ippkt)
-        checksum.modify_address(clan_addr, data_list, checksum.FLAG_MODIFY_DST_IP)
-        self.__timer.set_timeout(slan_daddr,self.__VALID_TIME)
+        checksum.modify_address(rs["clan_addr"], data_list, checksum.FLAG_MODIFY_DST_IP)
+        self.__timer.set_timeout(slan_daddr, self.__VALID_TIME)
 
-        return bytes(data_list)
+        return (rs["session_id"], bytes(data_list),)
 
     def recycle(self):
         names = self.__timer.get_timeout_names()
