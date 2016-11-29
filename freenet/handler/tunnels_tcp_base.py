@@ -144,11 +144,8 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
     def __send_data(self, byte_data, action=tunnel_tcp.ACT_DATA):
         # 清空还没有发送的数据
         if self.writer.size() > self.__BUFSIZE: self.writer.flush()
-        if action == tunnel_tcp.ACT_DATA:
-            if not self.fn_send(self.__session_id, len(byte_data)):
-                self.delete_handler(self.fileno)
-                return
-            ''''''
+        if not self.fn_send(self.__session_id, len(byte_data)): return
+
         self.__conn_time = time.time()
         sent_data = self.encrypt.build_packet(self.__session_id, action, byte_data)
         self.writer.write(sent_data)
@@ -159,9 +156,6 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
         pkt_len = (byte_data[2] << 8) | byte_data[3]
         if len(byte_data) != pkt_len:
             self.print_access_log("error_pkt_length:real:%s,protocol:%s" % (len(byte_data), pkt_len,))
-            self.delete_handler(self.fileno)
-            return
-        if not self.fn_recv(self.__session_id, pkt_len):
             self.delete_handler(self.fileno)
             return
         protocol = byte_data[9]
@@ -186,16 +180,20 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
         if ip_ver == 6: self.__handle_ipv6_data_from_tunnel(byte_data)
 
     def __handle_dns_request(self, dns_msg):
-        self.ctl_handler(self.fileno, self.__creator_fd, "request_dns", dns_msg)
+        self.ctl_handler(self.fileno, self.__creator_fd, "request_dns", self.__session_id,dns_msg)
 
     def __handle_read(self, session_id, action, byte_data):
         if action not in tunnel_tcp.ACTS:
             self.print_access_log("not_support_action_type")
             return
-
         # 对session的处理
         if not self.__session_id: self.__session_id = session_id
         if session_id != self.__session_id: return
+
+        if not self.fn_recv(self.__session_id, len(byte_data)):
+            self.delete_handler(self.fileno)
+            return
+
         self.dispatcher.bind_session_id(session_id, self.fileno)
 
         if action == tunnel_tcp.ACT_DNS: self.__handle_dns_request(byte_data)

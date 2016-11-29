@@ -8,7 +8,6 @@ import freenet.lib.static_nat as static_nat
 import freenet.lib.whitelist as udp_whitelist
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.utils as utils
-import freenet.lib.checksum as checksum
 import pywind.lib.timer as timer
 
 
@@ -81,9 +80,7 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         return self.fileno
 
     def __send_data(self, sent_data, action=tunnel_tcp.ACT_DATA):
-        session_id = self.fn_get_session_id()
-
-        sent_pkt = self.__encrypt.build_packet(session_id, action, sent_data)
+        sent_pkt = self.__encrypt.build_packet(self.__session_id, action, sent_data)
         # 丢弃阻塞的包
         if self.writer.size() > self.__BUFSIZE: self.writer.flush()
         self.__encrypt.reset()
@@ -120,6 +117,7 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         ip_ver = (resp_data[0] & 0xf0) >> 4
         if ip_ver not in (4, 6,): return
         if ip_ver == 4: self.__handle_ipv4_data_from_tunnel(resp_data)
+        if ip_ver == 6: self.__handle_ipv6_data_from_tunnel(resp_data)
 
     def __handle_ipv4_data_from_tunnel(self, byte_data):
         data_len = (byte_data[2] << 8) | byte_data[3]
@@ -127,6 +125,9 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         if len(byte_data) != data_len: self.print_access_log(
             "not_equal_pkt_len,real:%s,proto:%s" % (len(byte_data), data_len,))
         self.send_message_to_handler(self.fileno, self.__traffic_send_fd, byte_data)
+
+    def __handle_ipv6_data_from_tunnel(self, byte_data):
+        pass
 
     def __handle_dns(self, dns_msg):
         self.send_message_to_handler(self.fileno, self.__dns_fd, dns_msg)
@@ -139,8 +140,7 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         if action == tunnel_tcp.ACT_DATA: self.__handle_data_from_tunnel(resp_data)
 
     def __send_dns(self, dns_msg):
-        pkt_len = len(dns_msg)
-        self.__send_data(pkt_len, dns_msg, action=tunnel_tcp.ACT_DNS)
+        self.__send_data(dns_msg, action=tunnel_tcp.ACT_DNS)
 
     def tcp_readable(self):
         rdata = self.reader.read()
@@ -219,6 +219,7 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         ip_ver = (byte_data[0] & 0xf0) >> 4
         if ip_ver not in (4, 6,): return
         if ip_ver == 4: self.__handle_ipv4_traffic_from_lan(byte_data)
+        if ip_ver==6:self.__handle_traffic_from_lan(byte_data)
 
     def message_from_handler(self, from_fd, byte_data):
         if from_fd == self.__traffic_fetch_fd:
