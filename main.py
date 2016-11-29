@@ -15,6 +15,8 @@ import freenet.handler.tundev as tundev
 import freenet.handler.dns_proxy as dns_proxy
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.static_nat as static_nat
+import freenet.lib.checksum as checksum
+
 import time
 
 FDSL_PID_FILE = "fdslight.pid"
@@ -55,12 +57,17 @@ class fdslight(dispatcher.dispatcher):
     __dnsc_fd = -1
     __tunnelc = None
     __tunnelc_fd = -1
+
     __raw_socket_fd = -1
+    __raw6_socket_fd = -1
 
     __time = 0
     # 重新建立连接的时间间隔
     __RECONNECT_TIMEOUT = 60
     __mode = ""
+
+    __udp_proxy_sessions = {}
+    __session_bind = {}
 
     def __create_fn_server(self):
 
@@ -70,7 +77,7 @@ class fdslight(dispatcher.dispatcher):
         if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
 
         subnet = fns_config.configs["subnet"]
-        nat=static_nat.nat(subnet)
+        nat = static_nat.nat(subnet)
 
         self.create_poll()
         subnet = fns_config.configs["subnet"]
@@ -79,9 +86,9 @@ class fdslight(dispatcher.dispatcher):
         dns_fd = self.create_handler(-1, dns_proxy.dnsd_proxy, fns_config.configs["dns"])
         raw_socket_fd = self.create_handler(-1, traffic_pass.traffic_send)
 
-        self.create_handler(-1, m.tunnel, tun_fd, dns_fd, raw_socket_fd, nat, debug=self.__debug)
+        self.create_handler(-1, m.tunnel, tun_fd, dns_fd, nat, debug=self.__debug)
         self.create_handler(-1, ts_tcp_base._tunnel_tcp_listen,
-                            tun_fd, dns_fd, raw_socket_fd, nat,
+                            tun_fd, dns_fd, nat,
                             debug=self.__debug)
         self.__mode = "server"
 
@@ -108,7 +115,9 @@ class fdslight(dispatcher.dispatcher):
         blacklist = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
 
         self.__dnsc_fd = self.create_handler(-1, dns_proxy.dnsc_proxy, blacklist, debug=self.__debug)
+
         self.__raw_socket_fd = self.create_handler(-1, traffic_pass.traffic_send)
+        self.__raw6_socket_fd = self.create_handler(-1, traffic_pass.traffic_send, is_ipv6=True)
 
         name_tcp = "freenet.tunnelc.%s" % fnc_config.configs["tcp_tunnel"]
         name_udp = "freenet.tunnelc.%s" % fnc_config.configs["udp_tunnel"]
@@ -170,15 +179,99 @@ class fdslight(dispatcher.dispatcher):
         self.__need_establish_ctunnel = False
 
     def myloop(self):
-        if self.__need_establish_ctunnel:
-            t = time.time() - self.__time
-            if t < self.__RECONNECT_TIMEOUT: return
-            self.__time = time.time()
-            self.__need_establish_ctunnel = False
-            self.__tunnelc_fd = self.create_handler(-1, self.__tunnelc.tunnel,
-                                                    self.__dnsc_fd, self.__raw_socket_fd, [],
-                                                    debug=self.__debug)
         return
+
+    def open_ctunnel(self):
+        pass
+
+    def __create_udp_proxy(self, session_id, saddr, sport, is_ipv6=False):
+        """创建UDP代理,以支持cone nat"""
+        if session_id not in self.__udp_proxy_sessions: self.__udp_proxy_sessions[session_id] = {}
+        t = self.__udp_proxy_sessions[session_id]
+        uniq_id = "%s-%s" % (saddr, sport,)
+
+        if uniq_id in t: return
+        raw_sock_fileno = self.__raw_socket_fd
+        if is_ipv6: raw_sock_fileno = self.__raw6_socket_fd
+
+        fileno = self.create_handler(-1, traffic_pass.udp_proxy,
+                                     raw_sock_fileno, session_id,
+                                     saddr, sport, is_ipv6=is_ipv6
+                                     )
+        t[uniq_id] = fileno
+
+    def del_udp_proxy(self, session_id, saddr, sport):
+        """删除UDP proxy"""
+        if session_id not in self.__udp_proxy_sessions: return
+        uniq_id = "%s-%s" % (saddr, sport,)
+        t = self.__udp_proxy_sessions[session_id]
+        if uniq_id not in t: return
+        del t[uniq_id]
+        if not t: del self.__udp_proxy_sessions[session_id]
+
+    def __send_ipv4_msg_to_udp_proxy(self, session_id, message):
+        length = (message[2] << 3) | message[3]
+        msg_len = len(message)
+        if msg_len < 21: return
+        if length != len(message): return
+
+        ihl = (message[0] & 0x0f) * 4
+        offset = ((message[6] & 0x1f) << 5) | message[7]
+
+        # 说明不是第一个数据分包,那么就直接发送给raw socket
+        if offset:
+            L = list(message)
+            checksum.modify_address(b"\0\0\0\0", L, checksum.FLAG_MODIFY_SRC_IP)
+            self.send_message_to_handler(self.fileno, self.__raw_socket_fd, bytes(L))
+            return
+
+        b, e = (ihl, ihl + 1,)
+        sport = (message[b] << 8) | message[e]
+        saddr = message.inet_ntoa(message[12:16])
+
+        if not self.__udp_proxy_exists(session_id, saddr, sport):
+            self.__create_udp_proxy(session_id, saddr, sport)
+        fileno = self.__get_udp_proxy(session_id, saddr, sport)
+        self.send_message_to_handler(-1, fileno, message)
+
+    def __send_ipv6_msg_to_udp_proxy(self, session_id, message):
+        pass
+
+    def bind_session_id(self, session_id, fileno):
+        """把session_id和fileno绑定起来"""
+        self.__session_bind[session_id] = fileno
+
+    def unbind_session_id(self, session_id):
+        if session_id not in self.__session_bind: return
+        del self.__session_bind[session_id]
+
+    def send_msg_to_udp_proxy(self, session_id, message):
+        """发送消息到UDP PROXY"""
+        version = (message[0] & 0xf0) >> 4
+        if version not in (4, 6,): return
+        if session_id not in self.__session_bind: return
+        if version == 4: self.__send_ipv4_msg_to_udp_proxy(session_id, message)
+        if version == 6: self.__send_ipv6_msg_to_udp_proxy(session_id, message)
+
+    def __udp_proxy_exists(self, session_id, saddr, sport):
+        if session_id not in self.__udp_proxy_sessions: return False
+        uniq_id = "%s-%s" % (saddr, sport,)
+        t = self.__udp_proxy_sessions[session_id]
+        if uniq_id not in t: return False
+        return True
+
+    def __get_udp_proxy(self, session_id, saddr, sport):
+        if session_id not in self.__udp_proxy_sessions: return None
+        uniq_id = "%s-%s" % (saddr, sport,)
+        t = self.__udp_proxy_sessions[session_id]
+        if uniq_id not in t: return None
+        return t[uniq_id]
+
+    def send_msg_to_handler_from_udp_proxy(self, session_id, msg):
+        if session_id not in self.__session_bind: return
+        fileno = self.__session_bind[session_id]
+        if not self.handler_exists(fileno): return
+        self.ctl_handler(-1, fileno, "msg_from_udp_proxy", session_id, msg)
 
 
 def stop_service():
@@ -268,5 +361,6 @@ def main():
         sys.stderr.close()
 
     return
+
 
 if __name__ == '__main__': main()

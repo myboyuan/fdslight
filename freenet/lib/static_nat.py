@@ -112,3 +112,6 @@ class nat(_nat_base):
             self.delLan(name)
             self.__ip_alloc.put_addr(name)
         return
+
+
+class nat6(_nat_base): pass

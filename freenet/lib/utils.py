@@ -6,7 +6,6 @@ import freenet.lib.fn_utils as fn_utils
 
 __IP_HDR_SIZE = 20
 
-
 def build_ip_packet(pkt_len, protocol, saddr, daddr, message, pkt_id=1, flags_df=0, flags_mf=0, offset=0):
     """创建IP数据包
     :param pkt_len:包长度
@@ -65,7 +64,7 @@ def build_ip_packet(pkt_len, protocol, saddr, daddr, message, pkt_id=1, flags_df
     return b"".join((bytes(L), message,))
 
 
-def build_udp_packet(saddr, daddr, sport, dport, message, mtu=1500):
+def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500):
     """构建UDP数据包"""
     if mtu > 1500 or mtu < 576: raise ValueError("the value of mtu is wrong!")
     msg_len = 8 + len(message)

@@ -21,10 +21,11 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
     __debug = None
     __static_nat = None
     __udp_whitelist = None
-    __udp_proxy_map = None
 
     __traffic_fetch_fd = -1
     __traffic_send_fd = -1
+    __traffic6_send_fd = -1
+
     __dns_fd = -1
 
     __timer = None
@@ -33,7 +34,9 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
     __udp_no_proxy_clients = None
     __BUFSIZE = 16 * 1024
 
-    def init_func(self, creator_fd, dns_fd, raw_socket_fd, whitelist, debug=False):
+    __session_id = None
+
+    def init_func(self, creator_fd, dns_fd, raw_socket_fd, raw6_socket_fd, whitelist, debug=False):
         taddr = fnc_config.configs["tcp_server_address"]
         s = socket.socket()
 
@@ -54,8 +57,8 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         self.__static_nat = static_nat.nat()
         self.__dns_fd = dns_fd
         self.__traffic_send_fd = raw_socket_fd
+        self.__traffic6_send_fd = raw6_socket_fd
         self.__timer = timer.timer()
-        self.__udp_proxy_map = {}
 
         # 如果是非全局UDP代理,那么开启UDP白名单模式
         if not fnc_config.configs["udp_global"]:
@@ -95,6 +98,7 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         n = utils.ip4s_2_number(self.getpeername()[0])
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
 
+        self.__session_id = self.fn_get_session_id()
         self.dispatcher.ctunnel_ok()
 
         self.ctl_handler(self.fileno, self.__dns_fd, "as_tunnel_fd")
@@ -133,37 +137,6 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
             return
         if action == tunnel_tcp.ACT_DNS: self.__handle_dns(resp_data)
         if action == tunnel_tcp.ACT_DATA: self.__handle_data_from_tunnel(resp_data)
-
-    def __get_id(self, address):
-        """根据地址生成唯一id"""
-        return "%s-%s" % address
-
-    def __local_udp_proxy_for_send(self, byte_data):
-        """当地UDP代理,该代理不经过加密隧道"""
-        ihl = (byte_data[0] & 0x0f) * 4
-        offset = ((byte_data[6] & 0x1f) << 5) | byte_data[7]
-
-        # 说明不是第一个数据分包,那么就直接发送给raw socket
-        if offset:
-            L = list(byte_data)
-            checksum.modify_address(b"\0\0\0\0", L, checksum.FLAG_MODIFY_SRC_IP)
-            self.send_message_to_handler(self.fileno, self.__traffic_send_fd, bytes(L))
-            return
-
-        b, e = (ihl, ihl + 1,)
-        sport = (byte_data[b] << 8) | byte_data[e]
-        saddr = socket.inet_ntoa(byte_data[12:16])
-        uniq_id = self.__get_id((saddr, sport,))
-
-        fileno = 0
-        if uniq_id not in self.__udp_proxy_map:
-            fileno = self.create_handler(self.fileno, traffic_pass.udp_proxy,
-                                         self.__traffic_send_fd, (saddr, sport,),
-                                         uniq_id)
-            self.__udp_proxy_map[uniq_id] = fileno
-        else:
-            fileno = self.__udp_proxy_map[uniq_id]
-        self.send_message_to_handler(self.fileno, fileno, byte_data)
 
     def __send_dns(self, dns_msg):
         pkt_len = len(dns_msg)
@@ -217,13 +190,10 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         sys.stdout.flush()
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd not in ("request_dns", "udp_nat_del"): return
+        if cmd not in ("request_dns",): return
         if cmd == "request_dns":
             dns_msg, = args
             self.__send_dns(dns_msg)
-        if cmd == "udp_nat_del":
-            uniq_id, lan_addr = args
-            if uniq_id in self.__udp_proxy_map: del self.__udp_proxy_map[uniq_id]
         return
 
     def __handle_ipv4_traffic_from_lan(self, byte_data):
@@ -237,10 +207,13 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         # 处理UDP代理
         if protocol == 17 and not fnc_config.configs["udp_global"] and not udp_proxy:
             if self.__udp_whitelist.find(byte_data[16:20]) or (saddr in self.__udp_no_proxy_clients):
-                self.__local_udp_proxy_for_send(byte_data)
+                self.dispatcher.send_msg_to_udp_proxy(self.__session_id, byte_data)
                 return
             ''''''
         self.__send_data(byte_data)
+
+    def __handle_ipv6_traffic_from_lan(self, byte_data):
+        pass
 
     def __handle_traffic_from_lan(self, byte_data):
         ip_ver = (byte_data[0] & 0xf0) >> 4

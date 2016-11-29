@@ -90,11 +90,14 @@ class traffic_send(handler.handler):
     __sent = None
     __socket = None
 
-    def init_func(self, creator_fd):
+    def init_func(self, creator_fd, is_ipv6=False):
         self.__creator_fd = creator_fd
         self.__sent = []
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_RAW,
+        family = socket.AF_INET
+        if is_ipv6: family = socket.AF_INET6
+
+        s = socket.socket(family, socket.SOCK_RAW,
                           socket.IPPROTO_UDP | socket.IPPROTO_ICMP | socket.IPPROTO_UDP)
         s.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
         s.setblocking(0)
@@ -154,59 +157,81 @@ class traffic_send(handler.handler):
 
 
 class udp_proxy(udp_handler.udp_handler):
-    __creator_fd = -1
     __bind_address = None
-
     __lan_address = None
     __internet_ip = None
 
     # UDP会话超时时间,如果超过这个时间,将从认证会话中删除
-    __UDP_SESSION_TIMEOUT = 180
+    __UDP_SESSION_TIMEOUT = 300
     # handler超时时间
-    __TIMEOUT = 10
+    __LOOP_TIMEOUT = 10
 
     __timer = None
 
-    # 会话uniq id,指明是哪个客户端创建的
-    __session_uniq_id = None
+    # id号,用以对数据包进行区分
+    __uniq_id = None
 
     __raw_socket_fd = -1
+    __is_ipv6 = False
 
-    def init_func(self, creator_fd, raw_socket_fd, vlan_address, session_uniq_id):
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    __ipaddr = None
+    __port = None
 
-        self.__creator_fd = creator_fd
+    def init_func(self, creator_fd, raw_socket_fd, uniq_id, ipaddr, port, is_ipv6=False):
+        family = socket.AF_INET
+        if is_ipv6: family = socket.AF_INET6
+
+        s = socket.socket(family, socket.SOCK_DGRAM)
+
         self.set_socket(s)
-        self.bind(("0.0.0.0", 0))
+
+        if is_ipv6:
+            self.bind(("::", 0))
+        else:
+            self.bind(("0.0.0.0", 0))
+
         self.__bind_address = self.getsockname()
         self.__internet_ip = {}
         self.__raw_socket_fd = raw_socket_fd
 
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+        self.__timer = timer.timer()
+        self.__uniq_id = uniq_id
+        self.__is_ipv6 = is_ipv6
+        self.__ipaddr = ipaddr
+        self.__port = port
+
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
-
-        self.set_timeout(self.fileno, self.__TIMEOUT)
-        self.__timer = timer.timer()
-        self.__lan_address = vlan_address
-        self.__session_uniq_id = session_uniq_id
 
         return self.fileno
 
     def udp_readable(self, message, address):
         if not self.__lan_address: return
-        if not self.handler_exists(self.__creator_fd): return
         saddr, sport = address
 
         # 检查源IP是否合法,如果客户机没有发送过,那么丢弃这个UDP包
         if saddr not in self.__internet_ip: return
 
-        daddr, dport = self.__lan_address
-        n_saddr = socket.inet_aton(saddr)
-        n_daddr = socket.inet_aton(daddr)
+        if self.__is_ipv6:
+            family = socket.AF_INET6
+        else:
+            family = socket.AF_INET
 
-        udp_packets = utils.build_udp_packet(n_saddr, n_daddr, sport, dport, message)
+        n_saddr = socket.inet_pton(family, saddr)
+        n_daddr = socket.inet_aton(family, self.__ipaddr)
 
-        for udp_pkt in udp_packets: self.send_message_to_handler(self.fileno, self.__creator_fd, udp_pkt)
+        # 预留IPv6接口
+        if self.__is_ipv6:
+            return
+        else:
+            udp_packets = utils.build_udp_packets(n_saddr, n_daddr, sport, self.__port, message)
+
+        for udp_pkt in udp_packets:
+            self.dispatcher.send_msg_to_handler_from_udp_proxy(
+                self.__uniq_id, udp_pkt
+            )
+        return
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
@@ -221,12 +246,7 @@ class udp_proxy(udp_handler.udp_handler):
         pkt_list[10:12] = ((new_csum & 0xff00) >> 8, new_csum & 0x00ff,)
         pkt_list[12:16] = new_ip_pkt
 
-    def message_from_handler(self, from_fd, byte_data):
-        """接收到的数据是IP数据包"""
-        version = (byte_data[0] & 0xf0) >> 4
-        # 目前只支持IPv4
-        if version != 4: return
-
+    def __handle_ipv4_data_for_send(self, byte_data):
         ihl = (byte_data[0] & 0x0f) * 4
         bind_addr, bind_port = self.__bind_address
         bind_addr_pkt = socket.inet_aton(bind_addr)
@@ -270,12 +290,23 @@ class udp_proxy(udp_handler.udp_handler):
         self.send_message_to_handler(self.fileno, self.__raw_socket_fd, message)
         return
 
+    def __handle_ipv6_data_for_send(self, byte_data):
+        pass
+
+    def message_from_handler(self, from_fd, byte_data):
+        """接收到的数据是IP数据包"""
+        version = (byte_data[0] & 0xf0) >> 4
+        if version not in (4, 6,): return
+        if version == 4 and self.__is_ipv6: return
+        if version == 6 and not self.__is_ipv6: return
+        if version == 4: self.__handle_ipv4_data_for_send(byte_data)
+        if version == 6: self.__handle_ipv6_data_for_send(byte_data)
+
     def udp_error(self):
         self.delete_handler(self.fileno)
 
     def udp_delete(self):
-        if self.handler_exists(self.__creator_fd):
-            self.ctl_handler(self.fileno, self.__creator_fd, "udp_nat_del", self.__session_uniq_id, self.__lan_address)
+        self.dispatcher.del_udp_proxy(self.__uniq_id, self.__ipaddr, self.__port)
         self.unregister(self.fileno)
         self.socket.close()
 
@@ -290,6 +321,6 @@ class udp_proxy(udp_handler.udp_handler):
     def udp_timeout(self):
         self.__clear_timeout_session()
         if self.__internet_ip:
-            self.set_timeout(self.fileno, self.__TIMEOUT)
+            self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
             return
         self.delete_handler(self.fileno)
