@@ -501,25 +501,25 @@ class tunnels_udp_base(udp_handler.udp_handler):
         """
         return True
 
-    def fn_recv(self, data_len, address):
+    def fn_recv(self, data_len, session_id):
         """接收客户端数据的时候调用此函数
         :param data_len: 数据长度
-        :param address: 客户端地址
+        :param session_id: 会话ID
         :return Boolean: True表示继续执行,False表示中断执行
         """
         return True
 
-    def fn_send(self, data_len, address):
+    def fn_send(self, data_len, session_id):
         """发送数据的时候调用此函数
         :param data_len: 数据长度
-        :param address: 目标地址
+        :param address: 会话ID
         :return Boolean: True表示继续执行,False表示中断执行
         """
         return True
 
-    def fn_delete(self, address):
+    def fn_delete(self, session_id):
         """删除会话的时候会调用此函数,用于资源的释放
-        :param address :客户端地址
+        :param session_id:会话ID
         """
         pass
 
