@@ -6,35 +6,40 @@ import freenet.lib.base_proto.tunnel_tcp as tunnel_tcp
 import freenet.lib.base_proto.utils as proto_utils
 
 
-class _tunnel_tcp_listen(tcp_handler.tcp_handler):
+class tunnel_tcp_listener(tcp_handler.tcp_handler):
     __debug = None
     __module = None
     __tun_fd = -1
-    __dns_fd = None
+    __tun6_fd = -1
 
     __dns_fd = None
-    __nat = None
 
     # 最大连接数
     __max_conns = 10
     # 当前连接数
     __curr_conns = 0
 
-    def init_func(self, creator_fd, tun_fd, dns_fd, nat, debug=True):
+    __auth_module = None
+
+    def init_func(self, creator_fd, tun_fd, tun6_fd, dns_fd, auth_module, debug=True, is_ipv6=False):
         self.__debug = debug
         self.__max_conns = fns_config.configs["max_tcp_conns"]
 
-        name = "freenet.tunnels.%s" % fns_config.configs["tcp_tunnel"]
-        __import__(name)
-        self.__module = sys.modules[name]
-        self.__nat = nat
-
         self.__tun_fd = tun_fd
+        self.__tun6_fd = tun6_fd
+
         self.__dns_fd = dns_fd
 
-        s = socket.socket()
+        if is_ipv6:
+            s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+            bind = fns_config.configs["tcp6_listen"]
+        else:
+            s = socket.socket()
+            bind = fns_config.configs["tcp_listen"]
+
+        self.__auth_module = auth_module
         self.set_socket(s)
-        self.bind(fns_config.configs["tcp_listen"])
+        self.bind(bind)
 
         self.listen(10)
         self.register(self.fileno)
@@ -52,10 +57,9 @@ class _tunnel_tcp_listen(tcp_handler.tcp_handler):
                 cs.close()
                 return
             self.__curr_conns += 1
-            self.create_handler(self.fileno, self.__module.tunnel,
-                                self.__tun_fd,
-                                cs, caddr, self.__nat,
-                                debug=self.__debug
+            self.create_handler(self.fileno, tunnels_tcp_handler,
+                                self.__tun_fd, self.__tun6_fd,
+                                cs, caddr, self.__auth_module, debug=self.__debug
                                 )
             ''''''
         return
@@ -90,7 +94,7 @@ class _tunnel_tcp_listen(tcp_handler.tcp_handler):
         return None
 
 
-class tunnels_tcp_base(tcp_handler.tcp_handler):
+class tunnels_tcp_handler(tcp_handler.tcp_handler):
     __debug = None
     __caddr = None
     __LOOP_TIMEOUT = 10
@@ -104,32 +108,36 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
 
     __creator_fd = None
 
-    __traffic_send_fd = -1
     __tun_fd = -1
+    __tun6_fd = -1
+
     __BUFSIZE = 16 * 1024
     __session_id = None
 
-    __nat = None
+    __auth_module = None
 
-    def init_func(self, creator_fd, tun_fd, cs, caddr, nat, debug=True):
+    def init_func(self, creator_fd, tun_fd, tun6_fd, cs, caddr, auth_module, debug=True):
         self.__debug = debug
         self.__caddr = caddr
+        self.__auth_module = auth_module
 
         name = "freenet.lib.crypto.%s" % fns_config.configs["tcp_crypto_module"]["name"]
         __import__(name)
 
         crypto = sys.modules[name]
 
-        args = fns_config.configs["tcp_crypto_module"]["args"]
+        crypto_config = fns_config.configs["tcp_crypto_module"]["configs"]
 
-        self.__encrypt = crypto.encrypt(*args)
-        self.__decrypt = crypto.decrypt(*args)
+        self.__encrypt = crypto.encrypt()
+        self.__decrypt = crypto.decrypt()
+
+        self.__encrypt.config(crypto_config)
+        self.__decrypt.config(crypto_config)
+
         self.__creator_fd = creator_fd
         self.__tun_fd = tun_fd
-        self.__nat = nat
+        self.__tun6_fd = tun6_fd
         self.__conn_time = time.time()
-
-        self.fn_init()
 
         self.set_socket(cs)
 
@@ -144,7 +152,7 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
     def __send_data(self, byte_data, action=tunnel_tcp.ACT_DATA):
         # 清空还没有发送的数据
         if self.writer.size() > self.__BUFSIZE: self.writer.flush()
-        if not self.fn_send(self.__session_id, len(byte_data)): return
+        if not self.__auth_module.handle_send(self.__session_id, len(byte_data)): return
 
         self.__conn_time = time.time()
         sent_data = self.encrypt.build_packet(self.__session_id, action, byte_data)
@@ -154,10 +162,12 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
 
     def __handle_ipv4_data_from_tunnel(self, byte_data):
         pkt_len = (byte_data[2] << 8) | byte_data[3]
+
         if len(byte_data) != pkt_len:
             self.print_access_log("error_pkt_length:real:%s,protocol:%s" % (len(byte_data), pkt_len,))
             self.delete_handler(self.fileno)
             return
+
         protocol = byte_data[9]
 
         if protocol not in (1, 6, 17,): return
@@ -165,8 +175,8 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
             self.dispatcher.send_msg_to_udp_proxy(self.__session_id, byte_data)
             return
 
-        msg = self.__nat.get_ippkt2sLan_from_cLan(self.__session_id, byte_data)
-        self.send_message_to_handler(self.fileno, self.__tun_fd, msg)
+        self.ctl_handler(self.fileno, self.__tun_fd, "set_packet_session_id", self.__session_id)
+        self.send_message_to_handler(self.fileno, self.__tun_fd, byte_data)
 
     def __handle_ipv6_data_from_tunnel(self):
         pass
@@ -180,7 +190,7 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
         if ip_ver == 6: self.__handle_ipv6_data_from_tunnel(byte_data)
 
     def __handle_dns_request(self, dns_msg):
-        self.ctl_handler(self.fileno, self.__creator_fd, "request_dns", self.__session_id,dns_msg)
+        self.ctl_handler(self.fileno, self.__creator_fd, "request_dns", self.__session_id, dns_msg)
 
     def __handle_read(self, session_id, action, byte_data):
         if action not in tunnel_tcp.ACTS:
@@ -190,11 +200,15 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
         if not self.__session_id: self.__session_id = session_id
         if session_id != self.__session_id: return
 
-        if not self.fn_recv(self.__session_id, len(byte_data)):
+        if not self.__auth_module.handle_recv(self.__session_id, len(byte_data)):
             self.delete_handler(self.fileno)
             return
 
-        self.dispatcher.bind_session_id(session_id, self.fileno)
+        if self.dispatcher.is_bind_session(session_id):
+            # 如果之前绑定了会话,那么删除之前的连接
+            fileno, other = self.dispatcher.get_bind_session(session_id)
+            if other != "udp" and fileno != self.fileno: self.delete_handler(fileno)
+        self.dispatcher.bind_session_id(session_id, self.fileno, "tcp")
 
         if action == tunnel_tcp.ACT_DNS: self.__handle_dns_request(byte_data)
         if action == tunnel_tcp.ACT_DATA: self.__handle_data_from_tunnel(byte_data)
@@ -232,12 +246,11 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
         self.delete_handler(self.fileno)
 
     def tcp_timeout(self):
-        self.__nat.recycle()
         t = time.time()
         if t - self.__conn_time > self.__conn_timeout:
             self.delete_handler(self.fileno)
             return
-        self.fn_timeout(self.__session_id)
+        self.__auth_module.handle_timing_task(self.__session_id)
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def tcp_delete(self):
@@ -246,52 +259,24 @@ class tunnels_tcp_base(tcp_handler.tcp_handler):
         self.print_access_log("conn_close")
         self.unregister(self.fileno)
         self.close()
-        self.fn_close(self.__session_id)
+        self.__auth_module.handle_close(self.__session_id)
         self.ctl_handler(self.fileno, self.__creator_fd, "del_conn")
 
     def message_from_handler(self, from_fd, byte_data):
-        rs = self.__nat.get_ippkt2cLan_from_sLan(byte_data)
-        if not rs: return
-
-        session_id, msg = rs
-        self.__send_data(msg, action=tunnel_tcp.ACT_DATA)
-
-    def fn_init(self):
-        """重写这个方法"""
-        pass
-
-    def fn_recv(self, session_id, pkt_len):
-        """处理接收
-        ：:return Boolean, True表示继续,False表示不继续执行
-        """
-        return True
-
-    def fn_send(self, session_id, pkt_len):
-        """处理发送
-        :return Boolean,True表示继续,False表示不继续执行
-        """
-        return True
-
-    def fn_close(self, session_id):
-        """处理连接关闭
-        :return:
-        """
-        return
-
-    def fn_timeout(self, session_id):
-        """用来处理定时任务"""
-        pass
+        self.__send_data(byte_data, action=tunnel_tcp.ACT_DATA)
 
     def __send_dns(self, byte_data):
         if self.__debug: self.print_access_log("send_dns")
         self.__send_data(byte_data, action=tunnel_tcp.ACT_DNS)
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd not in ("response_dns", "msg_from_udp_proxy",): return False
+        if cmd not in ("response_dns", "msg_from_udp_proxy", "set_packet_session_id",): return False
         if cmd == "response_dns":
             dns_msg, = args
             self.__send_dns(dns_msg)
             return
+        if cmd == "set_packet_session_id": return
+
         session_id, msg = args
         self.__send_data(msg)
 

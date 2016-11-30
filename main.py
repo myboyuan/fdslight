@@ -3,20 +3,12 @@ import signal, sys, os, getopt
 
 d = os.path.dirname(sys.argv[0])
 sys.path.append(d)
-pid_dir = "/tmp"
+pid_dir = "/var/log "
 
 import pywind.evtframework.evt_dispatcher as dispatcher
-import fdslight_etc.fn_server as fns_config
-import fdslight_etc.fn_client as fnc_config
-import freenet.lib.fdsl_ctl as fdsl_ctl
-import freenet.lib.file_parser as file_parser
-import freenet.handler.tunnels_tcp_base as ts_tcp_base
-import freenet.handler.tundev as tundev
 import freenet.handler.dns_proxy as dns_proxy
 import freenet.handler.traffic_pass as traffic_pass
-import freenet.lib.static_nat as static_nat
 import freenet.lib.checksum as checksum
-
 import time
 
 FDSL_PID_FILE = "fdslight.pid"
@@ -69,32 +61,55 @@ class fdslight(dispatcher.dispatcher):
     __udp_proxy_sessions = {}
     __session_bind = {}
 
-    def __create_fn_server(self):
+    def __init(self):
+        self.create_poll()
+        self.__raw_socket_fd = self.create_handler(-1, traffic_pass.traffic_send)
+        self.__raw6_socket_fd = self.create_handler(-1, traffic_pass.traffic_send, is_ipv6=True)
 
-        name = "freenet.tunnels.%s" % fns_config.configs["udp_tunnel"]
+    def __create_fn_server(self):
+        import freenet.handler.tunnels_tcp as tunnels_tcp
+        import freenet.handler.tunnels_udp as tunnels_udp
+        import fdslight_etc.fn_server as fns_config
+        import freenet.handler.tundev as tundev
+        import freenet.lib.static_nat as static_nat
+
+        name = "freenet.tunnels_auth.%s" % fns_config.configs["auth_module"]
         __import__(name)
+
         m = sys.modules[name]
+        auth_module = m.auth()
+        auth_module.init()
+
         if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
 
         subnet = fns_config.configs["subnet"]
         nat = static_nat.nat(subnet)
 
-        self.create_poll()
         subnet = fns_config.configs["subnet"]
 
-        tun_fd = self.create_handler(-1, tundev.tuns, "fdslight", subnet)
+        tun_fd = self.create_handler(-1, tundev.tuns, nat, "fdslight", subnet)
         dns_fd = self.create_handler(-1, dns_proxy.dnsd_proxy, fns_config.configs["dns"])
-        raw_socket_fd = self.create_handler(-1, traffic_pass.traffic_send)
 
-        self.create_handler(-1, m.tunnel, tun_fd, dns_fd, nat, debug=self.__debug)
-        self.create_handler(-1, ts_tcp_base._tunnel_tcp_listen,
-                            tun_fd, dns_fd, nat,
-                            debug=self.__debug)
+        args = (tun_fd, -1, dns_fd, auth_module)
+        kwargs = {"debug": self.__debug}
+
+        self.create_handler(-1, tunnels_udp.tunnels_udp_listener, *args, **kwargs)
+        self.create_handler(-1, tunnels_tcp.tunnel_tcp_listener, *args, **kwargs)
+
+        if fns_config.configs["enable_ipv6_tunnel"]:
+            kwargs["is_ipv6"] = True
+            self.create_handler(-1, tunnels_udp.tunnels_udp_listener, *args, **kwargs)
+            self.create_handler(-1, tunnels_tcp.tunnel_tcp_listener, *args, **kwargs)
         self.__mode = "server"
 
     def __create_fn_client(self):
+        import fdslight_etc.fn_client as fnc_config
+        import freenet.lib.fdsl_ctl as fdsl_ctl
+        import freenet.handler.tunnelc_tcp as tunnelc_tcp
+        import freenet.handler.tunnelc_udp as tunnelc_udp
+        import freenet.lib.file_parser as file_parser
+
         if not self.__debug: create_pid_file(FDSL_PID_FILE, os.getpid())
-        self.create_poll()
 
         os.chdir("driver")
         if not os.path.isfile("fdslight.ko"):
@@ -116,28 +131,27 @@ class fdslight(dispatcher.dispatcher):
 
         self.__dnsc_fd = self.create_handler(-1, dns_proxy.dnsc_proxy, blacklist, debug=self.__debug)
 
-        self.__raw_socket_fd = self.create_handler(-1, traffic_pass.traffic_send)
-        self.__raw6_socket_fd = self.create_handler(-1, traffic_pass.traffic_send, is_ipv6=True)
+        tunnel_type = fnc_config.configs["tunnel_type"].lower()
+        args = (self.__dnsc_fd, self.__raw_socket_fd, self.__raw6_socket_fd, whitelist)
+        kwargs = {"debug": self.__debug, "is_ipv6": False}
 
-        name_tcp = "freenet.tunnelc.%s" % fnc_config.configs["tcp_tunnel"]
-        name_udp = "freenet.tunnelc.%s" % fnc_config.configs["udp_tunnel"]
+        if tunnel_type not in ("tcp6", "udp6", "tcp", "udp",): raise ValueError("not support tunnel type")
+        if tunnel_type in ("tcp6", "udp6",): kwargs["is_ipv6"] = True
 
-        if fnc_config.configs["tunnel_type"].lower() == "udp":
-            name = name_udp
+        if tunnel_type in ("udp", "udp6"):
+            tunnel = tunnelc_udp.tunnelc_udp
         else:
-            name = name_tcp
+            tunnel = tunnelc_tcp.tunnelc_tcp
 
-        __import__(name)
-        self.__tunnelc = sys.modules[name]
-        self.__tunnelc_fd = self.create_handler(-1, self.__tunnelc.tunnel, self.__dnsc_fd, self.__raw_socket_fd,
-                                                whitelist, debug=self.__debug)
+        self.__tunnelc_fd = self.create_handler(-1, tunnel, *args, **kwargs)
 
         signal.signal(signal.SIGUSR1, self.__update_blacklist)
         self.__mode = "client"
 
     def __update_blacklist(self, signum, frame):
-        if self.__mode != "client": return
+        import freenet.lib.file_parser as file_parser
 
+        if self.__mode != "client": return
         blacklist = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
         self.get_handler(self.__dnsc_fd).update_blacklist(blacklist)
 
@@ -150,6 +164,7 @@ class fdslight(dispatcher.dispatcher):
         self.__run(mode)
 
     def __debug_run(self, mode):
+        self.__init()
         if mode == "server":
             self.__create_fn_server()
         if mode == "client": self.__create_fn_client()
@@ -164,6 +179,7 @@ class fdslight(dispatcher.dispatcher):
 
         if pid != 0: sys.exit(0)
 
+        self.__init()
         if mode == "server": self.__create_fn_server()
         if mode == "client": self.__create_fn_client()
 
@@ -237,13 +253,21 @@ class fdslight(dispatcher.dispatcher):
     def __send_ipv6_msg_to_udp_proxy(self, session_id, message):
         pass
 
-    def bind_session_id(self, session_id, fileno):
+    def bind_session_id(self, session_id, fileno, other):
         """把session_id和fileno绑定起来"""
-        self.__session_bind[session_id] = fileno
+        self.__session_bind[session_id] = (fileno, other)
 
     def unbind_session_id(self, session_id):
         if session_id not in self.__session_bind: return
         del self.__session_bind[session_id]
+
+    def is_bind_session(self, session_id):
+        """session是否被绑定"""
+        return session_id in self.__session_bind
+
+    def get_bind_session(self, session_id):
+        """获取绑定的session的fileno"""
+        return self.__session_bind[session_id]
 
     def send_msg_to_udp_proxy(self, session_id, message):
         """发送消息到UDP PROXY"""
@@ -269,7 +293,7 @@ class fdslight(dispatcher.dispatcher):
 
     def send_msg_to_handler_from_udp_proxy(self, session_id, msg):
         if session_id not in self.__session_bind: return
-        fileno = self.__session_bind[session_id]
+        fileno, _ = self.__session_bind[session_id]
         if not self.handler_exists(fileno): return
         self.ctl_handler(-1, fileno, "msg_from_udp_proxy", session_id, msg)
 

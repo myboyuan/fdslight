@@ -148,6 +148,10 @@ class builder(object):
         """
         pass
 
+    def config(self, config):
+        """重写这个方法,用于协议配置"""
+        pass
+
 
 class parser(object):
     __fixed_header_size = 0
@@ -285,6 +289,10 @@ class parser(object):
         """
         self.__tot_seg = 0
         self.__data_area = {}
+
+    def config(self, config):
+        """重写这个方法,用于协议配置"""
+        pass
 
 
 """

@@ -4,21 +4,21 @@ import fdslight_etc.fn_client as fnc_config
 import socket, time, sys
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.base_proto.tunnel_tcp as tunnel_tcp
-import freenet.lib.static_nat as static_nat
 import freenet.lib.whitelist as udp_whitelist
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.utils as utils
+import freenet.lib.base_proto.utils as proto_utils
+
 import pywind.lib.timer as timer
 
 
-class tunnelc_tcp_base(tcp_handler.tcp_handler):
+class tunnelc_tcp(tcp_handler.tcp_handler):
     __LOOP_TIMEOUT = 10
 
     __encrypt = None
     __decrypt = None
 
     __debug = None
-    __static_nat = None
     __udp_whitelist = None
 
     __traffic_fetch_fd = -1
@@ -47,16 +47,22 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
 
         crypto_info = fnc_config.configs["tcp_crypto_module"]
         name = crypto_info["name"]
-        args = crypto_info["args"]
         name = "freenet.lib.crypto.%s" % name
 
         __import__(name)
         m = sys.modules[name]
 
-        self.__encrypt = m.encrypt(*args)
-        self.__decrypt = m.decrypt(*args)
+        self.__encrypt = m.encrypt()
+        self.__decrypt = m.decrypt()
+
+        self.__encrypt.config(crypto_info["configs"])
+        self.__decrypt.config(crypto_info["configs"])
+
         self.__debug = debug
-        self.__static_nat = static_nat.nat()
+
+        account = fnc_config.configs["account"]
+        self.__session_id = proto_utils.gen_session_id(account["username"], account["password"])
+
         self.__dns_fd = dns_fd
         self.__traffic_send_fd = raw_socket_fd
         self.__traffic6_send_fd = raw6_socket_fd

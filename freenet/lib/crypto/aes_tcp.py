@@ -7,6 +7,7 @@ sys.path.append("../../../")
 from Crypto.Cipher import AES
 import random, hashlib
 import freenet.lib.base_proto.tunnel_tcp as tunnel
+import freenet.lib.utils as proto_utils
 
 FIXED_HEADER_SIZE = 32
 
@@ -17,9 +18,7 @@ class encrypt(tunnel.builder):
     # 需要补充的`\0`
     __const_fill = b""
 
-    def __init__(self, aes_key):
-        self.__key = hashlib.md5(aes_key.encode()).digest()
-
+    def __init__(self):
         if tunnel.MIN_FIXED_HEADER_SIZE % 16 != 0:
             self.__const_fill = b"f" * (16 - tunnel.MIN_FIXED_HEADER_SIZE % 16)
 
@@ -63,11 +62,15 @@ class encrypt(tunnel.builder):
 
         return r
 
-    def set_aes_key(self, new_key):
+    def __set_aes_key(self, new_key):
         self.__key = hashlib.md5(new_key.encode()).digest()
 
     def reset(self):
         super(encrypt, self).reset()
+
+    def config(self, config):
+        """重写这个方法,用于协议配置"""
+        self.__set_aes_key(config["key"])
 
 
 class decrypt(tunnel.parser):
@@ -79,8 +82,7 @@ class decrypt(tunnel.parser):
     __iv_end_pos = 0
     __const_fill = b""
 
-    def __init__(self, aes_key):
-        self.__key = hashlib.md5(aes_key.encode()).digest()
+    def __init__(self):
         self.__iv_begin_pos = 0
         self.__iv_end_pos = self.__iv_begin_pos + 16
 
@@ -96,7 +98,7 @@ class decrypt(tunnel.parser):
         real_hdr = data[0:tunnel.MIN_FIXED_HEADER_SIZE]
 
         # 丢弃误码的包
-        if self.__const_fill != data[tunnel.MIN_FIXED_HEADER_SIZE:]: raise tunnel.ProtoError("data wrong")
+        if self.__const_fill != data[tunnel.MIN_FIXED_HEADER_SIZE:]: raise proto_utils.ProtoError("data wrong")
 
         return real_hdr
 
@@ -106,12 +108,16 @@ class decrypt(tunnel.parser):
 
         return d[0:length]
 
-    def set_aes_key(self, key):
+    def __set_aes_key(self, key):
         new_key = hashlib.md5(key.encode()).digest()
         self.__key = new_key
 
     def reset(self):
         super(decrypt, self).reset()
+
+    def config(self, config):
+        """重写这个方法,用于协议配置"""
+        self.__set_aes_key(config["key"])
 
 
 """

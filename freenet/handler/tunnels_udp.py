@@ -6,9 +6,8 @@ import pywind.evtframework.handler.udp_handler as udp_handler
 import pywind.lib.timer as timer
 
 
-class tunnels_udp_base(udp_handler.udp_handler):
+class tunnels_udp_listener(udp_handler.udp_handler):
     __debug = None
-    __nat = None
     __sessions = None
     __timer = None
 
@@ -20,6 +19,8 @@ class tunnels_udp_base(udp_handler.udp_handler):
     __SESSION_TIMEOUT = 1200
 
     __tun_fd = -1
+    __tun6_fd = -1
+
     __dns_fd = -1
 
     __encrypt = None
@@ -27,27 +28,43 @@ class tunnels_udp_base(udp_handler.udp_handler):
 
     __debug = False
 
-    def init_func(self, creator_fd, tun_fd, dns_fd, nat, debug=True):
+    __auth_module = None
+
+    # 当前包的session id
+    __cur_packet_session_id = None
+
+    def init_func(self, creator_fd, tun_fd, tun6_fd, dns_fd, auth_module, debug=True, is_ipv6=False):
         self.__debug = debug
         config = fns_config.configs
 
         # 导入加入模块
         name = "freenet.lib.crypto.%s" % config["udp_crypto_module"]["name"]
-        crypto_args = fns_config.configs["udp_crypto_module"].get("args", ())
+
         __import__(name)
         m = sys.modules.get(name, None)
 
-        self.__encrypt = m.encrypt(crypto_args)
-        self.__decrypt = m.decrypt(crypto_args)
+        crypto_config = config["udp_crypto_module"]["configs"]
+
+        self.__encrypt = m.encrypt()
+        self.__decrypt = m.decrypt()
+
+        self.__encrypt.config(crypto_config)
+        self.__decrypt.config(crypto_config)
 
         self.__timer = timer.timer()
         self.__debug = debug
         self.__sessions = {}
+        self.__auth_module = auth_module
 
-        self.__nat = nat
-        bind_address = fns_config.configs["udp_listen"]
+        if is_ipv6:
+            bind_address = fns_config.configs["udp6_listen"]
+        else:
+            bind_address = fns_config.configs["udp_listen"]
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if is_ipv6:
+            s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+        else:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         self.set_socket(s)
         self.bind(bind_address)
@@ -57,6 +74,7 @@ class tunnels_udp_base(udp_handler.udp_handler):
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
         self.__tun_fd = tun_fd
+        self.__tun6_fd = tun6_fd
         self.__dns_fd = dns_fd
 
         if not self.__debug:
@@ -75,7 +93,7 @@ class tunnels_udp_base(udp_handler.udp_handler):
         """
         if session_id in self.__sessions: return
         self.__sessions[session_id] = address
-        self.dispatcher.bind_session_id(session_id, self.fileno)
+        self.dispatcher.bind_session_id(session_id, self.fileno, "udp")
 
     def __modify_client_address(self, session_id, address):
         """修改客戶端地址,客戶端的端口和地址可能发生改变，为了确保数据到达，
@@ -96,7 +114,8 @@ class tunnels_udp_base(udp_handler.udp_handler):
         sts = "%s:%s" % address
 
         self.print_access_log("disconnect", sts)
-        self.fn_delete(session_id)
+        self.__auth_module.handle_close(session_id)
+        self.dispatcher.unbind_session(session_id)
 
         del self.__sessions[session_id]
 
@@ -112,6 +131,8 @@ class tunnels_udp_base(udp_handler.udp_handler):
         if protocol == 17:
             self.__handle_udp_data_from_tunnel(session_id, byte_data)
             return
+
+        self.ctl_handler(self.fileno, self.__tun_fd, "set_packet_session_id", session_id)
         self.send_message_to_handler(self.fileno, self.__tun_fd, byte_data)
 
     def __handle_ipv6_data_from_tunnel(self, session_id, byte_data):
@@ -141,7 +162,9 @@ class tunnels_udp_base(udp_handler.udp_handler):
 
         sts = "%s:%s" % address
         if self.__debug: self.print_access_log("send_dns", sts)
-        for pkt in pkts: self.sendto(pkt, address)
+        for pkt in pkts:
+            if not self.__auth_module.handle_send(session_id, len(byte_data)): return
+            self.sendto(pkt, address)
 
         self.add_evt_write(self.fileno)
 
@@ -151,7 +174,11 @@ class tunnels_udp_base(udp_handler.udp_handler):
 
         session_id, action, byte_data = result
 
-        if not self.fn_recv(session_id, len(byte_data)):
+        if self.dispatcher.is_bind_session(session_id):
+            fileno, other = self.dispatcher.get_bind_session(session_id)
+            if fileno != self.fileno and other == "tcp": self.delete_handler(fileno)
+
+        if not self.__auth_module.handle_recv(session_id, len(byte_data)):
             if self.__session_exists(session_id): self.__unregister_session(session_id)
             return
 
@@ -174,13 +201,14 @@ class tunnels_udp_base(udp_handler.udp_handler):
 
     def udp_timeout(self):
         names = self.__timer.get_timeout_names()
+
         for name in names:
             if self.__timer.exists(name): self.__timer.drop(name)
-            if name in self.__sessions: self.__unregister_session(name)
-            ''''''
-        self.fn_timeout()
+            if name in self.__sessions:
+                self.__unregister_session(name)
+                self.__auth_module.handle_timing_task(b"")
+            continue
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
-        self.__nat.recycle()
 
     def udp_delete(self):
         self.unregister(self.fileno)
@@ -198,26 +226,29 @@ class tunnels_udp_base(udp_handler.udp_handler):
         pkts = self.__encrypt.build_packets(session_id, tunnel_proto.ACT_DNS, dns_msg)
         self.__encrypt.reset()
 
-        if not self.fn_send(len(dns_msg), address): return
+        if not self.__auth_module.handle_send(session_id, len(dns_msg)): return
 
         if self.__debug: self.print_access_log("send_dns", address)
         for pkt in pkts: self.sendto(pkt, address)
         self.add_evt_write(self.fileno)
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd not in ("response_dns", "msg_from_udp_proxy"): return False
+        if cmd not in ("response_dns", "msg_from_udp_proxy", "set_packet_session_id",): return False
 
         if cmd == "response_dns":
             session_id, dns_msg = args
             if session_id not in self.__sessions: return True
             self.__send_dns(session_id, dns_msg)
             return True
+        if cmd == "set_packet_session_id":
+            self.__cur_packet_session_id, = args
+            return True
 
         session_id, msg = args
-        if session_id not in self.__sessions: return
+        if session_id not in self.__sessions: return True
         self.__send_data(session_id, msg)
 
-        return
+        return True
 
     def print_access_log(self, text, address):
         t = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -227,40 +258,5 @@ class tunnels_udp_base(udp_handler.udp_handler):
         sys.stdout.flush()
 
     def message_from_handler(self, from_fd, byte_data):
-        rs = self.__nat.get_ippkt2cLan_from_sLan(byte_data)
-        if not rs: return
-        session_id, msg = rs
-        self.__send_data(session_id, msg)
-
-    def fn_init(self):
-        """初始化一些设置,重写这个方法"""
-        pass
-
-    def fn_recv(self, session_id, data_len):
-        """接收客户端数据的时候调用此函数
-        :param session_id: 会话ID
-        :param data_len: 数据长度
-        :return Boolean: True表示继续执行,False表示中断执行
-        """
-        return True
-
-    def fn_send(self, session_id, data_len):
-        """发送数据的时候调用此函数
-        :param session_id: 会话ID
-        :param data_len: 数据长度
-        :return Boolean: True表示继续执行,False表示中断执行
-        """
-        return True
-
-    def fn_delete(self, session_id):
-        """删除会话的时候会调用此函数,用于资源的释放
-        :param session_id:会话ID
-        """
-        pass
-
-    def fn_timeout(self):
-        """超时函数调用,可用于一些数据统计
-        :param address:
-        :return:
-        """
-        pass
+        session_id = self.__cur_packet_session_id
+        self.__send_data(session_id, byte_data)

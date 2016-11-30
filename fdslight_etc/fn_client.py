@@ -8,54 +8,62 @@ configs = {
     "tcp_server_address": (
         "example.com", 1999
     ),
-    # 使用的TCP隧道模块
-    "tcp_tunnel": "tcp_simple",
-    # 使用的UDP隧道模块
-    "udp_tunnel": "udp_simple",
 
-    # 该字段是模块内部定义的，用于自定义模块的配置
-    "tunnelc_simple": {
-        "username": "test",
-        "password": "test"
-    },
-
+    # TCP加密模块配置
     "tcp_crypto_module": {
+        # 加密模块名
+        # 注意,必须和加密模块的文件名字相同
         "name": "aes_tcp",
-        "args": (
-            #  fdslight为初始化的aes key值,该值只有在发送验证的时候才使用
-            #  建议修改它
-            "fdslight",  # 此处逗号不能省略
-        ),
+        # 加密模块配置
+        "configs": {
+            "key": "fdslight"
+        },
     },
 
+    # UDP加密模块配置
     "udp_crypto_module": {
         # 加密模块名
+        # 注意,必须和加密模块的文件名字相同
         "name": "aes_udp",
-        # 模块初始化参数
-        "args": (
-            #  fdslight为初始化的aes key值,该值只有在发送验证的时候才使用
-            #  建议修改它
-            "fdslight",  # 此处逗号不能省略
-        )
+        # 加密模块配置
+        "configs": {
+            "key": "fdslight"
+        }
     },
-    # 隧道类型,可选的值有"tcp","udp",推荐使用udp,请根据你的ISP选择适合你的隧道类型
+
+    # 登录帐户配置
+    "account": {
+        # 用户名
+        "username": "test",
+        # 密码
+        "password": "test",
+    },
+
+    # 隧道类型,可选的值有"tcp","udp","tcp6","udp6",推荐使用udp或者udp6,请根据你的ISP选择适合你的隧道类型
+    # tcp6和udp6为ipv6的tcp和udp隧道
     "tunnel_type": "tcp",
+
     # 是否开启UDP全局代理,一般情况请不要这样做,当你的网络不支持内网穿透的时候,
     # 此项开启时网络一定会支持P2P
     # !!!注意  当为0的时候，白名单内与白名单外的机器无法进行p2p联机
     "udp_global": 0,
+
     # 强迫一些客户端进行全局UDP代理,如果 udp_global为1，那么这个选项可忽略
     "udp_force_global_clients": [
         # "192.168.1.2","192.168.1.3",
     ],
+
     # 不要进行UDP代理的客户端,此项在udp_global为0时有效
     "udp_no_proxy_clients": [
     ],
+
     # !!!注意:不走代理流量的DNS服务器,如果DNS无法解析的话建议设置成运行fdslight机器所连的网关的IP地址
     # 否则可能会出现隧道中断而导致需要代理的机器无法上网的情况
     "dns": "223.5.5.5",
-    # DNS绑定地址
+
+    # 本地DNS绑定地址,一般不需要更改
     "dns_bind": "0.0.0.0",
+
     # 访问日志
     "access_log": "/tmp/fdslight_access.log",
     # 故障日志

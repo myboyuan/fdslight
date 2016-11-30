@@ -4,7 +4,6 @@ import pywind.evtframework.excepts as excepts
 import os, sys, socket
 import pywind.evtframework.handler.handler as handler
 import freenet.lib.fn_utils as fn_utils
-import pywind.lib.timer as timer
 
 try:
     import fcntl
@@ -147,10 +146,12 @@ class tun_base(handler.handler):
 class tuns(tun_base):
     """服务端的tun数据处理
     """
-    __map = None
-    __timer = None
-    __MAP_TIMEOUT = 300
-    __TIMEOUT = 10
+    __LOOP_TIMEOUT = 10
+
+    __nat = None
+    __packet_session_id = None
+
+    __ip_ver = 4
 
     def __add_route(self, dev_name, subnet):
         """给设备添加路由
@@ -174,32 +175,51 @@ class tuns(tun_base):
         cmd = "route add -net %s/%s dev %s" % (ip, mask_size, dev_name)
         os.system(cmd)
 
-    def dev_init(self, tun_devname, subnet):
+    def __add_route6(self, dev_name, subnet):
+        pass
+
+    def dev_init(self, tun_devname, subnet, nat, is_ipv6=False):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
-        self.__add_route(tun_devname, subnet)
-        self.__timer = timer.timer()
-        self.__map = {}
+        if is_ipv6:
+            self.__add_route6(tun_devname, subnet)
+        else:
+            self.__add_route(tun_devname, subnet)
+        self.__nat = nat
+
+        if is_ipv6: self.__ip_ver = 6
+
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def dev_error(self):
         print("error:server tun device error")
         self.delete_handler(self.fileno)
 
+    def __handle_ipv6_packet_from_read(self, ip_packet):
+        pass
+
+    def __handle_ipv4_packet_from_read(self, ip_packet):
+        protocol = ip_packet[9]
+        if protocol not in (1, 6, 17,): return
+
+        rs = self.dispatcher.get_ippkt2cLan_from_sLan(ip_packet)
+        if not rs: return
+        session_id, msg = rs
+        fileno, _ = self.dispatcher.get_bind_session(session_id)
+
+        if not self.handler_exists(fileno): return
+
+        self.ctl_handler(self.fileno, fileno, "set_packet_session_id", session_id)
+        self.send_message_to_handler(self.fileno, fileno, msg)
+
     def handle_ip_packet_from_read(self, ip_packet):
         ip_ver = (ip_packet[0] & 0xf0) >> 4
-        if ip_ver != 4: return
-        protocol = ip_packet[9]
-        if protocol not in (1, 6, 17, 132,): return
-        daddr = ip_packet[16:20]
-        if daddr not in self.__map: return
-        fd = self.__map[daddr]
-        try:
-            self.send_message_to_handler(self.fileno, fd, ip_packet)
-            self.__timer.set_timeout(daddr, self.__MAP_TIMEOUT)
-        except excepts.HandlerNotFoundErr:
-            return
+        if ip_ver != self.__ip_ver: return
+        if ip_ver == 4: self.__handle_ipv4_packet_from_read(ip_packet)
+        if ip_ver == 6: self.__handle_ipv6_packet_from_read(ip_packet)
 
     def handle_ip_packet_for_write(self, ip_packet):
+
         return ip_packet
 
     def dev_delete(self):
@@ -208,19 +228,18 @@ class tuns(tun_base):
         sys.exit(-1)
 
     def message_from_handler(self, from_fd, ip_packet):
+        if not self.dispatcher.is_bind_session(self.__packet_session_id): return
         ip_ver = (ip_packet[0] & 0xf0) >> 4
-        if ip_ver != 4: return
 
-        saddr = ip_packet[12:16]
-        if saddr not in self.__map: self.__map[saddr] = from_fd
+        if ip_ver != self.__ip_ver: return
 
-        self.__timer.set_timeout(saddr, self.__MAP_TIMEOUT)
+        n_ippkt = self.__nat.get_ippkt2sLan_from_cLan(self.__packet_session_id, ip_packet)
         self.add_evt_write(self.fileno)
-        self.add_to_sent_queue(ip_packet)
+        self.add_to_sent_queue(n_ippkt)
 
     def dev_timeout(self):
-        names = self.__timer.get_timeout_names()
-        for name in names:
-            if name in self.__map: del self.__map[name]
-            if self.__timer.exists(name): self.__timer.drop(name)
-        self.set_timeout(self.fileno, self.__TIMEOUT)
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+
+    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
+        if cmd not in ("set_packet_session_id",): return
+        if cmd == "set_packet_session_id": self.__packet_session_id, = args

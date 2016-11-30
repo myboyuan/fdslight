@@ -22,6 +22,7 @@ import pywind.lib.reader as reader
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.utils as utils
 
+
 class builder(object):
     __fixed_hdr_size = 0
 
@@ -73,6 +74,10 @@ class builder(object):
         """获取负载长度,加密前后可能数据包长度不一致,重写这个方法"""
         return pkt_len
 
+    def config(self, config):
+        """重写这个方法,用于协议配置"""
+        pass
+
 
 class parser(object):
     __reader = None
@@ -117,7 +122,8 @@ class parser(object):
             e_body = self.__reader.read(self.__tot_length)
             body = self.unwrap_body(self.__real_length, e_body)
 
-            if utils.calc_content_md5(body)!=self.__payload_md5:raise proto_utils.ProtoError("data has been modified")
+            if utils.calc_content_md5(body) != self.__payload_md5: raise proto_utils.ProtoError(
+                "data has been modified")
 
             self.__results.append((self.__session_id, self.__action, body,))
             self.reset()
@@ -156,3 +162,7 @@ class parser(object):
             return self.__results.pop(0)
         except IndexError:
             return None
+
+    def config(self, config):
+        """重写这个方法,用于协议配置"""
+        pass

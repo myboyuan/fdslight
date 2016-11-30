@@ -84,11 +84,15 @@ class encrypt(tunnel.builder):
 
         return r
 
-    def set_aes_key(self, new_key):
+    def __set_aes_key(self, new_key):
         self.__key = hashlib.md5(new_key.encode()).digest()
 
     def reset(self):
         super(encrypt, self).reset()
+
+    def config(self, config):
+        """重写这个方法,用于协议配置"""
+        self.__set_aes_key(config["key"])
 
 
 class decrypt(tunnel.parser):
@@ -127,12 +131,16 @@ class decrypt(tunnel.parser):
 
         return d[0:length]
 
-    def set_aes_key(self, key):
+    def __set_aes_key(self, key):
         new_key = hashlib.md5(key.encode()).digest()
         self.__key = new_key
 
     def reset(self):
         super(decrypt, self).reset()
+
+    def config(self, config):
+        """重写这个方法,用于协议配置"""
+        self.__set_aes_key(config["key"])
 
 
 """

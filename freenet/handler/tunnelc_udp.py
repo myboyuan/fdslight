@@ -10,10 +10,11 @@ import freenet.lib.base_proto.tunnel_udp as tunnel_proto
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.utils as utils
+import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.whitelist as udp_whitelist
 
 
-class tunnelc_udp_base(udp_handler.udp_handler):
+class tunnelc_udp(udp_handler.udp_handler):
     __server = None
 
     __traffic_fetch_fd = -1
@@ -25,7 +26,6 @@ class tunnelc_udp_base(udp_handler.udp_handler):
     __encrypt_m = None
     __decrypt_m = None
 
-    __TIMEOUT_NO_AUTH = 5
     __session_id = None
 
     __debug = False
@@ -52,13 +52,19 @@ class tunnelc_udp_base(udp_handler.udp_handler):
         __import__(name)
         m = sys.modules.get(name, None)
 
-        crypto_args = fnc_config.configs["udp_crypto_module"].get("args", ())
-        self.__encrypt_m = m.encrypt(*crypto_args)
-        self.__decrypt_m = m.decrypt(*crypto_args)
+        crypto_config = fnc_config.configs["udp_crypto_module"]["configs"]
+
+        self.__encrypt_m = m.encrypt()
+        self.__decrypt_m = m.decrypt()
+
+        self.__encrypt_m.config(crypto_config)
+        self.__decrypt_m.config(crypto_config)
 
         self.__debug = debug
         self.__timer = timer.timer()
-        self.__wait_sent=[]
+
+        account = fnc_config.configs["account"]
+        self.__session_id = proto_utils.gen_session_id(account["username"], account["password"])
 
         self.__traffic_send_fd = raw_socket_fd
         self.__traffic6_send_fd = raw6_socket_fd
