@@ -20,6 +20,7 @@ MIN_FIXED_HEADER_SIZE = 37
 
 import pywind.lib.reader as reader
 import freenet.lib.base_proto.utils as proto_utils
+import freenet.lib.utils as utils
 
 class builder(object):
     __fixed_hdr_size = 0
@@ -49,7 +50,7 @@ class builder(object):
 
         pkt_len = len(byte_data)
         tot_len = self.get_payload_length(pkt_len)
-        payload_md5 = proto_utils.calc_content_md5(byte_data)
+        payload_md5 = utils.calc_content_md5(byte_data)
         base_hdr = self.__build_proto_headr(session_id, payload_md5, tot_len, pkt_len, action)
 
         e_hdr = self.wrap_header(base_hdr)
@@ -116,7 +117,7 @@ class parser(object):
             e_body = self.__reader.read(self.__tot_length)
             body = self.unwrap_body(self.__real_length, e_body)
 
-            if proto_utils.calc_content_md5(body)!=self.__payload_md5:raise proto_utils.ProtoError("data has been modified")
+            if utils.calc_content_md5(body)!=self.__payload_md5:raise proto_utils.ProtoError("data has been modified")
 
             self.__results.append((self.__session_id, self.__action, body,))
             self.reset()

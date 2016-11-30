@@ -35,9 +35,12 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
 
     __session_id = None
 
+    __wait_sent = None
+
     def init_func(self, creator_fd, dns_fd, raw_socket_fd, raw6_socket_fd, whitelist, debug=False):
         taddr = fnc_config.configs["tcp_server_address"]
         s = socket.socket()
+        self.__wait_sent = []
 
         self.set_socket(s)
         self.connect(taddr, 6)
@@ -104,6 +107,18 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+
+        while 1:
+            try:
+                is_dns, msg = self.__wait_sent.pop(0)
+            except IndexError:
+                break
+            if is_dns:
+                self.__send_dns(msg)
+            else:
+                self.__send_data(msg)
+            continue
+        return
 
     @property
     def encrypt(self):
@@ -193,6 +208,9 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         if cmd not in ("request_dns",): return
         if cmd == "request_dns":
             dns_msg, = args
+            if not self.connect_ok():
+                self.__wait_sent.append((1, dns_msg))
+                return
             self.__send_dns(dns_msg)
         return
 
@@ -219,10 +237,13 @@ class tunnelc_tcp_base(tcp_handler.tcp_handler):
         ip_ver = (byte_data[0] & 0xf0) >> 4
         if ip_ver not in (4, 6,): return
         if ip_ver == 4: self.__handle_ipv4_traffic_from_lan(byte_data)
-        if ip_ver==6:self.__handle_traffic_from_lan(byte_data)
+        if ip_ver == 6: self.__handle_traffic_from_lan(byte_data)
 
     def message_from_handler(self, from_fd, byte_data):
         if from_fd == self.__traffic_fetch_fd:
+            if not self.connect_ok():
+                self.__wait_sent.append((0, byte_data), )
+                return
             self.__handle_traffic_from_lan(byte_data)
             return
         self.send_message_to_handler(self.fileno, self.__traffic_send_fd, byte_data)

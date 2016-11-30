@@ -2,16 +2,14 @@
 """
 隧道客户端基本类
 """
-import socket, sys, time, random
+import socket, sys, time
 import fdslight_etc.fn_client as fnc_config
 import pywind.evtframework.handler.udp_handler as udp_handler
 import pywind.lib.timer as timer
-import freenet.lib.checksum as checksum
 import freenet.lib.base_proto.tunnel_udp as tunnel_proto
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.utils as utils
-import freenet.lib.static_nat as static_nat
 import freenet.lib.whitelist as udp_whitelist
 
 
@@ -60,6 +58,7 @@ class tunnelc_udp_base(udp_handler.udp_handler):
 
         self.__debug = debug
         self.__timer = timer.timer()
+        self.__wait_sent=[]
 
         self.__traffic_send_fd = raw_socket_fd
         self.__traffic6_send_fd = raw6_socket_fd

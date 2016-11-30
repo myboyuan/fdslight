@@ -3,6 +3,7 @@
 import socket, random
 import freenet.lib.checksum as checksum
 import freenet.lib.fn_utils as fn_utils
+import hashlib
 
 __IP_HDR_SIZE = 20
 
@@ -145,3 +146,9 @@ def rand_string(length):
         )
 
     return "".join(tmplist)
+
+def calc_content_md5(content):
+    md5 = hashlib.md5()
+    md5.update(content)
+
+    return md5.digest()
