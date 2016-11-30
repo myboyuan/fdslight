@@ -45,7 +45,7 @@ class tunnelc_udp(udp_handler.udp_handler):
 
     __LOOP_TIMEOUT = 10
 
-    def init_func(self, creator_fd, dns_fd, raw_socket_fd, raw6_socket_fd, whitelist, debug=False):
+    def init_func(self, creator_fd, dns_fd, raw_socket_fd, raw6_socket_fd, whitelist, debug=False, is_ipv6=False):
         self.__server = fnc_config.configs["udp_server_address"]
 
         name = "freenet.lib.crypto.%s" % fnc_config.configs["udp_crypto_module"]["name"]
@@ -69,11 +69,14 @@ class tunnelc_udp(udp_handler.udp_handler):
         self.__traffic_send_fd = raw_socket_fd
         self.__traffic6_send_fd = raw6_socket_fd
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if is_ipv6:
+            s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+        else:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         self.set_socket(s)
         self.__dns_fd = dns_fd
+        self.dispatcher.bind_session_id(self.__session_id,self.fileno,"udp")
 
         try:
             self.connect(self.__server)

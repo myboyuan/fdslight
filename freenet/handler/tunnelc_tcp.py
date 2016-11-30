@@ -37,9 +37,13 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
 
     __wait_sent = None
 
-    def init_func(self, creator_fd, dns_fd, raw_socket_fd, raw6_socket_fd, whitelist, debug=False):
+    def init_func(self, creator_fd, dns_fd, raw_socket_fd, raw6_socket_fd, whitelist, debug=False, is_ipv6=False):
         taddr = fnc_config.configs["tcp_server_address"]
-        s = socket.socket()
+
+        if is_ipv6:
+            s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        else:
+            s = socket.socket()
         self.__wait_sent = []
 
         self.set_socket(s)
@@ -104,8 +108,8 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         n = utils.ip4s_2_number(self.getpeername()[0])
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
 
-        self.__session_id = self.fn_get_session_id()
         self.dispatcher.ctunnel_ok()
+        self.dispatcher.bind_session_id(self.__session_id, self.fileno, "tcp")
 
         self.ctl_handler(self.fileno, self.__dns_fd, "as_tunnel_fd")
         self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_open")
@@ -143,8 +147,9 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
     def __handle_ipv4_data_from_tunnel(self, byte_data):
         data_len = (byte_data[2] << 8) | byte_data[3]
 
-        if len(byte_data) != data_len: self.print_access_log(
-            "not_equal_pkt_len,real:%s,proto:%s" % (len(byte_data), data_len,))
+        if len(byte_data) != data_len:
+            self.print_access_log("wrong_packet_length")
+            return
         self.send_message_to_handler(self.fileno, self.__traffic_send_fd, byte_data)
 
     def __handle_ipv6_data_from_tunnel(self, byte_data):
@@ -198,10 +203,6 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
             self.delete_handler(self.__traffic_fetch_fd)
         self.close()
         self.dispatcher.ctunnel_fail()
-
-    def fn_get_session_id(self):
-        """重写这个方法"""
-        return bytes(16)
 
     def print_access_log(self, text):
         t = time.strftime("%Y-%m-%d %H:%M:%S")
