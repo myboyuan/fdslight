@@ -108,7 +108,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         n = utils.ip4s_2_number(self.getpeername()[0])
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
 
-        self.dispatcher.ctunnel_ok()
+        self.dispatcher.tunnel_ok()
         self.dispatcher.bind_session_id(self.__session_id, self.fileno, "tcp")
 
         self.ctl_handler(self.fileno, self.__dns_fd, "as_tunnel_fd")
@@ -202,7 +202,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
             self.unregister(self.fileno)
             self.delete_handler(self.__traffic_fetch_fd)
         self.close()
-        self.dispatcher.ctunnel_fail()
+        self.dispatcher.tunnel_fail()
 
     def print_access_log(self, text):
         t = time.strftime("%Y-%m-%d %H:%M:%S")

@@ -81,7 +81,7 @@ class tunnelc_udp(udp_handler.udp_handler):
         try:
             self.connect(self.__server)
         except socket.gaierror:
-            self.dispatcher.ctunnel_fail()
+            self.dispatcher.tunnel_fail()
             return -1
 
         ipaddr, _ = s.getpeername()
@@ -144,7 +144,7 @@ class tunnelc_udp(udp_handler.udp_handler):
         n = utils.ip4s_2_number(self.__server_ipaddr)
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
 
-        self.dispatcher.ctunnel_ok()
+        self.dispatcher.tunnel_ok()
 
         self.ctl_handler(self.fileno, self.__dns_fd, "as_tunnel_fd")
         self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_open")
