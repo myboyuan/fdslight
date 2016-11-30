@@ -64,7 +64,7 @@ class fdslight(dispatcher.dispatcher):
     def __init(self):
         self.create_poll()
         self.__raw_socket_fd = self.create_handler(-1, traffic_pass.traffic_send)
-        self.__raw6_socket_fd = self.create_handler(-1, traffic_pass.traffic_send, is_ipv6=True)
+        #self.__raw6_socket_fd = self.create_handler(-1, traffic_pass.traffic_send, is_ipv6=True)
 
     def __create_fn_server(self):
         import freenet.handler.tunnels_tcp as tunnels_tcp
@@ -87,7 +87,7 @@ class fdslight(dispatcher.dispatcher):
 
         subnet = fns_config.configs["subnet"]
 
-        tun_fd = self.create_handler(-1, tundev.tuns, nat, "fdslight", subnet)
+        tun_fd = self.create_handler(-1, tundev.tuns, "fdslight", subnet,nat)
         dns_fd = self.create_handler(-1, dns_proxy.dnsd_proxy, fns_config.configs["dns"])
 
         args = (tun_fd, -1, dns_fd, auth_module)

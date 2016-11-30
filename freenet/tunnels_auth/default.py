@@ -41,6 +41,3 @@ class auth(auth_base.auth):
 
     def handle_close(self, session_id):
         pass
-
-    def release(self):
-        pass

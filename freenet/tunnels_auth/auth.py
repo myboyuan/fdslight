@@ -28,8 +28,3 @@ class auth(object):
     def handle_close(self,session_id):
         """处理会话关闭"""
         pass
-
-
-    def release(self):
-        """类对象被删除的一些清理工作"""
-        pass

@@ -22,9 +22,7 @@ class encrypt(tunnel.builder):
     __real_size = 0
     __body_size = 0
 
-    def __init__(self, aes_key):
-        self.__key = hashlib.md5(aes_key.encode()).digest()
-
+    def __init__(self):
         if tunnel.MIN_FIXED_HEADER_SIZE % 16 != 0:
             self.__const_fill = b"f" * (16 - tunnel.MIN_FIXED_HEADER_SIZE % 16)
 
@@ -40,21 +38,6 @@ class encrypt(tunnel.builder):
             seq.append(sset[n])
 
         return "".join(seq).encode("iso-8859-1")
-
-    def build_ping(self):
-        pkts = self.build_packets(tunnel.ACT_PING, 0, b"")
-
-        return pkts[0]
-
-    def build_pong(self):
-        pkts = self.build_packets(tunnel.ACT_PONG, 0, b"")
-
-        return pkts[0]
-
-    def build_close(self):
-        pkts = self.build_packets(tunnel.ACT_CLOSE, 0, b"")
-
-        return pkts[0]
 
     def wrap_header(self, base_hdr):
         iv = self.__rand()
@@ -104,8 +87,7 @@ class decrypt(tunnel.parser):
     __iv_end_pos = 0
     __const_fill = b""
 
-    def __init__(self, aes_key):
-        self.__key = hashlib.md5(aes_key.encode()).digest()
+    def __init__(self):
         self.__iv_begin_pos = 0
         self.__iv_end_pos = self.__iv_begin_pos + 16
 
