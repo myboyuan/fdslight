@@ -81,8 +81,6 @@ class tunnels_udp_listener(udp_handler.udp_handler):
             sys.stdout = open(fns_config.configs["access_log"], "a+")
             sys.stderr = open(fns_config.configs["error_log"], "a+")
 
-        self.fn_init()
-
         return self.fileno
 
     def __register_session(self, session_id, address):
