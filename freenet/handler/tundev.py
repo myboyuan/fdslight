@@ -253,7 +253,7 @@ class tunlc(tun_base):
         pass
 
     def handle_ip_packet_for_write(self, ip_packet):
-        pass
+        return ip_packet
 
     def dev_timeout(self):
         """重写这个方法
@@ -265,4 +265,10 @@ class tunlc(tun_base):
         """重写这个方法
         :return:
         """
+        self.unregister(self.fileno)
+        os.close(self.fileno)
+
+    def message_from_handler(self,from_fd,byte_data):
         pass
+
+

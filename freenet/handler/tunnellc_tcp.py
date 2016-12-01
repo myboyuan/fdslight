@@ -3,5 +3,7 @@
 import pywind.evtframework.handler.tcp_handler as tcp_handler
 
 
-class tunnellc(tcp_handler.tcp_handler):
-    pass
+class tunnelc_tcp(tcp_handler.tcp_handler):
+    def init_func(self, creator, tun_fd, is_ipv6=False):
+        pass
+

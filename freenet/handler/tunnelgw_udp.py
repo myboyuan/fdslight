@@ -127,9 +127,6 @@ class tunnelc_udp(udp_handler.udp_handler):
 
         return
 
-    def set_session_id(self, sid):
-        self.encrypt.set_session_id(sid)
-
     def __send_data(self, byte_data, action=tunnel_proto.ACT_DATA):
         # if self.__debug: self.print_access_log("send_data")
         try:

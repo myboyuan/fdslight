@@ -43,6 +43,9 @@ configs = {
     # tcp6和udp6为ipv6的tcp和udp隧道
     "tunnel_type": "tcp",
 
+    # Linux机器的DNS配置文件路径
+    "dns_resolv": "/etc/resolv.conf",
+
     # 访问日志
     "access_log": "/tmp/fdslight_access.log",
     # 故障日志
