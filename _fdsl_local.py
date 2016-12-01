@@ -25,7 +25,7 @@ class fdslightlc(_fdsl.fdslight):
         servers = file_parser.get_linux_host_nameservers(fnlc_config.configs["dns_resolv"])
         for ipaddr in servers:
             naddr = socket.inet_aton(ipaddr)
-            self.__dns_servers[ipaddr] = None
+            self.__dns_servers[naddr] = None
         return
 
     def create_fn_local(self):
@@ -53,7 +53,6 @@ class fdslightlc(_fdsl.fdslight):
             tunnel = tunnellc_udp.tunnelc_udp
         else:
             tunnel = tunnellc_tcp.tunnelc_tcp
-
         self.__tunnel_fd = self.create_handler(-1, tunnel, self.__tun_fd, is_ipv6=False)
 
     def tunnel_ok(self):
@@ -66,15 +65,19 @@ class fdslightlc(_fdsl.fdslight):
         """是否是DNS请求"""
         protocol = packet[9]
         ihl = (packet[0] & 0x0f) * 4
+        pkt_len = (packet[2] << 8) | packet[3]
         if protocol != 17: return (False, None,)
         a = ihl + 2
         b = a + 1
 
         dport = (packet[a] << 8) | packet[b]
-        if dport != 53: return False
+        if dport != 53: return (False,None,)
         daddr = packet[16:20]
+        if daddr not in self.__dns_servers: return (False,None,)
+        n = ihl + 8
+        dns_msg = packet[n:pkt_len]
 
-        return daddr in self.__dns_servers
+        return (True,dns_msg,)
 
     def get_tunnel_fileno(self):
         return self.__tunnel_fd
