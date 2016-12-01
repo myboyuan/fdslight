@@ -43,6 +43,9 @@ configs = {
     # tcp6和udp6为ipv6的tcp和udp隧道
     "tunnel_type": "tcp",
 
+    # DNS服务器,注意不要和本地机器设置的相同
+    "dns": "223.6.6.6",
+
     # Linux机器的DNS配置文件路径
     "dns_resolv": "/etc/resolv.conf",
 

@@ -398,7 +398,7 @@ class dnslocal_proxy(udp_handler.udp_handler):
         return self.fileno
 
     def udp_readable(self, message, address):
-        pass
+        self.__handle_dnsmsg_for_response(message)
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
@@ -414,6 +414,9 @@ class dnslocal_proxy(udp_handler.udp_handler):
             del self.__dns_map[name]
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
+    def udp_error(self):
+        self.delete_handler(self.fileno)
+
     def message_from_handler(self, from_fd, byte_data):
         if from_fd == self.__tun_fd:
             self.__handle_dnsmsg_from_tun(byte_data)
@@ -422,21 +425,34 @@ class dnslocal_proxy(udp_handler.udp_handler):
 
     def update_blacklist(self, rules):
         """更新黑名列表"""
-        pass
+        self.__match.clear()
+        for rule in rules: self.__match.add_rule(rule)
+
+    def __parse_udp(self, ip_packet):
+        ihl = (ip_packet[0] & 0x0f) * 4
+        a, b = (ihl, ihl + 1,)
+        sport = (ip_packet[a] << 8) | ip_packet[b]
+
+        n = ihl + 8
+        message = ip_packet[n:]
+
+        return (ip_packet[12:16], ip_packet[16:20], sport, message,)
+
+    def __send_dns_request_transparent(self, dns_msg):
+        self.add_evt_write(self.fileno)
+        self.send(dns_msg)
 
     def __handle_dnsmsg_from_tun(self, byte_data):
-        ihl = (byte_data[0] & 0x0f) * 4
-        a = ihl + 8
-
-        dns_msg = byte_data[a:]
+        saddr, daddr, sport, dns_msg = self.__parse_udp(byte_data)
+        msg = dns.message.from_wire(dns_msg)
+        questions = msg.question
         dns_id = (dns_msg[0] << 8) | dns_msg[1]
 
-        msg = dns.message.from_wire(dns_msg)
-
-        questions = msg.question
+        self.__dns_map[dns_id] = (saddr, daddr, sport,)
+        self.__timer.set_timeout(dns_id, self.__DNS_QUERY_TIMEOUT)
 
         if len(questions) != 1 or msg.opcode() != 0:
-            self.__send_to_dns_server(self.__transparent_dns, msg)
+            self.__send_dns_request_transparent(dns_msg)
             return
 
         q = questions[0]
@@ -444,10 +460,14 @@ class dnslocal_proxy(udp_handler.udp_handler):
         is_match, flags = self.__host_match.match(host)
 
         if not is_match:
-            self.send(dns_msg)
+            self.__send_dns_request_transparent(dns_msg)
             return
 
-    def __handle_dnsmsg_from_tunnel(self, message):
+        if not self.dispatcher.is_bind_session(self.__session_id): return
+        fileno, _ = self.dispatcher.get_bind_session(self.__session_id)
+        self.ctl_handler(self.fileno, fileno, "request_dns", dns_msg)
+
+    def __handle_dnsmsg_for_response(self, message):
         dns_id = (message[0] << 8) | message[1]
         if dns_id not in self.__dns_map: return
 
@@ -455,3 +475,8 @@ class dnslocal_proxy(udp_handler.udp_handler):
         # 伪造DNS数据包
         pkts = utils.build_udp_packets(dns_server_addr, caddr, 53, cport, message)
         for pkt in pkts: self.send_message_to_handler(self.fileno, self.__tun_fd, pkt)
+
+    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
+        if cmd != "response_dns": return
+        dns_msg, = args
+        self.__handle_dnsmsg_for_response(dns_msg)

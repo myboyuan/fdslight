@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import pywind.evtframework.excepts as excepts
 import os, sys, socket
 import pywind.evtframework.handler.handler as handler
 import freenet.lib.fn_utils as fn_utils
@@ -251,7 +250,11 @@ class tunlc(tun_base):
         pass
 
     def handle_ip_packet_from_read(self, ip_packet):
-        pass
+        if self.dispatcher.is_dns_request(ip_packet):
+            self.__handle_dns_request(ip_packet)
+            return
+
+        self.__send_data_to_tunnel(ip_packet)
 
     def handle_ip_packet_for_write(self, ip_packet):
         return ip_packet
@@ -270,4 +273,16 @@ class tunlc(tun_base):
         os.close(self.fileno)
 
     def message_from_handler(self, from_fd, byte_data):
+        self.add_evt_write(self.fileno)
+        self.add_to_sent_queue(byte_data)
+
+    def __handle_dns_request(self, byte_data):
         pass
+
+    def __send_data_to_tunnel(self, byte_data):
+        if not self.dispatcher.tunnel_is_ok():
+            self.dispatcher.open_tunnel()
+        if not self.dispatcher.tunnel_is_ok(): return
+
+        fileno = self.dispatcher.get_tunnel()
+        self.send_message_to_handler(self.fileno, fileno, byte_data)

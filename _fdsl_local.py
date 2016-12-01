@@ -62,6 +62,12 @@ class fdslightlc(_fdsl.fdslight):
     def tunnel_fail(self):
         self.__tunnel_ok = False
 
+    def tunnel_is_ok(self):
+        return self.__tunnel_ok
+
+    def get_tunnel(self):
+        return self.__tun_fd
+
     def is_dns_request(self, packet):
         """是否是DNS请求"""
         protocol = packet[9]
