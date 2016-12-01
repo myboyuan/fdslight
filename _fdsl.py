@@ -70,13 +70,13 @@ class fdslight(dispatcher.dispatcher):
     def debug(self):
         return self.__debug
 
-    def init_func(self, mode, debug=True):
+    def init_func(self,debug=True):
         self.__debug = debug
         if debug:
-            self.__debug_run(mode)
+            self.debug_run()
             return
 
-        self.__run(mode)
+        self.run()
 
     def debug_run(self):
         self.__init()

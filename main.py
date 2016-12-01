@@ -78,7 +78,7 @@ def main():
         fdslight_ins = _fdsl_local.fdslightlc()
 
     try:
-        fdslight_ins.ioloop(m, debug=debug)
+        fdslight_ins.ioloop(debug=debug)
     except KeyboardInterrupt:
         _fdsl.clear_pid_file()
         sys.stdout.flush()
