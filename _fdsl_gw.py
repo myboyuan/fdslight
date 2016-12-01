@@ -8,6 +8,7 @@ import fdslight_etc.fn_gw as fnc_config
 import freenet.handler.tunnelgw_tcp as tunnelc_tcp
 import freenet.handler.tunnelgw_udp as tunnelc_udp
 import freenet.lib.whitelist as whitelist
+import freenet.lib.base_proto.utils as proto_utils
 
 
 class fdslightgw(_fdsl.fdslight):
@@ -27,13 +28,18 @@ class fdslightgw(_fdsl.fdslight):
     # 过滤器IP保存时间
     __FILTER_IP_LIFETIME = 1200
 
+    __session_id = None
+
     def __init__(self):
         super(fdslightgw, self).__init__()
-        self.set_mode("client")
+        self.set_mode("gateway")
         self.__timer = timer.timer()
         self.__wait_del_ips_from_filter = []
         self.__udp_no_proxy_clients = {}
         self.__udp_global_proxy_clients = {}
+
+        account = fnc_config.configs["account"]
+        self.__session_id = proto_utils.gen_session_id(account["username"], account["password"])
 
         udp_no_proxy_clients = fnc_config.configs["udp_no_proxy_clients"]
         udp_global_proxy_clients = fnc_config.configs["udp_global_proxy_clients"]
@@ -46,7 +52,7 @@ class fdslightgw(_fdsl.fdslight):
             naddr = socket.inet_aton(ipaddr)
             self.__udp_global_proxy_clients[naddr] = None
 
-    def create_fn_client(self):
+    def create_fn_gw(self):
         if not self.debug: _fdsl.create_pid_file(_fdsl.FDSL_PID_FILE, os.getpid())
 
         os.chdir("driver")
@@ -70,7 +76,7 @@ class fdslightgw(_fdsl.fdslight):
 
         blacklist = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
 
-        self.__dns_fd = self.create_handler(-1, dns_proxy.dnsc_proxy, blacklist, debug=self.debug)
+        self.__dns_fd = self.create_handler(-1, dns_proxy.dnsc_proxy, self.__session_id, blacklist, debug=self.debug)
 
         signal.signal(signal.SIGUSR1, self.__update_blacklist)
 
@@ -80,7 +86,7 @@ class fdslightgw(_fdsl.fdslight):
 
     def open_tunnel(self):
         tunnel_type = fnc_config.configs["tunnel_type"].lower()
-        args = (self.__dns_fd, self.__raw_socket_fd, self.__raw6_socket_fd,)
+        args = (self.__session_id,self.__dns_fd, self.raw_sock_fd, self.raw6_sock_fd)
         kwargs = {"debug": self.debug, "is_ipv6": False}
 
         if tunnel_type not in ("tcp6", "udp6", "tcp", "udp",): raise ValueError("not support tunnel type")
@@ -92,7 +98,7 @@ class fdslightgw(_fdsl.fdslight):
             tunnel = tunnelc_tcp.tunnelc_tcp
         self.__tunnel_fd = self.create_handler(-1, tunnel, *args, **kwargs)
 
-    def is_need_send_udp_to_tunnel(self, sippkt,dippkt):
+    def is_need_send_udp_to_tunnel(self, sippkt, dippkt):
         """是否需要发送UDP流量到隧道
         :param sippkt 源地址主机网络序地址
         :param dippkt 目的地址主机网络序地址
@@ -101,10 +107,9 @@ class fdslightgw(_fdsl.fdslight):
 
         if is_global: return True
         if sippkt in self.__udp_no_proxy_clients: return False
-        if sippkt in self.__udp_global_proxy_clients:return True
+        if sippkt in self.__udp_global_proxy_clients: return True
 
         return self.__whitelist.find(dippkt)
-
 
     def set_filter_fd(self, fileno):
         self.__filter_fd = fileno
@@ -114,7 +119,7 @@ class fdslightgw(_fdsl.fdslight):
         self.__timer.set_timeout(n, self.__FILTER_IP_LIFETIME)
 
     def myloop(self):
-        if not self.__tunnel_ok: return
+        if not self.handler_exists(self.__tunnel_fd): return
 
         for ip in self.__timer.get_timeout_names():
             if not self.__timer.exists(ip): continue

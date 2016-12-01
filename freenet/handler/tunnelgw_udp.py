@@ -35,7 +35,7 @@ class tunnelc_udp(udp_handler.udp_handler):
 
     __LOOP_TIMEOUT = 10
 
-    def init_func(self, creator_fd, dns_fd, raw_socket_fd, raw6_socket_fd,debug=False, is_ipv6=False):
+    def init_func(self, creator_fd, session_id, dns_fd, raw_socket_fd, raw6_socket_fd, debug=False, is_ipv6=False):
         self.__server = fnc_config.configs["udp_server_address"]
 
         name = "freenet.lib.crypto.%s" % fnc_config.configs["udp_crypto_module"]["name"]
@@ -53,8 +53,7 @@ class tunnelc_udp(udp_handler.udp_handler):
         self.__debug = debug
         self.__timer = timer.timer()
 
-        account = fnc_config.configs["account"]
-        self.__session_id = proto_utils.gen_session_id(account["username"], account["password"])
+        self.__session_id = session_id
 
         self.__traffic_send_fd = raw_socket_fd
         self.__traffic6_send_fd = raw6_socket_fd
@@ -66,7 +65,7 @@ class tunnelc_udp(udp_handler.udp_handler):
 
         self.set_socket(s)
         self.__dns_fd = dns_fd
-        self.dispatcher.bind_session_id(self.__session_id,self.fileno,"udp")
+        self.dispatcher.bind_session_id(self.__session_id, self.fileno, "udp")
 
         try:
             self.connect(self.__server)
@@ -78,6 +77,7 @@ class tunnelc_udp(udp_handler.udp_handler):
 
         self.__server_ipaddr = ipaddr
 
+        self.__init()
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
@@ -91,7 +91,15 @@ class tunnelc_udp(udp_handler.udp_handler):
 
         return self.fileno
 
-    def __handle_data(self, byte_data):
+    def __init(self):
+        self.__traffic_fetch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read)
+        n = utils.ip4s_2_number(self.__server_ipaddr)
+        fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
+        self.ctl_handler(self.fileno, self.__dns_fd, "set_filter_fileno", self.__traffic_fetch_fd)
+
+        return
+
+    def __handle_data_from_tunnel(self, byte_data):
         try:
             length = (byte_data[2] << 8) | byte_data[3]
         except IndexError:
@@ -104,27 +112,10 @@ class tunnelc_udp(udp_handler.udp_handler):
             return
         byte_data = byte_data[0:length]
         p = byte_data[9]
-
         # print("recv:",byte_data)
         # 过滤到不支持的协议
         if p not in (1, 6, 17,): return
-
-        return
-
-    def __handle_close(self):
-        # 先删除流量过滤handler,保证其它流量能够走客户端默认路由
-        self.print_access_log("close_connect")
-        self.delete_handler(self.fileno)
-
-    def __init(self):
-        self.__traffic_fetch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read)
-        n = utils.ip4s_2_number(self.__server_ipaddr)
-        fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
-
-        self.ctl_handler(self.fileno, self.__dns_fd, "as_tunnel_fd")
-        self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_open")
-        self.ctl_handler(self.fileno, self.__dns_fd, "set_filter_dev_fd", self.__traffic_fetch_fd)
-
+        self.send_message_to_handler(self.fileno,self.__traffic_send_fd,byte_data)
         return
 
     def __send_data(self, byte_data, action=tunnel_proto.ACT_DATA):
@@ -144,12 +135,13 @@ class tunnelc_udp(udp_handler.udp_handler):
         if not result: return
 
         session_id, action, byte_data = result
+        if session_id != self.__session_id: return
 
         if action not in tunnel_proto.ACTS:
             self.print_access_log("can_not_found_action_%s" % action)
             return
 
-        if action == tunnel_proto.ACT_DATA: self.__handle_data(byte_data)
+        if action == tunnel_proto.ACT_DATA: self.__handle_data_from_tunnel(byte_data)
         if action == tunnel_proto.ACT_DNS: self.send_message_to_handler(self.fileno, self.__dns_fd, byte_data)
 
     def udp_writable(self):
@@ -161,11 +153,9 @@ class tunnelc_udp(udp_handler.udp_handler):
 
     def udp_timeout(self):
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
-        self.__handle_close()
 
     def udp_delete(self):
-        self.unregister(self.fileno)
-        self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_close")
+        self.dispatcher.unbind_session_id(self.__session_id)
         self.unregister(self.fileno)
         self.delete_handler(self.__traffic_fetch_fd)
         self.socket.close()
@@ -184,7 +174,7 @@ class tunnelc_udp(udp_handler.udp_handler):
     def __handle_ipv4_traffic_from_lan(self, byte_data):
         protocol = byte_data[9]
         if protocol == 17 and not \
-                self.dispatcher.is_need_send_udp_to_tunnel(byte_data[12:16],byte_data[16:20]):
+                self.dispatcher.is_need_send_udp_to_tunnel(byte_data[12:16], byte_data[16:20]):
             self.dispatcher.send_msg_to_udp_proxy(self.__session_id, byte_data)
             return
 
@@ -216,10 +206,7 @@ class tunnelc_udp(udp_handler.udp_handler):
         sys.stdout.flush()
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd not in ("msg_from_udp_proxy", "request_dns",): return False
-        if cmd == "request_dns":
-            dns_msg, = args
-            self.__send_data(dns_msg, action=tunnel_proto.ACT_DNS)
-            return True
-        session_id, msg = args
-        self.send_message_to_handler(self.fileno, self.__traffic_send_fd, msg)
+        if cmd not in ("request_dns",): return False
+        dns_msg, = args
+        self.__send_data(dns_msg, action=tunnel_proto.ACT_DNS)
+        return True

@@ -133,15 +133,18 @@ class dnsd_proxy(dns_base):
     def udp_readable(self, message, address):
         dns_id = (message[0] << 8) | message[1]
         if not self.dns_id_map_exists(dns_id): return
-        from_fd, n_dns_id, session_id = self.get_dns_id_map(dns_id)
+        n_dns_id, session_id = self.get_dns_id_map(dns_id)
         L = list(message)
         L[0:2] = (
             (n_dns_id & 0xff00) >> 8,
             n_dns_id & 0x00ff,
         )
 
-        self.ctl_handler(self.fileno, from_fd, "response_dns", session_id, bytes(L))
+        if not self.dispatcher.is_bind_session(session_id): return
+        fileno, _ = self.dispatcher.get_bind_session(session_id)
+        self.ctl_handler(self.fileno, fileno, "response_dns", session_id, bytes(L))
         self.del_dns_id_map(dns_id)
+
         if self.__timer.exists(dns_id): self.__timer.drop(dns_id)
 
     def udp_writable(self):
@@ -159,7 +162,7 @@ class dnsd_proxy(dns_base):
         if cmd != "request_dns": return False
         dns_id = (message[0] << 8) | message[1]
         n_dns_id = self.get_dns_id(dns_id)
-        self.set_dns_id_map(n_dns_id, (from_fd, dns_id, session_id,))
+        self.set_dns_id_map(n_dns_id, (dns_id, session_id,))
 
         L = list(message)
         L[0:2] = (
@@ -192,14 +195,11 @@ class dnsc_proxy(dns_base):
 
     __transparent_dns = None
 
-    __tunnel_fd = -1
     __dev_fd = -1
-    __tunnel_is_open = False
-
-    # 是否是第一次调用
-    __is_first = True
     # dns flags集合
     __dns_flags = None
+
+    __session_id = None
 
     def __check_ipaddr(self, sts):
         """检查是否是IP地址
@@ -236,8 +236,9 @@ class dnsc_proxy(dns_base):
         if self.__timer.exists(dns_id): self.__timer.drop(dns_id)
         if dns_id in self.__dns_flags: del self.__dns_flags[dns_id]
 
-    def init_func(self, creator_fd, host_rules, debug=False):
+    def init_func(self, creator_fd, session_id, host_rules, debug=False):
         self.__transparent_dns = fn_config.configs["dns"]
+        self.__session_id = session_id
 
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -312,13 +313,15 @@ class dnsc_proxy(dns_base):
             self.__send_to_dns_server(self.__transparent_dns, message)
             return
 
-        #没有打开隧道,尝试打开隧道
-        if not self.__tunnel_is_open:self.dispatcher.open_tunnel()
-        # 如果隧道没有打开,那么抛弃黑名单内的DNS请求包
-        if not self.__tunnel_is_open: return
+        # 没有打开隧道,尝试打开隧道
+        if not self.dispatcher.is_bind_session(self.__session_id): self.dispatcher.open_tunnel()
+        # 打开隧道失败,直接丢弃数据包
+        if not self.dispatcher.is_bind_session(self.__session_id): return
+
+        fileno, _ = self.dispatcher.get_bind_session(self.__session_id)
 
         self.__dns_flags[n_dns_id] = flags
-        self.ctl_handler(self.fileno, self.__tunnel_fd, "request_dns", message)
+        self.ctl_handler(self.fileno, fileno, "request_dns", message)
 
     def message_from_handler(self, from_fd, byte_data):
         dns_id = byte_data[0] << 8 | byte_data[1]
@@ -353,15 +356,7 @@ class dnsc_proxy(dns_base):
     def udp_error(self):
         self.delete_handler(self.fileno)
 
-    def handler_ctl(self, from_fd, cmd, filter_dev=None):
-        if cmd not in (
-                "tunnel_close", "tunnel_open", "set_filter_dev_fd", "as_tunnel_fd",): return False
-        if cmd == "tunnel_close": self.__tunnel_is_open = False
-        if cmd == "tunnel_open": self.__tunnel_is_open = True
-
-        if cmd == "set_filter_dev_fd":
-            self.__dev_fd = filter_dev
-            if not self.__is_first: return
-            self.__is_first = False
-        if cmd == "as_tunnel_fd": self.__tunnel_fd = from_fd
+    def handler_ctl(self, from_fd, cmd, *args):
+        if cmd != "set_filter_fileno": return
+        self.__dev_fd, = args
         return

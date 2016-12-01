@@ -10,7 +10,7 @@ from Crypto.Cipher import AES
 import random, hashlib
 import freenet.lib.base_proto.tunnel_udp as tunnel
 
-FIXED_HEADER_SIZE = 48
+FIXED_HEADER_SIZE = 64
 
 
 class encrypt(tunnel.builder):
@@ -132,14 +132,15 @@ L = []
 for n in range(length):
     L.append(33)
 
-builder = encrypt("hello")
+key = "hello"
+builder = encrypt()
+builder.config({"key":key})
 
-print(builder.build_ping())
-packets = builder.build_packets(tunnel.ACT_DATA, length, bytes(L))
+packets = builder.build_packets(bytes(16),tunnel.ACT_DATA,b"hello")
 
-parser = decrypt("hello")
+parser = decrypt()
+parser.config({"key":"hello"})
 
-packets.pop(1)
 
 for pkt in packets:
     ret = parser.parse(pkt)

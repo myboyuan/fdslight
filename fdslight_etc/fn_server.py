@@ -47,6 +47,9 @@ configs = {
         }
     },
 
+    # 连接超时时间
+    "timeout": 900,
+
     # 认证模块,你可以编写自己的认证模块
     # 模块名即为tunnels_auth下的去掉后文件后缀名的名字
     "auth_module": "default",

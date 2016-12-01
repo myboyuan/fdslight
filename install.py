@@ -19,7 +19,7 @@ def main():
         return
 
     __mode = argv[0]
-    if __mode not in ("gateway", "server",):
+    if __mode not in ("gateway", "server","local"):
         print("the mode must be gateway or server")
         return
 
@@ -36,11 +36,11 @@ def main():
         )
         os.system(cmd)
 
-    if __mode == "client":
+    if __mode == "gateway":
         os.chdir("driver")
         os.system("make")
 
-    if not os.path.isfile("fdslight.ko") and __mode == "client":
+    if not os.path.isfile("fdslight.ko") and __mode == "gatway":
         print("install fdslight failed!!!")
         return
     ''''''

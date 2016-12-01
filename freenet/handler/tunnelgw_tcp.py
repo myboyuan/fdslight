@@ -33,7 +33,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
 
     __wait_sent = None
 
-    def init_func(self, creator_fd, dns_fd, raw_socket_fd, raw6_socket_fd, debug=False, is_ipv6=False):
+    def init_func(self, creator_fd, session_id, dns_fd, raw_socket_fd, raw6_socket_fd, debug=False, is_ipv6=False):
         taddr = fnc_config.configs["tcp_server_address"]
 
         if is_ipv6:
@@ -41,8 +41,11 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         else:
             s = socket.socket()
         self.__wait_sent = []
+        self.__session_id = session_id
 
         self.set_socket(s)
+        self.dispatcher.bind_session_id(self.__session_id, self.fileno, "tcp")
+        self.print_access_log("connect")
         self.connect(taddr, 6)
 
         crypto_info = fnc_config.configs["tcp_crypto_module"]
@@ -59,10 +62,6 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         self.__decrypt.config(crypto_info["configs"])
 
         self.__debug = debug
-
-        account = fnc_config.configs["account"]
-        self.__session_id = proto_utils.gen_session_id(account["username"], account["password"])
-
         self.__dns_fd = dns_fd
         self.__traffic_send_fd = raw_socket_fd
         self.__traffic6_send_fd = raw6_socket_fd
@@ -71,7 +70,6 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         if not self.__debug:
             sys.stdout = open(fnc_config.configs["access_log"], "a+")
             sys.stderr = open(fnc_config.configs["error_log"], "a+")
-
         return self.fileno
 
     def __send_data(self, sent_data, action=tunnel_tcp.ACT_DATA):
@@ -83,18 +81,18 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         self.add_evt_write(self.fileno)
 
     def connect_ok(self):
+        # 可能目标主机不可达到
+        try:
+            n = utils.ip4s_2_number(self.getpeername()[0])
+        except OSError:
+            self.delete_handler(self.fileno)
+            return
+
         self.print_access_log("connect_ok")
-
         self.__traffic_fetch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read)
-
-        n = utils.ip4s_2_number(self.getpeername()[0])
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
 
-        self.dispatcher.bind_session_id(self.__session_id, self.fileno, "tcp")
-
-        self.ctl_handler(self.fileno, self.__dns_fd, "as_tunnel_fd")
-        self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_open")
-        self.ctl_handler(self.fileno, self.__dns_fd, "set_filter_dev_fd", self.__traffic_fetch_fd)
+        self.ctl_handler(self.fileno, self.__dns_fd, "set_filter_fileno", self.__traffic_fetch_fd)
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
@@ -139,7 +137,8 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
     def __handle_dns(self, dns_msg):
         self.send_message_to_handler(self.fileno, self.__dns_fd, dns_msg)
 
-    def __handle_read(self, action, resp_data):
+    def __handle_read(self, session_id, action, resp_data):
+        if session_id != self.__session_id: returns
         if action not in tunnel_tcp.ACTS:
             self.print_access_log("not_support_action_type")
             return
@@ -174,6 +173,9 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         self.delete_handler(self.fileno)
 
     def tcp_timeout(self):
+        if not self.is_conn_ok():
+            self.delete_handler(self.fileno)
+            return
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def tcp_delete(self):
@@ -182,6 +184,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
             self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_close")
             self.unregister(self.fileno)
             self.delete_handler(self.__traffic_fetch_fd)
+        self.dispatcher.unbind_session_id(self.__session_id)
         self.close()
 
     def print_access_log(self, text):
@@ -195,7 +198,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         if cmd not in ("request_dns",): return
         if cmd == "request_dns":
             dns_msg, = args
-            if not self.connect_ok():
+            if not self.is_conn_ok():
                 self.__wait_sent.append((1, dns_msg))
                 return
             self.__send_dns(dns_msg)
@@ -204,7 +207,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
     def __handle_ipv4_traffic_from_lan(self, byte_data):
         protocol = byte_data[9]
         if protocol == 17 and not \
-                self.dispatcher.is_need_send_udp_to_tunnel(byte_data[12:16],byte_data[16:20]):
+                self.dispatcher.is_need_send_udp_to_tunnel(byte_data[12:16], byte_data[16:20]):
             self.dispatcher.send_msg_to_udp_proxy(self.__session_id, byte_data)
             return
 
@@ -221,10 +224,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         if ip_ver == 6: self.__handle_traffic_from_lan(byte_data)
 
     def message_from_handler(self, from_fd, byte_data):
-        if from_fd == self.__traffic_fetch_fd:
-            if not self.connect_ok():
-                self.__wait_sent.append((0, byte_data), )
-                return
-            self.__handle_traffic_from_lan(byte_data)
+        if not self.is_conn_ok():
+            self.__wait_sent.append((0, byte_data), )
             return
-        self.send_message_to_handler(self.fileno, self.__traffic_send_fd, byte_data)
+        self.__handle_traffic_from_lan(byte_data)

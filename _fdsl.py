@@ -3,7 +3,7 @@
 import pywind.evtframework.evt_dispatcher as dispatcher
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.checksum as checksum
-import sys, os, signal
+import sys, os, signal, socket
 
 pid_dir = "/var/log "
 FDSL_PID_FILE = "fdslight.pid"
@@ -63,14 +63,23 @@ class fdslight(dispatcher.dispatcher):
 
     def __init(self):
         self.create_poll()
+        if self.__mode == "local": return
         self.__raw_socket_fd = self.create_handler(-1, traffic_pass.traffic_send)
         # elf.__raw6_socket_fd = self.create_handler(-1, traffic_pass.traffic_send, is_ipv6=True)
+
+    @property
+    def raw_sock_fd(self):
+        return self.__raw_socket_fd
+
+    @property
+    def raw6_sock_fd(self):
+        return self.__raw6_socket_fd
 
     @property
     def debug(self):
         return self.__debug
 
-    def init_func(self,debug=True):
+    def init_func(self, debug=True):
         self.__debug = debug
         if debug:
             self.debug_run()
@@ -145,7 +154,7 @@ class fdslight(dispatcher.dispatcher):
 
         b, e = (ihl, ihl + 1,)
         sport = (message[b] << 8) | message[e]
-        saddr = message.inet_ntoa(message[12:16])
+        saddr = socket.inet_ntoa(message[12:16])
 
         if not self.__udp_proxy_exists(session_id, saddr, sport):
             self.__create_udp_proxy(session_id, saddr, sport)

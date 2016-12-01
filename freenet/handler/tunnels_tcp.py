@@ -58,7 +58,7 @@ class tunnel_tcp_listener(tcp_handler.tcp_handler):
                 return
             self.__curr_conns += 1
             self.create_handler(self.fileno, tunnels_tcp_handler,
-                                self.__tun_fd, self.__tun6_fd,
+                                self.__tun_fd, self.__tun6_fd, self.__dns_fd,
                                 cs, caddr, self.__auth_module, debug=self.__debug
                                 )
             ''''''
@@ -81,15 +81,8 @@ class tunnel_tcp_listener(tcp_handler.tcp_handler):
         self.close()
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd not in ("request_dns", "response_dns", "del_conn",): return None
+        if cmd not in ("del_conn",): return None
         if cmd == "del_conn": self.__curr_conns -= 1
-        if cmd == "request_dns":
-            dns_msg, = args
-            self.ctl_handler(self.fileno, self.__dns_fd, "request_dns", from_fd, dns_msg)
-        if cmd == "response_dns":
-            t_fd, resp_dns_msg, = args
-            if not self.handler_exists(t_fd): return None
-            self.ctl_handler(self.fileno, t_fd, "response_dns", resp_dns_msg)
 
         return None
 
@@ -110,16 +103,19 @@ class tunnels_tcp_handler(tcp_handler.tcp_handler):
 
     __tun_fd = -1
     __tun6_fd = -1
+    __dns_fd = -1
 
     __BUFSIZE = 16 * 1024
     __session_id = None
 
     __auth_module = None
 
-    def init_func(self, creator_fd, tun_fd, tun6_fd, cs, caddr, auth_module, debug=True):
+    def init_func(self, creator_fd, tun_fd, tun6_fd, dns_fd, cs, caddr, auth_module, debug=True):
         self.__debug = debug
         self.__caddr = caddr
         self.__auth_module = auth_module
+
+        self.__conn_timeout = int(fns_config.configs["timeout"])
 
         name = "freenet.lib.crypto.%s" % fns_config.configs["tcp_crypto_module"]["name"]
         __import__(name)
@@ -137,6 +133,8 @@ class tunnels_tcp_handler(tcp_handler.tcp_handler):
         self.__creator_fd = creator_fd
         self.__tun_fd = tun_fd
         self.__tun6_fd = tun6_fd
+        self.__dns_fd = dns_fd
+
         self.__conn_time = time.time()
 
         self.set_socket(cs)
@@ -190,7 +188,7 @@ class tunnels_tcp_handler(tcp_handler.tcp_handler):
         if ip_ver == 6: self.__handle_ipv6_data_from_tunnel(byte_data)
 
     def __handle_dns_request(self, dns_msg):
-        self.ctl_handler(self.fileno, self.__creator_fd, "request_dns", self.__session_id, dns_msg)
+        self.ctl_handler(self.fileno, self.__dns_fd, "request_dns", self.__session_id, dns_msg)
 
     def __handle_read(self, session_id, action, byte_data):
         if action not in tunnel_tcp.ACTS:
@@ -272,7 +270,7 @@ class tunnels_tcp_handler(tcp_handler.tcp_handler):
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
         if cmd not in ("response_dns", "msg_from_udp_proxy", "set_packet_session_id",): return False
         if cmd == "response_dns":
-            dns_msg, = args
+            session_id, dns_msg, = args
             self.__send_dns(dns_msg)
             return
         if cmd == "set_packet_session_id": return

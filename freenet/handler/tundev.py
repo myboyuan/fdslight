@@ -202,7 +202,7 @@ class tuns(tun_base):
         protocol = ip_packet[9]
         if protocol not in (1, 6, 17,): return
 
-        rs = self.dispatcher.get_ippkt2cLan_from_sLan(ip_packet)
+        rs = self.__nat.get_ippkt2cLan_from_sLan(ip_packet)
         if not rs: return
         session_id, msg = rs
         fileno, _ = self.dispatcher.get_bind_session(session_id)
@@ -238,6 +238,7 @@ class tuns(tun_base):
         self.add_to_sent_queue(n_ippkt)
 
     def dev_timeout(self):
+        self.__nat.recycle()
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
@@ -268,7 +269,5 @@ class tunlc(tun_base):
         self.unregister(self.fileno)
         os.close(self.fileno)
 
-    def message_from_handler(self,from_fd,byte_data):
+    def message_from_handler(self, from_fd, byte_data):
         pass
-
-

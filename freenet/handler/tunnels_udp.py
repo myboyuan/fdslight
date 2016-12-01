@@ -37,6 +37,8 @@ class tunnels_udp_listener(udp_handler.udp_handler):
         self.__debug = debug
         config = fns_config.configs
 
+        self.__SESSION_TIMEOUT= int(config["timeout"])
+
         # 导入加入模块
         name = "freenet.lib.crypto.%s" % config["udp_crypto_module"]["name"]
 
@@ -129,7 +131,6 @@ class tunnels_udp_listener(udp_handler.udp_handler):
         if protocol == 17:
             self.__handle_udp_data_from_tunnel(session_id, byte_data)
             return
-
         self.ctl_handler(self.fileno, self.__tun_fd, "set_packet_session_id", session_id)
         self.send_message_to_handler(self.fileno, self.__tun_fd, byte_data)
 
@@ -140,7 +141,7 @@ class tunnels_udp_listener(udp_handler.udp_handler):
         version = (byte_data[0] & 0xf0) >> 4
         if version not in (4, 6,): return
         if version == 4: self.__handle_ipv4_data_from_tunnel(session_id, byte_data)
-        if version == 6: self.__handle_ipv4_data_from_tunnel(session_id, byte_data)
+        if version == 6: self.__handle_ipv6_data_from_tunnel(session_id, byte_data)
 
         if self.__debug: self.print_access_log("recv_data", self.__sessions[session_id])
 
@@ -158,8 +159,7 @@ class tunnels_udp_listener(udp_handler.udp_handler):
         pkts = self.__encrypt.build_packets(session_id, tunnel_proto.ACT_DATA, byte_data)
         self.__encrypt.reset()
 
-        sts = "%s:%s" % address
-        if self.__debug: self.print_access_log("send_dns", sts)
+        if self.__debug: self.print_access_log("send_dns", address)
         for pkt in pkts:
             if not self.__auth_module.handle_send(session_id, len(byte_data)): return
             self.sendto(pkt, address)
@@ -256,5 +256,4 @@ class tunnels_udp_listener(udp_handler.udp_handler):
         sys.stdout.flush()
 
     def message_from_handler(self, from_fd, byte_data):
-        session_id = self.__cur_packet_session_id
-        self.__send_data(session_id, byte_data)
+        self.__send_data(self.__cur_packet_session_id, byte_data)

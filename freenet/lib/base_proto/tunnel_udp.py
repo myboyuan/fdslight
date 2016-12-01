@@ -10,7 +10,6 @@ reverse:4 bit 保留
 action:4bit 动作
 """
 import freenet.lib.base_proto.utils as proto_utils
-import freenet.lib.utils as utils
 
 ACT_DATA = 1
 ACT_DNS = 2
@@ -112,7 +111,7 @@ class builder(object):
         data_seq = []
         tmp_t = self.__get_sent_raw_data(data_len, byte_data)
         tot_seq = len(tmp_t)
-        md5_hash = utils.calc_content_md5(byte_data)
+        md5_hash = proto_utils.calc_content_md5(byte_data)
         seq = 1
         for block in tmp_t:
             size = len(block)
@@ -201,7 +200,7 @@ class parser(object):
         return pkt[0:self.__pkt_len]
 
     def __check_data_is_modify(self, md5, byte_data):
-        n_md5 = utils.calc_content_md5(byte_data)
+        n_md5 = proto_utils.calc_content_md5(byte_data)
         return md5 == n_md5
 
     def parse(self, packet):

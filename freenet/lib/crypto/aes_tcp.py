@@ -4,12 +4,13 @@
 import sys
 sys.path.append("../../../")
 """
+
 from Crypto.Cipher import AES
 import random, hashlib
 import freenet.lib.base_proto.tunnel_tcp as tunnel
-import freenet.lib.utils as proto_utils
+import freenet.lib.base_proto.utils as proto_utils
 
-FIXED_HEADER_SIZE = 32
+FIXED_HEADER_SIZE = 64
 
 
 class encrypt(tunnel.builder):
@@ -88,7 +89,6 @@ class decrypt(tunnel.parser):
 
         if tunnel.MIN_FIXED_HEADER_SIZE % 16 != 0:
             self.__const_fill = b"f" * (16 - tunnel.MIN_FIXED_HEADER_SIZE % 16)
-
         super(decrypt, self).__init__(FIXED_HEADER_SIZE)
 
     def unwrap_header(self, header_data):
@@ -121,19 +121,22 @@ class decrypt(tunnel.parser):
 
 
 """
+key="name"
+builder = encrypt()
+builder.config({"key":key})
 
-builder = encrypt("hello")
-e_rs = builder.build_packet(tunnel.ACT_DATA, 5, b"hello")
+e_rs = builder.build_packet(bytes(16),tunnel.ACT_DATA,b"hello")
 builder.reset()
 
-parser = decrypt("hello")
+parser = decrypt()
+parser.config({"key":"name"})
 parser.input(e_rs)
 
 while parser.can_continue_parse():
     parser.parse()
 print(parser.get_pkt())
 
-e_rs = builder.build_packet(tunnel.ACT_DATA, 5, b"world")
+e_rs = builder.build_packet(bytes(16),tunnel.ACT_DATA,b"world")
 builder.reset()
 parser.input(e_rs)
 
