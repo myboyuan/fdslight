@@ -243,3 +243,26 @@ class tuns(tun_base):
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
         if cmd not in ("set_packet_session_id",): return
         if cmd == "set_packet_session_id": self.__packet_session_id, = args
+
+
+class tunlc(tun_base):
+    def dev_init(self, dev_name, *args, **kwargs):
+        pass
+
+    def handle_ip_packet_from_read(self, ip_packet):
+        pass
+
+    def handle_ip_packet_for_write(self, ip_packet):
+        pass
+
+    def dev_timeout(self):
+        """重写这个方法
+        :return:
+        """
+        pass
+
+    def dev_delete(self):
+        """重写这个方法
+        :return:
+        """
+        pass

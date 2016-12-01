@@ -33,7 +33,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
 
     __wait_sent = None
 
-    def init_func(self, creator_fd, dns_fd, raw_socket_fd, raw6_socket_fd, whitelist, debug=False, is_ipv6=False):
+    def init_func(self, creator_fd, dns_fd, raw_socket_fd, raw6_socket_fd, debug=False, is_ipv6=False):
         taddr = fnc_config.configs["tcp_server_address"]
 
         if is_ipv6:
@@ -90,7 +90,6 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         n = utils.ip4s_2_number(self.getpeername()[0])
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
 
-        self.dispatcher.tunnel_ok()
         self.dispatcher.bind_session_id(self.__session_id, self.fileno, "tcp")
 
         self.ctl_handler(self.fileno, self.__dns_fd, "as_tunnel_fd")
@@ -184,7 +183,6 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
             self.unregister(self.fileno)
             self.delete_handler(self.__traffic_fetch_fd)
         self.close()
-        self.dispatcher.tunnel_fail()
 
     def print_access_log(self, text):
         t = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -210,6 +208,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
             self.dispatcher.send_msg_to_udp_proxy(self.__session_id, byte_data)
             return
 
+        self.dispatcher.update_filter_ip_access_time(utils.ip4b_2_number(byte_data[16:20]))
         self.__send_data(byte_data)
 
     def __handle_ipv6_traffic_from_lan(self, byte_data):

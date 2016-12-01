@@ -311,6 +311,9 @@ class dnsc_proxy(dns_base):
         if not is_match:
             self.__send_to_dns_server(self.__transparent_dns, message)
             return
+
+        #没有打开隧道,尝试打开隧道
+        if not self.__tunnel_is_open:self.dispatcher.open_tunnel()
         # 如果隧道没有打开,那么抛弃黑名单内的DNS请求包
         if not self.__tunnel_is_open: return
 

@@ -82,7 +82,8 @@ class fdslight(dispatcher.dispatcher):
         self.__init()
         if self.__mode == "server":
             self.create_fn_server()
-        if self.__mode == "client": self.create_fn_client()
+        if self.__mode == "gateway": self.create_fn_gw()
+        if self.__mode == "local": self.create_fn_local()
 
     def run(self):
         pid = os.fork()
@@ -96,7 +97,8 @@ class fdslight(dispatcher.dispatcher):
 
         self.__init()
         if self.__mode == "server": self.reate_fn_server()
-        if self.__mode == "client": self.create_fn_client()
+        if self.__mode == "gateway": self.create_fn_gw()
+        if self.__mode == "local": self.create_fn_local()
 
         return
 
@@ -192,7 +194,7 @@ class fdslight(dispatcher.dispatcher):
         return t[uniq_id]
 
     def send_msg_to_handler_from_udp_proxy(self, session_id, msg):
-        if self.__mode == "client":
+        if self.__mode == "gateway":
             ip_ver = msg[0] & 0xf0 >> 4
             raw_fd = self.__raw_socket_fd
             if ip_ver == 6: raw_fd = self.__raw6_socket_fd
@@ -204,13 +206,17 @@ class fdslight(dispatcher.dispatcher):
         self.ctl_handler(-1, fileno, "msg_from_udp_proxy", session_id, msg)
 
     def set_mode(self, mode):
-        if mode not in ("client", "server",): raise ValueError("the mode must be client or server")
+        if mode not in ("gateway", "server", "local",): raise ValueError("the mode must be client or server")
         self.__mode = mode
 
     def create_fn_server(self):
         """服务端重写这个方法"""
         pass
 
-    def create_fn_client(self):
-        """客户端重写这个方法"""
+    def create_fn_gw(self):
+        """网关模式重写这个方法"""
+        pass
+
+    def create_fn_local(self):
+        """本地模式重写这个方法"""
         pass

@@ -5,8 +5,8 @@ import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.file_parser as file_parser
 import freenet.handler.dns_proxy as dns_proxy
 import fdslight_etc.fn_gw as fnc_config
-import freenet.handler.tunnelc_tcp as tunnelc_tcp
-import freenet.handler.tunnelc_udp as tunnelc_udp
+import freenet.handler.tunnelgw_tcp as tunnelc_tcp
+import freenet.handler.tunnelgw_udp as tunnelc_udp
 import freenet.lib.whitelist as whitelist
 
 
@@ -14,7 +14,6 @@ class fdslightgw(_fdsl.fdslight):
     __tunnel_fd = -1
     __filter_fd = None
     __dns_fd = -1
-    __tunnel_ok = False
 
     __whitelist = None
 
@@ -76,24 +75,12 @@ class fdslightgw(_fdsl.fdslight):
         signal.signal(signal.SIGUSR1, self.__update_blacklist)
 
     def __update_blacklist(self, signum, frame):
-        import freenet.lib.file_parser as file_parser
         blacklist = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
         self.get_handler(self.__dns_fd).update_blacklist(blacklist)
 
-    def tunnel_fail(self):
-        """客户端隧道建立失败"""
-        self.__tunnel_ok = False
-
-    def tunnel_ok(self):
-        """客户端隧道建立成功"""
-        self.__tunnel_ok = True
-
-    def tunnel_is_ok(self):
-        return self.__tunnel_ok
-
     def open_tunnel(self):
         tunnel_type = fnc_config.configs["tunnel_type"].lower()
-        args = (self.__dns_fd, self.__raw_socket_fd, self.__raw6_socket_fd, self.__whitelist)
+        args = (self.__dns_fd, self.__raw_socket_fd, self.__raw6_socket_fd,)
         kwargs = {"debug": self.debug, "is_ipv6": False}
 
         if tunnel_type not in ("tcp6", "udp6", "tcp", "udp",): raise ValueError("not support tunnel type")

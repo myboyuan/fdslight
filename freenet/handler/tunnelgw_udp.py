@@ -9,8 +9,8 @@ import pywind.lib.timer as timer
 import freenet.lib.base_proto.tunnel_udp as tunnel_proto
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.fdsl_ctl as fdsl_ctl
-import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
+import freenet.lib.utils as utils
 
 
 class tunnelc_udp(udp_handler.udp_handler):
@@ -33,15 +33,9 @@ class tunnelc_udp(udp_handler.udp_handler):
     __server_ipaddr = None
     __timer = None
 
-    # 如果超过这个时间,那么将会从内核过滤器中删除
-    __IP_TIMEOUT = 1200
-
-    __force_udp_global_clients = None
-    __udp_no_proxy_clients = None
-
     __LOOP_TIMEOUT = 10
 
-    def init_func(self, creator_fd, dns_fd, raw_socket_fd, raw6_socket_fd, whitelist, debug=False, is_ipv6=False):
+    def init_func(self, creator_fd, dns_fd, raw_socket_fd, raw6_socket_fd,debug=False, is_ipv6=False):
         self.__server = fnc_config.configs["udp_server_address"]
 
         name = "freenet.lib.crypto.%s" % fnc_config.configs["udp_crypto_module"]["name"]
@@ -127,8 +121,6 @@ class tunnelc_udp(udp_handler.udp_handler):
         n = utils.ip4s_2_number(self.__server_ipaddr)
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
 
-        self.dispatcher.tunnel_ok()
-
         self.ctl_handler(self.fileno, self.__dns_fd, "as_tunnel_fd")
         self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_open")
         self.ctl_handler(self.fileno, self.__dns_fd, "set_filter_dev_fd", self.__traffic_fetch_fd)
@@ -180,7 +172,6 @@ class tunnelc_udp(udp_handler.udp_handler):
         self.unregister(self.fileno)
         self.delete_handler(self.__traffic_fetch_fd)
         self.socket.close()
-        self.dispatcher.ctunnel_fail()
 
     @property
     def encrypt(self):
@@ -200,6 +191,7 @@ class tunnelc_udp(udp_handler.udp_handler):
             self.dispatcher.send_msg_to_udp_proxy(self.__session_id, byte_data)
             return
 
+        self.dispatcher.update_filter_ip_access_time(utils.ip4b_2_number(byte_data[16:20]))
         self.__send_data(byte_data)
 
     def __handle_ipv6_traffic_from_lan(self, byte_data):
@@ -234,7 +226,3 @@ class tunnelc_udp(udp_handler.udp_handler):
             return True
         session_id, msg = args
         self.send_message_to_handler(self.fileno, self.__traffic_send_fd, msg)
-
-    def fn_get_session_id(self):
-        """重写这个方法"""
-        return bytes(16)

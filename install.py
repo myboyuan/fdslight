@@ -10,7 +10,7 @@ src_path_2 = "driver/py_fdsl_ctl.c"
 dst_path_1 = "freenet/lib/fn_utils.so"
 dst_path_2 = "freenet/lib/fdsl_ctl.so"
 
-__mode = "client"
+__mode = "gateway"
 
 def main():
     argv = sys.argv[1:]
@@ -19,8 +19,8 @@ def main():
         return
 
     __mode = argv[0]
-    if __mode not in ("client", "server",):
-        print("the mode must be client or server")
+    if __mode not in ("gateway", "server",):
+        print("the mode must be gateway or server")
         return
 
     py_include = argv[1]

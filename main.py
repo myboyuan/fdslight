@@ -5,10 +5,11 @@ import _fdsl
 d = os.path.dirname(sys.argv[0])
 sys.path.append(d)
 
+
 def main():
     help_doc = """
     -u blacklist                update blacklist
-    -m client | server          client or server
+    -m gateway | server | local gateway,server or local
     -d stop | start | debug     stop,start,debug
     -h                          print help
     """
@@ -44,7 +45,7 @@ def main():
         return
 
     if u == "blacklist" and size == 1:
-        update_blacklist()
+        _fdsl.update_blacklist()
         return
 
     if not m or not d:
@@ -55,7 +56,7 @@ def main():
         print(help_doc)
         return
 
-    if m not in ["gateway", "server"]:
+    if m not in ["gateway", "server", "local"]:
         print(help_doc)
         return
 
@@ -69,9 +70,12 @@ def main():
     if m == "server":
         import _fdsl_server
         fdslight_ins = _fdsl_server.fdslightd()
-    else:
+    elif m == "gateway":
         import _fdsl_gw
         fdslight_ins = _fdsl_gw.fdslightgw()
+    else:
+        import _fdsl_local
+        fdslight_ins = _fdsl_local.fdslightlc()
 
     try:
         fdslight_ins.ioloop(m, debug=debug)
