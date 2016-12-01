@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 import pywind.evtframework.handler.tcp_handler as tcp_handler
-import fdslight_etc.fn_client as fnc_config
+import fdslight_etc.fn_gw as fnc_config
 import socket, time, sys
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.base_proto.tunnel_tcp as tunnel_tcp
-import freenet.lib.whitelist as udp_whitelist
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
@@ -19,7 +18,6 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
     __decrypt = None
 
     __debug = None
-    __udp_whitelist = None
 
     __traffic_fetch_fd = -1
     __traffic_send_fd = -1
@@ -29,8 +27,6 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
 
     __timer = None
 
-    __force_udp_global_clients = None
-    __udp_no_proxy_clients = None
     __BUFSIZE = 16 * 1024
 
     __session_id = None
@@ -72,23 +68,9 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         self.__traffic6_send_fd = raw6_socket_fd
         self.__timer = timer.timer()
 
-        # 如果是非全局UDP代理,那么开启UDP白名单模式
-        if not fnc_config.configs["udp_global"]:
-            self.__udp_whitelist = udp_whitelist.whitelist()
-            for subn, mask in whitelist: self.__udp_whitelist.add_rule(subn, mask)
-
         if not self.__debug:
             sys.stdout = open(fnc_config.configs["access_log"], "a+")
             sys.stderr = open(fnc_config.configs["error_log"], "a+")
-
-        self.__force_udp_global_clients = {}
-        self.__udp_no_proxy_clients = {}
-        for client_ip in fnc_config.configs["udp_force_global_clients"]:
-            saddr = socket.inet_aton(client_ip)
-            self.__force_udp_global_clients[saddr] = None
-        for client_ip in fnc_config.configs["udp_no_proxy_clients"]:
-            saddr = socket.inet_aton(client_ip)
-            self.__udp_no_proxy_clients[saddr] = None
 
         return self.fileno
 
@@ -223,18 +205,11 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
 
     def __handle_ipv4_traffic_from_lan(self, byte_data):
         protocol = byte_data[9]
+        if protocol == 17 and not \
+                self.dispatcher.is_need_send_udp_to_tunnel(byte_data[12:16],byte_data[16:20]):
+            self.dispatcher.send_msg_to_udp_proxy(self.__session_id, byte_data)
+            return
 
-        udp_proxy = False
-        saddr = byte_data[12:16]
-
-        if protocol == 17 and saddr in self.__force_udp_global_clients: udp_proxy = True
-
-        # 处理UDP代理
-        if protocol == 17 and not fnc_config.configs["udp_global"] and not udp_proxy:
-            if self.__udp_whitelist.find(byte_data[16:20]) or (saddr in self.__udp_no_proxy_clients):
-                self.dispatcher.send_msg_to_udp_proxy(self.__session_id, byte_data)
-                return
-            ''''''
         self.__send_data(byte_data)
 
     def __handle_ipv6_traffic_from_lan(self, byte_data):

@@ -49,7 +49,7 @@ configs = {
     "udp_global": 0,
 
     # 强迫一些客户端进行全局UDP代理,如果 udp_global为1，那么这个选项可忽略
-    "udp_force_global_clients": [
+    "udp_global_proxy_clients": [
         # "192.168.1.2","192.168.1.3",
     ],
 

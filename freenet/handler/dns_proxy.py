@@ -3,7 +3,7 @@ import pywind.evtframework.handler.udp_handler as udp_handler
 import pywind.lib.timer as timer
 import random, socket, os, json, sys
 import dns.message
-import fdslight_etc.fn_client as fn_config
+import fdslight_etc.fn_gw as fn_config
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.utils as utils
 
