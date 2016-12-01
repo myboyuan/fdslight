@@ -76,7 +76,7 @@ class fdslightgw(_fdsl.fdslight):
 
         blacklist = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
 
-        self.__dns_fd = self.create_handler(-1, dns_proxy.dnsc_proxy, self.__session_id, blacklist, debug=self.debug)
+        self.__dns_fd = self.create_handler(-1, dns_proxy.dnsgw_proxy, self.__session_id, blacklist, debug=self.debug)
 
         signal.signal(signal.SIGUSR1, self.__update_blacklist)
 

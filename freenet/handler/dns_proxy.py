@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import pywind.evtframework.handler.udp_handler as udp_handler
 import pywind.lib.timer as timer
-import random, socket, os, json, sys
+import random, socket, sys
 import dns.message
 import fdslight_etc.fn_gw as fn_config
 import freenet.lib.fdsl_ctl as fdsl_ctl
@@ -183,7 +183,7 @@ class dnsd_proxy(dns_base):
         sys.exit(-1)
 
 
-class dnsc_proxy(dns_base):
+class dnsgw_proxy(dns_base):
     """客户端的DNS代理"""
     __host_match = None
     __timer = None
@@ -324,7 +324,7 @@ class dnsc_proxy(dns_base):
         self.ctl_handler(self.fileno, fileno, "request_dns", message)
 
     def message_from_handler(self, from_fd, byte_data):
-        dns_id = byte_data[0] << 8 | byte_data[1]
+        dns_id = (byte_data[0] << 8) | byte_data[1]
         if dns_id not in self.__dns_flags: return
         msg = dns.message.from_wire(byte_data)
         for rrset in msg.answer:
@@ -360,3 +360,98 @@ class dnsc_proxy(dns_base):
         if cmd != "set_filter_fileno": return
         self.__dev_fd, = args
         return
+
+
+class dnslocal_proxy(udp_handler.udp_handler):
+    __LOOP_TIMEOUT = 10
+    # DNS查询超时时间
+    __DNS_QUERY_TIMEOUT = 6
+    __timer = None
+
+    __dns_map = None
+    __tun_fd = -1
+
+    __session_id = None
+    __match = None
+
+    def init_func(self, creator, session_id, tun_fd, dns_server):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        self.set_socket(s)
+        try:
+            self.connect((dns_server, 53))
+        except socket.gaierror:
+            self.close()
+            return -1
+
+        self.__timer = timer.timer()
+        self.__dns_map = {}
+        self.__tun_fd = tun_fd
+        self.__match = _host_match()
+
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
+
+        self.__session_id = session_id
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+
+        return self.fileno
+
+    def udp_readable(self, message, address):
+        pass
+
+    def udp_writable(self):
+        self.remove_evt_write(self.fileno)
+
+    def udp_delete(self):
+        self.unregister(self.fileno)
+        self.close()
+
+    def udp_timeout(self):
+        names = self.__timer.get_timeout_names()
+        for name in names:
+            if not self.__timer.exists(name): continue
+            del self.__dns_map[name]
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+
+    def message_from_handler(self, from_fd, byte_data):
+        if from_fd == self.__tun_fd:
+            self.__handle_dnsmsg_from_tun(byte_data)
+            return
+        self.__handle_dnsmsg_from_tunnel(byte_data)
+
+    def update_blacklist(self, rules):
+        """更新黑名列表"""
+        pass
+
+    def __handle_dnsmsg_from_tun(self, byte_data):
+        ihl = (byte_data[0] & 0x0f) * 4
+        a = ihl + 8
+
+        dns_msg = byte_data[a:]
+        dns_id = (dns_msg[0] << 8) | dns_msg[1]
+
+        msg = dns.message.from_wire(dns_msg)
+
+        questions = msg.question
+
+        if len(questions) != 1 or msg.opcode() != 0:
+            self.__send_to_dns_server(self.__transparent_dns, msg)
+            return
+
+        q = questions[0]
+        host = b".".join(q.name[0:-1]).decode("iso-8859-1")
+        is_match, flags = self.__host_match.match(host)
+
+        if not is_match:
+            self.send(dns_msg)
+            return
+
+    def __handle_dnsmsg_from_tunnel(self, message):
+        dns_id = (message[0] << 8) | message[1]
+        if dns_id not in self.__dns_map: return
+
+        caddr, cport, dns_server_addr = self.__dns_map[dns_id]
+        # 伪造DNS数据包
+        pkts = utils.build_udp_packets(dns_server_addr, caddr, 53, cport, message)
+        for pkt in pkts: self.send_message_to_handler(self.fileno, self.__tun_fd, pkt)

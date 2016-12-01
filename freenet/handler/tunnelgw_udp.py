@@ -70,7 +70,7 @@ class tunnelc_udp(udp_handler.udp_handler):
         try:
             self.connect(self.__server)
         except socket.gaierror:
-            self.dispatcher.tunnel_fail()
+            self.close()
             return -1
 
         ipaddr, _ = s.getpeername()

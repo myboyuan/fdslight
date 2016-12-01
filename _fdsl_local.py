@@ -26,6 +26,7 @@ class fdslightlc(_fdsl.fdslight):
         for ipaddr in servers:
             naddr = socket.inet_aton(ipaddr)
             self.__dns_servers[naddr] = None
+        self.__dns_map={}
         return
 
     def create_fn_local(self):
@@ -65,19 +66,15 @@ class fdslightlc(_fdsl.fdslight):
         """是否是DNS请求"""
         protocol = packet[9]
         ihl = (packet[0] & 0x0f) * 4
-        pkt_len = (packet[2] << 8) | packet[3]
-        if protocol != 17: return (False, None,)
+        if protocol != 17: return False
         a = ihl + 2
         b = a + 1
 
         dport = (packet[a] << 8) | packet[b]
-        if dport != 53: return (False,None,)
+        if dport != 53: return False
         daddr = packet[16:20]
-        if daddr not in self.__dns_servers: return (False,None,)
-        n = ihl + 8
-        dns_msg = packet[n:pkt_len]
 
-        return (True,dns_msg,)
+        return daddr in self.__dns_servers
 
     def get_tunnel_fileno(self):
         return self.__tunnel_fd
