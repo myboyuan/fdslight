@@ -204,6 +204,7 @@ class tuns(tun_base):
         rs = self.__nat.get_ippkt2cLan_from_sLan(ip_packet)
         if not rs: return
         session_id, msg = rs
+        if not self.dispatcher.is_bind_session(session_id):return
         fileno, _ = self.dispatcher.get_bind_session(session_id)
 
         if not self.handler_exists(fileno): return
