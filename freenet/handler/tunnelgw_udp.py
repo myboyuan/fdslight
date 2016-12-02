@@ -95,7 +95,6 @@ class tunnelc_udp(udp_handler.udp_handler):
         self.__traffic_fetch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read)
         n = utils.ip4s_2_number(self.__server_ipaddr)
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
-        self.ctl_handler(self.fileno, self.__dns_fd, "set_filter_fileno", self.__traffic_fetch_fd)
 
         return
 

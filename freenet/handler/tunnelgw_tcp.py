@@ -91,8 +91,6 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         self.__traffic_fetch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read)
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
 
-        self.ctl_handler(self.fileno, self.__dns_fd, "set_filter_fileno", self.__traffic_fetch_fd)
-
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 

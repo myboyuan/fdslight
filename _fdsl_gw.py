@@ -9,6 +9,7 @@ import freenet.handler.tunnelgw_tcp as tunnelc_tcp
 import freenet.handler.tunnelgw_udp as tunnelc_udp
 import freenet.lib.whitelist as whitelist
 import freenet.lib.base_proto.utils as proto_utils
+import freenet.lib.utils as utils
 
 
 class fdslightgw(_fdsl.fdslight):
@@ -86,7 +87,7 @@ class fdslightgw(_fdsl.fdslight):
 
     def open_tunnel(self):
         tunnel_type = fngw_config.configs["tunnel_type"].lower()
-        args = (self.__session_id,self.__dns_fd, self.raw_sock_fd, self.raw6_sock_fd)
+        args = (self.__session_id, self.__dns_fd, self.raw_sock_fd, self.raw6_sock_fd)
         kwargs = {"debug": self.debug, "is_ipv6": False}
 
         if tunnel_type not in ("tcp6", "udp6", "tcp", "udp",): raise ValueError("not support tunnel type")
@@ -117,6 +118,13 @@ class fdslightgw(_fdsl.fdslight):
     def update_filter_ip_access_time(self, n):
         """更新过滤器IP访问时间"""
         self.__timer.set_timeout(n, self.__FILTER_IP_LIFETIME)
+
+    def add_to_filter(self, ipaddr):
+        if not self.is_bind_session(self.__session_id): return
+        n = utils.ip4s_2_number(ipaddr)
+
+        self.__timer.set_timeout(n, self.__FILTER_IP_LIFETIME)
+        fdsl_ctl.tf_record_add(self.__filter_fd, )
 
     def myloop(self):
         if not self.handler_exists(self.__tunnel_fd): return

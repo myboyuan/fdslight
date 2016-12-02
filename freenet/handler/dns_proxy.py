@@ -4,8 +4,6 @@ import pywind.lib.timer as timer
 import random, socket, sys
 import dns.message
 import fdslight_etc.fn_gw as fn_config
-import freenet.lib.fdsl_ctl as fdsl_ctl
-import freenet.lib.utils as utils
 
 
 class _host_match(object):
@@ -195,7 +193,6 @@ class dnsgw_proxy(dns_base):
 
     __transparent_dns = None
 
-    __dev_fd = -1
     # dns flags集合
     __dns_flags = None
 
@@ -331,7 +328,7 @@ class dnsgw_proxy(dns_base):
             for cname in rrset:
                 ip = cname.__str__()
                 if not self.__check_ipaddr(ip): continue
-                fdsl_ctl.tf_record_add(self.__dev_fd, utils.ip4s_2_number(ip))
+                self.dispatcher.add_to_filter(ip)
                 ''''''
         self.__send_to_client(byte_data)
 
@@ -340,7 +337,7 @@ class dnsgw_proxy(dns_base):
 
     def udp_delete(self):
         self.unregister(self.fileno)
-        self.socket.close()
+        self.close()
 
     def udp_timeout(self):
         # 清除超时的DNS ID占用的资源,节约内存
@@ -356,7 +353,3 @@ class dnsgw_proxy(dns_base):
     def udp_error(self):
         self.delete_handler(self.fileno)
 
-    def handler_ctl(self, from_fd, cmd, *args):
-        if cmd != "set_filter_fileno": return
-        self.__dev_fd, = args
-        return
