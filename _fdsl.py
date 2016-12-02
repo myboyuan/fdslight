@@ -134,10 +134,23 @@ class fdslight(dispatcher.dispatcher):
         if not t: del self.__udp_proxy_sessions[session_id]
 
     def __send_ipv4_msg_to_udp_proxy(self, session_id, message):
-        length = (message[2] << 3) | message[3]
+        # 检查长度是否合法
         msg_len = len(message)
         if msg_len < 21: return
-        if length != len(message): return
+
+        ihl = (message[0] & 0x0f) * 4
+        pkt_len = (message[2] << 8) | message[3]
+        b = ihl + 4
+        e = b + 1
+        udp_len = (message[b] << 8) | message[e]
+        offset = ((message[6] & 0x1f) << 5) | message[7]
+        flags = ((message[6]) & 0xe0) >> 5
+        df = (flags & 0x2) >> 1
+        mf = flags & 0x1
+
+        if df and udp_len >= pkt_len: return
+        if udp_len == 0 and offset == 0: return
+        if df == 0 and mf == 1 and offset == 0 and udp_len < 512: return
 
         ihl = (message[0] & 0x0f) * 4
         offset = ((message[6] & 0x1f) << 5) | message[7]
@@ -146,7 +159,7 @@ class fdslight(dispatcher.dispatcher):
         if offset:
             L = list(message)
             checksum.modify_address(b"\0\0\0\0", L, checksum.FLAG_MODIFY_SRC_IP)
-            self.send_message_to_handler(self.fileno, self.__raw_socket_fd, bytes(L))
+            self.send_message_to_handler(-1, self.__raw_socket_fd, bytes(L))
             return
 
         b, e = (ihl, ihl + 1,)
@@ -156,6 +169,7 @@ class fdslight(dispatcher.dispatcher):
         if not self.__udp_proxy_exists(session_id, saddr, sport):
             self.__create_udp_proxy(session_id, saddr, sport)
         fileno = self.__get_udp_proxy(session_id, saddr, sport)
+
         self.send_message_to_handler(-1, fileno, message)
 
     def __send_ipv6_msg_to_udp_proxy(self, session_id, message):

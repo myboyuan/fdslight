@@ -167,7 +167,6 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         self.remove_evt_write(self.fileno)
 
     def tcp_error(self):
-        self.print_access_log("disconnect")
         self.delete_handler(self.fileno)
 
     def tcp_timeout(self):
@@ -177,11 +176,11 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def tcp_delete(self):
+        self.print_access_log("disconnect")
         self.unregister(self.fileno)
-        if self.is_conn_ok():
-            self.ctl_handler(self.fileno, self.__dns_fd, "tunnel_close")
-            self.unregister(self.fileno)
-            self.delete_handler(self.__traffic_fetch_fd)
+
+        if self.is_conn_ok(): self.delete_handler(self.__traffic_fetch_fd)
+
         self.dispatcher.unbind_session_id(self.__session_id)
         self.close()
 

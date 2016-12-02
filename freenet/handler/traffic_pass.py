@@ -158,7 +158,6 @@ class traffic_send(handler.handler):
 
 class udp_proxy(udp_handler.udp_handler):
     __bind_address = None
-    __lan_address = None
     __internet_ip = None
 
     # UDP会话超时时间,如果超过这个时间,将从认证会话中删除
@@ -207,7 +206,6 @@ class udp_proxy(udp_handler.udp_handler):
         return self.fileno
 
     def udp_readable(self, message, address):
-        if not self.__lan_address: return
         saddr, sport = address
 
         # 检查源IP是否合法,如果客户机没有发送过,那么丢弃这个UDP包
@@ -219,14 +217,13 @@ class udp_proxy(udp_handler.udp_handler):
             family = socket.AF_INET
 
         n_saddr = socket.inet_pton(family, saddr)
-        n_daddr = socket.inet_aton(family, self.__ipaddr)
+        n_daddr = socket.inet_pton(family, self.__ipaddr)
 
         # 预留IPv6接口
         if self.__is_ipv6:
             return
         else:
             udp_packets = utils.build_udp_packets(n_saddr, n_daddr, sport, self.__port, message)
-
         for udp_pkt in udp_packets:
             self.dispatcher.send_msg_to_handler_from_udp_proxy(
                 self.__uniq_id, udp_pkt
@@ -261,20 +258,6 @@ class udp_proxy(udp_handler.udp_handler):
         e = e + 1
         L[b:e] = ((bind_port & 0xff00) >> 8, bind_port & 0x00ff,)
 
-        # 检查长度是否合法
-        pkt_len = (byte_data[2] << 8) | byte_data[3]
-        b = ihl + 4
-        e = b + 1
-        udp_len = (byte_data[b] << 8) | byte_data[e]
-        offset = ((byte_data[6] & 0x1f) << 5) | byte_data[7]
-        flags = ((byte_data[6]) & 0xe0) >> 5
-        df = (flags & 0x2) >> 1
-        mf = flags & 0x1
-
-        if df and udp_len >= pkt_len: return
-        if udp_len == 0: return
-        if df == 0 and mf == 1 and offset == 0 and udp_len < 512: return
-
         b = ihl + 6
         e = b + 2
 
@@ -284,7 +267,6 @@ class udp_proxy(udp_handler.udp_handler):
         self.__modify_src_address(bind_addr_pkt, L)
 
         message = bytes(L)
-
         self.__internet_ip[dst_addr] = sport
         self.__timer.set_timeout(dst_addr, self.__UDP_SESSION_TIMEOUT)
         self.send_message_to_handler(self.fileno, self.__raw_socket_fd, message)
