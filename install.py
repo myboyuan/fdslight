@@ -19,7 +19,7 @@ def main():
         return
 
     __mode = argv[0]
-    if __mode not in ("gateway", "server","local"):
+    if __mode not in ("gateway", "server",):
         print("the mode must be gateway or server")
         return
 

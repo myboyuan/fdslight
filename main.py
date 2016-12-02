@@ -9,7 +9,7 @@ sys.path.append(d)
 def main():
     help_doc = """
     -u blacklist                update blacklist
-    -m gateway | server | local gateway,server or local
+    -m gateway | server         gateway,server
     -d stop | start | debug     stop,start,debug
     -h                          print help
     """
