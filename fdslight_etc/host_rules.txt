@@ -108,6 +108,10 @@
 # 华尔街日报
 *.wsj.com:1
 
+# 苹果日报
+*.appledaily.com:1
+*.appledaily.com.tw:1
+
 # 网络存储
 *.dropbox.com:1
 *.dropboxstatic.com:0

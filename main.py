@@ -36,7 +36,7 @@ def main():
             return
         continue
 
-    if u not in ("blacklist", "whitelist",) and u != "":
+    if u not in ("host_rules",) and u != "":
         print(help_doc)
         return
 
@@ -45,7 +45,7 @@ def main():
         return
 
     if u == "host_rules" and size == 1:
-        _fdsl.update_blacklist()
+        _fdsl.update_host_rules()
         return
 
     if not m or not d:
