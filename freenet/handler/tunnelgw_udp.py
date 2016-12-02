@@ -3,7 +3,7 @@
 隧道客户端基本类
 """
 import socket, sys, time
-import fdslight_etc.fn_gw as fnc_config
+import fdslight_etc.fn_gw as fngw_config
 import pywind.evtframework.handler.udp_handler as udp_handler
 import pywind.lib.timer as timer
 import freenet.lib.base_proto.tunnel_udp as tunnel_proto
@@ -36,13 +36,13 @@ class tunnelc_udp(udp_handler.udp_handler):
     __LOOP_TIMEOUT = 10
 
     def init_func(self, creator_fd, session_id, dns_fd, raw_socket_fd, raw6_socket_fd, debug=False, is_ipv6=False):
-        self.__server = fnc_config.configs["udp_server_address"]
+        self.__server = fngw_config.configs["udp_server_address"]
 
-        name = "freenet.lib.crypto.%s" % fnc_config.configs["udp_crypto_module"]["name"]
+        name = "freenet.lib.crypto.%s" % fngw_config.configs["udp_crypto_module"]["name"]
         __import__(name)
         m = sys.modules.get(name, None)
 
-        crypto_config = fnc_config.configs["udp_crypto_module"]["configs"]
+        crypto_config = fngw_config.configs["udp_crypto_module"]["configs"]
 
         self.__encrypt_m = m.encrypt()
         self.__decrypt_m = m.decrypt()
@@ -82,10 +82,10 @@ class tunnelc_udp(udp_handler.udp_handler):
         self.add_evt_read(self.fileno)
 
         if not self.__debug:
-            sys.stdout = open(fnc_config.configs["access_log"], "a+")
-            sys.stderr = open(fnc_config.configs["error_log"], "a+")
+            sys.stdout = open(fngw_config.configs["access_log"], "a+")
+            sys.stderr = open(fngw_config.configs["error_log"], "a+")
 
-        account = fnc_config.configs["account"]
+        account = fngw_config.configs["account"]
         self.__session_id = proto_utils.gen_session_id(account["username"], account["password"])
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 

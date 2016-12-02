@@ -8,6 +8,7 @@ import fdslight_etc.fn_server as fns_config
 import freenet.handler.tundev as tundev
 import freenet.lib.static_nat as static_nat
 
+
 class fdslightd(_fdsl.fdslight):
     def __init__(self):
         super(fdslightd, self).__init__()

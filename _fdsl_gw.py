@@ -4,7 +4,7 @@ import pywind.lib.timer as timer
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.file_parser as file_parser
 import freenet.handler.dns_proxy as dns_proxy
-import fdslight_etc.fn_gw as fnc_config
+import fdslight_etc.fn_gw as fngw_config
 import freenet.handler.tunnelgw_tcp as tunnelc_tcp
 import freenet.handler.tunnelgw_udp as tunnelc_udp
 import freenet.lib.whitelist as whitelist
@@ -38,11 +38,11 @@ class fdslightgw(_fdsl.fdslight):
         self.__udp_no_proxy_clients = {}
         self.__udp_global_proxy_clients = {}
 
-        account = fnc_config.configs["account"]
+        account = fngw_config.configs["account"]
         self.__session_id = proto_utils.gen_session_id(account["username"], account["password"])
 
-        udp_no_proxy_clients = fnc_config.configs["udp_no_proxy_clients"]
-        udp_global_proxy_clients = fnc_config.configs["udp_global_proxy_clients"]
+        udp_no_proxy_clients = fngw_config.configs["udp_no_proxy_clients"]
+        udp_global_proxy_clients = fngw_config.configs["udp_global_proxy_clients"]
 
         for ipaddr in udp_no_proxy_clients:
             naddr = socket.inet_aton(ipaddr)
@@ -85,7 +85,7 @@ class fdslightgw(_fdsl.fdslight):
         self.get_handler(self.__dns_fd).update_blacklist(blacklist)
 
     def open_tunnel(self):
-        tunnel_type = fnc_config.configs["tunnel_type"].lower()
+        tunnel_type = fngw_config.configs["tunnel_type"].lower()
         args = (self.__session_id,self.__dns_fd, self.raw_sock_fd, self.raw6_sock_fd)
         kwargs = {"debug": self.debug, "is_ipv6": False}
 
@@ -103,7 +103,7 @@ class fdslightgw(_fdsl.fdslight):
         :param sippkt 源地址主机网络序地址
         :param dippkt 目的地址主机网络序地址
         """
-        is_global = fnc_config.configs["udp_global"]
+        is_global = fngw_config.configs["udp_global"]
 
         if is_global: return True
         if sippkt in self.__udp_no_proxy_clients: return False

@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 import pywind.evtframework.handler.tcp_handler as tcp_handler
-import fdslight_etc.fn_gw as fnc_config
+import fdslight_etc.fn_gw as fngw_config
 import socket, time, sys
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.base_proto.tunnel_tcp as tunnel_tcp
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.utils as utils
-import freenet.lib.base_proto.utils as proto_utils
 
 import pywind.lib.timer as timer
 
@@ -34,7 +33,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
     __wait_sent = None
 
     def init_func(self, creator_fd, session_id, dns_fd, raw_socket_fd, raw6_socket_fd, debug=False, is_ipv6=False):
-        taddr = fnc_config.configs["tcp_server_address"]
+        taddr = fngw_config.configs["tcp_server_address"]
 
         if is_ipv6:
             s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
@@ -48,7 +47,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         self.print_access_log("connect")
         self.connect(taddr, 6)
 
-        crypto_info = fnc_config.configs["tcp_crypto_module"]
+        crypto_info = fngw_config.configs["tcp_crypto_module"]
         name = crypto_info["name"]
         name = "freenet.lib.crypto.%s" % name
 
@@ -68,8 +67,8 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         self.__timer = timer.timer()
 
         if not self.__debug:
-            sys.stdout = open(fnc_config.configs["access_log"], "a+")
-            sys.stderr = open(fnc_config.configs["error_log"], "a+")
+            sys.stdout = open(fngw_config.configs["access_log"], "a+")
+            sys.stderr = open(fngw_config.configs["error_log"], "a+")
         return self.fileno
 
     def __send_data(self, sent_data, action=tunnel_tcp.ACT_DATA):
@@ -189,7 +188,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
 
     def print_access_log(self, text):
         t = time.strftime("%Y-%m-%d %H:%M:%S")
-        addr = "%s:%s" % fnc_config.configs["tcp_server_address"]
+        addr = "%s:%s" % fngw_config.configs["tcp_server_address"]
         echo = "%s        %s        %s" % (text, addr, t)
         print(echo)
         sys.stdout.flush()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import _fdsl, os
+import _fdsl, os, sys
 import freenet.handler.tunnellc_tcp as tunnellc_tcp
 import freenet.handler.tunnellc_udp as tunnellc_udp
 import freenet.handler.tundev as tundev
@@ -47,10 +47,10 @@ class fdslightlc(_fdsl.fdslight):
         self.__session_id = proto_utils.gen_session_id(username, password)
 
     def create_fn_local(self):
-        self.__dns_fd=self.create_handler(-1,dns_proxy.dnslocal_proxy,
-                                          self.__session_id,self.__tun_fd,fnlc_config.configs["dns"]
-                                          )
-        self.__tun_fd = self.create_handler(-1, tundev.tunlc, self.__DEV_NAME,self.__dns_fd)
+        self.__dns_fd = self.create_handler(-1, dns_proxy.dnslocal_proxy,
+                                            self.__session_id, self.__tun_fd, fnlc_config.configs["dns"]
+                                            )
+        self.__tun_fd = self.create_handler(-1, tundev.tunlc, self.__DEV_NAME, self.__dns_fd)
 
     def set_router(self, ipaddr, prefix):
         name = "%s/%s" % (ipaddr, prefix)
