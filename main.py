@@ -71,8 +71,8 @@ def main():
         import _fdsl_server
         fdslight_ins = _fdsl_server.fdslightd()
     else:
-        import _fdsl_local
-        fdslight_ins = _fdsl_local.fdslightlc()
+        import _fdsl_gw
+        fdslight_ins = _fdsl_gw.fdslightgw()
 
     try:
         fdslight_ins.ioloop(debug=debug)
