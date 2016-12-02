@@ -33,7 +33,7 @@ def stop_service():
     os.kill(pid, signal.SIGINT)
 
 
-def update_blacklist():
+def update_host_rules():
     """更新黑名单"""
     pid = get_process_id(FDSL_PID_FILE)
     if pid < 1:

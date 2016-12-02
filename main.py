@@ -8,7 +8,7 @@ sys.path.append(d)
 
 def main():
     help_doc = """
-    -u blacklist                update blacklist
+    -u host_rules               update host rules
     -m gateway | server         gateway,server
     -d stop | start | debug     stop,start,debug
     -h                          print help
@@ -44,7 +44,7 @@ def main():
         print(help_doc)
         return
 
-    if u == "blacklist" and size == 1:
+    if u == "host_rules" and size == 1:
         _fdsl.update_blacklist()
         return
 

@@ -173,6 +173,7 @@ class tunnelc_udp(udp_handler.udp_handler):
 
     def __handle_ipv4_traffic_from_lan(self, byte_data):
         protocol = byte_data[9]
+        print(protocol)
         if protocol == 17 and not \
                 self.dispatcher.is_need_send_udp_to_tunnel(byte_data[12:16], byte_data[16:20]):
             self.dispatcher.send_msg_to_udp_proxy(self.__session_id, byte_data)

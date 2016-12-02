@@ -75,15 +75,15 @@ class fdslightgw(_fdsl.fdslight):
         self.__whitelist = whitelist.whitelist()
         for rule in whitelist_rules: self.__whitelist.add_rule(*rule)
 
-        blacklist = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
+        host_rules = file_parser.parse_host_file("fdslight_etc/host_rules.txt")
 
-        self.__dns_fd = self.create_handler(-1, dns_proxy.dnsgw_proxy, self.__session_id, blacklist, debug=self.debug)
+        self.__dns_fd = self.create_handler(-1, dns_proxy.dnsgw_proxy, self.__session_id, host_rules, debug=self.debug)
 
-        signal.signal(signal.SIGUSR1, self.__update_blacklist)
+        signal.signal(signal.SIGUSR1, self.__update_host_rules)
 
-    def __update_blacklist(self, signum, frame):
-        blacklist = file_parser.parse_host_file("fdslight_etc/blacklist.txt")
-        self.get_handler(self.__dns_fd).update_blacklist(blacklist)
+    def __update_host_rules(self, signum, frame):
+        host_rules = file_parser.parse_host_file("fdslight_etc/host_rules.txt")
+        self.get_handler(self.__dns_fd).update_host_rules(host_rules)
 
     def open_tunnel(self):
         tunnel_type = fngw_config.configs["tunnel_type"].lower()

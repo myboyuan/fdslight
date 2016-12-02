@@ -257,7 +257,7 @@ class dnsgw_proxy(dns_base):
 
         return self.fileno
 
-    def update_blacklist(self, host_rules):
+    def update_host_rules(self, host_rules):
         """更新黑名单"""
         self.__host_match.clear()
         for rule in host_rules: self.__host_match.add_rule(rule)
@@ -312,6 +312,12 @@ class dnsgw_proxy(dns_base):
 
         # 没有打开隧道,尝试打开隧道
         if not self.dispatcher.is_bind_session(self.__session_id): self.dispatcher.open_tunnel()
+
+        # 打开隧道,支持白名单
+        if is_match and flags == 2:
+            self.__send_to_dns_server(self.__transparent_dns, message)
+            return
+
         # 打开隧道失败,直接丢弃数据包
         if not self.dispatcher.is_bind_session(self.__session_id): return
 
@@ -328,7 +334,7 @@ class dnsgw_proxy(dns_base):
             for cname in rrset:
                 ip = cname.__str__()
                 if not self.__check_ipaddr(ip): continue
-                self.dispatcher.add_to_filter(ip)
+                if self.__dns_flags[dns_id] == 1: self.dispatcher.add_to_filter(ip)
                 ''''''
         self.__send_to_client(byte_data)
 
@@ -352,4 +358,3 @@ class dnsgw_proxy(dns_base):
 
     def udp_error(self):
         self.delete_handler(self.fileno)
-
