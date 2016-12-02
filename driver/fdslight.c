@@ -145,7 +145,7 @@ static unsigned int fdsl_push_packet_to_user(struct iphdr *ip_header)
     return NF_DROP;
 }
 
-static unsigned int hanle_udp_in(struct iphdr *ip_header)
+static unsigned int handle_udp_in(struct iphdr *ip_header)
 // 处理UDP
 {
     unsigned short sport,dport;
@@ -212,7 +212,7 @@ static unsigned int nf_handle_in(
 	protocol=ip_header->protocol;
 	switch(protocol){
 	    case IPPROTO_UDP:
-	        return hanle_udp_in(ip_header);
+	        return handle_udp_in(ip_header);
 	    case IPPROTO_TCP:
 	        return handle_tcp_and_icmp_in(ip_header);
 	    case IPPROTO_ICMP:

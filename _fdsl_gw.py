@@ -106,8 +106,9 @@ class fdslightgw(_fdsl.fdslight):
         is_global = fngw_config.configs["udp_global"]
 
         if is_global: return True
-        if sippkt in self.__udp_no_proxy_clients: return False
+        print("--------")
         if sippkt in self.__udp_global_proxy_clients: return True
+        if sippkt in self.__udp_no_proxy_clients: return False
 
         return self.__whitelist.find(dippkt)
 

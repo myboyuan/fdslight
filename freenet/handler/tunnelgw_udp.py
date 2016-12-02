@@ -115,7 +115,7 @@ class tunnelc_udp(udp_handler.udp_handler):
         # print("recv:",byte_data)
         # 过滤到不支持的协议
         if p not in (1, 6, 17,): return
-        self.send_message_to_handler(self.fileno,self.__traffic_send_fd,byte_data)
+        self.send_message_to_handler(self.fileno, self.__traffic_send_fd, byte_data)
         return
 
     def __send_data(self, byte_data, action=tunnel_proto.ACT_DATA):
@@ -177,8 +177,7 @@ class tunnelc_udp(udp_handler.udp_handler):
                 self.dispatcher.is_need_send_udp_to_tunnel(byte_data[12:16], byte_data[16:20]):
             self.dispatcher.send_msg_to_udp_proxy(self.__session_id, byte_data)
             return
-
-        self.dispatcher.update_filter_ip_access_time(utils.ip4b_2_number(byte_data[16:20]))
+        if protocol != 17: self.dispatcher.update_filter_ip_access_time(utils.ip4b_2_number(byte_data[16:20]))
         self.__send_data(byte_data)
 
     def __handle_ipv6_traffic_from_lan(self, byte_data):
