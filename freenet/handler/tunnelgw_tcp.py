@@ -209,8 +209,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
                 self.dispatcher.is_need_send_udp_to_tunnel(byte_data[12:16], byte_data[16:20]):
             self.dispatcher.send_msg_to_udp_proxy(self.__session_id, byte_data)
             return
-
-        self.dispatcher.update_filter_ip_access_time(utils.ip4b_2_number(byte_data[16:20]))
+        if protocol != 17: self.dispatcher.update_filter_ip_access_time(utils.ip4b_2_number(byte_data[16:20]))
         self.__send_data(byte_data)
 
     def __handle_ipv6_traffic_from_lan(self, byte_data):
