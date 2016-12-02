@@ -178,5 +178,6 @@ zh.foxtube.com:1
 
 ### 游戏联机
 *.playstation.net:2
+*.playstation.com:2
 
 #   详见： http://hikinggfw.org/blacklist/
