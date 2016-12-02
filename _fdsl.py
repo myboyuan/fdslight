@@ -5,7 +5,7 @@ import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.checksum as checksum
 import sys, os, signal, socket
 
-pid_dir = "/var/log "
+pid_dir = "/var/log"
 FDSL_PID_FILE = "fdslight.pid"
 
 
