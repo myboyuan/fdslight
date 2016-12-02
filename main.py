@@ -56,7 +56,7 @@ def main():
         print(help_doc)
         return
 
-    if m not in ["gateway", "server", "local"]:
+    if m not in ["gateway", "server"]:
         print(help_doc)
         return
 
@@ -70,9 +70,6 @@ def main():
     if m == "server":
         import _fdsl_server
         fdslight_ins = _fdsl_server.fdslightd()
-    elif m == "gateway":
-        import _fdsl_gw
-        fdslight_ins = _fdsl_gw.fdslightgw()
     else:
         import _fdsl_local
         fdslight_ins = _fdsl_local.fdslightlc()

@@ -137,7 +137,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         self.send_message_to_handler(self.fileno, self.__dns_fd, dns_msg)
 
     def __handle_read(self, session_id, action, resp_data):
-        if session_id != self.__session_id: returns
+        if session_id != self.__session_id: return
         if action not in tunnel_tcp.ACTS:
             self.print_access_log("not_support_action_type")
             return
