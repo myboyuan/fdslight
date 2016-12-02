@@ -103,7 +103,7 @@ class fdslight(dispatcher.dispatcher):
         if pid != 0: sys.exit(0)
 
         self.__init()
-        if self.__mode == "server": self.reate_fn_server()
+        if self.__mode == "server": self.create_fn_server()
         if self.__mode == "gateway": self.create_fn_gw()
 
         return
