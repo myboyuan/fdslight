@@ -106,11 +106,10 @@ class fdslightgw(_fdsl.fdslight):
         is_global = fngw_config.configs["udp_global"]
 
         if is_global: return True
-        print("--------")
         if sippkt in self.__udp_global_proxy_clients: return True
         if sippkt in self.__udp_no_proxy_clients: return False
 
-        return self.__whitelist.find(dippkt)
+        return not self.__whitelist.find(dippkt)
 
     def set_filter_fd(self, fileno):
         self.__filter_fd = fileno
