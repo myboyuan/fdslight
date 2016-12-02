@@ -124,7 +124,7 @@ class fdslightgw(_fdsl.fdslight):
         n = utils.ip4s_2_number(ipaddr)
 
         self.__timer.set_timeout(n, self.__FILTER_IP_LIFETIME)
-        fdsl_ctl.tf_record_add(self.__filter_fd, )
+        fdsl_ctl.tf_record_add(self.__filter_fd,n)
 
     def myloop(self):
         if not self.handler_exists(self.__tunnel_fd): return
