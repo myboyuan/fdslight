@@ -418,10 +418,7 @@ class dnslocal_proxy(udp_handler.udp_handler):
         self.delete_handler(self.fileno)
 
     def message_from_handler(self, from_fd, byte_data):
-        if from_fd == self.__tun_fd:
-            self.__handle_dnsmsg_from_tun(byte_data)
-            return
-        self.__handle_dnsmsg_from_tunnel(byte_data)
+        self.__handle_dnsmsg_from_tun(byte_data)
 
     def update_blacklist(self, rules):
         """更新黑名列表"""
@@ -448,7 +445,7 @@ class dnslocal_proxy(udp_handler.udp_handler):
         questions = msg.question
         dns_id = (dns_msg[0] << 8) | dns_msg[1]
 
-        self.__dns_map[dns_id] = (saddr, daddr, sport,)
+        self.__dns_map[dns_id] = [saddr, daddr, sport, False]
         self.__timer.set_timeout(dns_id, self.__DNS_QUERY_TIMEOUT)
 
         if len(questions) != 1 or msg.opcode() != 0:
@@ -463,7 +460,9 @@ class dnslocal_proxy(udp_handler.udp_handler):
             self.__send_dns_request_transparent(dns_msg)
             return
 
-        if not self.dispatcher.is_bind_session(self.__session_id): return
+        self.__dns_map[dns_id][3] = True
+        if not self.dispatcher.is_bind_session(self.__session_id):
+            self.dispatcher.open_tunnel()
         fileno, _ = self.dispatcher.get_bind_session(self.__session_id)
         self.ctl_handler(self.fileno, fileno, "request_dns", dns_msg)
 
@@ -471,9 +470,18 @@ class dnslocal_proxy(udp_handler.udp_handler):
         dns_id = (message[0] << 8) | message[1]
         if dns_id not in self.__dns_map: return
 
-        caddr, cport, dns_server_addr = self.__dns_map[dns_id]
+        caddr, cport, dns_server_addr, is_from_tunnel = self.__dns_map[dns_id]
         # 伪造DNS数据包
         pkts = utils.build_udp_packets(dns_server_addr, caddr, 53, cport, message)
+        if is_from_tunnel:
+            msg = dns.message.from_wire(message)
+            for rrset in msg.answer:
+                for cname in rrset:
+                    ip = cname.__str__()
+                    if self.dispatcher.is_set_router(ip, 32): continue
+                    self.dispatcher.set_router(ip, 32)
+                ''''''
+            ''''''
         for pkt in pkts: self.send_message_to_handler(self.fileno, self.__tun_fd, pkt)
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):

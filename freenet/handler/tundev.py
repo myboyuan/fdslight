@@ -246,14 +246,19 @@ class tuns(tun_base):
 
 
 class tunlc(tun_base):
-    def dev_init(self, dev_name, *args, **kwargs):
-        pass
+    __dns_fd = None
+
+    def dev_init(self, dev_name, dns_fd):
+        self.__dns_fd = dns_fd
 
     def handle_ip_packet_from_read(self, ip_packet):
         if self.dispatcher.is_dns_request(ip_packet):
             self.__handle_dns_request(ip_packet)
             return
 
+        daddr = socket.inet_ntoa(ip_packet[16:20])
+
+        self.dispatcher.update_router_access_time(daddr, 32)
         self.__send_data_to_tunnel(ip_packet)
 
     def handle_ip_packet_for_write(self, ip_packet):
@@ -277,12 +282,10 @@ class tunlc(tun_base):
         self.add_to_sent_queue(byte_data)
 
     def __handle_dns_request(self, byte_data):
-        pass
+        self.send_message_to_handler(self.fileno, self.__dns_fd, byte_data)
 
     def __send_data_to_tunnel(self, byte_data):
-        if not self.dispatcher.tunnel_is_ok():
-            self.dispatcher.open_tunnel()
+        if not self.dispatcher.tunnel_is_ok(): self.dispatcher.open_tunnel()
         if not self.dispatcher.tunnel_is_ok(): return
-
         fileno = self.dispatcher.get_tunnel()
         self.send_message_to_handler(self.fileno, fileno, byte_data)

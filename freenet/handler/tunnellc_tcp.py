@@ -6,7 +6,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
     __encrypt=None
     __decrypt=None
 
-    def init_func(self, creator, tun_fd, is_ipv6=False):
+    def init_func(self, creator, session_id,tun_fd,dns_fd, is_ipv6=False):
         pass
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):

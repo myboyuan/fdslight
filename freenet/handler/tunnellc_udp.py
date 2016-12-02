@@ -7,7 +7,7 @@ class tunnelc_udp(udp_handler.udp_handler):
     __encrypt = None
     __decrypt = None
 
-    def init_func(self, creator, tun_fd, is_ipv6=False):
+    def init_func(self, creator, session_id,tun_fd,dns_fd, is_ipv6=False):
         pass
 
     def udp_readable(self, message, address):
