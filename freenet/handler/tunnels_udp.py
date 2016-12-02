@@ -111,9 +111,8 @@ class tunnels_udp_listener(udp_handler.udp_handler):
         if session_id not in self.__sessions: return
 
         address = self.__sessions[session_id]
-        sts = "%s:%s" % address
 
-        self.print_access_log("disconnect", sts)
+        self.print_access_log("disconnect", address)
         self.__auth_module.handle_close(session_id)
         self.dispatcher.unbind_session(session_id)
 
