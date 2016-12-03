@@ -33,12 +33,14 @@ class tunnellc_udp(udp_handler.udp_handler):
             family = socket.AF_INET
 
         s = socket.socket(family, socket.SOCK_DGRAM)
-        self.set_timeout(s)
+        self.set_socket(s)
+        self.set_timeout(self.fileno,self.__LOOP_TIMEOUT)
 
         try:
             self.connect(address)
         except socket.gaierror:
-            self.delete_handler(self.fileno)
+            self.close()
+            return -1
 
         self.dispatcher.tunnel_ok()
         self.register(self.fileno)

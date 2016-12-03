@@ -383,7 +383,6 @@ class dnslc_proxy(udp_handler.udp_handler):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         self.set_socket(s)
-
         self.connect((remote_nameserver, 53))
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
@@ -405,7 +404,7 @@ class dnslc_proxy(udp_handler.udp_handler):
         else:
             return
 
-        sport = (a << 8) | b
+        sport = (byte_data[a] << 8) | byte_data[b]
         dns_id = (message[0] << 8) | message[1]
 
         msg = dns.message.from_wire(message)
@@ -424,20 +423,17 @@ class dnslc_proxy(udp_handler.udp_handler):
         q = questions[0]
         host = b".".join(q.name[0:-1]).decode("iso-8859-1")
         pos = host.find(".")
-
         if pos > 0 and self.__debug: print(host)
-        is_match, flags = self.__host_match.match(host)
+        is_match, flags = self.__match.match(host)
 
         if not is_match:
             self.__send_dns_to_remote_ns(message)
             return
-
         self.__dns_map[dns_id][2] = flags
         # 没有打开隧道,尝试打开隧道
         if not self.dispatcher.tunnel_is_ok(): self.dispatcher.open_tunnel()
         # 打开隧道失败,直接丢弃数据包
         if not self.dispatcher.tunnel_is_ok(): return
-
         fileno = self.dispatcher.get_tunnel()
         self.ctl_handler(self.fileno, fileno, "request_dns", message)
 
@@ -452,9 +448,9 @@ class dnslc_proxy(udp_handler.udp_handler):
                 ip = cname.__str__()
                 if flags == 1: self.dispatcher.set_router(ip)
             ''''''
+
         # 欺骗主机
         pkts = utils.build_udp_packets(self.__virt_ns_naddr, daddr, 53, dport, message)
-
         tun_fd = self.dispatcher.get_tun()
         for pkt in pkts:
             self.send_message_to_handler(self.fileno, tun_fd, pkt)
@@ -484,6 +480,12 @@ class dnslc_proxy(udp_handler.udp_handler):
 
     def udp_timeout(self):
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+        names = self.__timer.get_timeout_names()
+        for name in names:
+            if not self.__timer.exists(name): continue
+            self.__timer.drop(name)
+            del self.__dns_map[name]
+        return
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
         if cmd != "response_dns": return

@@ -251,9 +251,11 @@ class tunlc(tun_base):
 
     def dev_init(self, dev_name, is_ipv6=False):
         self.__is_ipv6 = is_ipv6
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
 
     def handle_ip_packet_from_read(self, ip_packet):
-        if self.dispatcher.is_dns_request:
+        if self.dispatcher.is_dns_request(ip_packet):
             fileno = self.dispatcher.get_dns()
             self.send_message_to_handler(self.fileno, fileno, ip_packet)
             return

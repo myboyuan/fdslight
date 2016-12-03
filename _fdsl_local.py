@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 import freenet.handler.dns_proxy as dns_proxy
 import fdslight_etc.fn_local as fnlc_config
-import _fdsl, os, socket, sys
+import _fdsl, os, socket, sys, signal
 import freenet.handler.tundev as tundev
 import pywind.lib.timer as timer
 import freenet.handler.tunnellc_tcp as tunnellc_tcp
 import freenet.handler.tunnellc_udp as tunnellc_udp
 import freenet.lib.base_proto.utils as proto_utils
+import freenet.lib.file_parser as file_parser
 
 
 class fdslightlc(_fdsl.fdslight):
@@ -56,31 +57,39 @@ class fdslightlc(_fdsl.fdslight):
 
         self.__nameserver = socket.inet_aton(fnlc_config.configs["virtual_dns"])
         self.__dns_fd = self.create_handler(-1, dns_proxy.dnslc_proxy, *args)
+        self.__update_host_rules()
 
+        signal.signal(signal.SIGUSR1, self.__update_host_rules)
         # 设置DNS路由
         cmd = "route add -host %s dev %s" % (fnlc_config.configs["virtual_dns"], self.__TUN_NAME)
         os.system(cmd)
 
+    def __update_host_rules(self):
+        host_rules = file_parser.parse_host_file("fdslight_etc/host_rules.txt")
+        self.get_handler(self.__dns_fd).update_host_rules(host_rules)
+
     def __is_ipv4_dns_request(self, byte_data):
-        if len(byte_data) < 28: return
+        if len(byte_data) < 28: return False
+        if byte_data[9] != 17: return False
 
         ihl = (byte_data[0] & 0x0f) * 4
         daddr = byte_data[16:20]
+
         if daddr != self.__nameserver: return False
         a, b = (ihl + 2, ihl + 3)
-        dport = (a << 8) | b
+        dport = (byte_data[a] << 8) | byte_data[b]
 
         return dport == 53
 
-    def __is_ipv6_dns_request(self):
+    def __is_ipv6_dns_request(self, byte_data):
         return False
 
     def is_dns_request(self, byte_data):
         ip_ver = (byte_data[0] & 0xf0) >> 4
         if ip_ver not in (4, 6,): return
 
-        if ip_ver == 4: return self.__is_ipv4_dns_request()
-        return self.__is_ipv6_dns_request()
+        if ip_ver == 4: return self.__is_ipv4_dns_request(byte_data)
+        return self.__is_ipv6_dns_request(byte_data)
 
     def tunnel_is_ok(self):
         return self.__tunnel_ok
@@ -99,7 +108,7 @@ class fdslightlc(_fdsl.fdslight):
 
     def open_tunnel(self):
         tunnel_type = fnlc_config.configs["tunnel_type"].lower()
-        kwargs = {"debug": self.debug, "is_ipv6": False}
+        kwargs = {"is_ipv6": False}
 
         if tunnel_type not in ("tcp6", "udp6", "tcp", "udp",): raise ValueError("not support tunnel type")
         if tunnel_type in ("tcp6", "udp6",): kwargs["is_ipv6"] = True
@@ -112,7 +121,7 @@ class fdslightlc(_fdsl.fdslight):
 
     def set_router(self, ipaddr):
         if ipaddr in self.__routers: return
-        cmd = "route add -host %s/%s dev %s" % (ipaddr,self.__TUN_NAME)
+        cmd = "route add -host %s/%s dev %s" % (ipaddr, self.__TUN_NAME)
         os.system(cmd)
         self.__routers[ipaddr] = None
         self.__timer.set_timeout(ipaddr, self.__ROUTER_TIMEOUT)
@@ -120,7 +129,7 @@ class fdslightlc(_fdsl.fdslight):
     def del_router(self, ipaddr):
         if ipaddr not in self.__routers: return
 
-        cmd = "route del -host %s dev %s" % (ipaddr,self.__TUN_NAME)
+        cmd = "route del -host %s dev %s" % (ipaddr, self.__TUN_NAME)
         os.system(cmd)
         del self.__routers[ipaddr]
 
