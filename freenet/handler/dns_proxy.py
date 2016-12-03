@@ -393,6 +393,22 @@ class dnslc_proxy(udp_handler.udp_handler):
         self.add_evt_write(self.fileno)
         self.send(message)
 
+    def __check_ipaddr(self, sts):
+        """检查是否是IP地址
+        :param sts:
+        :return:
+        """
+        tmplist = sts.split(".")
+        if len(tmplist) != 4:
+            return False
+
+        for i in tmplist:
+            try:
+                _ = int(i)
+            except ValueError:
+                return False
+        return True
+
     def __handle_data_from_tun(self, byte_data):
         ip_ver = (byte_data[0] & 0xf0) >> 4
 
@@ -446,6 +462,7 @@ class dnslc_proxy(udp_handler.udp_handler):
         for rrset in msg.answer:
             for cname in rrset:
                 ip = cname.__str__()
+                if not self.__check_ipaddr(ip): continue
                 if flags == 1: self.dispatcher.set_router(ip)
             ''''''
 

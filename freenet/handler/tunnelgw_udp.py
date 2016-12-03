@@ -31,7 +31,6 @@ class tunnelc_udp(udp_handler.udp_handler):
 
     # 服务端IP地址
     __server_ipaddr = None
-    __timer = None
 
     __LOOP_TIMEOUT = 10
 
@@ -51,7 +50,6 @@ class tunnelc_udp(udp_handler.udp_handler):
         self.__decrypt_m.config(crypto_config)
 
         self.__debug = debug
-        self.__timer = timer.timer()
 
         self.__session_id = session_id
 

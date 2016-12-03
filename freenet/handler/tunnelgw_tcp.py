@@ -24,8 +24,6 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
 
     __dns_fd = -1
 
-    __timer = None
-
     __BUFSIZE = 16 * 1024
 
     __session_id = None
@@ -64,7 +62,6 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         self.__dns_fd = dns_fd
         self.__traffic_send_fd = raw_socket_fd
         self.__traffic6_send_fd = raw6_socket_fd
-        self.__timer = timer.timer()
 
         return self.fileno
 

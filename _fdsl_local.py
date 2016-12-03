@@ -8,6 +8,7 @@ import freenet.handler.tunnellc_tcp as tunnellc_tcp
 import freenet.handler.tunnellc_udp as tunnellc_udp
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.file_parser as file_parser
+import dns.resolver
 
 
 class fdslightlc(_fdsl.fdslight):
@@ -56,7 +57,7 @@ class fdslightlc(_fdsl.fdslight):
         )
 
         self.__nameserver = socket.inet_aton(fnlc_config.configs["virtual_dns"])
-        self.__dns_fd = self.create_handler(-1, dns_proxy.dnslc_proxy, *args)
+        self.__dns_fd = self.create_handler(-1, dns_proxy.dnslc_proxy, *args, debug=self.debug)
         self.__update_host_rules()
 
         signal.signal(signal.SIGUSR1, self.__update_host_rules)
@@ -121,7 +122,7 @@ class fdslightlc(_fdsl.fdslight):
 
     def set_router(self, ipaddr):
         if ipaddr in self.__routers: return
-        cmd = "route add -host %s/%s dev %s" % (ipaddr, self.__TUN_NAME)
+        cmd = "route add -host %s dev %s" % (ipaddr, self.__TUN_NAME)
         os.system(cmd)
         self.__routers[ipaddr] = None
         self.__timer.set_timeout(ipaddr, self.__ROUTER_TIMEOUT)
@@ -152,3 +153,25 @@ class fdslightlc(_fdsl.fdslight):
 
     def get_tun(self):
         return self.__tun_fd
+
+    def get_ipaddr(self, s, is_ipv6=False):
+        """获取ip地址"""
+        if is_ipv6:
+            family = socket.AF_INET6
+        else:
+            family = socket.AF_INET
+        is_host = False
+        try:
+            socket.inet_pton(family, s)
+        except:
+            is_host = True
+        # 如果不是主机,那么就是IP地址
+        if not is_host: return s
+        my_resolver = dns.resolver.Resolver()
+        my_resolver.nameservers = [fnlc_config.configs["remote_dns"], ]
+
+        addrs = []
+        anwer = my_resolver.query(s, "a")
+        for r in anwer: addrs.append(r.__str__())
+
+        return addrs.pop(0)

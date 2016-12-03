@@ -21,24 +21,28 @@ class tunnellc_udp(udp_handler.udp_handler):
 
         crypto_config = fnlc_config.configs["udp_crypto_module"]["configs"]
 
-        self.__encrypt_m = m.encrypt()
-        self.__decrypt_m = m.decrypt()
+        self.__encrypt = m.encrypt()
+        self.__decrypt = m.decrypt()
 
-        self.__encrypt_m.config(crypto_config)
-        self.__decrypt_m.config(crypto_config)
+        self.__encrypt.config(crypto_config)
+        self.__decrypt.config(crypto_config)
+
+        self.__session_id=session_id
 
         if is_ipv6:
-            s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         else:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.set_socket(s)
 
-        self.connect(address)
+        # 如果是域名,那么获取真是IP地址,防止死循环查询
+        ipaddr = self.dispatcher.get_ipaddr(address[0])
+
+        self.connect((ipaddr, address[1]))
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
         self.dispatcher.tunnel_ok()
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
-
 
         return self.fileno
 
@@ -52,8 +56,8 @@ class tunnellc_udp(udp_handler.udp_handler):
     def __send_data(self, byte_data, action=tunnel_udp.ACT_DATA):
         # if self.__debug: self.print_access_log("send_data")
         try:
-            ippkts = self.__encrypt_m.build_packets(self.__session_id, action, byte_data)
-            self.__encrypt_m.reset()
+            ippkts = self.__encrypt.build_packets(self.__session_id, action, byte_data)
+            self.__encrypt.reset()
         except ValueError:
             return
         # print("send:", byte_data)
@@ -68,7 +72,7 @@ class tunnellc_udp(udp_handler.udp_handler):
         if ip_ver == 6: self.__handle_ipv6_data_from_tunnel(byte_data)
 
     def udp_readable(self, message, address):
-        result = self.__decrypt_m.parse(message)
+        result = self.__decrypt.parse(message)
         if not result: return
 
         session_id, action, byte_data = result
