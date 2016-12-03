@@ -58,7 +58,7 @@ class fdslightlc(_fdsl.fdslight):
         self.__dns_fd = self.create_handler(-1, dns_proxy.dnslc_proxy, *args)
 
         # 设置DNS路由
-        cmd = "route add -net %s/32 dev %s" % (fnlc_config.configs["virtual_dns"], self.__TUN_NAME)
+        cmd = "route add -host %s dev %s" % (fnlc_config.configs["virtual_dns"], self.__TUN_NAME)
         os.system(cmd)
 
     def __is_ipv4_dns_request(self, byte_data):
