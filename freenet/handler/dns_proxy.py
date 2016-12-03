@@ -368,16 +368,13 @@ class dnslc_proxy(udp_handler.udp_handler):
     __DNS_QUERY_TIMEOUT = 5
     __match = None
 
-    __tun_fd = None
-
     __virt_ns_naddr = None
 
     __debug = False
     __timer = None
 
-    def init_func(self, creator, tun_fd, virtual_nameserver, remote_nameserver, debug=False):
+    def init_func(self, creator, virtual_nameserver, remote_nameserver, debug=False):
         self.__match = _host_match()
-        self.__tun_fd = tun_fd
         self.__virt_ns_naddr = socket.inet_aton(virtual_nameserver)
         self.__dns_map = {}
         self.__debug = debug
@@ -455,10 +452,12 @@ class dnslc_proxy(udp_handler.udp_handler):
                 ip = cname.__str__()
                 if flags == 1: self.dispatcher.set_router(ip, 32)
             ''''''
+        # 欺骗主机
         pkts = utils.build_udp_packets(self.__virt_ns_naddr, daddr, 53, dport, message)
 
+        tun_fd = self.dispatcher.get_tun()
         for pkt in pkts:
-            self.send_message_to_handler(self.fileno, self.__tun_fd, pkt)
+            self.send_message_to_handler(self.fileno, tun_fd, pkt)
         return
 
     def update_host_rules(self, host_rules):
@@ -477,10 +476,11 @@ class dnslc_proxy(udp_handler.udp_handler):
         self.remove_evt_write(self.fileno)
 
     def udp_error(self):
-        pass
+        self.delete_handler(self.fileno)
 
     def udp_delete(self):
-        pass
+        self.unregister(self.fileno)
+        self.close()
 
     def udp_timeout(self):
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)

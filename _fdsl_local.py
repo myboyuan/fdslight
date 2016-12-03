@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 import freenet.handler.dns_proxy as dns_proxy
 import fdslight_etc.fn_local as fnlc_config
-import _fdsl, os, socket,sys
+import _fdsl, os, socket, sys
 import freenet.handler.tundev as tundev
 import pywind.lib.timer as timer
 import freenet.handler.tunnellc_tcp as tunnellc_tcp
 import freenet.handler.tunnellc_udp as tunnellc_udp
+import freenet.lib.base_proto.utils as proto_utils
 
 
 class fdslightlc(_fdsl.fdslight):
@@ -28,6 +29,8 @@ class fdslightlc(_fdsl.fdslight):
 
     __routers = None
 
+    __session_id = None
+
     def __init__(self):
         super(fdslightlc, self).__init__()
         self.set_mode("local")
@@ -38,6 +41,8 @@ class fdslightlc(_fdsl.fdslight):
         if not self.debug:
             sys.stdout = open(fnlc_config.configs["access_log"], "a+")
             sys.stderr = open(fnlc_config.configs["error_log"], "a+")
+        account = fnlc_config.configs["account"]
+        self.__session_id = proto_utils.gen_session_id(account["username"], account["password"])
 
         self.__tun_fd = self.create_handler(-1, tundev.tunlc, self.__TUN_NAME)
 
@@ -45,7 +50,6 @@ class fdslightlc(_fdsl.fdslight):
             raise ValueError("virtual_dns and remote_dns are same")
 
         args = (
-            self.__tun_fd,
             fnlc_config.configs["virtual_dns"],
             fnlc_config.configs["remote_dns"]
         )
@@ -91,7 +95,6 @@ class fdslightlc(_fdsl.fdslight):
 
     def open_tunnel(self):
         tunnel_type = fnlc_config.configs["tunnel_type"].lower()
-        args = (self.__session_id, self.__dns_fd, self.raw_sock_fd, self.raw6_sock_fd)
         kwargs = {"debug": self.debug, "is_ipv6": False}
 
         if tunnel_type not in ("tcp6", "udp6", "tcp", "udp",): raise ValueError("not support tunnel type")
@@ -101,22 +104,41 @@ class fdslightlc(_fdsl.fdslight):
             tunnel = tunnellc_udp.tunnellc_udp
         else:
             tunnel = tunnellc_tcp.tunnellc_tcp
-        self.__tunnel_fd = self.create_handler(-1, tunnel, *args, **kwargs)
+        self.__tunnel_fd = self.create_handler(-1, tunnel, self.__session_id, **kwargs)
 
     def set_router(self, ipaddr, prefix):
+        name = "%s/%s" % (ipaddr, prefix,)
+        if name in self.__routers: return
         cmd = "route add -net %s/%s dev %s" % (ipaddr, prefix, self.__TUN_NAME)
         os.system(cmd)
+        self.__routers[name] = (ipaddr, prefix,)
+        self.__timer.set_timeout(name, self.__ROUTER_TIMEOUT)
 
     def del_router(self, ipaddr, prefix):
+        name = "%s/%s" % (ipaddr, prefix,)
+        if name not in self.__routers: return
+
         cmd = "route del -net %s/%s dev %s" % (ipaddr, prefix, self.__TUN_NAME)
         os.system(cmd)
+        del self.__routers[name]
 
     def update_router_access_time(self, ipaddr, prefix):
         """更新路由访问时间"""
-        pass
+        name = "%s/%s" % (ipaddr, prefix,)
+        if name not in self.__routers: return
+        self.set_timeout(name, self.__ROUTER_TIMEOUT)
 
     def get_dns(self):
         return self.__dns_fd
 
     def myloop(self):
-        pass
+        names = self.__timer.get_timeout_names()
+        for name in names:
+            if not self.__timer.exists(name): continue
+            if not self.__routers: continue
+            ipaddr, prefix = self.__routers[name]
+            self.del_router(ipaddr, prefix)
+        return
+
+    def get_tun(self):
+        return self.__tun_fd
