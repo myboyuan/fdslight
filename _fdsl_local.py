@@ -57,6 +57,10 @@ class fdslightlc(_fdsl.fdslight):
         self.__nameserver = socket.inet_aton(fnlc_config.configs["virtual_dns"])
         self.__dns_fd = self.create_handler(-1, dns_proxy.dnslc_proxy, *args)
 
+        # 设置DNS路由
+        cmd = "route add -net %s/32 dev %s" % (fnlc_config.configs["virtual_dns"], self.__TUN_NAME)
+        os.system(cmd)
+
     def __is_ipv4_dns_request(self, byte_data):
         if len(byte_data) < 28: return
 
@@ -106,27 +110,24 @@ class fdslightlc(_fdsl.fdslight):
             tunnel = tunnellc_tcp.tunnellc_tcp
         self.__tunnel_fd = self.create_handler(-1, tunnel, self.__session_id, **kwargs)
 
-    def set_router(self, ipaddr, prefix):
-        name = "%s/%s" % (ipaddr, prefix,)
-        if name in self.__routers: return
-        cmd = "route add -net %s/%s dev %s" % (ipaddr, prefix, self.__TUN_NAME)
+    def set_router(self, ipaddr):
+        if ipaddr in self.__routers: return
+        cmd = "route add -host %s/%s dev %s" % (ipaddr,self.__TUN_NAME)
         os.system(cmd)
-        self.__routers[name] = (ipaddr, prefix,)
-        self.__timer.set_timeout(name, self.__ROUTER_TIMEOUT)
+        self.__routers[ipaddr] = None
+        self.__timer.set_timeout(ipaddr, self.__ROUTER_TIMEOUT)
 
-    def del_router(self, ipaddr, prefix):
-        name = "%s/%s" % (ipaddr, prefix,)
-        if name not in self.__routers: return
+    def del_router(self, ipaddr):
+        if ipaddr not in self.__routers: return
 
-        cmd = "route del -net %s/%s dev %s" % (ipaddr, prefix, self.__TUN_NAME)
+        cmd = "route del -host %s dev %s" % (ipaddr,self.__TUN_NAME)
         os.system(cmd)
-        del self.__routers[name]
+        del self.__routers[ipaddr]
 
-    def update_router_access_time(self, ipaddr, prefix):
+    def update_router_access_time(self, ipaddr):
         """更新路由访问时间"""
-        name = "%s/%s" % (ipaddr, prefix,)
-        if name not in self.__routers: return
-        self.set_timeout(name, self.__ROUTER_TIMEOUT)
+        if ipaddr not in self.__routers: return
+        self.set_timeout(ipaddr, self.__ROUTER_TIMEOUT)
 
     def get_dns(self):
         return self.__dns_fd
@@ -136,8 +137,8 @@ class fdslightlc(_fdsl.fdslight):
         for name in names:
             if not self.__timer.exists(name): continue
             if not self.__routers: continue
-            ipaddr, prefix = self.__routers[name]
-            self.del_router(ipaddr, prefix)
+            self.del_router(name)
+            del self.__routers[name]
         return
 
     def get_tun(self):

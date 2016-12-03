@@ -450,7 +450,7 @@ class dnslc_proxy(udp_handler.udp_handler):
         for rrset in msg.answer:
             for cname in rrset:
                 ip = cname.__str__()
-                if flags == 1: self.dispatcher.set_router(ip, 32)
+                if flags == 1: self.dispatcher.set_router(ip)
             ''''''
         # 欺骗主机
         pkts = utils.build_udp_packets(self.__virt_ns_naddr, daddr, 53, dport, message)

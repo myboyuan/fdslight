@@ -102,4 +102,20 @@ class tunnellc_udp(udp_handler.udp_handler):
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
         if cmd != "request_dns": return
         message, = args
-        self.__send_data(message, action=tunnel_udp.ACT_DATA)
+        self.__send_data(message, action=tunnel_udp.ACT_DNS)
+
+    def __handle_ipv4_data_for_send(self, byte_data):
+        daddr = byte_data[16:20]
+        self.dispatcher.update_router_access_time(socket.inet_ntoa(daddr))
+        self.__send_data(byte_data)
+
+    def __handle_ipv6_data_for_send(self, byte_data):
+        pass
+
+    def message_from_handler(self, from_fd, byte_data):
+        ip_ver = (byte_data[0] & 0xf0) >> 4
+        if ip_ver not in (4, 6): return
+        if ip_ver == 4:
+            self.__handle_ipv4_data_for_send(byte_data)
+            return
+        self.__handle_ipv6_data_for_send(byte_data)
