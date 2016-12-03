@@ -63,8 +63,8 @@ class fdslight(dispatcher.dispatcher):
 
     def __init(self):
         self.create_poll()
-        self.__raw_socket_fd = self.create_handler(-1, traffic_pass.traffic_send)
-        # elf.__raw6_socket_fd = self.create_handler(-1, traffic_pass.traffic_send, is_ipv6=True)
+        if self.__mode != "local": self.__raw_socket_fd = self.create_handler(-1, traffic_pass.traffic_send)
+        # self.__raw6_socket_fd = self.create_handler(-1, traffic_pass.traffic_send, is_ipv6=True)
 
     @property
     def raw_sock_fd(self):
@@ -88,9 +88,9 @@ class fdslight(dispatcher.dispatcher):
 
     def debug_run(self):
         self.__init()
-        if self.__mode == "server":
-            self.create_fn_server()
+        if self.__mode == "server": self.create_fn_server()
         if self.__mode == "gateway": self.create_fn_gw()
+        if self.__mode == "local": self.create_fn_local()
 
     def run(self):
         pid = os.fork()
@@ -105,6 +105,7 @@ class fdslight(dispatcher.dispatcher):
         self.__init()
         if self.__mode == "server": self.create_fn_server()
         if self.__mode == "gateway": self.create_fn_gw()
+        if self.__mode == "local": self.create_fn_local()
 
         return
 
@@ -226,7 +227,8 @@ class fdslight(dispatcher.dispatcher):
         self.ctl_handler(-1, fileno, "msg_from_udp_proxy", session_id, msg)
 
     def set_mode(self, mode):
-        if mode not in ("gateway", "server",): raise ValueError("the mode must be client or server")
+        if mode not in ("gateway", "server","loacl",):
+            raise ValueError("the mode must be gateway,server or local")
         self.__mode = mode
 
     def create_fn_server(self):
@@ -235,4 +237,8 @@ class fdslight(dispatcher.dispatcher):
 
     def create_fn_gw(self):
         """网关模式重写这个方法"""
+        pass
+
+    def create_fn_local(self):
+        """本地模式重写这个方法"""
         pass
