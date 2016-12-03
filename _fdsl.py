@@ -229,7 +229,7 @@ class fdslight(dispatcher.dispatcher):
         self.ctl_handler(-1, fileno, "msg_from_udp_proxy", session_id, msg)
 
     def set_mode(self, mode):
-        if mode not in ("gateway", "server", "loacl",):
+        if mode not in ("gateway", "server", "local",):
             raise ValueError("the mode must be gateway,server or local")
         self.__mode = mode
 
