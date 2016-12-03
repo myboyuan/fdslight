@@ -9,7 +9,7 @@ sys.path.append(d)
 def main():
     help_doc = """
     -u host_rules               update host rules
-    -m gateway | server         gateway,server
+    -m gateway | server | local gateway,server,local
     -d stop | start | debug     stop,start,debug
     -h                          print help
     """

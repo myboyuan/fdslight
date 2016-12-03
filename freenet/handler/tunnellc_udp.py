@@ -10,10 +10,9 @@ class tunnellc_udp(udp_handler.udp_handler):
     __encrypt = None
     __decrypt = None
 
-    __tun_fd = -1
     __LOOP_TIMEOUT = 10
 
-    def init_func(self, creator, session_id,is_ipv6=False):
+    def init_func(self, creator, session_id, is_ipv6=False):
         address = fnlc_config.configs["udp_server_address"]
 
         name = "freenet.lib.crypto.%s" % fnlc_config.configs["udp_crypto_module"]["name"]
@@ -27,8 +26,6 @@ class tunnellc_udp(udp_handler.udp_handler):
 
         self.__encrypt_m.config(crypto_config)
         self.__decrypt_m.config(crypto_config)
-
-        self.__tun_fd = tun_fd
 
         if is_ipv6:
             family = socket.AF_INET6
@@ -50,10 +47,23 @@ class tunnellc_udp(udp_handler.udp_handler):
         return self.fileno
 
     def __handle_ipv4_data_from_tunnel(self, byte_data):
-        self.send_message_to_handler(self.fileno, self.__tun_fd, byte_data)
+        tun_fd = self.dispatcher.get_tun()
+        self.send_message_to_handler(self.fileno, tun_fd, byte_data)
 
     def __handle_ipv6_data_from_tunnel(self, byte_data):
         pass
+
+    def __send_data(self, byte_data, action=tunnel_udp.ACT_DATA):
+        # if self.__debug: self.print_access_log("send_data")
+        try:
+            ippkts = self.__encrypt_m.build_packets(self.__session_id, action, byte_data)
+            self.__encrypt_m.reset()
+        except ValueError:
+            return
+        # print("send:", byte_data)
+        for ippkt in ippkts: self.send(ippkt)
+
+        self.add_evt_write(self.fileno)
 
     def __handle_data_from_tunnel(self, byte_data):
         ip_ver = (byte_data[0] & 0xf0) >> 4
@@ -88,3 +98,8 @@ class tunnellc_udp(udp_handler.udp_handler):
 
     def udp_error(self):
         self.delete_handler(self.fileno)
+
+    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
+        if cmd != "request_dns": return
+        message, = args
+        self.__send_data(message, action=tunnel_udp.ACT_DATA)

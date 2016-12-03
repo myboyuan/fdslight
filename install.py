@@ -19,8 +19,8 @@ def main():
         return
 
     __mode = argv[0]
-    if __mode not in ("gateway", "server",):
-        print("the mode must be gateway or server")
+    if __mode not in ("gateway", "server","local"):
+        print("the mode must be gateway,server or local")
         return
 
     py_include = argv[1]
