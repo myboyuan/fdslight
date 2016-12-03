@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import freenet.handler.dns_proxy as dns_proxy
 import fdslight_etc.fn_local as fnlc_config
-import _fdsl, os, socket
+import _fdsl, os, socket,sys
 import freenet.handler.tundev as tundev
 import pywind.lib.timer as timer
 import freenet.handler.tunnellc_tcp as tunnellc_tcp
@@ -35,6 +35,10 @@ class fdslightlc(_fdsl.fdslight):
         self.__routers = {}
 
     def create_fn_local(self):
+        if not self.debug:
+            sys.stdout = open(fnlc_config.configs["access_log"], "a+")
+            sys.stderr = open(fnlc_config.configs["error_log"], "a+")
+
         self.__tun_fd = self.create_handler(-1, tundev.tunlc, self.__TUN_NAME)
 
         if fnlc_config.configs["virtual_dns"] == fnlc_config.configs["remote_dns"]:

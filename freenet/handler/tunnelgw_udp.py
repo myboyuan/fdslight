@@ -81,10 +81,6 @@ class tunnelc_udp(udp_handler.udp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
-        if not self.__debug:
-            sys.stdout = open(fngw_config.configs["access_log"], "a+")
-            sys.stderr = open(fngw_config.configs["error_log"], "a+")
-
         account = fngw_config.configs["account"]
         self.__session_id = proto_utils.gen_session_id(account["username"], account["password"])
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)

@@ -66,9 +66,6 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         self.__traffic6_send_fd = raw6_socket_fd
         self.__timer = timer.timer()
 
-        if not self.__debug:
-            sys.stdout = open(fngw_config.configs["access_log"], "a+")
-            sys.stderr = open(fngw_config.configs["error_log"], "a+")
         return self.fileno
 
     def __send_data(self, sent_data, action=tunnel_tcp.ACT_DATA):

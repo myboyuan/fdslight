@@ -55,6 +55,9 @@ class fdslightgw(_fdsl.fdslight):
 
     def create_fn_gw(self):
         if not self.debug: _fdsl.create_pid_file(_fdsl.FDSL_PID_FILE, os.getpid())
+        if not self.debug:
+            sys.stdout = open(fngw_config.configs["access_log"], "a+")
+            sys.stderr = open(fngw_config.configs["error_log"], "a+")
 
         os.chdir("driver")
         if not os.path.isfile("fdslight.ko"):

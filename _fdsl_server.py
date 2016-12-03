@@ -23,6 +23,9 @@ class fdslightd(_fdsl.fdslight):
         auth_module.init()
 
         if not self.debug: _fdsl.create_pid_file(_fdsl.FDSL_PID_FILE, os.getpid())
+        if not self.debug:
+            sys.stdout = open(fns_config.configs["access_log"], "a+")
+            sys.stderr = open(fns_config.configs["error_log"], "a+")
 
         subnet = fns_config.configs["subnet"]
         nat = static_nat.nat(subnet)
