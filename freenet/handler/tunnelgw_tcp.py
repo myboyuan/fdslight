@@ -6,8 +6,7 @@ import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.base_proto.tunnel_tcp as tunnel_tcp
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.utils as utils
-
-import pywind.lib.timer as timer
+import freenet.lib.base_proto.utils as proto_utils
 
 
 class tunnelc_tcp(tcp_handler.tcp_handler):
@@ -146,7 +145,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         while self.__decrypt.can_continue_parse():
             try:
                 self.__decrypt.parse()
-            except tunnel_tcp.ProtoError:
+            except proto_utils.ProtoError:
                 self.print_access_log("wrong_format_packet")
                 self.delete_handler(self.fileno)
                 return

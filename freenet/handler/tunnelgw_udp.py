@@ -5,7 +5,6 @@
 import socket, sys, time
 import fdslight_etc.fn_gw as fngw_config
 import pywind.evtframework.handler.udp_handler as udp_handler
-import pywind.lib.timer as timer
 import freenet.lib.base_proto.tunnel_udp as tunnel_proto
 import freenet.handler.traffic_pass as traffic_pass
 import freenet.lib.fdsl_ctl as fdsl_ctl

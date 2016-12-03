@@ -3,6 +3,7 @@ import pywind.evtframework.handler.tcp_handler as tcp_handler
 import fdslight_etc.fn_local as fnlc_config
 import socket, sys
 import freenet.lib.base_proto.tunnel_tcp as tunnel_tcp
+import freenet.lib.base_proto.utils as proto_utils
 
 
 class tunnellc_tcp(tcp_handler.tcp_handler):
@@ -13,6 +14,7 @@ class tunnellc_tcp(tcp_handler.tcp_handler):
     __LOOP_TIMEOUT = 10
 
     __wait_sent = None
+    __BUFSIZE = 16 * 1024
 
     def init_func(self, creator, session_id, is_ipv6=False):
         address = fnlc_config.configs["tcp_server_address"]
@@ -82,7 +84,7 @@ class tunnellc_tcp(tcp_handler.tcp_handler):
         while self.__decrypt.can_continue_parse():
             try:
                 self.__decrypt.parse()
-            except tunnel_tcp.ProtoError:
+            except proto_utils.ProtoError:
                 self.delete_handler(self.fileno)
                 return
             while 1:
