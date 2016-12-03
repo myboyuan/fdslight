@@ -159,9 +159,12 @@ class tunnels_tcp_handler(tcp_handler.tcp_handler):
         self.encrypt.reset()
 
     def __handle_ipv4_data_from_tunnel(self, byte_data):
+        size = len(byte_data)
+        if size < 21: return
+
         pkt_len = (byte_data[2] << 8) | byte_data[3]
 
-        if len(byte_data) != pkt_len:
+        if size != pkt_len:
             self.print_access_log("error_pkt_length:real:%s,protocol:%s" % (len(byte_data), pkt_len,))
             self.delete_handler(self.fileno)
             return

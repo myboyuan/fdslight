@@ -184,6 +184,8 @@ class tunnelc_udp(udp_handler.udp_handler):
         pass
 
     def __handle_traffic_from_lan(self, byte_data):
+        size = len(byte_data)
+        if size < 21: return
         version = (byte_data[0] & 0xf0) >> 4
         if version not in (4, 6,): return
         if version == 4: self.__handle_ipv4_traffic_from_lan(byte_data)

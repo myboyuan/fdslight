@@ -162,6 +162,8 @@ class fdslight(dispatcher.dispatcher):
             checksum.modify_address(b"\0\0\0\0", L, checksum.FLAG_MODIFY_SRC_IP)
             self.send_message_to_handler(-1, self.__raw_socket_fd, bytes(L))
             return
+        # 丢弃长度不合法的数据包
+        if not offset and msg_len < 28: return
 
         b, e = (ihl, ihl + 1,)
         sport = (message[b] << 8) | message[e]
@@ -227,7 +229,7 @@ class fdslight(dispatcher.dispatcher):
         self.ctl_handler(-1, fileno, "msg_from_udp_proxy", session_id, msg)
 
     def set_mode(self, mode):
-        if mode not in ("gateway", "server","loacl",):
+        if mode not in ("gateway", "server", "loacl",):
             raise ValueError("the mode must be gateway,server or local")
         self.__mode = mode
 

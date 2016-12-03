@@ -4,6 +4,7 @@ import pywind.lib.timer as timer
 import random, socket, sys
 import dns.message
 import fdslight_etc.fn_gw as fn_config
+import freenet.lib.utils as utils
 
 
 class _host_match(object):
@@ -358,3 +359,136 @@ class dnsgw_proxy(dns_base):
 
     def udp_error(self):
         self.delete_handler(self.fileno)
+
+
+class dnslc_proxy(udp_handler.udp_handler):
+    __LOOP_TIMEOUT = 10
+    __dns_map = None
+
+    __DNS_QUERY_TIMEOUT = 5
+    __match = None
+
+    __tun_fd = None
+
+    __virt_ns_naddr = None
+
+    __debug = False
+    __timer = None
+
+    def init_func(self, creator, tun_fd, virtual_nameserver, remote_nameserver, debug=False):
+        self.__match = _host_match()
+        self.__tun_fd = tun_fd
+        self.__virt_ns_naddr = socket.inet_aton(virtual_nameserver)
+        self.__dns_map = {}
+        self.__debug = debug
+        self.__timer = timer.timer()
+
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        self.set_socket(s)
+
+        self.connect((remote_nameserver, 53))
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
+
+        return self.fileno
+
+    def __send_dns_to_remote_ns(self, message):
+        self.add_evt_write(self.fileno)
+        self.send(message)
+
+    def __handle_data_from_tun(self, byte_data):
+        ip_ver = (byte_data[0] & 0xf0) >> 4
+
+        if ip_ver == 4:
+            ihl = (byte_data[0] & 0x0f) * 4
+            n = ihl + 8
+            a, b = (ihl, ihl + 1,)
+            message = byte_data[n:]
+        else:
+            return
+
+        sport = (a << 8) | b
+        dns_id = (message[0] << 8) | message[1]
+
+        msg = dns.message.from_wire(message)
+
+        questions = msg.question
+
+        if ip_ver == 4: saddr = byte_data[12:16]
+
+        self.__dns_map[dns_id] = [saddr, sport, None, ]
+        self.__timer.set_timeout(dns_id, self.__DNS_QUERY_TIMEOUT)
+
+        if len(questions) != 1 or msg.opcode() != 0:
+            self.__send_dns_to_remote_ns(message)
+            return
+
+        q = questions[0]
+        host = b".".join(q.name[0:-1]).decode("iso-8859-1")
+        pos = host.find(".")
+
+        if pos > 0 and self.__debug: print(host)
+        is_match, flags = self.__host_match.match(host)
+
+        if not is_match:
+            self.__send_dns_to_remote_ns(message)
+            return
+
+        self.__dns_map[dns_id][2] = flags
+        # 没有打开隧道,尝试打开隧道
+        if not self.dispatcher.tunnel_is_ok(): self.dispatcher.open_tunnel()
+        # 打开隧道失败,直接丢弃数据包
+        if not self.dispatcher.tunnel_is_ok(): return
+
+        fileno = self.dispatcher.get_tunnel()
+        self.ctl_handler(self.fileno, fileno, "request_dns", message)
+
+    def __handle_dns_response(self, message):
+        dns_id = (message[0] << 8) | message[1]
+        if dns_id not in self.__dns_map: return
+        msg = dns.message.from_wire(message)
+        daddr, dport, flags = self.__dns_map[dns_id]
+
+        for rrset in msg.answer:
+            for cname in rrset:
+                ip = cname.__str__()
+                if flags == 1: self.dispatcher.set_router(ip, 32)
+            ''''''
+        pkts = utils.build_udp_packets(self.__virt_ns_naddr, daddr, 53, dport, message)
+
+        for pkt in pkts:
+            self.send_message_to_handler(self.fileno, self.__tun_fd, pkt)
+        return
+
+    def update_host_rules(self, host_rules):
+        self.__match.clear()
+        for rule in host_rules:
+            _, flags = rule
+            # 不支持2号规则
+            if flags == 2: continue
+            self.__match.add_rule(rule)
+        return
+
+    def udp_readable(self, messsage, address):
+        self.__handle_dns_response(messsage)
+
+    def udp_writable(self):
+        self.remove_evt_write(self.fileno)
+
+    def udp_error(self):
+        pass
+
+    def udp_delete(self):
+        pass
+
+    def udp_timeout(self):
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+
+    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
+        if cmd != "response_dns": return
+        message, = args
+        self.__handle_dns_response(message)
+
+    def message_from_handler(self, from_fd, byte_data):
+        self.__handle_data_from_tun(byte_data)

@@ -204,7 +204,7 @@ class tuns(tun_base):
         rs = self.__nat.get_ippkt2cLan_from_sLan(ip_packet)
         if not rs: return
         session_id, msg = rs
-        if not self.dispatcher.is_bind_session(session_id):return
+        if not self.dispatcher.is_bind_session(session_id): return
         fileno, _ = self.dispatcher.get_bind_session(session_id)
 
         if not self.handler_exists(fileno): return
@@ -246,3 +246,35 @@ class tuns(tun_base):
         if cmd == "set_packet_session_id": self.__packet_session_id, = args
 
 
+class tunlc(tun_base):
+    __is_ipv6 = None
+
+    def dev_init(self, dev_name, is_ipv6=False):
+        self.__is_ipv6 = is_ipv6
+
+    def handle_ip_packet_from_read(self, ip_packet):
+        if self.dispatcher.is_dns_request:
+            fileno = self.dispatcher.get_dns()
+            self.send_message_to_handler(self.fileno, fileno, ip_packet)
+            return
+
+        if not self.dispatcher.tunnel_is_ok(): return
+        fileno = self.dispatcher.get_tunnel()
+        self.send_message_to_handler(self.fileno,fileno,ip_packet)
+
+    def handle_ip_packet_for_write(self, ip_packet):
+        return ip_packet
+
+    def dev_delete(self):
+        self.unregister(self.fileno)
+        os.close(self.fileno)
+
+    def dev_error(self):
+        self.delete_handler(self.fileno)
+
+    def dev_timeout(self):
+        pass
+
+    def message_from_handler(self,from_fd,byte_data):
+        self.add_evt_write(self.fileno)
+        self.add_to_sent_queue(byte_data)

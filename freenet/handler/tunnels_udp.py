@@ -37,7 +37,7 @@ class tunnels_udp_listener(udp_handler.udp_handler):
         self.__debug = debug
         config = fns_config.configs
 
-        self.__SESSION_TIMEOUT= int(config["timeout"])
+        self.__SESSION_TIMEOUT = int(config["timeout"])
 
         # 导入加入模块
         name = "freenet.lib.crypto.%s" % config["udp_crypto_module"]["name"]
@@ -122,6 +122,9 @@ class tunnels_udp_listener(udp_handler.udp_handler):
         self.ctl_handler(self.fileno, self.__dns_fd, "request_dns", session_id, dns_msg)
 
     def __handle_ipv4_data_from_tunnel(self, session_id, byte_data):
+        size = len(byte_data)
+        if size < 21: return
+
         # print("recv:",byte_data)
         protocol = byte_data[9]
         # 只支持 ICMP,TCP,UDP协议

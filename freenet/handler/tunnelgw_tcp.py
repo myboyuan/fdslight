@@ -202,6 +202,9 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         return
 
     def __handle_ipv4_traffic_from_lan(self, byte_data):
+        size = len(byte_data)
+        if size < 21: return
+
         protocol = byte_data[9]
 
         if protocol == 17 and not \
