@@ -88,7 +88,7 @@ class tunnellc_tcp(tcp_handler.tcp_handler):
                 self.delete_handler(self.fileno)
                 return
             while 1:
-                pkt_info = self.decrypt.get_pkt()
+                pkt_info = self.__decrypt.get_pkt()
                 if not pkt_info: break
                 self.__handle_data_from_tunnel(*pkt_info)
             ''''''

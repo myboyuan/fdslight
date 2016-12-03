@@ -100,14 +100,6 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
             continue
         return
 
-    @property
-    def encrypt(self):
-        return self.__encrypt
-
-    @property
-    def decrypt(self):
-        return self.__decrypt
-
     def __handle_data_from_tunnel(self, resp_data):
         ip_ver = (resp_data[0] & 0xf0) >> 4
         if ip_ver not in (4, 6,): return
@@ -150,7 +142,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
                 self.delete_handler(self.fileno)
                 return
             while 1:
-                pkt_info = self.decrypt.get_pkt()
+                pkt_info = self.__decrypt.get_pkt()
                 if not pkt_info: break
                 self.__handle_read(*pkt_info)
             ''''''
