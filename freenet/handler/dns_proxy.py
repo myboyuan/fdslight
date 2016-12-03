@@ -466,7 +466,7 @@ class dnslc_proxy(udp_handler.udp_handler):
                 if flags == 1: self.dispatcher.set_router(ip)
             ''''''
 
-        # 欺骗主机
+        # 欺骗主机,让主机认为DNS数据包是从虚拟DNS服务器响应的
         pkts = utils.build_udp_packets(self.__virt_ns_naddr, daddr, 53, dport, message)
         tun_fd = self.dispatcher.get_tun()
         for pkt in pkts:

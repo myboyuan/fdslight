@@ -70,11 +70,11 @@ class tunnellc_tcp(tcp_handler.tcp_handler):
 
         if action == tunnel_tcp.ACT_DNS:
             dns_fd = self.dispatcher.get_dns()
-            self.ctl_handler(self.fileno, dns_fd, byte_data)
+            self.ctl_handler(self.fileno, dns_fd, "response_dns", byte_data)
             return
         ip_ver = (byte_data[0] & 0xf0) >> 4
         # 暂时不支持ipv6
-        if ip_ver != 6: return
+        if ip_ver == 6: return
         tun_fd = self.dispatcher.get_tun()
         self.send_message_to_handler(self.fileno, tun_fd, byte_data)
 
