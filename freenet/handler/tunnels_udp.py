@@ -114,7 +114,7 @@ class tunnels_udp_listener(udp_handler.udp_handler):
 
         self.print_access_log("disconnect", address)
         self.__auth_module.handle_close(session_id)
-        self.dispatcher.unbind_session(session_id)
+        self.dispatcher.unbind_session_id(session_id)
 
         del self.__sessions[session_id]
 
