@@ -48,4 +48,8 @@ configs = {
     "virtual_dns": "10.10.10.1",
     # 远程DNS,即不经过隧道的实际DNS服务器,一般默认即可
     "remote_dns": "223.5.5.5",
+    #访问日志
+    "access_log": "/tmp/fdslight_access.log",
+    #故障日志
+    "error_log": "/tmp/fdslight_error.log"
 }

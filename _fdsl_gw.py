@@ -69,6 +69,10 @@ class fdslightgw(_fdsl.fdslight):
         os.system("insmod fdslight.ko")
         os.chdir("../")
 
+        if not self.debug:
+            sys.stdout = open(fngw_config.configs["access_log"], "a+")
+            sys.stderr = open(fngw_config.configs["error_log"], "a+")
+
         whitelist_rules = file_parser.parse_ip_subnet_file("fdslight_etc/whitelist.txt")
         self.__whitelist = whitelist.whitelist()
         for rule in whitelist_rules: self.__whitelist.add_rule(*rule)
@@ -122,7 +126,7 @@ class fdslightgw(_fdsl.fdslight):
         n = utils.ip4s_2_number(ipaddr)
 
         self.__timer.set_timeout(n, self.__FILTER_IP_LIFETIME)
-        fdsl_ctl.tf_record_add(self.__filter_fd,n)
+        fdsl_ctl.tf_record_add(self.__filter_fd, n)
 
     def myloop(self):
         if not self.handler_exists(self.__tunnel_fd): return
