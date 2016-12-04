@@ -107,6 +107,8 @@ class fdslight(dispatcher.dispatcher):
         if self.__mode == "gateway": self.create_fn_gw()
         if self.__mode == "local": self.create_fn_local()
 
+        create_pid_file(FDSL_PID_FILE,os.getpid())
+
         return
 
     def __create_udp_proxy(self, session_id, saddr, sport, is_ipv6=False):
