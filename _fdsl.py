@@ -95,6 +95,7 @@ class fdslight(dispatcher.dispatcher):
     def run(self):
         # Local模式不fork,方便信息查看
         if self.__mode == "local":
+            self.__init()
             self.create_fn_local()
             return
         pid = os.fork()
