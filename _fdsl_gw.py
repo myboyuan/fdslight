@@ -54,8 +54,6 @@ class fdslightgw(_fdsl.fdslight):
             self.__udp_global_proxy_clients[naddr] = None
 
     def create_fn_gw(self):
-        if not self.debug: _fdsl.create_pid_file(_fdsl.FDSL_PID_FILE, os.getpid())
-
         os.chdir("driver")
         if not os.path.isfile("fdslight.ko"):
             print("you must install this software")
