@@ -148,7 +148,6 @@ class fdslightlc(_fdsl.fdslight):
             if not self.__timer.exists(name): continue
             if name not in self.__routers: continue
             self.del_router(name)
-            del self.__routers[name]
         return
 
     def get_tun(self):
