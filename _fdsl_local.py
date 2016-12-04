@@ -146,7 +146,7 @@ class fdslightlc(_fdsl.fdslight):
         names = self.__timer.get_timeout_names()
         for name in names:
             if not self.__timer.exists(name): continue
-            if not self.__routers: continue
+            if name not in self.__routers: continue
             self.del_router(name)
             del self.__routers[name]
         return
@@ -171,7 +171,10 @@ class fdslightlc(_fdsl.fdslight):
         my_resolver.nameservers = [fnlc_config.configs["remote_dns"], ]
 
         addrs = []
-        anwer = my_resolver.query(s, "a")
+        if is_ipv6:
+            anwer = my_resolver.query(s, "aaaa")
+        else:
+            anwer = my_resolver.query(s, "a")
         for r in anwer: addrs.append(r.__str__())
 
         return addrs.pop(0)
