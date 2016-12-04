@@ -40,9 +40,6 @@ class fdslightlc(_fdsl.fdslight):
         self.__routers = {}
 
     def create_fn_local(self):
-        if not self.debug:
-            sys.stdout = open(fnlc_config.configs["access_log"], "a+")
-            sys.stderr = open(fnlc_config.configs["error_log"], "a+")
         account = fnlc_config.configs["account"]
         self.__session_id = proto_utils.gen_session_id(account["username"], account["password"])
 

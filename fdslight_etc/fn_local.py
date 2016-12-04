@@ -51,9 +51,4 @@ configs = {
 
     # 本地DNS绑定地址,一般不需要更改
     "dns_bind": "0.0.0.0",
-
-    # 访问日志
-    "access_log": "/tmp/fdslight_access.log",
-    # 故障日志
-    "error_log": "/tmp/fdslight_error.log",
 }

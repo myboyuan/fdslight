@@ -93,6 +93,10 @@ class fdslight(dispatcher.dispatcher):
         if self.__mode == "local": self.create_fn_local()
 
     def run(self):
+        # Local模式不fork,方便信息查看
+        if self.__mode == "local":
+            self.create_fn_local()
+            return
         pid = os.fork()
         if pid != 0: sys.exit(0)
 
@@ -105,9 +109,8 @@ class fdslight(dispatcher.dispatcher):
         self.__init()
         if self.__mode == "server": self.create_fn_server()
         if self.__mode == "gateway": self.create_fn_gw()
-        if self.__mode == "local": self.create_fn_local()
 
-        create_pid_file(FDSL_PID_FILE,os.getpid())
+        create_pid_file(FDSL_PID_FILE, os.getpid())
 
         return
 
