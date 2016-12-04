@@ -27,16 +27,16 @@ class tunnellc_udp(udp_handler.udp_handler):
         self.__encrypt.config(crypto_config)
         self.__decrypt.config(crypto_config)
 
-        self.__session_id=session_id
+        self.__session_id = session_id
+        # 如果是域名,那么获取真是IP地址,防止死循环查询
+        ipaddr = self.dispatcher.get_ipaddr(address[0])
+        if not ipaddr: return -1
 
         if is_ipv6:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         else:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.set_socket(s)
-
-        # 如果是域名,那么获取真是IP地址,防止死循环查询
-        ipaddr = self.dispatcher.get_ipaddr(address[0])
 
         self.connect((ipaddr, address[1]))
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)

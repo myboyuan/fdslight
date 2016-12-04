@@ -36,6 +36,7 @@ class tunnellc_tcp(tcp_handler.tcp_handler):
 
         # 如果是域名,那么获取真是IP地址,防止死循环查询
         ipaddr = self.dispatcher.get_ipaddr(address[0])
+        if not ipaddr: return -1
         address = (ipaddr, address[1],)
 
         if is_ipv6:

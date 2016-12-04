@@ -171,10 +171,13 @@ class fdslightlc(_fdsl.fdslight):
         my_resolver.nameservers = [fnlc_config.configs["remote_dns"], ]
 
         addrs = []
-        if is_ipv6:
-            anwer = my_resolver.query(s, "aaaa")
-        else:
-            anwer = my_resolver.query(s, "a")
+        try:
+            if is_ipv6:
+                anwer = my_resolver.query(s, "aaaa")
+            else:
+                anwer = my_resolver.query(s, "a")
+        except dns.exception.Timeout:
+            return None
         for r in anwer: addrs.append(r.__str__())
 
         return addrs.pop(0)
