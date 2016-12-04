@@ -43,7 +43,7 @@ configs = {
     # tcp6和udp6为ipv6的tcp和udp隧道
     "tunnel_type": "udp",
 
-    # 虚拟DNS地址,可以设置成任意地址
+    # 虚拟DNS地址,可以设置成任意地址,但是请不要设置成同局域网的地址
     # 注意:请不要把地址设置成与下面的remote_dns相同,并且在机器网络设置中把DNS改成虚拟DNS地址
     "virtual_dns": "10.10.10.1",
     # 远程DNS,即不经过隧道的实际DNS服务器,一般默认即可

@@ -165,7 +165,7 @@ class fdslightlc(_fdsl.fdslight):
         if not is_host: return s
         my_resolver = dns.resolver.Resolver()
         my_resolver.nameservers = [fnlc_config.configs["remote_dns"], ]
-
+        my_resolver.lifetime = 3
         addrs = []
         try:
             if is_ipv6:
