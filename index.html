@@ -41,14 +41,15 @@
 
 <p>1.首先需要安装python的dnspython和pycrypto库，dnspython无论一定要，如果使用默认的加密方式，那么需要pycrypto库<br>
 2.命令：cd /opt/bin<br>
-3.命令：./pip3 install dnspython3<br>
-4.命令：./pip3 install pycrypto  </p>
+3.命令：sudo ./pip3 install dnspython3<br>
+4.命令：sudo ./pip3 install pycrypto  </p>
 
 <h3>
 <a id="服务端安装" class="anchor" href="#%E6%9C%8D%E5%8A%A1%E7%AB%AF%E5%AE%89%E8%A3%85" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>服务端安装</h3>
 
 <p>1.首先进入下载的fdslight的目录,里面有个install.py文件<br>
-2.命令：/opt/bin/python3 install.py server /opt/include/python3.5m</p>
+2.命令：/opt/bin/python3 install.py server /opt/include/python3.5m
+3.修改/etc/sysctl.conf：net.ipv4.ip_forward=1</p>
 
 <h3>
 <a id="客戶端gateway模式安装" class="anchor" href="#%E5%AE%A2%E6%88%B6%E7%AB%AFgateway%E6%A8%A1%E5%BC%8F%E5%AE%89%E8%A3%85" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>客戶端gateway模式安装</h3>
@@ -63,6 +64,23 @@
 
 <p>1.进入下载的fdslight的目录
 2.命令：/opt/bin/python3 install.py local /opt/include/python3.5m</p>
+
+<h3>
+<a id="安装完成后配置说明" class="anchor" href="#%E5%AE%89%E8%A3%85%E5%AE%8C%E6%88%90%E5%90%8E%E9%85%8D%E7%BD%AE%E8%AF%B4%E6%98%8E" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>安装完成后配置说明</h3>
+
+<p>1.文件结构请看fdslight项目源码上面的wiki页面，传送连接:<a href="https://github.com/fdslight/fdslight/wiki/%E4%B8%80%E4%BA%9B%E6%96%87%E4%BB%B6%E7%BB%93%E6%9E%84%E8%AF%B4%E6%98%8E">https://github.com/fdslight/fdslight/wiki/一些文件结构说明</a>
+2.请详细阅读配置文件注释，上面有给了每个配置选项的具体说明</p>
+
+<h3>
+<a id="启动命令的说明表示或的意思" class="anchor" href="#%E5%90%AF%E5%8A%A8%E5%91%BD%E4%BB%A4%E7%9A%84%E8%AF%B4%E6%98%8E%E8%A1%A8%E7%A4%BA%E6%88%96%E7%9A%84%E6%84%8F%E6%80%9D" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>启动命令的说明("|"表示或的意思)</h3>
+
+<p>sudo /opt/bin/python3 main.py -m server|gateway|local -d start|debug|stop  </p>
+
+<h3>
+<a id="客户端gateway模式的特别说明" class="anchor" href="#%E5%AE%A2%E6%88%B7%E7%AB%AFgateway%E6%A8%A1%E5%BC%8F%E7%9A%84%E7%89%B9%E5%88%AB%E8%AF%B4%E6%98%8E" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>客户端gateway模式的特别说明</h3>
+
+<h3>
+<a id="客户端local模式的特别说明" class="anchor" href="#%E5%AE%A2%E6%88%B7%E7%AB%AFlocal%E6%A8%A1%E5%BC%8F%E7%9A%84%E7%89%B9%E5%88%AB%E8%AF%B4%E6%98%8E" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>客户端local模式的特别说明</h3>
 
       <footer class="site-footer">
         <span class="site-footer-owner"><a href="https://github.com/fdslight/fdslight">Fdslight</a> is maintained by <a href="https://github.com/fdslight">fdslight</a>.</span>
