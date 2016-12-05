@@ -55,7 +55,7 @@
 <a id="客戶端gateway模式安装" class="anchor" href="#%E5%AE%A2%E6%88%B6%E7%AB%AFgateway%E6%A8%A1%E5%BC%8F%E5%AE%89%E8%A3%85" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>客戶端gateway模式安装</h3>
 
 <p>1.在ubuntu desktop版本下已经默认安装了linux headers,你不需要安装，如果不是ubuntu需要安装linux headers,即内核开发包<br>
-  <strong>如果你的机器更新了内核，你需要重新一次</strong><br>
+  <strong>如果你的机器更新了内核，你需要重新安装一次</strong><br>
 2.进入下载的fdslight的目录
 3.命令：/opt/bin/python3 install.py gateway /opt/include/python3.5m</p>
 
@@ -68,7 +68,7 @@
 <h3>
 <a id="安装完成后配置说明" class="anchor" href="#%E5%AE%89%E8%A3%85%E5%AE%8C%E6%88%90%E5%90%8E%E9%85%8D%E7%BD%AE%E8%AF%B4%E6%98%8E" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>安装完成后配置说明</h3>
 
-<p>1.文件结构请看fdslight项目源码上面的wiki页面，传送连接:<a href="https://github.com/fdslight/fdslight/wiki/%E4%B8%80%E4%BA%9B%E6%96%87%E4%BB%B6%E7%BB%93%E6%9E%84%E8%AF%B4%E6%98%8E">https://github.com/fdslight/fdslight/wiki/一些文件结构说明</a>
+<p>1.文件结构请看fdslight项目源码上面的wiki页面，传送连接:<a href="https://github.com/fdslight/fdslight/wiki/">https://github.com/fdslight/fdslight/wiki/</a> 一些文件结构说明
 2.请详细阅读配置文件注释，上面有给了每个配置选项的具体说明</p>
 
 <h3>
@@ -79,8 +79,18 @@
 <h3>
 <a id="客户端gateway模式的特别说明" class="anchor" href="#%E5%AE%A2%E6%88%B7%E7%AB%AFgateway%E6%A8%A1%E5%BC%8F%E7%9A%84%E7%89%B9%E5%88%AB%E8%AF%B4%E6%98%8E" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>客户端gateway模式的特别说明</h3>
 
+<p>1.网关模式本地机器无法通过代理，局域网的其他的机器可以走代理
+2.要使局域网的其他机器可以走代理，你需要设置局域网其他机器的网关为运行fdslight客户端的地址，DNS也是fdslight客户端的地址</p>
+
 <h3>
-<a id="客户端local模式的特别说明" class="anchor" href="#%E5%AE%A2%E6%88%B7%E7%AB%AFlocal%E6%A8%A1%E5%BC%8F%E7%9A%84%E7%89%B9%E5%88%AB%E8%AF%B4%E6%98%8E" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>客户端local模式的特别说明</h3>
+<a id="客户端local模式的特别说明以ubuntu-desktop发行版说明" class="anchor" href="#%E5%AE%A2%E6%88%B7%E7%AB%AFlocal%E6%A8%A1%E5%BC%8F%E7%9A%84%E7%89%B9%E5%88%AB%E8%AF%B4%E6%98%8E%E4%BB%A5ubuntu-desktop%E5%8F%91%E8%A1%8C%E7%89%88%E8%AF%B4%E6%98%8E" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>客户端local模式的特别说明(以ubuntu desktop发行版说明）</h3>
+
+<p>1.fn_local.py的有个virtual_dns选项，需要把主机的DNS改成这个DNS地址（如果是DHCP分配地址的方式，请把他改成只地址的选项，如下图）
+<img src="https://github.com/fdslight/fdslight/blob/master/images/fdsl_local_config.png?raw=true" alt="local配置图"></p>
+
+<p>2.改好之后需要断开网络然后重启网络，但是此时如果运行fdslight，或导致退出，无论如何，你都要重新启动或者启动fdslight，参考图  </p>
+
+<p><img src="https://github.com/fdslight/fdslight/blob/master/images/fdsl_local_chg_nw.png?raw=true" alt="网络中断"></p>
 
       <footer class="site-footer">
         <span class="site-footer-owner"><a href="https://github.com/fdslight/fdslight">Fdslight</a> is maintained by <a href="https://github.com/fdslight">fdslight</a>.</span>
