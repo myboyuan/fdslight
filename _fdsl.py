@@ -235,6 +235,22 @@ class fdslight(dispatcher.dispatcher):
             raise ValueError("the mode must be gateway,server or local")
         self.__mode = mode
 
+    def check_ipv4_data(self, packet):
+        """核对IPV4数据包是否合法"""
+        size = len(packet)
+        tot_length = (packet[2] << 8) | packet[3]
+        check_ok = True
+
+        if size < 21: check_ok = False
+        if size > 1500: check_ok = False
+        if size != tot_length: check_ok = False
+
+        return check_ok
+
+    def check_ipv6_data(self, packet):
+        """核对IPV6数据包是否合法"""
+        return False
+
     def create_fn_server(self):
         """服务端重写这个方法"""
         pass

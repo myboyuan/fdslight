@@ -118,9 +118,7 @@ class tunnels_udp_listener(udp_handler.udp_handler):
         self.ctl_handler(self.fileno, self.__dns_fd, "request_dns", session_id, dns_msg)
 
     def __handle_ipv4_data_from_tunnel(self, session_id, byte_data):
-        size = len(byte_data)
-        if size < 21: return
-
+        if not self.dispatcher.check_ipv4_data(byte_data): return
         # print("recv:",byte_data)
         protocol = byte_data[9]
         # 只支持 ICMP,TCP,UDP协议
