@@ -85,6 +85,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
         self.dispatcher.set_filter_fd(self.__traffic_fetch_fd)
 
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
