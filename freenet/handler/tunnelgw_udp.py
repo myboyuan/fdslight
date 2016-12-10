@@ -33,6 +33,9 @@ class tunnelc_udp(udp_handler.udp_handler):
 
     __LOOP_TIMEOUT = 10
 
+    __conn_time = 0
+    __conn_timeout = 0
+
     def init_func(self, creator_fd, session_id, dns_fd, raw_socket_fd, raw6_socket_fd, debug=False, is_ipv6=False):
         self.__server = fngw_config.configs["udp_server_address"]
 
@@ -54,6 +57,7 @@ class tunnelc_udp(udp_handler.udp_handler):
 
         self.__traffic_send_fd = raw_socket_fd
         self.__traffic6_send_fd = raw6_socket_fd
+        self.__conn_timeout = int(fngw_config.configs["timeout"])
 
         if is_ipv6:
             s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
@@ -75,6 +79,7 @@ class tunnelc_udp(udp_handler.udp_handler):
         self.__server_ipaddr = ipaddr
 
         self.__init()
+        self.__conn_time = time.time()
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
@@ -113,6 +118,7 @@ class tunnelc_udp(udp_handler.udp_handler):
 
     def __send_data(self, byte_data, action=tunnel_proto.ACT_DATA):
         # if self.__debug: self.print_access_log("send_data")
+        self.__conn_time = time.time()
         try:
             ippkts = self.__encrypt_m.build_packets(self.__session_id, action, byte_data)
             self.__encrypt_m.reset()
@@ -145,6 +151,9 @@ class tunnelc_udp(udp_handler.udp_handler):
         self.delete_handler(self.fileno)
 
     def udp_timeout(self):
+        if time.time() - self.__conn_time > self.__conn_timeout:
+            self.delete_handler(self.fileno)
+            return
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def udp_delete(self):

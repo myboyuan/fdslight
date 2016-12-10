@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import pywind.evtframework.handler.udp_handler as udp_handler
 import fdslight_etc.fn_local as fnlc_config
-import socket, sys
+import socket, sys, time
 import freenet.lib.base_proto.tunnel_udp as tunnel_udp
 
 
@@ -12,8 +12,12 @@ class tunnellc_udp(udp_handler.udp_handler):
 
     __LOOP_TIMEOUT = 10
 
+    __conn_time = 0
+    __conn_timeout = 0
+
     def init_func(self, creator, session_id, is_ipv6=False):
         address = fnlc_config.configs["udp_server_address"]
+        self.__conn_timeout = int(fnlc_config.configs["timeout"])
 
         name = "freenet.lib.crypto.%s" % fnlc_config.configs["udp_crypto_module"]["name"]
         __import__(name)
@@ -44,6 +48,8 @@ class tunnellc_udp(udp_handler.udp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
+        self.__conn_time = time.time()
+
         return self.fileno
 
     def __handle_ipv4_data_from_tunnel(self, byte_data):
@@ -54,6 +60,7 @@ class tunnellc_udp(udp_handler.udp_handler):
         pass
 
     def __send_data(self, byte_data, action=tunnel_udp.ACT_DATA):
+        self.__conn_time = time.time()
         # if self.__debug: self.print_access_log("send_data")
         try:
             ippkts = self.__encrypt.build_packets(self.__session_id, action, byte_data)
@@ -89,6 +96,9 @@ class tunnellc_udp(udp_handler.udp_handler):
         self.remove_evt_write(self.fileno)
 
     def udp_timeout(self):
+        if time.time() - self.__conn_time > self.__conn_timeout:
+            self.delete_handler(self.fileno)
+            return
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def udp_delete(self):

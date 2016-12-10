@@ -43,13 +43,16 @@ configs = {
     # tcp6和udp6为ipv6的tcp和udp隧道
     "tunnel_type": "udp",
 
+    # 连接超时
+    "timeout": 460,
+
     # 虚拟DNS地址,可以设置成任意地址,但是请不要设置成同局域网的地址
     # 注意:请不要把地址设置成与下面的remote_dns相同,并且在机器网络设置中把DNS改成虚拟DNS地址
     "virtual_dns": "223.5.5.5",
     # 远程DNS,即不经过隧道的实际DNS服务器,一般默认即可
     "remote_dns": "223.6.6.6",
-    #访问日志
+    # 访问日志
     "access_log": "/tmp/fdslight_access.log",
-    #故障日志
+    # 故障日志
     "error_log": "/tmp/fdslight_error.log"
 }

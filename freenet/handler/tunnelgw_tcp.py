@@ -29,6 +29,9 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
 
     __wait_sent = None
 
+    __conn_time = 0
+    __conn_timeout = 0
+
     def init_func(self, creator_fd, session_id, dns_fd, raw_socket_fd, raw6_socket_fd, debug=False, is_ipv6=False):
         taddr = fngw_config.configs["tcp_server_address"]
 
@@ -38,6 +41,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
             s = socket.socket()
         self.__wait_sent = []
         self.__session_id = session_id
+        self.__conn_time = int(fngw_config.configs["timeout"])
 
         self.set_socket(s)
         self.dispatcher.bind_session_id(self.__session_id, self.fileno, "tcp")
@@ -65,6 +69,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         return self.fileno
 
     def __send_data(self, sent_data, action=tunnel_tcp.ACT_DATA):
+        self.__conn_time = time.time()
         sent_pkt = self.__encrypt.build_packet(self.__session_id, action, sent_data)
         # 丢弃阻塞的包
         if self.writer.size() > self.__BUFSIZE: self.writer.flush()
@@ -80,6 +85,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
 
+        self.__conn_time = time.time()
         self.print_access_log("connect_ok")
         self.__traffic_fetch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read)
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
@@ -157,6 +163,9 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
+            self.delete_handler(self.fileno)
+            return
+        if time.time() - self.__conn_time > self.__conn_timeout:
             self.delete_handler(self.fileno)
             return
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import pywind.evtframework.handler.tcp_handler as tcp_handler
 import fdslight_etc.fn_local as fnlc_config
-import socket, sys
+import socket, sys, time
 import freenet.lib.base_proto.tunnel_tcp as tunnel_tcp
 import freenet.lib.base_proto.utils as proto_utils
 
@@ -16,8 +16,12 @@ class tunnellc_tcp(tcp_handler.tcp_handler):
     __wait_sent = None
     __BUFSIZE = 16 * 1024
 
+    __conn_time = 0
+    __conn_timeout = 0
+
     def init_func(self, creator, session_id, is_ipv6=False):
         address = fnlc_config.configs["tcp_server_address"]
+        self.__conn_timeout = int(fnlc_config.configs["timeout"])
 
         name = "freenet.lib.crypto.%s" % fnlc_config.configs["tcp_crypto_module"]["name"]
         __import__(name)
@@ -50,6 +54,7 @@ class tunnellc_tcp(tcp_handler.tcp_handler):
         return self.fileno
 
     def connect_ok(self):
+        self.__conn_time = time.time()
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
         self.dispatcher.tunnel_ok()
         self.register(self.fileno)
@@ -102,6 +107,9 @@ class tunnellc_tcp(tcp_handler.tcp_handler):
         if not self.is_conn_ok():
             self.delete_handler(self.fileno)
             return
+        if time.time() - self.__conn_time > self.__conn_timeout:
+            self.delete_handler(self.fileno)
+            return
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def tcp_error(self):
@@ -113,6 +121,7 @@ class tunnellc_tcp(tcp_handler.tcp_handler):
         self.dispatcher.tunnel_fail()
 
     def __send_data(self, sent_data, action=tunnel_tcp.ACT_DATA):
+        self.__conn_time = time.time()
         sent_pkt = self.__encrypt.build_packet(self.__session_id, action, sent_data)
         # 丢弃阻塞的包
         if self.writer.size() > self.__BUFSIZE: self.writer.flush()
