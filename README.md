@@ -1,4 +1,4 @@
-# IP层代理软件，更多详情请查看项目上方的wiki页面
+# IP层代理软件(VPN)，更多详情请查看项目上方的wiki页面
 教程链接 https://fdslight.github.io/fdslight/
 
 #软件功能说明  
