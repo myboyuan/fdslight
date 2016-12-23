@@ -28,7 +28,7 @@ class fdslightgw(_fdsl.fdslight):
     # 过滤器中需要删除的IP
     __wait_del_ips_from_filter = None
     # 过滤器IP保存时间
-    __FILTER_IP_LIFETIME = 1200
+    __FILTER_IP_LIFETIME = 600
 
     __session_id = None
 
