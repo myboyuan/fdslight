@@ -79,19 +79,35 @@ class dns_base(udp_handler.udp_handler):
     # 新的DNS ID映射到就的DNS ID
     __dns_id_map = {}
 
+    # 空闲的dns ids
+    __empty_dns_ids = []
+    # 当前最大的DNS ID
+    __current_max_dns_id = 0
+    # 最大的DNS ID
+    __max_dns_id = 2000
+
+    def set_dns_id_max(self, max_id):
+        if max_id > 65535: max_id = 65535
+        self.__max_dns_id = max_id
+
     def get_dns_id(self, old_dns_id):
         if old_dns_id not in self.__dns_id_map: return old_dns_id
-        while 1:
-            n_dns_id = random.randint(1, 65534)
-            if n_dns_id in self.__dns_id_map: continue
-            break
+
+        if not self.__empty_dns_ids:
+            n_dns_id = self.__empty_dns_ids.pop(0)
+        else:
+            self.__current_max_dns_id += 1
+            n_dns_id = self.__current_max_dns_id
         return n_dns_id
 
     def set_dns_id_map(self, dns_id, value):
         self.__dns_id_map[dns_id] = value
 
     def del_dns_id_map(self, dns_id):
-        if dns_id in self.__dns_id_map: del self.__dns_id_map[dns_id]
+        if dns_id in self.__dns_id_map:
+            self.__empty_dns_ids.append(dns_id)
+            del self.__dns_id_map[dns_id]
+        return
 
     def get_dns_id_map(self, dns_id):
         return self.__dns_id_map[dns_id]
@@ -100,10 +116,7 @@ class dns_base(udp_handler.udp_handler):
         return dns_id in self.__dns_id_map
 
     def recyle_resource(self, dns_ids):
-        for dns_id in dns_ids:
-            if dns_id not in self.__dns_id_map: continue
-            del self.__dns_id_map[dns_id]
-        return
+        for dns_id in dns_ids: self.del_dns_id_map(dns_id)
 
     def print_dns_id_map(self):
         print(self.__dns_id_map)

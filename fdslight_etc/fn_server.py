@@ -63,4 +63,7 @@ configs = {
     "dns": "8.8.8.8",
     # 最大TCP隧道连接数目
     "max_tcp_conns": 20,
+
+    # 最大DNS并发数目
+    "max_dns_request": 2000,
 }

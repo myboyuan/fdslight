@@ -71,4 +71,7 @@ configs = {
     "access_log": "/tmp/fdslight_access.log",
     # 故障日志
     "error_log": "/tmp/fdslight_error.log",
+
+    # 最大DNS并发数目
+    "max_dns_request": 2000,
 }

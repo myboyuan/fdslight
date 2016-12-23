@@ -245,7 +245,6 @@ class tuns(tun_base):
         if cmd not in ("set_packet_session_id",): return
         if cmd == "set_packet_session_id": self.__packet_session_id, = args
 
-
 class tunlc(tun_base):
     __is_ipv6 = None
 
@@ -262,7 +261,7 @@ class tunlc(tun_base):
 
         if not self.dispatcher.tunnel_is_ok(): return
         fileno = self.dispatcher.get_tunnel()
-        self.send_message_to_handler(self.fileno,fileno,ip_packet)
+        self.send_message_to_handler(self.fileno, fileno, ip_packet)
 
     def handle_ip_packet_for_write(self, ip_packet):
         return ip_packet
@@ -277,6 +276,6 @@ class tunlc(tun_base):
     def dev_timeout(self):
         pass
 
-    def message_from_handler(self,from_fd,byte_data):
+    def message_from_handler(self, from_fd, byte_data):
         self.add_evt_write(self.fileno)
         self.add_to_sent_queue(byte_data)
