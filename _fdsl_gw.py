@@ -10,7 +10,6 @@ import freenet.handler.tunnelgw_udp as tunnelc_udp
 import freenet.lib.whitelist as whitelist
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.utils as utils
-from fdslight_etc import fn_gw
 
 
 class fdslightgw(_fdsl.fdslight):
