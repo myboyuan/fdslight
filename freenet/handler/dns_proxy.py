@@ -88,6 +88,7 @@ class dns_base(udp_handler.udp_handler):
 
     def set_dns_id_max(self, max_id):
         if max_id > 65535: max_id = 65535
+        if max_id < 0: max_id = self.__max_dns_id
         self.__max_dns_id = max_id
 
     def get_dns_id(self, old_dns_id):

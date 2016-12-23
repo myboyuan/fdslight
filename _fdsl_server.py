@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import _fdsl, os, sys
+import _fdsl,sys
 import freenet.handler.dns_proxy as dns_proxy
 import freenet.handler.tunnels_tcp as tunnels_tcp
 import freenet.handler.tunnels_udp as tunnels_udp
@@ -33,6 +33,7 @@ class fdslightd(_fdsl.fdslight):
 
         tun_fd = self.create_handler(-1, tundev.tuns, "fdslight", subnet, nat)
         dns_fd = self.create_handler(-1, dns_proxy.dnsd_proxy, fns_config.configs["dns"])
+        self.get_handler(dns_fd).set_dns_id_max(int(fns_config.configs["max_dns_request"]))
 
         args = (tun_fd, -1, dns_fd, auth_module)
         kwargs = {"debug": self.debug}

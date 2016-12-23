@@ -10,6 +10,7 @@ import freenet.handler.tunnelgw_udp as tunnelc_udp
 import freenet.lib.whitelist as whitelist
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.utils as utils
+from fdslight_etc import fn_gw
 
 
 class fdslightgw(_fdsl.fdslight):
@@ -80,6 +81,7 @@ class fdslightgw(_fdsl.fdslight):
         host_rules = file_parser.parse_host_file("fdslight_etc/host_rules.txt")
 
         self.__dns_fd = self.create_handler(-1, dns_proxy.dnsgw_proxy, self.__session_id, host_rules, debug=self.debug)
+        self.get_handler(self.__dns_fd).set_dns_id_max(int(fngw_config.configs["max_dns_request"]))
 
         signal.signal(signal.SIGUSR1, self.__update_host_rules)
 
