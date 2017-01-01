@@ -41,7 +41,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
             s = socket.socket()
         self.__wait_sent = []
         self.__session_id = session_id
-        self.__conn_time = int(fngw_config.configs["timeout"])
+        self.__conn_timeout = int(fngw_config.configs["timeout"])
 
         self.set_socket(s)
         self.dispatcher.bind_session_id(self.__session_id, self.fileno, "tcp")
@@ -169,9 +169,11 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
+            self.print_access_log("connect_fail")
             self.delete_handler(self.fileno)
             return
         if time.time() - self.__conn_time > self.__conn_timeout:
+            self.print_access_log("timeout")
             self.delete_handler(self.fileno)
             return
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
