@@ -37,7 +37,6 @@ struct class *dev_class;
 static struct file_operations chr_ops;
 
 static struct fdsl_queue *r_queue;
-static struct fdsl_ip_filter *dst_ip_filter;
 
 struct fdsl_poll *poll;
 
@@ -95,8 +94,7 @@ static int fdsl_set_udp_proxy_subnet(unsigned long arg)
 
 static long chr_ioctl(struct file *f,unsigned int cmd,unsigned long arg)
 {
-	int ret=0,err=0;
-	unsigned int ui_tmp;
+	int ret=0;
 	if(_IOC_TYPE(cmd)!=FDSL_IOC_MAGIC) return -EINVAL;
 
 	switch(cmd){
