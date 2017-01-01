@@ -97,7 +97,7 @@ class tunnelc_udp(udp_handler.udp_handler):
         subnet, prefix = fngw_config.configs["udp_proxy_subnet"]
         subnet = utils.ip4b_2_number(socket.inet_aton(subnet))
 
-        fdsl_ctl.set_udp_proxy_subnet(self.__traffic_fetch_fd, subnet, int(prefix))
+        fdsl_ctl.set_udp_proxy_subnet(self.__traffic_fetch_fd, subnet, chr(int(prefix)).encode())
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
 
         return
