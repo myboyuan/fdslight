@@ -349,7 +349,7 @@ class dnsgw_proxy(dns_base):
             for cname in rrset:
                 ip = cname.__str__()
                 if not self.__check_ipaddr(ip): continue
-                if self.__dns_flags[dns_id] == 1: self.dispatcher.set_router(ip)(ip)
+                if self.__dns_flags[dns_id] == 1: self.dispatcher.set_router(ip)
                 ''''''
         self.__send_to_client(byte_data)
 
