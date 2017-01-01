@@ -93,7 +93,6 @@ class tunnelc_udp(udp_handler.udp_handler):
         self.__traffic_fetch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read)
         n = utils.ip4s_2_number(self.__server_ipaddr)
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
-        self.dispatcher.set_filter_fd(self.__traffic_fetch_fd)
 
         return
 
@@ -175,12 +174,12 @@ class tunnelc_udp(udp_handler.udp_handler):
 
     def __handle_ipv4_traffic_from_lan(self, byte_data):
         protocol = byte_data[9]
-        if protocol == 17 and not \
-                self.dispatcher.is_need_send_udp_to_tunnel(byte_data[12:16], byte_data[16:20]):
-            self.dispatcher.send_msg_to_udp_proxy(self.__session_id, byte_data)
-            return
-        if protocol != 17: self.dispatcher.update_filter_ip_access_time(utils.ip4b_2_number(byte_data[16:20]))
+        if protocol not in (1, 6, 17,): return
+
+        ipaddr = socket.inet_ntoa(byte_data[16:20])
+        self.dispatcher.update_router_access_time(ipaddr)
         self.__send_data(byte_data)
+
 
     def __handle_ipv6_traffic_from_lan(self, byte_data):
         pass

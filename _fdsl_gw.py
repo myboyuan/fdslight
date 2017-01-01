@@ -7,17 +7,11 @@ import freenet.handler.dns_proxy as dns_proxy
 import fdslight_etc.fn_gw as fngw_config
 import freenet.handler.tunnelgw_tcp as tunnelc_tcp
 import freenet.handler.tunnelgw_udp as tunnelc_udp
-import freenet.lib.whitelist as whitelist
 import freenet.lib.base_proto.utils as proto_utils
-import freenet.lib.utils as utils
-
 
 class fdslightgw(_fdsl.fdslight):
     __tunnel_fd = -1
-    __filter_fd = None
     __dns_fd = -1
-
-    __whitelist = None
 
     __udp_no_proxy_clients = None
     __udp_global_proxy_clients = None
@@ -25,17 +19,17 @@ class fdslightgw(_fdsl.fdslight):
     __timer = None
 
     # 过滤器中需要删除的IP
-    __wait_del_ips_from_filter = None
-    # 过滤器IP保存时间
-    __FILTER_IP_LIFETIME = 600
-
+    __routers = None
     __session_id = None
+
+    __TUN_NAME = "fdslight"
+    __ROUTER_TIMEOUT = 900
 
     def __init__(self):
         super(fdslightgw, self).__init__()
         self.set_mode("gateway")
         self.__timer = timer.timer()
-        self.__wait_del_ips_from_filter = []
+        self.__routers = {}
         self.__udp_no_proxy_clients = {}
         self.__udp_global_proxy_clients = {}
 
@@ -73,10 +67,6 @@ class fdslightgw(_fdsl.fdslight):
             sys.stdout = open(fngw_config.configs["access_log"], "a+")
             sys.stderr = open(fngw_config.configs["error_log"], "a+")
 
-        whitelist_rules = file_parser.parse_ip_subnet_file("fdslight_etc/whitelist.txt")
-        self.__whitelist = whitelist.whitelist()
-        for rule in whitelist_rules: self.__whitelist.add_rule(*rule)
-
         host_rules = file_parser.parse_host_file("fdslight_etc/host_rules.txt")
 
         self.__dns_fd = self.create_handler(-1, dns_proxy.dnsgw_proxy, self.__session_id, host_rules, debug=self.debug)
@@ -102,45 +92,30 @@ class fdslightgw(_fdsl.fdslight):
             tunnel = tunnelc_tcp.tunnelc_tcp
         self.__tunnel_fd = self.create_handler(-1, tunnel, *args, **kwargs)
 
-    def is_need_send_udp_to_tunnel(self, sippkt, dippkt):
-        """是否需要发送UDP流量到隧道
-        :param sippkt 源地址主机网络序地址
-        :param dippkt 目的地址主机网络序地址
-        """
-        is_global = fngw_config.configs["udp_global"]
-
-        if is_global: return True
-        if sippkt in self.__udp_global_proxy_clients: return True
-        if sippkt in self.__udp_no_proxy_clients: return False
-
-        return not self.__whitelist.find(dippkt)
-
-    def set_filter_fd(self, fileno):
-        self.__filter_fd = fileno
-
-    def update_filter_ip_access_time(self, n):
-        """更新过滤器IP访问时间"""
-        self.__timer.set_timeout(n, self.__FILTER_IP_LIFETIME)
-
-    def add_to_filter(self, ipaddr):
-        if not self.is_bind_session(self.__session_id): return
-        n = utils.ip4s_2_number(ipaddr)
-
-        self.__timer.set_timeout(n, self.__FILTER_IP_LIFETIME)
-        fdsl_ctl.tf_record_add(self.__filter_fd, n)
-
     def myloop(self):
         if not self.handler_exists(self.__tunnel_fd): return
 
         for ip in self.__timer.get_timeout_names():
             if not self.__timer.exists(ip): continue
-            self.__timer.drop(ip)
-            self.__wait_del_ips_from_filter.append(ip)
-        while 1:
-            try:
-                ip = self.__wait_del_ips_from_filter.pop(0)
-            except IndexError:
-                break
-            fdsl_ctl.tf_record_del(self.__filter_fd, ip)
-        self.__whitelist.recycle_cache()
+            if ip not in self.__routers: continue
+            self.del_router(ip)
         return
+
+    def update_router_access_time(self, ipaddr):
+        """更新路由访问时间"""
+        if ipaddr not in self.__routers: return
+        self.set_timeout(ipaddr, self.__ROUTER_TIMEOUT)
+
+    def set_router(self, ipaddr):
+        if ipaddr in self.__routers: return
+        cmd = "route add -host %s dev %s" % (ipaddr, self.__TUN_NAME)
+        os.system(cmd)
+        self.__routers[ipaddr] = None
+        self.__timer.set_timeout(ipaddr, self.__ROUTER_TIMEOUT)
+
+    def del_router(self, ipaddr):
+        if ipaddr not in self.__routers: return
+
+        cmd = "route del -host %s dev %s" % (ipaddr, self.__TUN_NAME)
+        os.system(cmd)
+        del self.__routers[ipaddr]

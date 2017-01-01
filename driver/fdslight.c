@@ -18,13 +18,10 @@
 #include<linux/version.h>
 #include "fdsl_queue.h"
 #include "fdsl_dev_ctl.h"
-#include "fdsl_ip_filter.h"
 
 #define DEV_NAME FDSL_DEV_NAME
 #define DEV_CLASS FDSL_DEV_NAME
 #define QUEUE_SIZE 10
-
-#define COPY_IP_FROM_USER  err=copy_from_user(&ui_tmp,(unsigned long *)arg,sizeof(unsigned int));if(err) return -EINVAL;ui_tmp=ntohl(ui_tmp);
 
 struct fdsl_poll{
 	struct fdsl_queue *r_queue;
@@ -45,6 +42,8 @@ static struct fdsl_ip_filter *dst_ip_filter;
 struct fdsl_poll *poll;
 
 static unsigned int tunnel=0;
+static unsigned int udp_proxy_subnet_base=0;
+static unsigned int udp_proxy_subnet_mask=0;
 
 static int chr_open(struct inode *node,struct file *f)
 {
@@ -70,6 +69,30 @@ static int fdsl_set_tunnel(unsigned long arg)
 	return 0;
 }
 
+static int fdsl_set_udp_proxy_subnet(unsigned long arg)
+{
+    struct fdsl_subnet udp_proxy_subnet;
+    unsigned int mask=0;
+    int t;
+
+    int err=copy_from_user(&udp_proxy_subnet,(unsigned long *)arg,sizeof(struct fdsl_subnet));
+
+    if(err) return -EINVAL;
+    if (udp_proxy_subnet.prefix>32) return -EINVAL;
+
+    t=32-udp_proxy_subnet.prefix;
+
+    while(t>0){
+        t=t-1;
+        mask|= 1 << t;
+    }
+
+    udp_proxy_subnet_mask=~mask;
+    udp_proxy_subnet_base=udp_proxy_subnet.address;
+
+    return 0;
+}
+
 static long chr_ioctl(struct file *f,unsigned int cmd,unsigned long arg)
 {
 	int ret=0,err=0;
@@ -77,17 +100,8 @@ static long chr_ioctl(struct file *f,unsigned int cmd,unsigned long arg)
 	if(_IOC_TYPE(cmd)!=FDSL_IOC_MAGIC) return -EINVAL;
 
 	switch(cmd){
-        case FDSL_IOC_TF_RECORD_ADD:
-			COPY_IP_FROM_USER;
-            ret=fdsl_ip_filter_add(dst_ip_filter,(const char *)(&ui_tmp));
-            break;
-        case FDSL_IOC_TF_RECORD_DEL:
-   			COPY_IP_FROM_USER;
-             ret=fdsl_ip_filter_delete(dst_ip_filter,(const char *)(&ui_tmp));
-             break;
-        case FDSL_IOC_TF_FIND:
-       		COPY_IP_FROM_USER;
-            ret=fdsl_ip_filter_find(dst_ip_filter,(const char *)(&ui_tmp));
+        case FDSL_IOC_SET_UDP_PROXY_SUBNET:
+            ret=fdsl_set_udp_proxy_subnet(arg);
             break;
         case FDSL_IOC_SET_TUNNEL_IP:
             ret=fdsl_set_tunnel(arg);
@@ -148,29 +162,10 @@ static unsigned int fdsl_push_packet_to_user(struct iphdr *ip_header)
 static unsigned int handle_udp_in(struct iphdr *ip_header)
 // 处理UDP
 {
-    unsigned short sport,dport;
-	struct udphdr *udp_header;
+    unsigned int saddr=(unsigned int)ip_header->saddr;
+    saddr=ntohl(saddr);
 
-    udp_header=(struct udphdr *)((__u32 *)ip_header+ip_header->ihl);
-    dport=ntohs((unsigned short int)udp_header->dest);
-    sport=ntohs((unsigned short int)udp_header->source);
-	
-	if(53==dport) return NF_ACCEPT;
-	if(53==sport) return NF_ACCEPT;
-
-    return fdsl_push_packet_to_user(ip_header);
-}
-
-static unsigned int handle_tcp_and_icmp_in(struct iphdr *ip_header)
-// TCP和ICMP处理
-{
-    unsigned int daddr;
-	int find_r=0;
-
-	daddr=(unsigned int)ip_header->daddr;
-    find_r=fdsl_ip_filter_find(dst_ip_filter,(const char *)(&daddr));
-
-	if (find_r < 1) return NF_ACCEPT;
+    if((saddr & udp_proxy_subnet_mask)!=udp_proxy_subnet_base) return NF_ACCEPT;
 
     return fdsl_push_packet_to_user(ip_header);
 }
@@ -210,15 +205,10 @@ static unsigned int nf_handle_in(
 	if (daddr==tunnel) return NF_ACCEPT;
 
 	protocol=ip_header->protocol;
-	switch(protocol){
-	    case IPPROTO_UDP:
-	        return handle_udp_in(ip_header);
-	    case IPPROTO_TCP:
-	        return handle_tcp_and_icmp_in(ip_header);
-	    case IPPROTO_ICMP:
-	        return handle_tcp_and_icmp_in(ip_header);
-	    default:return NF_ACCEPT;
-	}
+
+	if (IPPROTO_UDP!=protocol) return NF_ACCEPT;
+
+	return handle_udp_in(ip_header);
 }
 
 static int create_dev(void)
@@ -279,7 +269,6 @@ static int fdsl_init(void)
 	init_waitqueue_head(&poll->inq);
 
 	r_queue=fdsl_queue_init(QUEUE_SIZE);
-    dst_ip_filter=fdsl_ip_filter_init(FDSL_IP_VER4);
 	poll->r_queue=r_queue;
 
 
@@ -291,8 +280,7 @@ static void fdsl_exit(void)
 	delete_dev();
 	nf_unregister_hook(&nf_ops);
 	fdsl_queue_release(r_queue);
-    fdsl_ip_filter_release(dst_ip_filter);
-    
+
 	kfree(poll);
 }
 
