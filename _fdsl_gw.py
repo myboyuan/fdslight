@@ -16,9 +16,6 @@ class fdslightgw(_fdsl.fdslight):
     __dns_fd = -1
     __tun_fd = -1
 
-    __udp_no_proxy_clients = None
-    __udp_global_proxy_clients = None
-
     __timer = None
 
     # 过滤器中需要删除的IP
@@ -33,22 +30,9 @@ class fdslightgw(_fdsl.fdslight):
         self.set_mode("gateway")
         self.__timer = timer.timer()
         self.__routers = {}
-        self.__udp_no_proxy_clients = {}
-        self.__udp_global_proxy_clients = {}
 
         account = fngw_config.configs["account"]
         self.__session_id = proto_utils.gen_session_id(account["username"], account["password"])
-
-        udp_no_proxy_clients = fngw_config.configs["udp_no_proxy_clients"]
-        udp_global_proxy_clients = fngw_config.configs["udp_global_proxy_clients"]
-
-        for ipaddr in udp_no_proxy_clients:
-            naddr = socket.inet_aton(ipaddr)
-            self.__udp_no_proxy_clients[naddr] = None
-
-        for ipaddr in udp_global_proxy_clients:
-            naddr = socket.inet_aton(ipaddr)
-            self.__udp_global_proxy_clients[naddr] = None
 
     def create_fn_gw(self):
         os.chdir("driver")
