@@ -123,8 +123,8 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         if len(byte_data) != data_len:
             self.print_access_log("wrong_packet_length")
             return
-        tun_fd = self.dispatcher.get_tun()
-        self.send_message_to_handler(self.fileno, tun_fd, byte_data)
+        #tun_fd = self.dispatcher.get_tun()
+        self.send_message_to_handler(self.fileno, self.__traffic_send_fd, byte_data)
 
     def __handle_ipv6_data_from_tunnel(self, byte_data):
         pass
@@ -164,6 +164,7 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         self.remove_evt_write(self.fileno)
 
     def tcp_error(self):
+        self.print_access_log("error")
         self.delete_handler(self.fileno)
 
     def tcp_timeout(self):

@@ -120,8 +120,8 @@ class tunnelc_udp(udp_handler.udp_handler):
         # 过滤到不支持的协议
 
         if p not in (1, 6, 17,): return
-        tun_fd = self.dispatcher.get_tun()
-        self.send_message_to_handler(self.fileno, tun_fd, byte_data)
+        #tun_fd = self.dispatcher.get_tun()
+        self.send_message_to_handler(self.fileno, self.__traffic_send_fd, byte_data)
         return
 
     def __send_data(self, byte_data, action=tunnel_proto.ACT_DATA):

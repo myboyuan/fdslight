@@ -197,6 +197,7 @@ class tunnels_tcp_handler(tcp_handler.tcp_handler):
         if session_id != self.__session_id: return
 
         if not self.__auth_module.handle_recv(self.__session_id, len(byte_data)):
+            self.print_access_log("auth_forbid_recv")
             self.delete_handler(self.fileno)
             return
 
@@ -239,11 +240,13 @@ class tunnels_tcp_handler(tcp_handler.tcp_handler):
         self.remove_evt_write(self.fileno)
 
     def tcp_error(self):
+        self.print_access_log("error")
         self.delete_handler(self.fileno)
 
     def tcp_timeout(self):
         t = time.time()
         if t - self.__conn_time > self.__conn_timeout:
+            self.print_access_log("timeout")
             self.delete_handler(self.fileno)
             return
         self.__auth_module.handle_timing_task(self.__session_id)
