@@ -8,6 +8,7 @@ import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
 
+
 class tunnelc_tcp(tcp_handler.tcp_handler):
     __LOOP_TIMEOUT = 10
 
@@ -86,9 +87,14 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
 
         self.__conn_time = time.time()
         self.print_access_log("connect_ok")
-        self.__traffic_fetch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read)
-        fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
 
+        if fngw_config.configs["udp_global"]:
+            self.__traffic_fetch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read)
+            subnet, prefix = fngw_config.configs["udp_proxy_subnet"]
+            subnet = socket.inet_aton(subnet)
+
+            fdsl_ctl.set_udp_proxy_subnet(self.__traffic_fetch_fd, subnet, int(prefix))
+            fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
@@ -172,7 +178,8 @@ class tunnelc_tcp(tcp_handler.tcp_handler):
         self.print_access_log("disconnect")
         self.unregister(self.fileno)
 
-        if self.is_conn_ok(): self.delete_handler(self.__traffic_fetch_fd)
+        if self.is_conn_ok() and fngw_config.configs["udp_global"]:
+            self.delete_handler(self.__traffic_fetch_fd)
 
         self.dispatcher.unbind_session_id(self.__session_id)
         self.close()

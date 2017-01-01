@@ -90,8 +90,14 @@ class tunnelc_udp(udp_handler.udp_handler):
         return self.fileno
 
     def __init(self):
+        if not fngw_config.configs["udp_global"]: return
         self.__traffic_fetch_fd = self.create_handler(self.fileno, traffic_pass.traffic_read)
         n = utils.ip4s_2_number(self.__server_ipaddr)
+
+        subnet, prefix = fngw_config.configs["udp_proxy_subnet"]
+        subnet = socket.inet_aton(subnet)
+
+        fdsl_ctl.set_udp_proxy_subnet(self.__traffic_fetch_fd, subnet, int(prefix))
         fdsl_ctl.set_tunnel(self.__traffic_fetch_fd, n)
 
         return
@@ -158,7 +164,8 @@ class tunnelc_udp(udp_handler.udp_handler):
     def udp_delete(self):
         self.dispatcher.unbind_session_id(self.__session_id)
         self.unregister(self.fileno)
-        self.delete_handler(self.__traffic_fetch_fd)
+        if fngw_config.configs["udp_global"]:
+            self.delete_handler(self.__traffic_fetch_fd)
         self.socket.close()
 
     @property
@@ -179,7 +186,6 @@ class tunnelc_udp(udp_handler.udp_handler):
         ipaddr = socket.inet_ntoa(byte_data[16:20])
         self.dispatcher.update_router_access_time(ipaddr)
         self.__send_data(byte_data)
-
 
     def __handle_ipv6_traffic_from_lan(self, byte_data):
         pass
