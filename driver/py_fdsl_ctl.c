@@ -31,7 +31,7 @@ fdsl_set_tunnel(PyObject *self,PyObject *args)
 }
 
 static PyMethodDef fdsl_ctl_methods[]={
-    {"set_udp_proxy_subnet",fdsl_set_udp_proxy_subnet,"set udp global proxy subnet"},
+    {"set_udp_proxy_subnet",fdsl_set_udp_proxy_subnet,METH_VARARGS,"set udp global proxy subnet"},
     {"set_tunnel",fdsl_set_tunnel,METH_VARARGS,"set tunnel"},
 	{NULL,NULL,0,NULL}
 };
