@@ -245,6 +245,35 @@ class tuns(tun_base):
         if cmd not in ("set_packet_session_id",): return
         if cmd == "set_packet_session_id": self.__packet_session_id, = args
 
+
+class tungw(tun_base):
+    __is_ipv6 = None
+
+    def dev_init(self, dev_name, is_ipv6=False):
+        self.__is_ipv6 = is_ipv6
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
+
+    def handle_ip_packet_from_read(self, ip_packet):
+        tunnel_fd = self.dispatcher.get_tunnel()
+        if not self.handler_exists(tunnel_fd): return
+        self.send_message_to_handler(self.fileno, tunnel_fd, ip_packet)
+
+    def handle_ip_packet_for_write(self, ip_packet):
+        return ip_packet
+
+    def dev_delete(self):
+        self.unregister(self.fileno)
+        os.close(self.fileno)
+
+    def dev_error(self):
+        self.delete_handler(self.fileno)
+
+    def message_from_handler(self, from_fd, byte_data):
+        self.add_evt_read(self.fileno)
+        self.add_to_sent_queue(byte_data)
+
+
 class tunlc(tun_base):
     __is_ipv6 = None
 

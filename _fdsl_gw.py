@@ -8,10 +8,13 @@ import fdslight_etc.fn_gw as fngw_config
 import freenet.handler.tunnelgw_tcp as tunnelc_tcp
 import freenet.handler.tunnelgw_udp as tunnelc_udp
 import freenet.lib.base_proto.utils as proto_utils
+import freenet.handler.tundev as tundev
+
 
 class fdslightgw(_fdsl.fdslight):
     __tunnel_fd = -1
     __dns_fd = -1
+    __tun_fd = -1
 
     __udp_no_proxy_clients = None
     __udp_global_proxy_clients = None
@@ -69,6 +72,7 @@ class fdslightgw(_fdsl.fdslight):
 
         host_rules = file_parser.parse_host_file("fdslight_etc/host_rules.txt")
 
+        self.__tun_fd = self.create_handler(-1, tundev.tungw, self.__TUN_NAME)
         self.__dns_fd = self.create_handler(-1, dns_proxy.dnsgw_proxy, self.__session_id, host_rules, debug=self.debug)
         self.get_handler(self.__dns_fd).set_dns_id_max(int(fngw_config.configs["max_dns_request"]))
 
@@ -119,3 +123,9 @@ class fdslightgw(_fdsl.fdslight):
         cmd = "route del -host %s dev %s" % (ipaddr, self.__TUN_NAME)
         os.system(cmd)
         del self.__routers[ipaddr]
+
+    def get_tunnel(self):
+        return self.__tunnel_fd
+
+    def get_tun(self):
+        return self.__tun_fd
