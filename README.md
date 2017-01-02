@@ -2,8 +2,9 @@
 教程链接 https://fdslight.github.io/fdslight/
 
 #软件功能说明  
-1. 支持UDP穿透技术，即P2P技术。   
-2. TCP使用分发规则：在名单内的使用代理。UDP使用白名单：在名单外的使用代理(gateway模式)
+1. 支持UDP穿透技术，即P2P技术,(gateway模式)
+2. TCP使用分发规则：在名单内的使用代理。
+3. 可以指定特定局域网客户机进行UDP全局代理，该功能为游戏联机准备(gateway模式)
 
 #软件技术说明
 1. LICENSE说明在LICENSE文件中，如果你做二次开发以及其它用途，请仔细阅读BSD LICENSE  
