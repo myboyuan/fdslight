@@ -107,7 +107,6 @@ class fdslightgw(_fdsl.fdslight):
 
         cmd = "route del -host %s dev %s" % (ipaddr, self.__TUN_NAME)
         os.system(cmd)
-        self.__timer.drop(ipaddr)
         del self.__routers[ipaddr]
 
     def get_tunnel(self):
