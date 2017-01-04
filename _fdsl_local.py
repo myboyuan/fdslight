@@ -147,6 +147,7 @@ class fdslightlc(_fdsl.fdslight):
         names = self.__timer.get_timeout_names()
         for name in names:
             if not self.__timer.exists(name): continue
+            self.__timer.drop(name)
             if name not in self.__routers: continue
             self.del_router(name)
         return

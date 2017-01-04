@@ -85,6 +85,7 @@ class fdslightgw(_fdsl.fdslight):
 
         for ip in self.__timer.get_timeout_names():
             if not self.__timer.exists(ip): continue
+            self.__timer.drop(ip)
             if ip not in self.__routers: continue
             self.del_router(ip)
         return
