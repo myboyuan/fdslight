@@ -133,12 +133,14 @@ class fdslightlc(_fdsl.fdslight):
 
         cmd = "route del -host %s dev %s" % (ipaddr, self.__TUN_NAME)
         os.system(cmd)
+
+        self.__timer.drop(ipaddr)
         del self.__routers[ipaddr]
 
     def update_router_access_time(self, ipaddr):
         """更新路由访问时间"""
         if ipaddr not in self.__routers: return
-        self.set_timeout(ipaddr, self.__ROUTER_TIMEOUT)
+        self.__timer.set_timeout(ipaddr, self.__ROUTER_TIMEOUT)
 
     def get_dns(self):
         return self.__dns_fd
