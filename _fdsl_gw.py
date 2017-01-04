@@ -92,7 +92,7 @@ class fdslightgw(_fdsl.fdslight):
     def update_router_access_time(self, ipaddr):
         """更新路由访问时间"""
         if ipaddr not in self.__routers: return
-        self.set_timeout(ipaddr, self.__ROUTER_TIMEOUT)
+        self.__timer.set_timeout(ipaddr, self.__ROUTER_TIMEOUT)
 
     def set_router(self, ipaddr):
         if ipaddr in self.__routers: return
