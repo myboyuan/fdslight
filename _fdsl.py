@@ -155,7 +155,6 @@ class fdslight(dispatcher.dispatcher):
         if udp_len == 0 and offset == 0: return
         if df == 0 and mf == 1 and offset == 0 and udp_len < 512: return
 
-        ihl = (message[0] & 0x0f) * 4
         offset = ((message[6] & 0x1f) << 5) | message[7]
 
         # 说明不是第一个数据分包,那么就直接发送给raw socket
