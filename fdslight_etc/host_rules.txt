@@ -149,6 +149,10 @@ register.mesh.com:1
 *.uukanshu.com:1
 *.jsdelivr.net:0
 *.cloudfront.net:0
+*.cloudflare.com:1
+*.jwpcdn.com:1
+*.ntdimg.com:1
+*.jwpltx.com:1
 
 ### 游戏相关
 *.rockstargames.com:1
