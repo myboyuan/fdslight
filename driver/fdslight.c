@@ -175,7 +175,8 @@ static unsigned int nf_handle_in(
 #endif
 #if LINUX_VERSION_CODE>=KERNEL_VERSION(4,4,0)
         void *priv,
-#else
+#endif
+#if LINUX_VERSION_CODE<KERNEL_VERSION(4,4,0)
         const struct nf_hook_ops *ops,
 #endif
 		struct sk_buff *skb,
