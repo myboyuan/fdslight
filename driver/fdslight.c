@@ -176,7 +176,7 @@ static unsigned int nf_handle_in(
 #if LINUX_VERSION_CODE>=KERNEL_VERSION(4,4,0)
         void *priv,
 #endif
-#if LINUX_VERSION_CODE<KERNEL_VERSION(4,4,0)
+#if LINUX_VERSION_CODE<KERNEL_VERSION(4,4,0) && LINUX_VERSION_CODE>(3,1,2)
         const struct nf_hook_ops *ops,
 #endif
 		struct sk_buff *skb,
@@ -252,7 +252,7 @@ static struct file_operations chr_ops={
 };
 
 static struct nf_hook_ops nf_ops={
-	.hook=NULL,
+	.hook=nf_handle_in,
 	.hooknum=NF_INET_FORWARD,
 	.pf=PF_INET,
 	.priority=NF_IP_PRI_FIRST
