@@ -252,7 +252,7 @@ static struct file_operations chr_ops={
 };
 
 static struct nf_hook_ops nf_ops={
-	.hook=nf_handle_in,
+	.hook=NULL,
 	.hooknum=NF_INET_FORWARD,
 	.pf=PF_INET,
 	.priority=NF_IP_PRI_FIRST
