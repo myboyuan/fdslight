@@ -170,13 +170,13 @@ static unsigned int handle_udp_in(struct iphdr *ip_header)
 
 static unsigned int nf_handle_in(
 // 处理流进的包
-#if LINUX_VERSION_CODE<=KERNEL_VERSION(3,1,0)
+#if LINUX_VERSION_CODE<=KERNEL_VERSION(3,1,2)
         unsigned int hooknum,
 #endif
 #if LINUX_VERSION_CODE>=KERNEL_VERSION(4,4,0)
         void *priv,
 #endif
-#if LINUX_VERSION_CODE<KERNEL_VERSION(4,4,0) && LINUX_VERSION_CODE>=(3,1,0)
+#if LINUX_VERSION_CODE<KERNEL_VERSION(4,4,0) && LINUX_VERSION_CODE>(3,1,2)
         const struct nf_hook_ops *ops,
 #endif
 		struct sk_buff *skb,
