@@ -348,7 +348,7 @@ class dnsgw_proxy(dns_base):
         for rrset in msg.answer:
             for cname in rrset:
                 ip = cname.__str__()
-                if not self.__check_ipaddr(ip): continue
+                if not utils.is_ipv4_address(ip): continue
                 if self.__dns_flags[dns_id] == 1: self.dispatcher.set_router(ip)
                 ''''''
         self.__send_to_client(byte_data)
@@ -476,7 +476,7 @@ class dnslc_proxy(udp_handler.udp_handler):
         for rrset in msg.answer:
             for cname in rrset:
                 ip = cname.__str__()
-                if not self.__check_ipaddr(ip): continue
+                if not utils.is_ipv4_address(ip): continue
                 if flags == 1: self.dispatcher.set_router(ip)
             ''''''
 

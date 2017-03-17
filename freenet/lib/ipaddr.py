@@ -4,6 +4,7 @@
 """
 
 import socket
+import freenet.lib.utils as utils
 
 
 class IpaddrNoEnoughErr(Exception):
@@ -12,68 +13,55 @@ class IpaddrNoEnoughErr(Exception):
     pass
 
 
-class ip4addr(object):
-    __base_ipaddr = 0
-    __mask = 0
-    __recycle_ips = None
-    # 当前最大IP地址
-    __current_max_ipaddr = 0
+class ipalloc(object):
+    __no_use_iplist = None
+    __subnet = None
+    __subnet_num = None
+    __prefix = None
+    __prefix_num = None
 
-    def __init__(self, ipaddr, mask_size):
-        """
-        :param ipaddr:192.168.1.0
-        :param mask:25
-        :return:
-        """
-        self.__recycle_ips = []
+    __cur_max_ipaddr_num = None
 
-        if mask_size < 1:
-            raise ValueError("the mask_size must be number and the value must be more than 0")
+    __is_ipv6 = None
 
-        if mask_size > 31:
-            raise ValueError("the mask_size must be number and the value must be less than 32")
+    __fa = None
 
-        for i in range(mask_size):
-            n = 32 - i
-            self.__mask |= 1 << n
+    def __init__(self, subnet, prefix, is_ipv6=False):
 
-        self.__base_ipaddr = self.__get_int_ipaddr_from_sIpaddr(ipaddr)
+        self.__no_use_iplist_num = []
+        self.__subnet = subnet
+        self.__prefix = prefix
+        self.__is_ipv6 = is_ipv6
 
+        if not is_ipv6:
+            self.__fa = socket.AF_INET
+            self.__cur_max_ipaddr_num = utils.bytes2number(socket.inet_pton(socket.AF_INET, subnet))
+            self.__prefix_num = utils.calc_net_prefix_num(prefix)
+        else:
+            self.__fa = socket.AF_INET6
+            self.__cur_max_ipaddr_num = utils.bytes2number(socket.inet_pton(socket.AF_INET6, subnet))
+            self.__prefix_num = utils.calc_net_prefix_num(prefix, is_ipv6=True)
+
+        self.__subnet_num = self.__cur_max_ipaddr_num
         return
 
-    def __get_int_ipaddr_from_sIpaddr(self, ipaddr):
-        nbytes = socket.inet_aton(ipaddr)
+    def put_addr(self, byte_ip):
+        n = utils.bytes2number(byte_ip)
 
-        return (nbytes[0] << 24) | (nbytes[1] << 16) | (nbytes[2] << 8) | nbytes[3]
+        if n == self.__cur_max_ipaddr_num:
+            self.__cur_max_ipaddr_num -= 1
+            return
+        self.__no_use_iplist_num.append(n)
 
     def get_addr(self):
-        """获取IP地址
-        :param addr:
-        :return:
-        """
-        if len(self.__recycle_ips) > 20:
-            return self.__recycle_ips.pop(0)
+        if self.__no_use_iplist: return self.__no_use_iplist.pop(0)
+        size = 4
+        if self.__is_ipv6: size = 16
 
-        n = self.__current_max_ipaddr + 1
-        host_n = self.__base_ipaddr & self.__mask
+        self.__cur_max_ipaddr_num += 1
+        byte_ip = utils.number2bytes(self.__cur_max_ipaddr_num, size)
 
-        if host_n < n:
-            if self.__recycle_ips: return self.__recycle_ips.pop(0)
-            raise IpaddrNoEnoughErr
+        if self.__cur_max_ipaddr_num & self.__prefix_num != self.__subnet_num:
+            raise IpaddrNoEnoughErr("not enough ip address")
 
-        new_int_ip = self.__base_ipaddr + n
-        self.__current_max_ipaddr = n
-
-        a = (new_int_ip & 0xff000000) >> 24
-        b = (new_int_ip & 0x00ff0000) >> 16
-        c = (new_int_ip & 0x0000ff00) >> 8
-        d = new_int_ip & 0x000000ff
-
-        return bytes([a, b, c, d])
-
-    def put_addr(self, ipaddr):
-        """回收IP资源
-        :param ipaddr:
-        :return:
-        """
-        if ipaddr not in self.__recycle_ips: self.__recycle_ips.append(ipaddr)
+        return byte_ip

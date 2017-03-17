@@ -5,10 +5,10 @@ import sys
 sys.path.append("../../../")
 """
 
-from Crypto.Cipher import AES
-import random, hashlib
+import hashlib, os
 import freenet.lib.base_proto.tunnel_tcp as tunnel
 import freenet.lib.base_proto.utils as proto_utils
+import freenet.lib.crypto._aes_cfb as aes_cfb
 
 FIXED_HEADER_SIZE = 64
 
@@ -25,43 +25,22 @@ class encrypt(tunnel.builder):
 
         super(encrypt, self).__init__(FIXED_HEADER_SIZE)
 
-    def __rand(self, length=16):
-        sset = "1234567890qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"
-        seq = []
-
-        for i in range(length):
-            n = random.randint(0, 61)
-            seq.append(sset[n])
-
-        return "".join(seq).encode("iso-8859-1")
-
     def wrap_header(self, base_hdr):
-        iv = self.__rand()
-        cipher = AES.new(self.__key, AES.MODE_CFB, iv)
+        iv = os.urandom(16)
         self.__iv = iv
         seq = [
             base_hdr,
             self.__const_fill
         ]
-        e_data = cipher.encrypt(b"".join(seq))
+        e_data = aes_cfb.encrypt(self.__key, self.__iv, b"".join(seq))
 
         return iv + e_data
 
     def wrap_body(self, size, body_data):
-        cipher = AES.new(self.__key, AES.MODE_CFB, self.__iv)
-        fill = b"\0" * (self.get_payload_length(size) - size)
-        data = body_data + fill
-
-        return cipher.encrypt(data)
+        return aes_cfb.encrypt(self.__key, self.__iv, body_data)
 
     def get_payload_length(self, pkt_len):
-        a = pkt_len % 16
-        if a:
-            r = (int(pkt_len / 16) + 1) * 16
-        else:
-            r = pkt_len
-
-        return r
+        return pkt_len
 
     def __set_aes_key(self, new_key):
         self.__key = hashlib.md5(new_key.encode()).digest()
@@ -93,8 +72,7 @@ class decrypt(tunnel.parser):
 
     def unwrap_header(self, header_data):
         self.__iv = header_data[self.__iv_begin_pos:self.__iv_end_pos]
-        cipher = AES.new(self.__key, AES.MODE_CFB, self.__iv)
-        data = cipher.decrypt(header_data[self.__iv_end_pos:FIXED_HEADER_SIZE])
+        data = aes_cfb.decrypt(self.__key, self.__iv, header_data[self.__iv_end_pos:FIXED_HEADER_SIZE])
         real_hdr = data[0:tunnel.MIN_FIXED_HEADER_SIZE]
 
         # 丢弃误码的包
@@ -103,8 +81,7 @@ class decrypt(tunnel.parser):
         return real_hdr
 
     def unwrap_body(self, length, body_data):
-        cipher = AES.new(self.__key, AES.MODE_CFB, self.__iv)
-        d = cipher.decrypt(body_data)
+        d = aes_cfb.decrypt(self.__key, self.__iv, body_data)
 
         return d[0:length]
 

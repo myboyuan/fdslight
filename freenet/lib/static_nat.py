@@ -76,7 +76,7 @@ class nat(_nat_base):
 
     def __init__(self, subnet):
         super(nat, self).__init__()
-        self.__ip_alloc = ipaddr.ip4addr(*subnet)
+        self.__ip_alloc = ipaddr.ipalloc(*subnet, is_ipv6=False)
         self.__timer = timer.timer()
 
     def get_ippkt2sLan_from_cLan(self, session_id, ippkt):
