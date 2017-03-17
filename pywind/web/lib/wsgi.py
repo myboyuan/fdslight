@@ -164,7 +164,7 @@ class wsgi(object):
             return
 
         if self.__is_resp_hdr:
-            self.__handle_error("500 Internal Server Error", [], "http header has responsed!")
+            self.__handle_error("500 Internal Server Error", [], "http master has responsed!")
             return
 
         if self.__resp_stcode >= 300:

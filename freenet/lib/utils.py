@@ -152,3 +152,145 @@ def calc_content_md5(content):
     md5.update(content)
 
     return md5.digest()
+
+
+def calc_net_prefix_num(prefix, is_ipv6=False):
+    """根据前缀计算网络掩码"""
+    if is_ipv6:
+        m = 128
+        n = 2 ** 128 - 1
+    else:
+        m = 32
+        n = 2 ** 32 - 1
+
+    r = 0
+    t = m - prefix
+
+    while t > 0:
+        t = t - 1
+        r |= 1 << t
+
+    return (~r) & n
+
+
+def calc_subnet(ipaddr, prefix, is_ipv6=False):
+    if is_ipv6 and prefix == 128: return ipaddr
+    if not is_ipv6 and prefix == 32: return ipaddr
+
+    q = int(prefix / 8)
+    r = prefix % 8
+
+    if is_ipv6:
+        byte_ipaddr = socket.inet_pton(socket.AF_INET6, ipaddr)
+        results = list(bytes(16))
+    else:
+        byte_ipaddr = socket.inet_pton(socket.AF_INET, ipaddr)
+        results = list(bytes(4))
+
+    results[0:q] = byte_ipaddr[0:q]
+    v = 0
+    for n in range(r + 1):
+        if n == 0: continue
+        v += 2 ** (8 - n)
+
+    results[q] = byte_ipaddr[q] & v
+    if is_ipv6:
+        return socket.inet_ntop(socket.AF_INET6, bytes(results))
+    else:
+        return socket.inet_ntop(socket.AF_INET, bytes(results))
+
+
+def check_subnet_fmt(subnet, prefix, is_ipv6=False):
+    """检查子网格式是否正确"""
+    if is_ipv6 and not is_ipv6_address(subnet): return False
+    if not is_ipv6 and not is_ipv4_address(subnet): return False
+
+    try:
+        prefix = int(prefix)
+    except ValueError:
+        return False
+    if not is_ipv6 and prefix > 32: return False
+    if prefix < 0: return False
+    if is_ipv6 and prefix > 128: return False
+
+    n_subnet = calc_subnet(subnet, prefix, is_ipv6)
+
+    return n_subnet == subnet
+
+
+def check_is_from_subnet(ipaddr, subnet, prefix, is_ipv6=False):
+    """检查IP地址是否来自于子网"""
+    n_subnet = calc_subnet(ipaddr, prefix, is_ipv6)
+
+    return n_subnet == subnet
+
+
+def number2bytes(n, fixed_size=0):
+    seq = []
+
+    while n != 0:
+        t = n & 0xff
+        seq.insert(0, t)
+        n = n >> 8
+
+    if fixed_size:
+        size = len(seq)
+        for i in range(fixed_size - size): seq.insert(0, 0)
+
+    return bytes(seq)
+
+
+def bytes2number(byte_data):
+    v = 0
+    for n in byte_data: v = (v << 8) | n
+    return v
+
+
+def is_ipv4_address(sts_ipaddr):
+    """检查是否是IPv4地址"""
+    try:
+        socket.inet_aton(sts_ipaddr)
+    except OSError:
+        return False
+    return True
+
+
+def is_ipv6_address(sts_ipaddr):
+    """检查是否是IPv6地址"""
+    try:
+        socket.inet_pton(socket.AF_INET6, sts_ipaddr)
+    except OSError:
+        return False
+    return True
+
+
+def extract_subnet_info(sts):
+    """从字符串中提取子网信息，字符串的格式为 xxxx／prefix
+    :param sts:
+    :return:成功返回 （subnet,prefix,) ,否则返回 None
+    """
+    pos = sts.find("/")
+
+    if pos < 2: return None
+    subnet = sts[0:pos]
+    pos += 1
+
+    try:
+        prefix = int(sts[pos:])
+    except ValueError:
+        return None
+
+    return (subnet, prefix,)
+
+
+def is_uint(s):
+    """是否是无符号整数
+    :param s:
+    :return:
+    """
+    try:
+        n = int(s)
+    except ValueError:
+        return False
+
+    return n >= 0

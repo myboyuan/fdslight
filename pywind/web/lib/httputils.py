@@ -28,7 +28,7 @@ def get_http1x_map(sts):
 
     for s in tmplist:
         p = s.find(":")
-        if p < 1: raise Http1xHeaderErr("wrong http header:%s" % s)
+        if p < 1: raise Http1xHeaderErr("wrong http master:%s" % s)
         name = s[0:p]
         p += 1
         value = s[p:].lstrip()
@@ -49,10 +49,10 @@ def parse_htt1x_request_header(sts):
     """解析HTTP1x头"""
     p = sts.find("\r\n")
     first_line = sts[0:p]
-    if first_line[0] == " ": raise Http1xHeaderErr("wrong http header:%s" % first_line)
+    if first_line[0] == " ": raise Http1xHeaderErr("wrong http master:%s" % first_line)
     tmplist = first_line.split(" ")
     __drop_nul_seq_elements(tmplist)
-    if len(tmplist) != 3: raise Http1xHeaderErr("wrong http header:%s" % first_line)
+    if len(tmplist) != 3: raise Http1xHeaderErr("wrong http master:%s" % first_line)
 
     t = tuple(tmplist)
     method, uri, version = t
@@ -69,7 +69,7 @@ def parse_htt1x_request_header(sts):
 def parse_http1x_response_header(sts):
     p = sts.find("\r\n")
     first_line = sts[0:p]
-    if p < 4: raise Http1xHeaderErr("wrong http header:%s" % first_line)
+    if p < 4: raise Http1xHeaderErr("wrong http master:%s" % first_line)
     try:
         stcode = int(first_line[0:3])
     except ValueError:

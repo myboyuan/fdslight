@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import pywind.evtframework.handler.tcp_handler as tcp_handler
+import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.web.lib.wsgi as wsgi
 import socket, os, time
 
@@ -100,7 +100,7 @@ class scgid(tcp_handler.tcp_handler):
         sts = rdata[0:-2].decode("iso-8859-1")
         tmplist = sts.split("\0")
         Lsize = len(tmplist)
-        if Lsize % 2 != 0: raise scgiErr("invalid scgi header")
+        if Lsize % 2 != 0: raise scgiErr("invalid scgi master")
         cgi_env = {}
         a, b = (0, 1,)
 

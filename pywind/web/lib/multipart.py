@@ -43,7 +43,7 @@ class parser(object):
             line = self.__reader.readline(SIZE)
             content_type = self.__get_content_type(line)
         line = self.__reader.readline(2)
-        if line != b"\r\n": raise MultipartErr("wrong part header")
+        if line != b"\r\n": raise MultipartErr("wrong part master")
 
         return {"is_file": is_file, "name": name, "filename": filename, "content_type": content_type,}
 
@@ -51,8 +51,8 @@ class parser(object):
         try:
             sts = byte_data.decode()
         except UnicodeDecodeError:
-            raise MultipartErr("wrong part header")
-        if sts[0:13].lower() != "content-type:": raise MultipartErr("wrong part header")
+            raise MultipartErr("wrong part master")
+        if sts[0:13].lower() != "content-type:": raise MultipartErr("wrong part master")
         sts = sts[13:].lstrip()
 
         return sts[0:-2]
@@ -61,9 +61,9 @@ class parser(object):
         try:
             sts = byte_data.decode()
         except UnicodeDecodeError:
-            raise MultipartErr("wrong part header")
+            raise MultipartErr("wrong part master")
         sts = sts[0:-2]
-        if sts[0:20].lower() != "content-disposition:": raise MultipartErr("wrong part header")
+        if sts[0:20].lower() != "content-disposition:": raise MultipartErr("wrong part master")
         sts = sts[20:].lstrip()
         if sts[0:10] != "form-data;": raise MultipartErr("wrong content-disposition format")
         sts = sts[10:].lstrip()
