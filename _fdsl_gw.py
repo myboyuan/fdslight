@@ -39,7 +39,7 @@ class fdslightgw(_fdsl.fdslight):
         account = fngw_config.configs["account"]
         self.__session_id = proto_utils.gen_session_id(account["username"], account["password"])
 
-    def __kern_ver_changed(fpath):
+    def __kern_ver_changed(self,fpath):
         """Linux内核是否发生改变
         :param fpath:
         :return Boolean: True表示发生改变
