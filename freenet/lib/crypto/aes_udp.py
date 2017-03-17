@@ -6,7 +6,6 @@ import sys
 sys.path.append("../../../")
 """
 
-from Crypto.Cipher import AES
 import hashlib, os
 import freenet.lib.base_proto.tunnel_udp as tunnel
 import freenet.lib.crypto._aes_cfb as aes_cfb
