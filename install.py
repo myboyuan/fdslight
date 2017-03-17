@@ -12,6 +12,18 @@ dst_path_2 = "freenet/lib/fdsl_ctl.so"
 
 __mode = "gateway"
 
+
+def write_kern_ver_to_file(fpath):
+    """写入内核版本到文件
+    :param fpath:
+    :return:
+    """
+    with open(fpath, "w") as f:
+        popen = os.popen("uname -r")
+        f.write(popen.read())
+        popen.close()
+
+
 def main():
     argv = sys.argv[1:]
     if len(argv) != 2:
@@ -19,7 +31,7 @@ def main():
         return
 
     __mode = argv[0]
-    if __mode not in ("gateway", "server","local"):
+    if __mode not in ("gateway", "server", "local"):
         print("the mode must be gateway,server or local")
         return
 
@@ -39,8 +51,10 @@ def main():
     if __mode == "gateway":
         os.chdir("driver")
         os.system("make")
+        os.chdir("../")
+        write_kern_ver_to_file("fdslight_etc/kern_version")
 
-    if not os.path.isfile("fdslight.ko") and __mode == "gatway":
+    if not os.path.isfile("driver/fdslight.ko") and __mode == "gatway":
         print("install fdslight failed!!!")
         return
     ''''''

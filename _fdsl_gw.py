@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import _fdsl, os, sys, signal, socket
+import _fdsl, os, sys, signal
 import pywind.lib.timer as timer
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.file_parser as file_parser
@@ -27,12 +27,32 @@ class fdslightgw(_fdsl.fdslight):
 
     def __init__(self):
         super(fdslightgw, self).__init__()
+
+        if self.__kern_ver_changed("fdslight_etc/kern_version"):
+            print("please install or reinstall software")
+            sys.exit(-1)
+
         self.set_mode("gateway")
         self.__timer = timer.timer()
         self.__routers = {}
 
         account = fngw_config.configs["account"]
         self.__session_id = proto_utils.gen_session_id(account["username"], account["password"])
+
+    def __kern_ver_changed(fpath):
+        """Linux内核是否发生改变
+        :param fpath:
+        :return Boolean: True表示发生改变
+        """
+        if not os.path.isfile(fpath): return True
+
+        with open(fpath, "r") as f:
+            popen = os.popen("uname -r")
+            content_a = popen.read()
+            popen.close()
+            content_b = f.read()
+
+            return content_a == content_b
 
     def create_fn_gw(self):
         os.chdir("driver")

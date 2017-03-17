@@ -7,6 +7,7 @@ import hashlib
 
 __IP_HDR_SIZE = 20
 
+
 def build_ip_packet(pkt_len, protocol, saddr, daddr, message, pkt_id=1, flags_df=0, flags_mf=0, offset=0):
     """创建IP数据包
     :param pkt_len:包长度
@@ -146,6 +147,7 @@ def rand_string(length):
         )
 
     return "".join(tmplist)
+
 
 def calc_content_md5(content):
     md5 = hashlib.md5()
@@ -294,3 +296,4 @@ def is_uint(s):
         return False
 
     return n >= 0
+
