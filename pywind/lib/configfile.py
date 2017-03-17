@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+
+class IniFileFmtErr(Exception): pass
+
+
+class _Iniparser(object):
+    def __drop_comment(self, seq):
+        """去除注释"""
+        line_n = 0
+        rs = []
+
+        for s in seq:
+            line_n += 1
+
+            # 去除空行
+            t = s.replace(" ", "")
+            t = s.replace("\t", "")
+
+            if not t: continue
+            if s[0] == " ": raise IniFileFmtErr(s)
+            if s[0] == "=": raise IniFileFmtErr(s)
+            if s[0] == ";": continue
+            if s[0] == "#": continue
+            rs.append(s)
+
+        return rs
+
+    def __get_key_val(self, s):
+        pos = s.find("=")
+        if pos < 1: return None
+        name = s[0:pos].rstrip()
+        pos += 1
+        value = s[pos:].lstrip()
+
+        return (name, value,)
+
+    def __get_result(self, seq):
+        result = {}
+        name = ""
+        for s in seq:
+            s = s.rstrip()
+            if s[0] == "[":
+                s = s.replace("[", "")
+                s = s.replace("]", "")
+                name = s
+                continue
+            rs = self.__get_key_val(s)
+            if not rs: continue
+            k, v = rs
+            if name not in result: result[name] = {}
+            result[name][k] = v
+
+        return result
+
+    def __split(self, sts):
+        """对数据进行分割"""
+        sts = sts.replace("\r", '')
+        seq = sts.split("\n")
+
+        return seq
+
+    def parse(self, sts):
+        seq = self.__split(sts)
+        seq = self.__drop_comment(seq)
+        result = self.__get_result(seq)
+
+        return result
+
+
+
+def ini_parse_from_file(fpath):
+    with open(fpath, "r") as f:
+        data = f.read()
+
+    p = _Iniparser()
+    return p.parse(data)
+
+
+def ini_parse_from_sts(sts):
+    p = _Iniparser()
+
+    return p.parse(sts)
