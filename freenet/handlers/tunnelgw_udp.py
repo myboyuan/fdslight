@@ -4,9 +4,9 @@
 """
 import socket, sys, time
 import fdslight_etc.fn_gw as fngw_config
-import pywind.evtframework.handler.udp_handler as udp_handler
+import pywind.evtframework.handlers.udp_handler as udp_handler
 import freenet.lib.base_proto.tunnel_udp as tunnel_proto
-import freenet.handler.traffic_pass as traffic_pass
+import freenet.handlers.traffic_pass as traffic_pass
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.utils as utils

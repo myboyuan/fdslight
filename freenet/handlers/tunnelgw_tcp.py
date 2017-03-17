@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-import pywind.evtframework.handler.tcp_handler as tcp_handler
+import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import fdslight_etc.fn_gw as fngw_config
 import socket, time, sys
-import freenet.handler.traffic_pass as traffic_pass
+import freenet.handlers.traffic_pass as traffic_pass
 import freenet.lib.base_proto.tunnel_tcp as tunnel_tcp
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.utils as utils

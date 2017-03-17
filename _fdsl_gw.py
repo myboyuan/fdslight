@@ -3,12 +3,12 @@ import _fdsl, os, sys, signal, socket
 import pywind.lib.timer as timer
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.file_parser as file_parser
-import freenet.handler.dns_proxy as dns_proxy
+import freenet.handlers.dns_proxy as dns_proxy
 import fdslight_etc.fn_gw as fngw_config
-import freenet.handler.tunnelgw_tcp as tunnelc_tcp
-import freenet.handler.tunnelgw_udp as tunnelc_udp
+import freenet.handlers.tunnelgw_tcp as tunnelc_tcp
+import freenet.handlers.tunnelgw_udp as tunnelc_udp
 import freenet.lib.base_proto.utils as proto_utils
-import freenet.handler.tundev as tundev
+import freenet.handlers.tundev as tundev
 
 
 class fdslightgw(_fdsl.fdslight):

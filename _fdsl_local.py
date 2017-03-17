@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-import freenet.handler.dns_proxy as dns_proxy
+import freenet.handlers.dns_proxy as dns_proxy
 import fdslight_etc.fn_local as fnlc_config
 import _fdsl, os, socket, sys, signal
-import freenet.handler.tundev as tundev
+import freenet.handlers.tundev as tundev
 import pywind.lib.timer as timer
-import freenet.handler.tunnellc_tcp as tunnellc_tcp
-import freenet.handler.tunnellc_udp as tunnellc_udp
+import freenet.handlers.tunnellc_tcp as tunnellc_tcp
+import freenet.handlers.tunnellc_udp as tunnellc_udp
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.file_parser as file_parser
 import dns.resolver

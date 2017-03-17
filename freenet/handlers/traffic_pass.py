@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """实现P2P代理,让非白名单的IP地址走代理"""
-import pywind.evtframework.handler.handler as handler
-import pywind.evtframework.handler.udp_handler as udp_handler
+import pywind.evtframework.handlers.handler as handler
+import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.lib.timer as timer
 import socket, os
 import freenet.lib.fdsl_ctl as fdsl_ctl

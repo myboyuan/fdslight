@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import pywind.evtframework.evt_dispatcher as dispatcher
-import freenet.handler.traffic_pass as traffic_pass
+import freenet.handlers.traffic_pass as traffic_pass
 import freenet.lib.checksum as checksum
 import sys, os, signal, socket
 

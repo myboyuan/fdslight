@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-import pywind.evtframework.handler.udp_handler as udp_handler
+import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.lib.timer as timer
-import random, socket, sys
+import socket, sys
 import dns.message
 import fdslight_etc.fn_gw as fn_config
 import freenet.lib.utils as utils

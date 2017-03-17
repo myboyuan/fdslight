@@ -2,7 +2,7 @@
 import socket, sys, time
 import fdslight_etc.fn_server as fns_config
 import freenet.lib.base_proto.tunnel_udp as tunnel_proto
-import pywind.evtframework.handler.udp_handler as udp_handler
+import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.lib.timer as timer
 
 

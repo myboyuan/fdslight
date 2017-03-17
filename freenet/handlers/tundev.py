@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os, sys, socket
-import pywind.evtframework.handler.handler as handler
+import pywind.evtframework.handlers.handler as handler
 import freenet.lib.fn_utils as fn_utils
 
 try:

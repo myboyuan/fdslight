@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import pywind.evtframework.handler.tcp_handler as tcp_handler
+import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import fdslight_etc.fn_local as fnlc_config
 import socket, sys, time
 import freenet.lib.base_proto.tunnel_tcp as tunnel_tcp

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 import _fdsl,sys
-import freenet.handler.dns_proxy as dns_proxy
-import freenet.handler.tunnels_tcp as tunnels_tcp
-import freenet.handler.tunnels_udp as tunnels_udp
+import freenet.handlers.dns_proxy as dns_proxy
+import freenet.handlers.tunnels_tcp as tunnels_tcp
+import freenet.handlers.tunnels_udp as tunnels_udp
 import fdslight_etc.fn_server as fns_config
-import freenet.handler.tundev as tundev
+import freenet.handlers.tundev as tundev
 import freenet.lib.static_nat as static_nat
 
 

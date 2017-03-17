@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import pywind.evtframework.handler.udp_handler as udp_handler
+import pywind.evtframework.handlers.udp_handler as udp_handler
 import fdslight_etc.fn_local as fnlc_config
 import socket, sys, time
 import freenet.lib.base_proto.tunnel_udp as tunnel_udp
