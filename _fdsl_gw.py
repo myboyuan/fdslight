@@ -52,7 +52,7 @@ class fdslightgw(_fdsl.fdslight):
             popen.close()
             content_b = f.read()
 
-            return content_a == content_b
+            return content_a != content_b
 
     def create_fn_gw(self):
         os.chdir("driver")
