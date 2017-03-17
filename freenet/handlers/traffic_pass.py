@@ -7,6 +7,7 @@ import socket, os
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.utils as utils
 import freenet.lib.checksum as checksum
+import pywind.evtframework.handlers.tcp_handler as tcp_handler
 
 
 class _qos(object):
@@ -306,3 +307,7 @@ class udp_proxy(udp_handler.udp_handler):
             self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
             return
         self.delete_handler(self.fileno)
+
+
+class tcp_proxy(tcp_handler.tcp_handler):
+    pass
