@@ -308,6 +308,3 @@ class udp_proxy(udp_handler.udp_handler):
             return
         self.delete_handler(self.fileno)
 
-
-class tcp_proxy(tcp_handler.tcp_handler):
-    pass
