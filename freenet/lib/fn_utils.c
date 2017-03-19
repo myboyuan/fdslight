@@ -385,6 +385,42 @@ static PyMethodDef mbuf_methods[]={
     {NULL}
 };
 
+static Py_ssize_t
+mbuf_sq_length(mbuf *self)
+{
+    return (Py_ssize_t)(self->payload_size);
+}
+
+static PyObject *
+mbuf_sq_item(mbuf *self,Py_ssize_t i)
+{
+    if(i>MBUF_AREA_SIZE-1) return NULL;
+
+    return Py_BuildValue("b",self->data_area[i]);
+}
+
+static int
+mbuf_sq_ass_item(mbuf *self,Py_ssize_t i,PyObject *v)
+{
+    unsigned char ch;
+    if(!PyArg_ParseTuple(v,"b",&ch)) return -1;
+    if(i>MBUF_AREA_SIZE-1) return -1;
+
+    self->data_area[i]=ch;
+    return 0;
+}
+
+static PySequenceMethods mbuf_seq_methods[]={
+    (lenfunc)mbuf_sq_length,
+    NULL,
+    NULL,
+    (ssizeargfunc)mbuf_sq_item,
+    (ssizeobjargproc)mbuf_sq_ass_item,
+    NULL,
+    NULL,
+    NULL
+};
+
 static PyTypeObject mbuf_type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "fn_utils.mbuf",             /* tp_name */
@@ -397,7 +433,7 @@ static PyTypeObject mbuf_type = {
     0,                         /* tp_reserved */
     0,                         /* tp_repr */
     0,                         /* tp_as_number */
-    0,                         /* tp_as_sequence */
+    mbuf_seq_methods,          /* tp_as_sequence */
     0,                         /* tp_as_mapping */
     0,                         /* tp_hash  */
     0,                         /* tp_call */
