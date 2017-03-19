@@ -283,17 +283,10 @@ static PyMethodDef UtilsMethods[] = {
 //---
 // 分配到的数据内存大小
 #define MBUF_AREA_SIZE 1501
-enum{
-	MBUF_T_UINT,
-	MBUF_T_USHORT,
-	MBUF_T_UCHAR
-};
 
 // mbuf
 typedef struct {
     PyObject_HEAD
-    // 实际数据大小
-    char *data_ptr;
     unsigned short payload_size;
     unsigned short offset;
     char data_area[MBUF_AREA_SIZE];
@@ -311,8 +304,8 @@ mbuf_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 mbuf_init(mbuf *self, PyObject *args, PyObject *kwds)
 {
-	self->data_ptr=self->data_area;
     memset(self->data_area,0,MBUF_AREA_SIZE);
+	self->offset=0;
 
     return 0;
 }
@@ -334,6 +327,7 @@ mbuf_reset(mbuf *self)
 {
     memset(self->data_area,0,MBUF_AREA_SIZE);
     self->payload_size=0;
+	self->offset=0;
 
     Py_RETURN_NONE;
 }
@@ -365,15 +359,52 @@ mbuf_ip_version(mbuf *self)
 static PyObject *
 mbuf_get_data(mbuf *self)
 {
-    return Py_BuildValue("y#",self->data_area,self->payload_size);
+	int t=self->payload_size-self->offset;
+	const char *ptr;
+	if(t<0) return NULL;
+
+	ptr=self->data_area+self->offset;
+
+    return Py_BuildValue("y#",ptr,t);
 }
 
 static PyObject *
 mbuf_get_part(mbuf *self,PyObject *args)
 {
-	const char *type;
+	unsigned short length;
+	const char *ptr;
+	int t=self->payload_size-self->offset;
+
+	if(t<0) return NULL;
+	if(!PyArg_ParseTuple(args,"H",&length)) return NULL;
 	
-	return NULL;
+	if(length>t) length=t;
+
+	ptr=self->data_area+self->offset;
+
+	if(1==length) return Py_BuildValue("B",ptr[0]);
+
+	return Py_BuildValue("y#",ptr,length);
+}
+
+static PyObject *
+mbuf_replace(mbuf *self,PyObject *args)
+{
+	const char *sts;
+	char *ptr;
+	int length;
+
+	int t=self->payload_size-self->offset;
+
+	if(!PyArg_ParseTuple(args,"y#",&sts,&length)) return Py_True;
+	if(t<length) return Py_False;
+	
+	ptr=self->data_area+self->offset;
+
+	//printf("%s\r\n",sts);
+	memcpy(ptr,sts,length);
+
+	return Py_True;
 }
 
 static PyMethodDef mbuf_methods[]={
@@ -381,45 +412,11 @@ static PyMethodDef mbuf_methods[]={
     {"copy2buf",(PyCFunction)mbuf_copy2buf,METH_VARARGS,"copy data to buff"},
     {"get_data",(PyCFunction)mbuf_get_data,METH_NOARGS,"get data from buff"},
     {"ip_version",(PyCFunction)mbuf_ip_version,METH_NOARGS,"get ip version"},
+	{"replace",(PyCFunction)mbuf_replace,METH_VARARGS,"replace buffer content"},
 	{"get_part",(PyCFunction)mbuf_get_part,METH_VARARGS,"get part data"},
     {NULL}
 };
 
-static Py_ssize_t
-mbuf_sq_length(mbuf *self)
-{
-    return (Py_ssize_t)(self->payload_size);
-}
-
-static PyObject *
-mbuf_sq_item(mbuf *self,Py_ssize_t i)
-{
-    if(i>MBUF_AREA_SIZE-1) return NULL;
-
-    return Py_BuildValue("b",self->data_area[i]);
-}
-
-static int
-mbuf_sq_ass_item(mbuf *self,Py_ssize_t i,PyObject *v)
-{
-    unsigned char ch;
-    if(!PyArg_ParseTuple(v,"b",&ch)) return -1;
-    if(i>MBUF_AREA_SIZE-1) return -1;
-
-    self->data_area[i]=ch;
-    return 0;
-}
-
-static PySequenceMethods mbuf_seq_methods[]={
-    (lenfunc)mbuf_sq_length,
-    NULL,
-    NULL,
-    (ssizeargfunc)mbuf_sq_item,
-    (ssizeobjargproc)mbuf_sq_ass_item,
-    NULL,
-    NULL,
-    NULL
-};
 
 static PyTypeObject mbuf_type = {
     PyVarObject_HEAD_INIT(NULL, 0)
@@ -433,7 +430,7 @@ static PyTypeObject mbuf_type = {
     0,                         /* tp_reserved */
     0,                         /* tp_repr */
     0,                         /* tp_as_number */
-    mbuf_seq_methods,          /* tp_as_sequence */
+    0,          /* tp_as_sequence */
     0,                         /* tp_as_mapping */
     0,                         /* tp_hash  */
     0,                         /* tp_call */

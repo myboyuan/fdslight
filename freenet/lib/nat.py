@@ -2,6 +2,7 @@
 import freenet.lib.checksum as checksum
 import freenet.lib.ipaddr as ipaddr
 import pywind.lib.timer as timer
+import socket
 
 
 class _nat_base(object):
@@ -114,4 +115,52 @@ class nat(_nat_base):
         return
 
 
-class nat6(_nat_base): pass
+class nat66(object):
+    __byte_local_ip6 = None
+    __timer = None
+
+    __nat = None
+    __nat_reverse = None
+
+    def __init__(self, local_ip6):
+        """
+        :param local_ip6: 本机IPv6地址
+        """
+        self.__timer = timer.timer()
+        self.__byte_local_ip6 = socket.inet_pton(socket.AF_INET6, local_ip6)
+        self.__nat = {}
+        self.__nat_reverse = {}
+
+    def __get_nat_id(self, mbuf):
+        mbuf.offset = 8
+        saddr = mbuf.get_part(16)
+
+        mbuf.offset = 24
+        daddr = mbuf.get_part(16)
+
+        mbuf.offset = 6
+        nexthdr = mbuf.get_part(1)
+
+        if (nexthdr == socket.IPPROTO_TCP):
+            pass
+
+        if (nexthdr == socket.IPPROTO_UDP):
+            pass
+
+        if (nexthdr == socket.IPPROTO_ICMPV6):
+            pass
+
+
+
+    def get_nat(self, session_id, mbuf):
+        if session_id not in self.__nat:
+            self.__nat[session_id] = {}
+
+        pydict = self.__nat[session_id]
+        nat_id = self.__get_nat_id(mbuf)
+
+    def get_nat_reverse(self, mbuf):
+        pass
+
+    def recycle(self):
+        pass
