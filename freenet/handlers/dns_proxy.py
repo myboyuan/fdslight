@@ -256,7 +256,6 @@ class dnsc_proxy(dns_base):
             fa = socket.AF_INET6
         else:
             fa = socket.AF_INET
-
         s = socket.socket(fa, socket.SOCK_DGRAM)
 
         self.set_socket(s)
@@ -269,6 +268,7 @@ class dnsc_proxy(dns_base):
 
         self.__debug = debug
         self.__host_match = _host_match()
+        self.__timer = timer.timer()
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
@@ -374,8 +374,8 @@ class dnsc_proxy(dns_base):
 
         if not is_match and not self.__server_side:
             self.send(message)
+            self.add_evt_write(self.fileno)
             return
-
         self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_DNS, message)
 
     def message_from_handler(self, from_fd, message):
@@ -417,6 +417,3 @@ class dnsc_proxy(dns_base):
     def udp_delete(self):
         self.unregister(self.fileno)
         self.close()
-
-
-

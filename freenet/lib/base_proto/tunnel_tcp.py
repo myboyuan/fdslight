@@ -8,14 +8,6 @@ action:4 bit 包动作
 tot_length: 2 bytes 包的总长度
 real_length: 2 bytes 加密前的长度
 """
-
-ACT_DATA = 1
-ACT_DNS = 2
-
-ACTS = (
-    ACT_DATA, ACT_DNS,
-)
-
 MIN_FIXED_HEADER_SIZE = 37
 
 import pywind.lib.reader as reader

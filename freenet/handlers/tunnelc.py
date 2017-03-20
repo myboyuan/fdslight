@@ -8,7 +8,7 @@ import socket, time
 import freenet.lib.utils as proto_utils
 
 
-class tunnel_tcp(tcp_handler.tcp_handler):
+class tcp_tunnel(tcp_handler.tcp_handler):
     __encrypt = None
     __decrypt = None
 
@@ -28,11 +28,18 @@ class tunnel_tcp(tcp_handler.tcp_handler):
         self.__conn_timeout = conn_timeout
         self.__sent_queue = []
 
+        self.__encrypt = crypto.encrypt()
+        self.__decrypt = crypto.decrypt()
+
+        self.__encrypt.config(crypto_configs)
+        self.__decrypt.config(crypto_configs)
+
         return self.fileno
 
     def create_tunnel(self, server_address):
+        server_ip = self.dispatcher.get_server_ip(server_address[0])
         try:
-            self.connect(server_address)
+            self.connect((server_ip,server_address[1]))
         except socket.gaierror:
             return False
 
@@ -126,11 +133,18 @@ class udp_tunnel(udp_handler.udp_handler):
         self.__conn_timeout = conn_timeout
         self.__sent_queue = []
 
+        self.__encrypt = crypto.encrypt()
+        self.__decrypt = crypto.decrypt()
+
+        self.__encrypt.config(crypto_configs)
+        self.__decrypt.config(crypto_configs)
+
         return self.fileno
 
     def create_tunnel(self, server_address):
+        server_ip = self.dispatcher.get_server_ip(server_address[0])
         try:
-            self.connect_ex(server_address)
+            self.connect((server_ip,server_address[1]))
         except socket.gaierror:
             return False
 

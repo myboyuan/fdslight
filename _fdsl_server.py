@@ -15,7 +15,7 @@ class fdslightd(_fdsl.fdslight):
         self.set_mode("server")
 
     def create_fn_server(self):
-        name = "freenet.tunnels_auth.%s" % fns_config.configs["auth_module"]
+        name = "freenet.access.%s" % fns_config.configs["auth_module"]
         __import__(name)
 
         m = sys.modules[name]

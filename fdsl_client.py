@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+import sys
+
+sys.path.append("./")
+
 import pywind.evtframework.evt_dispatcher as dispatcher
 import pywind.lib.timer as timer
 import pywind.lib.configfile as configfile
@@ -8,9 +12,12 @@ import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.proc as proc
 import freenet.handlers.tundev as tundev
-import os, sys, getopt, signal, importlib, socket
+import os, getopt, signal, importlib, socket
 import freenet.handlers.dns_proxy as dns_proxy
 import freenet.lib.fdsl_ctl as fdsl_ctl
+import freenet.handlers.tunnelc as tunnelc
+import freenet.lib.file_parser as file_parser
+import dns.resolver
 
 _MODE_GW = 1
 _MODE_LOCAL = 2
@@ -50,6 +57,10 @@ class _fdslight_client(dispatcher.dispatcher):
     __crypto_configs = None
 
     def init_func(self, mode, debug, configs):
+        self.create_poll()
+
+        signal.signal(signal.SIGINT, self.__exit)
+
         self.__router_timer = timer.timer()
         self.__routers = {}
         self.__configs = configs
@@ -62,7 +73,9 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__mbuf = fn_utils.mbuf()
         self.__debug = debug
 
-        self.__tundev_fileno = tundev.tundevc(self.__DEVNAME)
+        self.__tundev_fileno = self.create_handler(
+            -1, tundev.tundevc, self.__DEVNAME
+        )
 
         public = configs["public"]
         gateway = configs["gateway"]
@@ -82,7 +95,15 @@ class _fdslight_client(dispatcher.dispatcher):
                 public["remote_dns"], debug=debug, server_side=False, is_ipv6=is_ipv6
             )
 
-        if self.__mode == _MODE_GW: self.__load_kernel_mod()
+        self.__set_host_rules(None, None)
+
+        if self.__mode == _MODE_GW:
+            self.__load_kernel_mod()
+        else:
+            local = configs["local"]
+            vir_dns = local["virtual_dns"]
+            is_ipv6 = utils.is_ipv6_address(vir_dns)
+            self.set_router(vir_dns, is_ipv6=is_ipv6, is_dynamic=False)
 
         conn = configs["connection"]
 
@@ -108,8 +129,9 @@ class _fdslight_client(dispatcher.dispatcher):
 
         self.__crypto_configs = crypto_configs
 
-        sys.stderr = open(STDERR_FILE, "a+")
-        sys.stdout = open(STDOUT_FILE, "a+")
+        if not debug:
+            sys.stderr = open(STDERR_FILE, "a+")
+            sys.stdout = open(STDOUT_FILE, "a+")
 
     def __load_kernel_mod(self):
         os.chdir("driver")
@@ -129,7 +151,7 @@ class _fdslight_client(dispatcher.dispatcher):
 
     def handle_msg_from_tun(self, message):
         self.__mbuf.copy2buf(message)
-        ip_ver = self.__mbuf.get_ip_version()
+        ip_ver = self.__mbuf.ip_version()
 
         if ip_ver not in (4, 6,): return
 
@@ -172,7 +194,7 @@ class _fdslight_client(dispatcher.dispatcher):
             return
 
         self.__mbuf.copy2buf(message)
-        ip_ver = self.__mbuf.get_ip_version()
+        ip_ver = self.__mbuf.ip_version()
         if ip_ver not in (4, 6,): return
 
         if ip_ver == 4:
@@ -201,7 +223,7 @@ class _fdslight_client(dispatcher.dispatcher):
         self.get_handler(self.__tundev_fileno).msg_from_tunnel(message)
 
     def __is_dns_request(self, mbuf):
-        ip_ver = mbuf.get_ip_version()
+        ip_ver = mbuf.ip_version()
 
         if ip_ver == 4:
             mbuf.offset = 0
@@ -248,11 +270,60 @@ class _fdslight_client(dispatcher.dispatcher):
 
         return self.__session_id
 
+    def __set_host_rules(self, signum, frame):
+        fpath = "fdslight_etc/host_rules.txt"
+
+        if not os.path.isfile(fpath):
+            print("cannot found host_rules.txt")
+            self.__exit(signum, frame)
+
+        rules = file_parser.parse_host_file(fpath)
+        self.get_handler(self.__dns_fileno).set_host_rules(rules)
+
     def __open_tunnel(self):
-        pass
+        conn = self.__configs["connection"]
+        host = conn["host"]
+        port = int(conn["port"])
+        enable_ipv6 = bool(int(conn["enable_ipv6"]))
+        conn_timeout = int(conn["conn_timeout"])
+        tunnel_type = conn["tunnel_type"]
+
+        if tunnel_type.lower() == "udp":
+            handler = tunnelc.udp_tunnel
+            crypto = self.__udp_crypto
+        else:
+            handler = tunnelc.tcp_tunnel
+            crypto = self.__tcp_crypto
+
+        self.__tunnel_fileno = self.create_handler(
+            -1, handler,
+            crypto, self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=enable_ipv6
+        )
+
+        self.get_handler(self.__tunnel_fileno).create_tunnel((host, port,))
 
     def tell_tunnel_close(self):
         self.__tunnel_fileno = -1
+
+    def get_server_ip(self, host):
+        """获取服务器IP
+        :param host:
+        :return:
+        """
+        if utils.is_ipv4_address(host): return host
+        if utils.is_ipv6_address(host): return host
+
+        enable_ipv6 = bool(int(self.__configs["connection"]["enable_ipv6"]))
+        resolver = dns.resolver.Resolver()
+        resolver.nameservers = [self.__configs["public"]["remote_dns"]]
+
+        if enable_ipv6:
+            rs = resolver.query(host, "AAAA")
+        else:
+            rs = resolver.query(host, "A")
+
+        for anwser in rs:
+            return anwser.__str__()
 
     def myloop(self):
         names = self.__router_timer.get_timeout_names()
@@ -264,7 +335,7 @@ class _fdslight_client(dispatcher.dispatcher):
         if is_ipv6:
             cmd = "route add -A inet6 -host %s dev %s" % (host, self.__DEVNAME)
         else:
-            cmd = "routre add -host %s dev %s" % (host, self.__DEVNAME)
+            cmd = "route add -host %s dev %s" % (host, self.__DEVNAME)
 
         os.system(cmd)
 
@@ -293,6 +364,12 @@ class _fdslight_client(dispatcher.dispatcher):
         """
         if host not in self.__routers: return
         self.__router_timer.set_timeout(host, self.__ROUTER_TIMEOUT)
+
+    def __exit(self, signum, frame):
+        if self.handler_exists(self.__dns_fileno):
+            self.delete_handler(self.__dns_fileno)
+
+        sys.exit(-1)
 
 
 def __start_service(mode, debug):
@@ -379,3 +456,6 @@ def main():
         return
 
     if d == "stop": __stop_service()
+
+
+if __name__ == '__main__': main()

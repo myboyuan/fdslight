@@ -11,13 +11,6 @@ action:4bit 动作
 """
 import freenet.lib.base_proto.utils as proto_utils
 
-ACT_DATA = 1
-ACT_DNS = 2
-
-ACTS = (
-    ACT_DATA, ACT_DNS,
-)
-
 MIN_FIXED_HEADER_SIZE = 38
 
 

@@ -280,14 +280,7 @@ class tundevc(tun_base):
         self.add_evt_read(self.fileno)
 
     def handle_ip_packet_from_read(self, ip_packet):
-        if self.dispatcher.is_dns_request(ip_packet):
-            fileno = self.dispatcher.get_dns()
-            self.send_message_to_handler(self.fileno, fileno, ip_packet)
-            return
-
-        if not self.dispatcher.tunnel_is_ok(): return
-        fileno = self.dispatcher.get_tunnel()
-        self.send_message_to_handler(self.fileno, fileno, ip_packet)
+        self.dispatcher.handle_msg_from_tun(ip_packet)
 
     def handle_ip_packet_for_write(self, ip_packet):
         return ip_packet
