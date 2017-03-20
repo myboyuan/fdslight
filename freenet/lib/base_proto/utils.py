@@ -2,6 +2,12 @@
 
 import hashlib
 
+ACT_DATA = 1
+ACT_DNS = 2
+
+ACTS = (
+    ACT_DATA, ACT_DNS,
+)
 
 class ProtoError(Exception): pass
 

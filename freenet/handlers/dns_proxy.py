@@ -3,8 +3,8 @@ import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.lib.timer as timer
 import socket, sys
 import dns.message
-import fdslight_etc.fn_gw as fn_config
 import freenet.lib.utils as utils
+import freenet.lib.base_proto.utils as proto_utils
 
 
 class _host_match(object):
@@ -196,111 +196,141 @@ class dnsd_proxy(dns_base):
         sys.exit(-1)
 
 
-class dnsgw_proxy(dns_base):
-    """客户端的DNS代理"""
-    __host_match = None
-    __timer = None
+class udp_client_for_dns(udp_handler.udp_handler):
+    __creator = None
 
-    __DNS_QUERY_TIMEOUT = 5
-    __TIMEOUT = 10
+    def init_func(self, creator, address, is_ipv6=False):
+        if is_ipv6:
+            fa = socket.AF_INET6
+        else:
+            fa = socket.AF_INET
 
-    __debug = False
-
-    __transparent_dns = None
-
-    # dns flags集合
-    __dns_flags = None
-
-    __session_id = None
-
-    def __check_ipaddr(self, sts):
-        """检查是否是IP地址
-        :param sts:
-        :return:
-        """
-        tmplist = sts.split(".")
-        if len(tmplist) != 4:
-            return False
-
-        for i in tmplist:
-            try:
-                _ = int(i)
-            except ValueError:
-                return False
-        return True
-
-    def __send_to_dns_server(self, server, message):
-        self.add_evt_write(self.fileno)
-        self.sendto(message, (server, 53))
-
-    def __send_to_client(self, message):
-        dns_id = (message[0] << 8) | message[1]
-        if not self.dns_id_map_exists(dns_id): return
-        n_dns_id, dst_addr = self.get_dns_id_map(dns_id)
-        L = list(message)
-        L[0:2] = ((n_dns_id & 0xff00) >> 8, n_dns_id & 0x00ff,)
-
-        new_pkt = bytes(L)
-
-        self.add_evt_write(self.fileno)
-        self.sendto(new_pkt, dst_addr)
-        self.del_dns_id_map(dns_id)
-        if self.__timer.exists(dns_id): self.__timer.drop(dns_id)
-        if dns_id in self.__dns_flags: del self.__dns_flags[dns_id]
-
-    def init_func(self, creator_fd, session_id, host_rules, debug=False):
-        self.__transparent_dns = fn_config.configs["dns"]
-        self.__session_id = session_id
-
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.__creator = creator
+        s = socket.socket(fa, socket.SOCK_DGRAM)
 
         self.set_socket(s)
-        self.__debug = debug
-
-        self.bind((fn_config.configs["dns_bind"], 53))
-        self.set_timeout(self.fileno, self.__TIMEOUT)
-
-        self.__host_match = _host_match()
-        self.__timer = timer.timer()
-        self.__dns_flags = {}
-
-        for rule in host_rules: self.__host_match.add_rule(rule)
-
+        self.connect((address, 53))
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
         return self.fileno
 
-    def update_host_rules(self, host_rules):
-        """更新黑名单"""
-        self.__host_match.clear()
-        for rule in host_rules: self.__host_match.add_rule(rule)
-
     def udp_readable(self, message, address):
-        # dns至少有12个字节
-        if len(message) < 12: return
+        self.send_message_to_handler(self.fileno, self.__creator, message)
 
-        ipaddr, port = address
+    def udp_writable(self):
+        self.remove_evt_write(self.fileno)
 
-        # 把从DNS服务器收到的信息发送到客户端
-        if ipaddr == self.__transparent_dns:
-            self.__send_to_client(message)
+    def udp_error(self):
+        self.delete_handler(self.fileno)
+
+    def udp_delete(self):
+        self.unregister(self.fileno)
+        self.close()
+
+    def message_from_handler(self, from_fd, message):
+        self.add_evt_write(self.fileno)
+        self.send(message)
+
+
+class dnsc_proxy(dns_base):
+    """客户端的DNS代理
+    """
+    __host_match = None
+    __timer = None
+
+    __DNS_QUERY_TIMEOUT = 5
+    __LOOP_TIMEOUT = 10
+
+    __debug = False
+    __dnsserver = None
+    __server_side = False
+
+    __udp_client = None
+    __is_ipv6 = False
+
+    def init_func(self, creator, address, debug=False, is_ipv6=False, server_side=False):
+        self.__is_ipv6 = is_ipv6
+
+        if is_ipv6:
+            fa = socket.AF_INET6
+        else:
+            fa = socket.AF_INET
+
+        s = socket.socket(fa, socket.SOCK_DGRAM)
+
+        self.set_socket(s)
+        self.__server_side = server_side
+
+        if server_side:
+            self.bind((address, 53))
+        else:
+            self.connect((address, 53))
+
+        self.__debug = debug
+        self.__host_match = _host_match()
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
+
+        return self.fileno
+
+    def set_parent_dnsserver(self, server, is_ipv6=False):
+        """当作为网关模式时需要调用此函数来设置上游DNS
+        :param server:
+        :return:
+        """
+        self.__udp_client = self.create_handler(self.fileno, udp_client_for_dns, server, is_ipv6=is_ipv6)
+
+    def __handle_msg_from_response(self, message):
+        try:
+            msg = dns.message.from_wire(message)
+        except:
             return
 
         dns_id = (message[0] << 8) | message[1]
-        n_dns_id = self.get_dns_id(dns_id)
+        if not self.dns_id_map_exists(dns_id): return
 
-        self.set_dns_id_map(n_dns_id, (dns_id, address,))
+        saddr, daddr, dport, n_dns_id, flags = self.get_dns_id_map(dns_id)
+        self.del_dns_id_map(dns_id)
         L = list(message)
-        L[0:2] = ((n_dns_id & 0xff00) >> 8, n_dns_id & 0x00ff,)
-
-        # 设置资源超时,防止占用过多内存
-        self.__timer.set_timeout(n_dns_id, self.__TIMEOUT)
-
+        L[0:2] = (
+            (n_dns_id & 0xff00) >> 8,
+            n_dns_id & 0xff,
+        )
         message = bytes(L)
 
-        msg = dns.message.from_wire(message)
+        if flags == 1:
+            for rrset in msg.answer:
+                for cname in rrset:
+                    ip = cname.__str__()
+                    if utils.is_ipv4_address(ip): self.dispatcher.set_router(ip, is_dynamic=True)
+                    if utils.is_ipv6_address(ip): self.dispatcher.set_router(ip, is_ipv6=True, is_dynamic=True)
+                ''''''
+            ''''''
+        if not self.__server_side:
+            packets = utils.build_udp_packets(saddr, daddr, 53, dport, message, is_ipv6=self.__is_ipv6)
+            for packet in packets:
+                self.dispatcher.send_msg_to_tun(packet)
+            return
+
+        if self.__is_ipv6:
+            sts_daddr = socket.inet_ntop(socket.AF_INET6, daddr)
+        else:
+            sts_daddr = socket.inet_ntop(socket.AF_INET, daddr)
+
+        self.sendto(message, (sts_daddr, dport))
+        self.add_evt_write(self.fileno)
+
+    def __handle_msg_for_request(self, saddr, daddr, sport, message):
+        size = len(message)
+
+        if size < 8: return
+
+        try:
+            msg = dns.message.from_wire(message)
+        except:
+            return
 
         questions = msg.question
 
@@ -321,207 +351,72 @@ class dnsgw_proxy(dns_base):
 
         if pos > 0 and self.__debug: print(host)
         is_match, flags = self.__host_match.match(host)
-        if not is_match:
-            self.__send_to_dns_server(self.__transparent_dns, message)
+
+        dns_id = (message[0] << 8) | message[1]
+        n_dns_id = self.get_dns_id(dns_id)
+
+        if not is_match: flags = None
+
+        self.set_dns_id_map(n_dns_id, (daddr, saddr, sport, dns_id, flags))
+
+        L = list(message)
+        L[0:2] = (
+            (n_dns_id & 0xff00) >> 8,
+            n_dns_id & 0xff,
+        )
+
+        message = bytes(L)
+        self.__timer.set_timeout(n_dns_id, self.__DNS_QUERY_TIMEOUT)
+
+        if not is_match and self.__server_side:
+            self.send_message_to_handler(self.fileno, self.__udp_client, message)
             return
 
-        # 没有打开隧道,尝试打开隧道
-        if not self.dispatcher.is_bind_session(self.__session_id): self.dispatcher.open_tunnel()
-
-        # 打开隧道,支持白名单
-        if is_match and flags == 2:
-            self.__send_to_dns_server(self.__transparent_dns, message)
+        if not is_match and not self.__server_side:
+            self.send(message)
             return
 
-        # 打开隧道失败,直接丢弃数据包
-        if not self.dispatcher.is_bind_session(self.__session_id): return
+        self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_DNS, message)
 
-        fileno, _ = self.dispatcher.get_bind_session(self.__session_id)
+    def message_from_handler(self, from_fd, message):
+        self.__handle_msg_from_response(message)
 
-        self.__dns_flags[n_dns_id] = flags
-        self.ctl_handler(self.fileno, fileno, "request_dns", message)
+    def msg_from_tunnel(self, message):
+        self.__handle_msg_from_response(message)
 
-    def message_from_handler(self, from_fd, byte_data):
-        dns_id = (byte_data[0] << 8) | byte_data[1]
-        if dns_id not in self.__dns_flags: return
-        msg = dns.message.from_wire(byte_data)
-        for rrset in msg.answer:
-            for cname in rrset:
-                ip = cname.__str__()
-                if not utils.is_ipv4_address(ip): continue
-                if self.__dns_flags[dns_id] == 1: self.dispatcher.set_router(ip)
-                ''''''
-        self.__send_to_client(byte_data)
+    def set_host_rules(self, rules):
+        self.__host_match.clear()
+        for rule in rules: self.__host_match.add_rule(rule)
 
-    def udp_writable(self):
-        self.remove_evt_write(self.fileno)
-
-    def udp_delete(self):
-        self.unregister(self.fileno)
-        self.close()
+    def dnsmsg_from_tun(self, saddr, daddr, sport, message):
+        self.__handle_msg_for_request(saddr, daddr, sport, message)
 
     def udp_timeout(self):
-        # 清除超时的DNS ID占用的资源,节约内存
-        dns_ids = self.__timer.get_timeout_names()
-        for dns_id in dns_ids:
-            if self.__timer.exists(dns_id): self.__timer.drop(dns_id)
-            if dns_id in self.__dns_flags: del self.__dns_flags[dns_id]
-        self.recyle_resource(dns_ids)
-        self.set_timeout(self.fileno, self.__TIMEOUT)
-
-        return
-
-    def udp_error(self):
-        self.delete_handler(self.fileno)
-
-
-class dnslc_proxy(udp_handler.udp_handler):
-    __LOOP_TIMEOUT = 10
-    __dns_map = None
-
-    __DNS_QUERY_TIMEOUT = 5
-    __match = None
-
-    __virt_ns_naddr = None
-
-    __debug = False
-    __timer = None
-
-    def init_func(self, creator, virtual_nameserver, remote_nameserver, debug=False):
-        self.__match = _host_match()
-        self.__virt_ns_naddr = socket.inet_aton(virtual_nameserver)
-        self.__dns_map = {}
-        self.__debug = debug
-        self.__timer = timer.timer()
-
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-        self.set_socket(s)
-        self.connect((remote_nameserver, 53))
-        self.register(self.fileno)
-        self.add_evt_read(self.fileno)
-
-        return self.fileno
-
-    def __send_dns_to_remote_ns(self, message):
-        self.add_evt_write(self.fileno)
-        self.send(message)
-
-    def __check_ipaddr(self, sts):
-        """检查是否是IP地址
-        :param sts:
-        :return:
-        """
-        tmplist = sts.split(".")
-        if len(tmplist) != 4:
-            return False
-
-        for i in tmplist:
-            try:
-                _ = int(i)
-            except ValueError:
-                return False
-        return True
-
-    def __handle_data_from_tun(self, byte_data):
-        ip_ver = (byte_data[0] & 0xf0) >> 4
-
-        if ip_ver == 4:
-            ihl = (byte_data[0] & 0x0f) * 4
-            n = ihl + 8
-            a, b = (ihl, ihl + 1,)
-            message = byte_data[n:]
-        else:
-            return
-
-        sport = (byte_data[a] << 8) | byte_data[b]
-        dns_id = (message[0] << 8) | message[1]
-
-        msg = dns.message.from_wire(message)
-
-        questions = msg.question
-
-        if ip_ver == 4: saddr = byte_data[12:16]
-
-        self.__dns_map[dns_id] = [saddr, sport, None, ]
-        self.__timer.set_timeout(dns_id, self.__DNS_QUERY_TIMEOUT)
-
-        if len(questions) != 1 or msg.opcode() != 0:
-            self.__send_dns_to_remote_ns(message)
-            return
-
-        q = questions[0]
-        host = b".".join(q.name[0:-1]).decode("iso-8859-1")
-        pos = host.find(".")
-        if pos > 0 and self.__debug: print(host)
-        is_match, flags = self.__match.match(host)
-
-        if not is_match:
-            self.__send_dns_to_remote_ns(message)
-            return
-        self.__dns_map[dns_id][2] = flags
-        # 没有打开隧道,尝试打开隧道
-        if not self.dispatcher.tunnel_is_ok(): self.dispatcher.open_tunnel()
-        # 打开隧道失败,直接丢弃数据包
-        if not self.dispatcher.tunnel_is_ok(): return
-        fileno = self.dispatcher.get_tunnel()
-        self.ctl_handler(self.fileno, fileno, "request_dns", message)
-
-    def __handle_dns_response(self, message):
-        dns_id = (message[0] << 8) | message[1]
-        if dns_id not in self.__dns_map: return
-        msg = dns.message.from_wire(message)
-        daddr, dport, flags = self.__dns_map[dns_id]
-
-        for rrset in msg.answer:
-            for cname in rrset:
-                ip = cname.__str__()
-                if not utils.is_ipv4_address(ip): continue
-                if flags == 1: self.dispatcher.set_router(ip)
-            ''''''
-
-        # 欺骗主机,让主机认为DNS数据包是从虚拟DNS服务器响应的
-        pkts = utils.build_udp_packets(self.__virt_ns_naddr, daddr, 53, dport, message)
-        tun_fd = self.dispatcher.get_tun()
-        for pkt in pkts:
-            self.send_message_to_handler(self.fileno, tun_fd, pkt)
-        return
-
-    def update_host_rules(self, host_rules):
-        self.__match.clear()
-        for rule in host_rules:
-            _, flags = rule
-            # 不支持2号规则
-            if flags == 2: continue
-            self.__match.add_rule(rule)
-        return
-
-    def udp_readable(self, messsage, address):
-        self.__handle_dns_response(messsage)
-
-    def udp_writable(self):
-        self.remove_evt_write(self.fileno)
-
-    def udp_error(self):
-        self.delete_handler(self.fileno)
-
-    def udp_delete(self):
-        self.unregister(self.fileno)
-        self.close()
-
-    def udp_timeout(self):
-        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
         names = self.__timer.get_timeout_names()
         for name in names:
             if not self.__timer.exists(name): continue
-            self.__timer.drop(name)
-            del self.__dns_map[name]
-        return
+            self.del_dns_id_map(name)
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
-    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd != "response_dns": return
-        message, = args
-        self.__handle_dns_response(message)
+    def udp_readable(self, message, address):
+        if self.__server_side:
+            if self.__is_ipv6:
+                byte_saddr = socket.inet_pton(socket.AF_INET6, address[0])
+            else:
+                byte_saddr = socket.inet_pton(socket.AF_INET, address[0])
+            self.__handle_msg_for_request(byte_saddr, None, address[1], message)
+            return
+        self.__handle_msg_from_response(message)
 
-    def message_from_handler(self, from_fd, byte_data):
-        self.__handle_data_from_tun(byte_data)
+    def udp_writable(self):
+        self.remove_evt_write(self.fileno)
+
+    def udp_error(self):
+        self.delete_handler(self.fileno)
+
+    def udp_delete(self):
+        self.unregister(self.fileno)
+        self.close()
+
+
+

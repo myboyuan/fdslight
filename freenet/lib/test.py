@@ -1,7 +1,6 @@
-import freenet.lib.fn_utils as fn_utils
+import dns.message
 
-cls=fn_utils.mbuf()
-cls.copy2buf(b"hello")
-
-cls.offset+=2
-print(cls.get_part(1))
+try:
+    dns.message.from_wire(b"ssssssssssssssssss")
+except:
+    print("hello")

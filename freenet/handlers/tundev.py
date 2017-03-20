@@ -274,11 +274,8 @@ class tungw(tun_base):
         self.add_to_sent_queue(byte_data)
 
 
-class tunlc(tun_base):
-    __is_ipv6 = None
-
-    def dev_init(self, dev_name, is_ipv6=False):
-        self.__is_ipv6 = is_ipv6
+class tundevc(tun_base):
+    def dev_init(self, dev_name):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
@@ -305,6 +302,6 @@ class tunlc(tun_base):
     def dev_timeout(self):
         pass
 
-    def message_from_handler(self, from_fd, byte_data):
+    def msg_from_tunnel(self, message):
+        self.add_to_sent_queue(message)
         self.add_evt_write(self.fileno)
-        self.add_to_sent_queue(byte_data)
