@@ -17,7 +17,7 @@ class tunnel_tcp(tcp_handler.tcp_handler):
     __conn_timeout = 0
     __sent_queue = None
 
-    def init_func(self, creator, crypto, conn_timeout=720, is_ipv6=False):
+    def init_func(self, creator, crypto, crypto_configs, conn_timeout=720, is_ipv6=False):
         if is_ipv6:
             fa = socket.AF_INET6
         else:
@@ -115,7 +115,7 @@ class udp_tunnel(udp_handler.udp_handler):
     __conn_timeout = 0
     __sent_queue = None
 
-    def init_func(self, creator, crypto, conn_timeout=720, is_ipv6=False):
+    def init_func(self, creator, crypto, crypto_configs, conn_timeout=720, is_ipv6=False):
         if is_ipv6:
             fa = socket.AF_INET6
         else:

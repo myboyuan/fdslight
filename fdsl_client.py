@@ -44,7 +44,10 @@ class _fdslight_client(dispatcher.dispatcher):
     __session_id = None
 
     __debug = False
-    __crypto = None
+
+    __tcp_crypto = None
+    __udp_crypto = None
+    __crypto_configs = None
 
     def init_func(self, mode, debug, configs):
         self.__router_timer = timer.timer()
@@ -82,10 +85,13 @@ class _fdslight_client(dispatcher.dispatcher):
         if self.__mode == _MODE_GW: self.__load_kernel_mod()
 
         conn = configs["connection"]
+
+        m = "freenet.lib.crypto.%s" % conn["crypto_module"]
         try:
-            crypto = importlib.import_module("freenet.lib.crypto.%s" % conn["crypto_module"])
+            self.__tcp_crypto = importlib.import_module("%s.%s_tcp" % (m, conn["crypto_module"]))
+            self.__udp_crypto = importlib.import_module("%s.%s_udp" % (m, conn["crypto_module"]))
         except ImportError:
-            print("cannot found crypto module")
+            print("cannot found tcp or udp crypto module")
             sys.exit(-1)
 
         crypto_fpath = "./fdslight_etc/%s" % conn["crypto_configfile"]
@@ -94,7 +100,13 @@ class _fdslight_client(dispatcher.dispatcher):
             print("crypto configfile not exists")
             sys.exit(-1)
 
-        self.__crypto = crypto
+        try:
+            crypto_configs = proto_utils.load_crypto_configfile(crypto_fpath)
+        except:
+            print("crypto configfile should be json file")
+            sys.exit(-1)
+
+        self.__crypto_configs = crypto_configs
 
         sys.stderr = open(STDERR_FILE, "a+")
         sys.stdout = open(STDOUT_FILE, "a+")

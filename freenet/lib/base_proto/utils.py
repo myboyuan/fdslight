@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import hashlib
+import hashlib, json
 
 ACT_DATA = 1
 ACT_DNS = 2
@@ -8,6 +8,7 @@ ACT_DNS = 2
 ACTS = (
     ACT_DATA, ACT_DNS,
 )
+
 
 class ProtoError(Exception): pass
 
@@ -24,3 +25,14 @@ def calc_content_md5(content):
     md5.update(content)
 
     return md5.digest()
+
+
+def load_crypto_configfile(fpath):
+    """载入加密配置文件
+    :param fpath:
+    :return:
+    """
+    with open(fpath, "r") as f:
+        data = f.read()
+
+    return json.loads(data)

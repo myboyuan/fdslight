@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""UDP版本的AES加密模块"""
-
+"""TCP版本的AES加密模块"""
 """
 import sys
 sys.path.append("../../../")
 """
 
-import hashlib, os
-import freenet.lib.base_proto.tunnel_udp as tunnel
-import freenet.lib.crypto._aes_cfb as aes_cfb
+import hashlib
+import os
+
+import freenet.lib.base_proto.tunnel_tcp as tunnel
+import freenet.lib.base_proto.utils as proto_utils
+import freenet.lib.crypto.aes._aes_cfb as aes_cfb
 
 FIXED_HEADER_SIZE = 64
 
@@ -19,15 +21,11 @@ class encrypt(tunnel.builder):
     # 需要补充的`\0`
     __const_fill = b""
 
-    __real_size = 0
-    __body_size = 0
-
     def __init__(self):
         if tunnel.MIN_FIXED_HEADER_SIZE % 16 != 0:
             self.__const_fill = b"f" * (16 - tunnel.MIN_FIXED_HEADER_SIZE % 16)
 
         super(encrypt, self).__init__(FIXED_HEADER_SIZE)
-        self.set_max_pkt_size(self.block_size - self.block_size % 16)
 
     def wrap_header(self, base_hdr):
         iv = os.urandom(16)
@@ -36,12 +34,15 @@ class encrypt(tunnel.builder):
             base_hdr,
             self.__const_fill
         ]
-
         e_data = aes_cfb.encrypt(self.__key, self.__iv, b"".join(seq))
+
         return iv + e_data
 
     def wrap_body(self, size, body_data):
         return aes_cfb.encrypt(self.__key, self.__iv, body_data)
+
+    def get_payload_length(self, pkt_len):
+        return pkt_len
 
     def __set_aes_key(self, new_key):
         self.__key = hashlib.md5(new_key.encode()).digest()
@@ -69,7 +70,6 @@ class decrypt(tunnel.parser):
 
         if tunnel.MIN_FIXED_HEADER_SIZE % 16 != 0:
             self.__const_fill = b"f" * (16 - tunnel.MIN_FIXED_HEADER_SIZE % 16)
-
         super(decrypt, self).__init__(FIXED_HEADER_SIZE)
 
     def unwrap_header(self, header_data):
@@ -78,7 +78,7 @@ class decrypt(tunnel.parser):
         real_hdr = data[0:tunnel.MIN_FIXED_HEADER_SIZE]
 
         # 丢弃误码的包
-        if self.__const_fill != data[tunnel.MIN_FIXED_HEADER_SIZE:]: return None
+        if self.__const_fill != data[tunnel.MIN_FIXED_HEADER_SIZE:]: raise proto_utils.ProtoError("data wrong")
 
         return real_hdr
 
@@ -100,23 +100,26 @@ class decrypt(tunnel.parser):
 
 
 """
-length = 1500
-L = []
-
-for n in range(length):
-    L.append(33)
-
-key = "hello"
+key="name"
 builder = encrypt()
 builder.config({"key":key})
 
-packets = builder.build_packets(bytes(16),tunnel.ACT_DATA,b"hello")
+e_rs = builder.build_packet(bytes(16),tunnel.ACT_DATA,b"hello")
+builder.reset()
 
 parser = decrypt()
-parser.config({"key":"hello"})
+parser.config({"key":"name"})
+parser.input(e_rs)
 
+while parser.can_continue_parse():
+    parser.parse()
+print(parser.get_pkt())
 
-for pkt in packets:
-    ret = parser.parse(pkt)
-    if ret: print(ret)
+e_rs = builder.build_packet(bytes(16),tunnel.ACT_DATA,b"world")
+builder.reset()
+parser.input(e_rs)
+
+while parser.can_continue_parse():
+    parser.parse()
+print(parser.get_pkt())
 """
