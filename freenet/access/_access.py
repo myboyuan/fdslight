@@ -9,9 +9,14 @@ class access(object):
     # 会话超时时间
     __SESSION_TIMEOUT = 800
 
-    def __init__(self):
+    __dispatcher = None
+
+    def __init__(self, dispatcher):
         self.__timer = timer.timer()
         self.__sessions = {}
+        self.__dispatcher = dispatcher
+
+        self.init()
 
     def init(self):
         """初始化函数,重写这个方法"""
@@ -55,6 +60,7 @@ class access(object):
 
         self.__sessions[session_id] = [fileno, username, address, priv_data, ]
         self.__timer.set_timeout(session_id, self.__SESSION_TIMEOUT)
+        self.__dispatcher.tell_register_session(session_id)
 
     def get_session_info(self, session_id):
         if session_id not in self.__sessions: return None
@@ -70,6 +76,7 @@ class access(object):
 
         self.__timer.drop(session_id)
         self.handle_close(session_id)
+        self.__dispatcher.tell_unregister_session(session_id)
 
         del self.__sessions[session_id]
 

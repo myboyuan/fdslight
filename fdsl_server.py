@@ -16,6 +16,7 @@ import pywind.lib.configfile as configfile
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.nat as nat
 import freenet.handlers.tunnels as tunnels
+import freenet.lib.ipfrag as ipfrag
 
 
 class _fdslight_server(dispatcher.dispatcher):
@@ -53,11 +54,15 @@ class _fdslight_server(dispatcher.dispatcher):
     # 是否开启NAT66
     __enable_nat66 = False
 
+    __ip4fragments = None
+
     def init_func(self, debug, configs):
         self.create_poll()
 
         self.__configs = configs
         self.__debug = debug
+
+        self.__ip4fragments = {}
 
         conn_config = self.__configs["connection"]
         mod_name = "freenet.access.%s" % conn_config["access_module"]
@@ -131,8 +136,7 @@ class _fdslight_server(dispatcher.dispatcher):
             -1, tundev.tundevs, self.__DEVNAME
         )
 
-        self.__access = access.access()
-        self.__access.init()
+        self.__access = access.access(self)
 
         self.__mbuf = fn_utils.mbuf()
 
@@ -149,16 +153,29 @@ class _fdslight_server(dispatcher.dispatcher):
         )
 
         enable_ipv6 = bool(int(nat_config["enable_ipv6"]))
+        ip6addr = nat_config["local_ip6"]
+        eth_name = nat["eth_name"]
 
         if enable_ipv6:
-            self.__nat6 = nat.nat66()
+            self.__nat6 = nat.nat66(ip6addr)
             self.__enable_nat66 = True
-        self.__nat4 = nat.nat()
+            self.__config_gateway6(ip6addr)
+
+        subnet, prefix = utils.extract_subnet_info(nat_config["virtual_ip_subnet"])
+        self.__nat4 = nat.nat((subnet, prefix,))
+        self.__config_gateway(subnet, prefix, eth_name)
 
     def myloop(self):
         if self.__enable_nat66: self.__nat6.recycle()
         self.__nat4.recycle()
         self.__access.access_loop()
+
+        session_ids = self.__timer.get_timeout_names()
+        for session_id in session_ids:
+            if not self.__timer.exists(session_id): continue
+            ipfragment = self.__ip4fragments[session_id]
+            ipfragment.recycle()
+        return
 
     def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
         if action == proto_utils.ACT_DATA:
@@ -192,21 +209,46 @@ class _fdslight_server(dispatcher.dispatcher):
 
         # MTU 最大为1500
         if self.__mbuf.payload_size > 1500: return False
-        if self.__mbuf.payload_size < 21: return False
+        if self.__get_ip4_hdrlen() + 8 > self.__mbuf.payload_size: return False
 
         if protocol not in self.__support_ip4_protocols: return False
 
         # 对UDP和UDPLite进行特殊处理,以支持内网穿透
         if protocol == 17 or protocol == 136:
+            self.__handle_ipv4_dgram_from_tunnel(session_id)
             return True
+        self.__mbuf.offset = 0
 
         self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(self.__mbuf.get_data())
+        return True
+
+    def __send_msg_to_tunnel(self, session_id, action, message):
+        if not self.__access.session_exists(session_id): return
+        if not self.__access.data_for_send(session_id, self.__mbuf.payload_size): return
+
+        session_info = self.__access.get_session_info(session_id)
+        fileno = session_info[0]
+
+        self.get_handler(fileno).send_msg(session_id, session_info[2], action, message)
 
     def send_msg_to_tunnel_from_tun(self, message):
-        pass
+        self.__mbuf.copy2buf(message)
+
+        ip_ver = self.__mbuf.ip_version()
+
+        if ip_ver == 4:
+            rs = self.__nat4.get_ippkt2cLan_from_sLan(message)
+        else:
+            rs = self.__nat6.get_nat_reverse(self.__mbuf)
+
+        if not rs: return
+
+        self.__mbuf.offset = 0
+        session_id, pkt = rs
+        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, pkt)
 
     def send_msg_to_tunnel_from_p2p_proxy(self, session_id, message):
-        pass
+        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, message)
 
     def response_dns(self, session_id, message):
         if not self.__access.session_exists(session_id): return
@@ -238,7 +280,7 @@ class _fdslight_server(dispatcher.dispatcher):
         os.system("iptables -t nat -A POSTROUTING -s %s/%s -o %s -j MASQUERADE" % (subnet, prefix, eth_name,))
         os.system("iptables -A FORWARD -s %s/%s -j ACCEPT" % (subnet, prefix))
 
-    def __init_gateway6(self, ip6address, eth_name):
+    def __config_gateway6(self, ip6address):
         """配置IPV6网关
         :param ip6address:
         :param eth_name:
@@ -249,6 +291,39 @@ class _fdslight_server(dispatcher.dispatcher):
         os.system(cmd)
         # 开启IPV6流量重定向
         os.system("echo 1 >/proc/sys/net/ipv6/conf/all/forwarding")
+
+    def __get_ip4_hdrlen(self):
+        self.__mbuf.offset = 0
+        n = self.__mbuf.get_part(0)
+        hdrlen = (n & 0x0f) * 4
+        return hdrlen
+
+    def __handle_ipv4_dgram_from_tunnel(self, session_id):
+        """处理IPV4数据报
+        :return:
+        """
+        ipfragment = self.__ip4fragments[session_id]
+        ipfragment.add_frag(self.__mbuf)
+
+        data = ipfragment.get_data()
+        if not data: return
+
+        saddr, daddr, sport, dport, msg = data
+
+
+    def tell_register_session(self, session_id):
+        """告知注册session
+        :param session_id:
+        :return:
+        """
+        self.__ip4fragments[session_id] = ipfrag.ip4_p2p_proxy()
+
+    def tell_unregister_session(self, session_id):
+        """告知取消session注册
+        :param session_id:
+        :return:
+        """
+        del self.__ip4fragments[session_id]
 
 
 def __start_service(debug):

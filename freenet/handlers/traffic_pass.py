@@ -5,7 +5,6 @@ import pywind.evtframework.handlers.udp_handler as udp_handler
 import socket, os, time
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.utils as utils
-import freenet.lib.ipfrag as ipfrag
 
 
 class _qos(object):
@@ -97,7 +96,6 @@ class p2p_proxy(udp_handler.udp_handler):
     __update_time = 0
 
     __session_id = None
-    __ipfrag = None
 
     def init_func(self, creator_fd, session_id, internal_address, is_udplite=False):
         if not is_udplite:
@@ -111,7 +109,6 @@ class p2p_proxy(udp_handler.udp_handler):
 
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, proto)
         self.__permits = {}
-        self.__ipfrag = ipfrag.ip4_p2p_proxy()
 
         self.set_socket(s)
         self.bind(("0.0.0.0", 0))
@@ -157,5 +154,9 @@ class p2p_proxy(udp_handler.udp_handler):
 
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
-    def send_msg(self, message):
-        pass
+    def send_msg(self, message, address):
+        self.add_evt_write(self.fileno)
+        self.sendto(message, address)
+
+        addr_id = "%s-%s" % address
+        if addr_id not in self.__permits: self.__permits[addr_id] = None

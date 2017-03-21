@@ -44,7 +44,6 @@ class ip4_p2p_proxy(object):
     """处理IPV4 UDP 或者 UDPLite PROXY的数据分包
     此类的作用是对数据进行组包
     """
-    __max_size = 0
     __frag_data = None
     __timer = None
 
@@ -53,11 +52,10 @@ class ip4_p2p_proxy(object):
     # 超时时间,超时就丢弃分包
     __TIMEOUT = 5
 
-    def __init__(self, max_size=8192):
+    def __init__(self):
         """
         :param max_size: 组包之后数据的最大大小,单位为字节
         """
-        self.__max_size = max_size
         self.__frag_data = {}
         self.__timer = timer.timer()
         self.__ok_packets = []
@@ -80,6 +78,8 @@ class ip4_p2p_proxy(object):
             return
 
         if offset % 8 != 0: return
+        # 限制分包数目
+        if offset > 2048: return
 
         if offset == 0:
             daddr, dport = self.__get_pkt_dst_info(mbuf)
@@ -106,6 +106,7 @@ class ip4_p2p_proxy(object):
         del self.__frag_data[uniq_id]
 
     def get_data(self):
+        self.recycle()
         try:
             return self.__ok_packets.pop(0)
         except IndexError:
