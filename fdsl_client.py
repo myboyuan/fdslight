@@ -56,6 +56,9 @@ class _fdslight_client(dispatcher.dispatcher):
     __udp_crypto = None
     __crypto_configs = None
 
+    __support_ip4_protocols = (1, 6, 17, 132, 136,)
+    __support_ip6_protocols = (6, 7, 17, 44, 58, 132, 136,)
+
     def init_func(self, mode, debug, configs):
         self.create_poll()
 
@@ -173,8 +176,8 @@ class _fdslight_client(dispatcher.dispatcher):
         sts_daddr = socket.inet_ntop(fa, byte_daddr)
 
         # 丢弃不支持的传输层包
-        if ip_ver == 4 and nexthdr not in (1, 6, 17, 132, 136,): return
-        if ip_ver == 6 and nexthdr not in (6, 7, 17, 44, 58, 132, 136,): return
+        if ip_ver == 4 and nexthdr not in self.__support_ip4_protocols: return
+        if ip_ver == 6 and nexthdr not in self.__support_ip6_protocols: return
 
         if self.__mode == _MODE_LOCAL:
             is_dns_req, saddr, daddr, sport, rs = self.__is_dns_request(self.__mbuf)

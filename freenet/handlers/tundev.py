@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, socket
+import os, sys
 import pywind.evtframework.handlers.handler as handler
 import freenet.lib.fn_utils as fn_utils
 
@@ -142,136 +142,33 @@ class tun_base(handler.handler):
         self.___ip_packets_for_write.append(n_ip_message)
 
 
-class tuns(tun_base):
+class tundevs(tun_base):
     """服务端的tun数据处理
     """
-    __LOOP_TIMEOUT = 10
 
-    __nat = None
-    __packet_session_id = None
-
-    __ip_ver = 4
-
-    def __add_route(self, dev_name, subnet):
-        """给设备添加路由
-        :param dev_name:
-        :param subnet:
-        :return:
-        """
-        ip, mask_size = subnet
-        mask = 0
-
-        for n in range(mask_size):
-            mask |= 1 << (31 - n)
-
-        t = socket.inet_aton(ip)
-        i_ip = (t[0] << 24) | (t[1] << 16) | (t[2] << 8) | t[3]
-
-        if i_ip & mask != (i_ip):
-            print("error:netmask doesn't match route address")
-            sys.exit(-1)
-
-        cmd = "route add -net %s/%s dev %s" % (ip, mask_size, dev_name)
-        os.system(cmd)
-
-    def __add_route6(self, dev_name, subnet):
-        pass
-
-    def dev_init(self, tun_devname, subnet, nat, is_ipv6=False):
+    def dev_init(self, dev_name):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
-        if is_ipv6:
-            self.__add_route6(tun_devname, subnet)
-        else:
-            self.__add_route(tun_devname, subnet)
-        self.__nat = nat
-
-        if is_ipv6: self.__ip_ver = 6
-
-        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
-
-    def dev_error(self):
-        print("error:server tun device error")
-        self.delete_handler(self.fileno)
-
-    def __handle_ipv6_packet_from_read(self, ip_packet):
-        pass
-
-    def __handle_ipv4_packet_from_read(self, ip_packet):
-        protocol = ip_packet[9]
-        if protocol not in (1, 6, 17,): return
-
-        rs = self.__nat.get_ippkt2cLan_from_sLan(ip_packet)
-        if not rs: return
-        session_id, msg = rs
-        if not self.dispatcher.is_bind_session(session_id): return
-        fileno, _ = self.dispatcher.get_bind_session(session_id)
-
-        if not self.handler_exists(fileno): return
-
-        self.ctl_handler(self.fileno, fileno, "set_packet_session_id", session_id)
-        self.send_message_to_handler(self.fileno, fileno, msg)
 
     def handle_ip_packet_from_read(self, ip_packet):
-        ip_ver = (ip_packet[0] & 0xf0) >> 4
-        if ip_ver != self.__ip_ver: return
-        if ip_ver == 4: self.__handle_ipv4_packet_from_read(ip_packet)
-        if ip_ver == 6: self.__handle_ipv6_packet_from_read(ip_packet)
+        self.dispatcher.handle_msg_from_tun(ip_packet)
 
     def handle_ip_packet_for_write(self, ip_packet):
-
         return ip_packet
 
     def dev_delete(self):
         self.unregister(self.fileno)
         os.close(self.fileno)
-        sys.exit(-1)
 
-    def message_from_handler(self, from_fd, ip_packet):
-        if not self.dispatcher.is_bind_session(self.__packet_session_id): return
-        ip_ver = (ip_packet[0] & 0xf0) >> 4
-
-        if ip_ver != self.__ip_ver: return
-
-        n_ippkt = self.__nat.get_ippkt2sLan_from_cLan(self.__packet_session_id, ip_packet)
-        self.add_evt_write(self.fileno)
-        self.add_to_sent_queue(n_ippkt)
+    def dev_error(self):
+        self.delete_handler(self.fileno)
 
     def dev_timeout(self):
-        self.__nat.recycle()
-        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+        pass
 
-    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd not in ("set_packet_session_id",): return
-        if cmd == "set_packet_session_id": self.__packet_session_id, = args
-
-
-class tungw(tun_base):
-    __is_ipv6 = None
-
-    def dev_init(self, dev_name, is_ipv6=False):
-        self.__is_ipv6 = is_ipv6
-        self.register(self.fileno)
-        self.add_evt_read(self.fileno)
-
-    def handle_ip_packet_from_read(self, ip_packet):
-        tunnel_fd = self.dispatcher.get_tunnel()
-        if not self.handler_exists(tunnel_fd): return
-        self.send_message_to_handler(self.fileno, tunnel_fd, ip_packet)
-
-    def handle_ip_packet_for_write(self, ip_packet):
-        return ip_packet
-
-    def dev_delete(self):
-        self.unregister(self.fileno)
-        os.close(self.fileno)
-
-    def dev_error(self):
-        self.delete_handler(self.fileno)
-
-    def message_from_handler(self, from_fd, byte_data):
-        self.add_evt_read(self.fileno)
-        self.add_to_sent_queue(byte_data)
+    def handle_msg_from_tunnel(self, message):
+        self.add_to_sent_queue(message)
+        self.add_evt_write(self.fileno)
 
 
 class tundevc(tun_base):

@@ -125,40 +125,46 @@ class dns_base(udp_handler.udp_handler):
 
 class dnsd_proxy(dns_base):
     """服务端的DNS代理"""
-    __TIMEOUT = 5
-    __creator_fd = -1
+    __LOOP_TIMEOUT = 5
+    # DNS查询超时
+    __QUERY_TIMEOUT = 3
     __timer = None
 
-    def init_func(self, creator_fd, dns_server):
+    def init_func(self, creator_fd, dns_server, is_ipv6=False):
         self.__timer = timer.timer()
-        self.__creator_fd = creator_fd
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if is_ipv6:
+            fa = socket.AF_INET6
+        else:
+            fa = socket.AF_INET
+
+        s = socket.socket(fa, socket.SOCK_DGRAM)
 
         self.set_socket(s)
         self.connect((dns_server, 53))
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
-        self.set_timeout(self.fileno, self.__TIMEOUT)
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
         return self.fileno
 
     def udp_readable(self, message, address):
+        size = len(message)
+        if size < 16: return
+
         dns_id = (message[0] << 8) | message[1]
         if not self.dns_id_map_exists(dns_id): return
         n_dns_id, session_id = self.get_dns_id_map(dns_id)
         L = list(message)
+
         L[0:2] = (
             (n_dns_id & 0xff00) >> 8,
-            n_dns_id & 0x00ff,
+            n_dns_id & 0xff
         )
-
-        if not self.dispatcher.is_bind_session(session_id): return
-        fileno, _ = self.dispatcher.get_bind_session(session_id)
-        self.ctl_handler(self.fileno, fileno, "response_dns", session_id, bytes(L))
         self.del_dns_id_map(dns_id)
+        self.__timer.drop(dns_id)
 
-        if self.__timer.exists(dns_id): self.__timer.drop(dns_id)
+        self.dispatcher.response_dns(session_id, bytes(L))
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
@@ -166,26 +172,10 @@ class dnsd_proxy(dns_base):
     def udp_timeout(self):
         dns_ids = self.__timer.get_timeout_names()
         for dns_id in dns_ids:
-            if self.__timer.exists(dns_id): self.__timer.drop(dns_id)
-
-        self.recyle_resource(dns_ids)
-        self.set_timeout(self.fileno, self.__TIMEOUT)
-
-    def handler_ctl(self, from_fd, cmd, session_id, message):
-        if cmd != "request_dns": return False
-        dns_id = (message[0] << 8) | message[1]
-        n_dns_id = self.get_dns_id(dns_id)
-        self.set_dns_id_map(n_dns_id, (dns_id, session_id,))
-
-        L = list(message)
-        L[0:2] = (
-            (n_dns_id & 0xff00) >> 8,
-            n_dns_id & 0x00ff,
-        )
-
-        self.__timer.set_timeout(n_dns_id, self.__TIMEOUT)
-        self.add_evt_write(self.fileno)
-        self.send(bytes(L))
+            if not self.__timer.exists(dns_id): continue
+            self.del_dns_id_map(dns_id)
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+        return
 
     def udp_error(self):
         self.delete_handler(self.fileno)
@@ -193,7 +183,22 @@ class dnsd_proxy(dns_base):
     def udp_delete(self):
         self.unregister(self.fileno)
         self.close()
-        sys.exit(-1)
+
+    def request_dns(self, session_id, message):
+        if len(message) < 16: return
+        dns_id = (message[0] << 8) | message[1]
+        n_dns_id = self.get_dns_id(dns_id)
+
+        self.set_dns_id_map(n_dns_id, (dns_id, session_id))
+        L = list(message)
+        L[0:2] = (
+            (n_dns_id & 0xff00) >> 8,
+            n_dns_id & 0x00ff
+        )
+        self.__timer.set_timeout(n_dns_id, self.__QUERY_TIMEOUT)
+
+        self.send(bytes(L))
+        self.add_evt_write(self.fileno)
 
 
 class udp_client_for_dns(udp_handler.udp_handler):
@@ -396,6 +401,7 @@ class dnsc_proxy(dns_base):
         for name in names:
             if not self.__timer.exists(name): continue
             self.del_dns_id_map(name)
+            self.__timer.drop(name)
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def udp_readable(self, message, address):
