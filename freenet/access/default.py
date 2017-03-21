@@ -4,7 +4,7 @@
 """
 
 import json, os
-import freenet.access._access as auth_base
+import freenet.access.access as auth_base
 import freenet.lib.base_proto.utils as proto_utils
 
 
