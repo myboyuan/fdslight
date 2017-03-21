@@ -317,6 +317,9 @@ class dnsc_proxy(dns_base):
             packets = utils.build_udp_packets(saddr, daddr, 53, dport, message, is_ipv6=self.__is_ipv6)
             for packet in packets:
                 self.dispatcher.send_msg_to_tun(packet)
+
+            self.del_dns_id_map(dns_id)
+            self.__timer.drop(dns_id)
             return
 
         if self.__is_ipv6:
@@ -324,6 +327,8 @@ class dnsc_proxy(dns_base):
         else:
             sts_daddr = socket.inet_ntop(socket.AF_INET, daddr)
 
+        self.del_dns_id_map(dns_id)
+        self.__timer.drop(dns_id)
         self.sendto(message, (sts_daddr, dport))
         self.add_evt_write(self.fileno)
 

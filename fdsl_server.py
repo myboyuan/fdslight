@@ -10,7 +10,6 @@ import pywind.evtframework.evt_dispatcher as dispatcher
 import freenet.lib.proc as proc
 import freenet.handlers.dns_proxy as dns_proxy
 import freenet.handlers.tundev as tundev
-import freenet.lib.nat as nat
 import freenet.lib.fn_utils as fn_utils
 import freenet.lib.utils as utils
 import pywind.lib.configfile as configfile
@@ -116,7 +115,7 @@ class _fdslight_server(dispatcher.dispatcher):
             )
             self.__udp6_fileno = self.create_handler(
                 -1, tunnels.udp_handler,
-                listen6_udp, self.__udp_crypto, self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=True
+                listen6_udp, self.__udp_crypto, self.__crypto_configs, is_ipv6=True
             )
 
         self.__tcp_fileno = self.create_handler(
@@ -125,10 +124,12 @@ class _fdslight_server(dispatcher.dispatcher):
         )
         self.__udp_fileno = self.create_handler(
             -1, tunnels.udp_handler,
-            listen_udp, self.__udp_crypto, self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=False
+            listen_udp, self.__udp_crypto, self.__crypto_configs, is_ipv6=False
         )
 
-        self.__tundev_fileno = tundev.tundevs(self.__DEVNAME)
+        self.__tundev_fileno = self.create_handler(
+            -1, tundev.tundevs, self.__DEVNAME
+        )
 
         self.__access = access.access()
         self.__access.init()
@@ -136,6 +137,16 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__mbuf = fn_utils.mbuf()
 
         nat_config = configs["nat"]
+
+        dns_addr = nat_config["dns"]
+        if utils.is_ipv6_address(dns_addr):
+            is_ipv6 = True
+        else:
+            is_ipv6 = False
+
+        self.__dns_fileno = self.create_handler(
+            -1, dns_proxy.dnsd_proxy, dns_addr, is_ipv6=is_ipv6
+        )
 
         enable_ipv6 = bool(int(nat_config["enable_ipv6"]))
 
@@ -149,7 +160,7 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__nat4.recycle()
         self.__access.access_loop()
 
-    def handle_msg_from_tunnel(self, fileno, session_id, action, message, address):
+    def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
         if action == proto_utils.ACT_DATA:
             self.__mbuf.copy2buf(message)
             size = self.__mbuf.payload_size
@@ -183,7 +194,7 @@ class _fdslight_server(dispatcher.dispatcher):
         if self.__mbuf.payload_size > 1500: return False
         if self.__mbuf.payload_size < 21: return False
 
-        if protocol not in (1, 6, 17, 132, 136,): return False
+        if protocol not in self.__support_ip4_protocols: return False
 
         # 对UDP和UDPLite进行特殊处理,以支持内网穿透
         if protocol == 17 or protocol == 136:
@@ -191,14 +202,53 @@ class _fdslight_server(dispatcher.dispatcher):
 
         self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(self.__mbuf.get_data())
 
-    def handle_msg_from_tun(self, message):
+    def send_msg_to_tunnel_from_tun(self, message):
+        pass
+
+    def send_msg_to_tunnel_from_p2p_proxy(self, session_id, message):
         pass
 
     def response_dns(self, session_id, message):
+        if not self.__access.session_exists(session_id): return
+
+        fileno, _, address, _ = self.__access.get_session_info(session_id)
+        if not self.handler_exists(fileno): return
+
+        self.get_handler(fileno).send_msg(session_id, address, proto_utils.ACT_DNS, message)
+
+    def __send_msg(self, session_id, action, message):
         pass
 
     def __request_dns(self, session_id, message):
-        pass
+        self.get_handler(self.__dns_fileno).request_dns(session_id, message)
+
+    def __config_gateway(self, subnet, prefix, eth_name):
+        """ 配置IPV4网关
+        :param subnet:子网
+        :param prefix:子网前缀
+        :param eth_name:流量出口网卡名
+        :return:
+        """
+        # 添加一条到tun设备的IPV4路由
+        cmd = "route add -net %s/%s dev %s" % (subnet, prefix, self.__DEVNAME)
+        os.system(cmd)
+        # 开启ip forward
+        os.system("echo 1 > /proc/sys/net/ipv4/ip_forward")
+        # 开启IPV4 NAT
+        os.system("iptables -t nat -A POSTROUTING -s %s/%s -o %s -j MASQUERADE" % (subnet, prefix, eth_name,))
+        os.system("iptables -A FORWARD -s %s/%s -j ACCEPT" % (subnet, prefix))
+
+    def __init_gateway6(self, ip6address, eth_name):
+        """配置IPV6网关
+        :param ip6address:
+        :param eth_name:
+        :return:
+        """
+        # 添加一条到tun设备的IPv6路由
+        cmd = "route add -A inet6 -host %s dev %s" % (ip6address, self.__DEVNAME)
+        os.system(cmd)
+        # 开启IPV6流量重定向
+        os.system("echo 1 >/proc/sys/net/ipv6/conf/all/forwarding")
 
 
 def __start_service(debug):
@@ -227,7 +277,36 @@ def __stop_service():
     os.kill(pid, signal.SIGINT)
 
 
-def main(): pass
+def main():
+    help_doc = """
+    -d      debug | start | stop    debug,start or stop application
+    """
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "u:m:d:")
+    except getopt.GetoptError:
+        print(help_doc)
+        return
+    d = ""
+
+    for k, v in opts:
+        if k == "-d": d = v
+    if not d:
+        print(help_doc)
+        return
+
+    if d not in ("debug", "start", "stop"):
+        print(help_doc)
+        return
+
+    debug = False
+
+    if d == "stop":
+        __stop_service()
+        return
+    if d == "debug": debug = True
+    if d == "start": debug = True
+
+    __start_service(debug)
 
 
 if __name__ == '__main__': main()

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import pywind.lib.timer as timer
+import freenet.lib.utils as utils
+import socket
 
 
 class nat66(object):
@@ -38,34 +40,118 @@ class nat66(object):
         return
 
 
-class ip4_udp_proxy(object):
-    """处理IPV4 UDP PROXY的数据分包
+class ip4_p2p_proxy(object):
+    """处理IPV4 UDP 或者 UDPLite PROXY的数据分包
+    此类的作用是对数据进行组包
     """
     __max_size = 0
-    __data = None
+    __frag_data = None
     __timer = None
+
+    __ok_packets = None
+
+    # 超时时间,超时就丢弃分包
+    __TIMEOUT = 5
 
     def __init__(self, max_size=8192):
         """
         :param max_size: 组包之后数据的最大大小,单位为字节
         """
         self.__max_size = max_size
-        self.__data = {}
+        self.__frag_data = {}
         self.__timer = timer.timer()
+        self.__ok_packets = []
 
-    def add_frag(self, session_id, mbuf):
-        mbuf.offset = 12
-        saddr = mbuf.get_part(4)
+    def add_frag(self, mbuf):
+        mbuf.offset = 4
+        uniq_id = utils.bytes2number(mbuf.get_part(2))
 
-        offset = 0
+        mbuf.offset = 6
+        frag_off = utils.bytes2number(mbuf.get_part(2))
+        df = 0x4000 >> 12
+        mf = 0x2000 >> 11
+        offset = frag_off & 0x1fff
+
+        # 处理部分包只有一个分包的情况
+        if df or (offset == 0 and mf == 0):
+            daddr, dport = self.__get_pkt_dst_info(mbuf)
+            content = self.__get_transfer_content(mbuf)
+            self.__ok_packets.append((daddr, dport, content,))
+            return
+
+        if offset % 8 != 0: return
 
         if offset == 0:
-            pass
+            daddr, dport = self.__get_pkt_dst_info(mbuf)
+            content = self.__get_transfer_content(mbuf)
 
-        if session_id not in self.__data:
-            self.__data[session_id] = {}
+            self.__frag_data[uniq_id] = (daddr, dport, [content, ])
+            self.__timer.set_timeout(uniq_id, self.__TIMEOUT)
+            return
+        elif uniq_id not in self.__frag_data:
+            return
 
-        pydict = self.__data[session_id]
+        else:
+            content = self.__get_transfer_content(mbuf, is_off=True)
+            _, _, frag_pkts = self.__frag_data[uniq_id]
+            frag_pkts.append(content)
+
+        if mf != 0: return
+
+        daddr, dport, frag_pkts = self.__frag_data[uniq_id]
+
+        self.__ok_packets.append(daddr, dport, b"".join(frag_pkts))
+        self.__timer.drop(uniq_id)
+
+        del self.__frag_data[uniq_id]
 
     def get_data(self):
-        pass
+        try:
+            return self.__ok_packets.pop(0)
+        except IndexError:
+            return None
+
+    def __get_pkt_dst_info(self, mbuf):
+        """获取数据包目的信息
+        :param mbuf:
+        :return:
+        """
+        mbuf.offset = 0
+        n = mbuf.get_part(0)
+        hdrlen = (n & 0x0f) * 4
+
+        mbuf.offset = hdrlen + 2
+        dport = utils.bytes2number(mbuf.get_part(2))
+
+        mbuf.offset = 16
+        daddr = mbuf.get_part(4)
+
+        return (socket.inet_ntoa(daddr), dport,)
+
+    def __get_transfer_content(self, mbuf, is_off=False):
+        """
+        :param mbuf:
+        :param is_off: 是否有偏移
+        :return:
+        """
+        if is_off:
+            mbuf.offset = self.__get_pkt_hdr_len(mbuf)
+        else:
+            mbuf.offset = self.__get_pkt_hdr_len(mbuf) + 8
+
+        return mbuf.get_data()
+
+    def __get_pkt_hdr_len(self, mbuf):
+        mbuf.offset = 0
+        n = mbuf.get_part(0)
+        hdrlen = (n & 0x0f) * 4
+
+        return hdrlen
+
+    def recycle(self):
+        uniq_ids = self.__timer.get_timeout_names()
+        for uniq_id in uniq_ids:
+            if not self.__timer.exists(uniq_id): continue
+            self.__timer.drop(uniq_id)
+            del self.__frag_data[uniq_id]
+        return

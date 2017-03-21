@@ -2,6 +2,7 @@
 import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import socket, time
+import freenet.lib.base_proto.utils as proto_utils
 
 
 class tcp_tunnel(tcp_handler.tcp_handler):
@@ -75,7 +76,22 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         return self.fileno
 
     def tcp_readable(self):
-        pass
+        rdata = self.reader.read()
+        self.__decrypt.input(rdata)
+
+        while self.__decrypt.can_continue_parse():
+            try:
+                self.__decrypt.parse()
+            except proto_utils.ProtoError:
+                self.delete_handler(self.fileno)
+                return
+            while 1:
+                pkt_info = self.__decrypt.get_pkt()
+                if not pkt_info: break
+                session_id, action, message = pkt_info
+                self.dispatcher.handle_msg_from_tunnel(self.fileno, session_id, self.__address, action, message)
+            ''''''
+        self.__update_time = time.time()
 
     def tcp_writable(self):
         self.remove_evt_read(self.fileno)
@@ -93,6 +109,13 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
     def tcp_delete(self):
         self.unregister(self.fileno)
         self.close()
+
+    def send_msg(self, session_id, address, action, message):
+        sent_pkt = self.__encrypt.build_packet(session_id, action, message)
+        self.writer.write(sent_pkt)
+        self.add_evt_write(self.fileno)
+        self.__encrypt.reset()
+        self.__update_time = time.time()
 
 
 class udp_tunnel(udp_handler.udp_handler):
@@ -119,7 +142,11 @@ class udp_tunnel(udp_handler.udp_handler):
         return self.fileno
 
     def udp_readable(self, message, address):
-        pass
+        result = self.__decrypt.parse(message)
+        if not result: return
+
+        session_id, action, byte_data = result
+        self.dispatcher.handle_msg_from_tunnel(self.fileno, session_id, address, action, byte_data)
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
@@ -133,3 +160,11 @@ class udp_tunnel(udp_handler.udp_handler):
     def udp_delete(self):
         self.unregister(self.fileno)
         self.close()
+
+    def send_msg(self, session_id, address, action, message):
+        ippkts = self.__encrypt.build_packets(session_id, action, message)
+        self.__encrypt.reset()
+
+        for ippkt in ippkts: self.sendto(ippkt, address)
+
+        self.add_evt_write(self.fileno)

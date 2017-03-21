@@ -39,7 +39,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
     def create_tunnel(self, server_address):
         server_ip = self.dispatcher.get_server_ip(server_address[0])
         try:
-            self.connect((server_ip,server_address[1]))
+            self.connect((server_ip, server_address[1]))
         except socket.gaierror:
             return False
 
@@ -111,6 +111,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             self.__update_time = time.time()
         self.writer.write(sent_pkt)
         self.add_evt_write(self.fileno)
+        self.__encrypt.reset()
 
 
 class udp_tunnel(udp_handler.udp_handler):
@@ -144,7 +145,7 @@ class udp_tunnel(udp_handler.udp_handler):
     def create_tunnel(self, server_address):
         server_ip = self.dispatcher.get_server_ip(server_address[0])
         try:
-            self.connect((server_ip,server_address[1]))
+            self.connect((server_ip, server_address[1]))
         except socket.gaierror:
             return False
 
@@ -182,11 +183,8 @@ class udp_tunnel(udp_handler.udp_handler):
         self.close()
 
     def send_msg_to_tunnel(self, session_id, action, message):
-        try:
-            ippkts = self.__encrypt.build_packets(session_id, action, message)
-            self.__encrypt.reset()
-        except ValueError:
-            return
+        ippkts = self.__encrypt.build_packets(session_id, action, message)
+        self.__encrypt.reset()
 
         for ippkt in ippkts: self.send(ippkt)
 
