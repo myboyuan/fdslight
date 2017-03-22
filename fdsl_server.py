@@ -235,7 +235,7 @@ class _fdslight_server(dispatcher.dispatcher):
         self.get_handler(fileno).send_msg(session_id, session_info[2], action, message)
 
     def send_msg_to_tunnel_from_tun(self, message):
-        if len(message) > fn_utils.MBUF_AREA_SIZE return
+        if len(message) > fn_utils.MBUF_AREA_SIZE: return
 
         self.__mbuf.copy2buf(message)
 

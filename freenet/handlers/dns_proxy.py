@@ -301,7 +301,7 @@ class dnsc_proxy(dns_base):
                 ''''''
             ''''''
         if not self.__server_side:
-            packets = ippkts.build_udp_packets(saddr, daddr, 53, dport, message, is_ipv6=self.__is_ipv6)
+            packets = ippkts.build_udp_packets(saddr, daddr, 53, dport, message)
             for packet in packets:
                 self.dispatcher.send_msg_to_tun(packet)
 
