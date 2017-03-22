@@ -372,6 +372,7 @@ def __start_service(debug):
         pid = os.fork()
 
         if pid != 0: sys.exit(0)
+        proc.write_pid(PID_FILE)
 
     configs = configfile.ini_parse_from_file("fdslight_etc/fn_server.ini")
     cls = _fdslight_server()
@@ -415,7 +416,7 @@ def main():
         __stop_service()
         return
     if d == "debug": debug = True
-    if d == "start": debug = True
+    if d == "start": debug = False
 
     __start_service(debug)
 

@@ -90,12 +90,13 @@ def __modify_ip_packet_address(ip_packet, ip_packet_list, flags=0):
     return
 
 
-def modify_tcpudp_checksum_for_ip_change(ip_packet, ip_packet_list, proto, flags=0):
+def modify_tcpudp_checksum_for_ip_change(ip_packet, ip_packet_list, proto, flags=0, is_ipv6=False):
     """ IP改变的时候重新计算TCP和UDP的校检和
     :param ip_packet:
     :param ip_packet_list:
     :param proto: 0表示计算的UDP,1表示计算的TCP
     :param flags: 0 表示修改时的源地址,1表示修改的是目的地址
+    :param is_ipv6:表示是否是否是IPV6
     :return:
     """
     if proto not in [0, 1]: return
@@ -139,6 +140,7 @@ def fill_ip_hdr_checksum(pkt_list):
     )
     return
 
+
 def _calc_incre_checksum(old_checksum, old_field, new_field):
     """使用增量式计算校检和
     :param old_checksum: 2 bytes的旧校检和
@@ -175,3 +177,14 @@ def _calc_checksum(pacekt, size):
     checksum += (checksum >> 16)
 
     return (~checksum) & 0xffff
+
+
+def modidfy_icmp6_echo_for_change(byte_ip, new_icmpid, mbuf, flags=0):
+    """修改ICMPv6报文
+    :param byte_ip:
+    :param new_icmpid:
+    :param mbuf:
+    :param flags:
+    :return:
+    """
+    pass

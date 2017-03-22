@@ -123,6 +123,7 @@ def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_udplite=
 
     return pkts
 
+
 def ip4b_2_number(ip_pkt):
     """ipv4 bytes转换为数字"""
     return (ip_pkt[0] << 24) | (ip_pkt[1] << 16) | (ip_pkt[2] << 8) | ip_pkt[3]
@@ -295,3 +296,4 @@ def is_uint(s):
         return False
 
     return n >= 0
+

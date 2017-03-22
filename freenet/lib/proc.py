@@ -3,7 +3,7 @@ import os
 
 
 def write_pid(fpath):
-    pid = os.getpid()
+    pid = str(os.getpid())
     with open(fpath, "w") as f: f.write(pid)
 
 
