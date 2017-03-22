@@ -58,7 +58,7 @@ class builder(object):
         return (bytes(list_a), bytes(list_b), bytes(csum_list),)
 
     def __build_proto_header(self, session_id, pkt_md5, pkt_len, real_size, tot_seg, seq, action):
-        if action not in ACTS: raise ValueError("not support action type")
+        if action not in proto_utils.ACTS: raise ValueError("not support action type")
         L = [
             session_id, pkt_md5,
         ]
