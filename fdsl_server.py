@@ -301,7 +301,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
     def __get_ip4_hdrlen(self):
         self.__mbuf.offset = 0
-        n = self.__mbuf.get_part(0)
+        n = self.__mbuf.get_part(1)
         hdrlen = (n & 0x0f) * 4
         return hdrlen
 
