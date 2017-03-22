@@ -179,7 +179,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
     def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
         size = len(message)
-        if size > 1500: return False
+        if size > fn_utils.MBUF_AREA_SIZE: return False
 
         if action == proto_utils.ACT_DATA: self.__mbuf.copy2buf(message)
 
@@ -235,9 +235,13 @@ class _fdslight_server(dispatcher.dispatcher):
         self.get_handler(fileno).send_msg(session_id, session_info[2], action, message)
 
     def send_msg_to_tunnel_from_tun(self, message):
+        if len(message) > fn_utils.MBUF_AREA_SIZE return
+
         self.__mbuf.copy2buf(message)
 
         ip_ver = self.__mbuf.ip_version()
+
+        if ip_ver == 6 and not self.__enable_nat66: return
 
         if ip_ver == 4:
             rs = self.__nat4.get_ippkt2cLan_from_sLan(self.__mbuf)
