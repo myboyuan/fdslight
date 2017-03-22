@@ -222,7 +222,8 @@ class _fdslight_server(dispatcher.dispatcher):
 
         rs = self.__nat4.get_ippkt2sLan_from_cLan(session_id, self.__mbuf)
         if not rs: return
-        self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(rs)
+        self.__mbuf.offset=0
+        self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(self.__mbuf.get_data())
         return True
 
     def __send_msg_to_tunnel(self, session_id, action, message):
