@@ -299,15 +299,28 @@ def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_udplite=
     if mtu > 1500 or mtu < 576: raise ValueError("the value of mtu is wrong!")
     msg_len = 8 + len(message)
     # 构建UDP数据头
-    udp_hdr = (
+    udp_hdr = [
         (sport & 0xff00) >> 8,
         sport & 0x00ff,
         (dport & 0xff00) >> 8,
         dport & 0x00ff,
-        (msg_len & 0xff00) >> 8,
-        msg_len & 0x00ff,
-        0, 0,
-    )
+    ]
+
+    if is_udplite:
+        udp_hdr += [
+            0, 8,
+            0, 0,
+        ]
+        csum = fn_utils.calc_csum(bytes(udp_hdr))
+        udp_hdr[6] = (csum & 0xff00) >> 8
+        udp_hdr[7] = csum & 0xff
+    else:
+        udp_hdr += [
+            (msg_len & 0xff00) >> 8,
+            msg_len & 0x00ff,
+            0, 0,
+        ]
+
     pkt_data = b"".join(
         (bytes(udp_hdr), message,)
     )
@@ -336,8 +349,13 @@ def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_udplite=
         else:
             flags_mf = 1
 
+        if is_udplite:
+            p = 136
+        else:
+            p = 17
+
         offset = n * every_offset
-        ippkt = build_ip_packet(slice_size + __IP_HDR_SIZE, 17,
+        ippkt = build_ip_packet(slice_size + __IP_HDR_SIZE, p,
                                 saddr, daddr, bdata, pkt_id=pkt_id,
                                 flags_df=flags_df, flags_mf=flags_mf,
                                 offset=offset

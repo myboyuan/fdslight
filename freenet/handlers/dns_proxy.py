@@ -247,14 +247,8 @@ class dnsc_proxy(dns_base):
     __udp_client = None
     __is_ipv6 = False
 
-    def init_func(self, creator, address, debug=False, is_ipv6=False, server_side=False):
-        self.__is_ipv6 = is_ipv6
-
-        if is_ipv6:
-            fa = socket.AF_INET6
-        else:
-            fa = socket.AF_INET
-        s = socket.socket(fa, socket.SOCK_DGRAM)
+    def init_func(self, creator, address, debug=False, server_side=False):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         self.set_socket(s)
         self.__server_side = server_side

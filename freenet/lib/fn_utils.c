@@ -249,7 +249,8 @@ calc_csum(PyObject *self,PyObject *args)
     const char *sts;
     int size=0;
     unsigned short int csum;
-    if(!PyArg_ParseTuple(args,"y#i",&sts,&size)) return NULL;
+
+    if(!PyArg_ParseTuple(args,"y#",&sts,&size)) return NULL;
 
     csum=calc_checksum((unsigned short *)sts,size);
 

@@ -86,16 +86,15 @@ class _fdslight_client(dispatcher.dispatcher):
         is_ipv6 = utils.is_ipv6_address(public["remote_dns"])
 
         if self.__mode == _MODE_GW:
-            _is_ipv6 = utils.is_ipv6_address(gateway["dnsserver_bind"])
             self.__dns_fileno = self.create_handler(
                 -1, dns_proxy.dnsc_proxy,
-                gateway["dnsserver_bind"], debug=debug, is_ipv6=_is_ipv6, server_side=True
+                gateway["dnsserver_bind"], debug=debug, server_side=True
             )
             self.get_handler(self.__dns_fileno).set_parent_dnsserver(public["remote_dns"], is_ipv6=is_ipv6)
         else:
             self.__dns_fileno = self.create_handler(
                 -1, dns_proxy.dnsc_proxy,
-                public["remote_dns"], debug=debug, server_side=False, is_ipv6=is_ipv6
+                public["remote_dns"], debug=debug, server_side=False
             )
 
         self.__set_host_rules(None, None)
