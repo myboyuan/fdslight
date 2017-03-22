@@ -250,7 +250,6 @@ class _fdslight_server(dispatcher.dispatcher):
 
         if not rs: return
 
-        print("-----")
         self.__mbuf.offset = 0
         session_id, pkt = rs
         self.__send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, pkt)
