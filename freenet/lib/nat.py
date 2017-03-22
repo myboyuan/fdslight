@@ -128,7 +128,7 @@ class nat66(object):
     # NAT超时时间
     __NAT_TIMEOUT = 900
 
-    def __init__(self, local_ip6, nat_sessions=5000):
+    def __init__(self, local_ip6, nat_sessions=2000):
         """
         :param local_ip6: 本机IPv6地址
         """

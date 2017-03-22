@@ -66,7 +66,7 @@ def build_ip_packet(pkt_len, protocol, saddr, daddr, message, pkt_id=1, flags_df
     return b"".join((bytes(L), message,))
 
 
-def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_ipv6=False):
+def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_udplite=False):
     """构建UDP数据包"""
     if mtu > 1500 or mtu < 576: raise ValueError("the value of mtu is wrong!")
     msg_len = 8 + len(message)
@@ -122,33 +122,6 @@ def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_ipv6=Fal
         e = b + step
 
     return pkts
-
-
-def build_ipv6_packets(nexthdr, flow_label, saddr, daddr, payload_data, mtu=1200):
-    """构建IPV6数据包
-    :param nexthdr:
-    :param flow_label:
-    :param saddr:
-    :param daddr:
-    :param payload_data:
-    :return:
-    """
-    pass
-
-
-def build_tcp_data(saddr, daddr, sport, dport, seq_num, ack_num, control_bits, window, data, is_ipv6=False):
-    """构建TCP数据包
-    :param sport:
-    :param dport:
-    :param seq_num:
-    :param ack_num:
-    :param control_bits:
-    :param window:
-    :param data:
-    :return:
-    """
-    pass
-
 
 def ip4b_2_number(ip_pkt):
     """ipv4 bytes转换为数字"""

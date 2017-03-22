@@ -68,6 +68,8 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__ip4fragments = {}
         self.__ip4_udp_proxy = {}
 
+        signal.signal(signal.SIGINT, self.__exit)
+
         conn_config = self.__configs["connection"]
         mod_name = "freenet.access.%s" % conn_config["access_module"]
 
@@ -79,8 +81,8 @@ class _fdslight_server(dispatcher.dispatcher):
 
         crypto_mod_name = conn_config["crypto_module"]
 
-        tcp_crypto = "freenet.crypto.%s.%s_tcp" % (crypto_mod_name, crypto_mod_name)
-        udp_crypto = "freenet.crypto.%s.%s_udp" % (crypto_mod_name, crypto_mod_name)
+        tcp_crypto = "freenet.lib.crypto.%s.%s_tcp" % (crypto_mod_name, crypto_mod_name)
+        udp_crypto = "freenet.lib.crypto.%s.%s_udp" % (crypto_mod_name, crypto_mod_name)
 
         crypto_configfile = "./fdslight_etc/%s" % conn_config["crypto_configfile"]
 
@@ -128,11 +130,11 @@ class _fdslight_server(dispatcher.dispatcher):
             )
 
         self.__tcp_fileno = self.create_handler(
-            -1, tunnels.tcp_handler,
+            -1, tunnels.tcp_tunnel,
             listen_tcp, self.__tcp_crypto, self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=False
         )
         self.__udp_fileno = self.create_handler(
-            -1, tunnels.udp_handler,
+            -1, tunnels.udp_tunnel,
             listen_udp, self.__udp_crypto, self.__crypto_configs, is_ipv6=False
         )
 
@@ -156,9 +158,9 @@ class _fdslight_server(dispatcher.dispatcher):
             -1, dns_proxy.dnsd_proxy, dns_addr, is_ipv6=is_ipv6
         )
 
-        enable_ipv6 = bool(int(nat_config["enable_ipv6"]))
+        enable_ipv6 = bool(int(nat_config["enable_nat66"]))
         ip6addr = nat_config["local_ip6"]
-        eth_name = nat["eth_name"]
+        eth_name = nat_config["eth_name"]
 
         if enable_ipv6:
             self.__nat6 = nat.nat66(ip6addr)
@@ -173,12 +175,6 @@ class _fdslight_server(dispatcher.dispatcher):
         if self.__enable_nat66: self.__nat6.recycle()
         self.__nat4.recycle()
         self.__access.access_loop()
-
-        session_ids = self.__timer.get_timeout_names()
-        for session_id in session_ids:
-            if not self.__timer.exists(session_id): continue
-            ipfragment = self.__ip4fragments[session_id]
-            ipfragment.recycle()
         return
 
     def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
@@ -361,6 +357,10 @@ class _fdslight_server(dispatcher.dispatcher):
         del pydict[key]
         if not pydict: del self.__ip4_udp_proxy[session_id]
 
+    def __exit(self, signum, frame):
+        if self.handler_exists(self.__dns_fileno):
+            self.delete_handler(self.__dns_fileno)
+        sys.exit(-1)
 
 def __start_service(debug):
     if not debug:
@@ -374,8 +374,8 @@ def __start_service(debug):
         if pid != 0: sys.exit(0)
 
     configs = configfile.ini_parse_from_file("fdslight_etc/fn_server.ini")
-    cls = _fdslight_server(debug, configs)
-    cls.ioloop()
+    cls = _fdslight_server()
+    cls.ioloop(debug, configs)
 
 
 def __stop_service():
