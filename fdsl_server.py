@@ -243,7 +243,6 @@ class _fdslight_server(dispatcher.dispatcher):
         ip_ver = self.__mbuf.ip_version()
 
         if ip_ver == 6 and not self.__enable_nat66: return
-        print("hello--")
         if ip_ver == 4:
             rs = self.__nat4.get_ippkt2cLan_from_sLan(self.__mbuf)
         else:
@@ -251,6 +250,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
         if not rs: return
 
+        print("-----")
         self.__mbuf.offset = 0
         session_id, pkt = rs
         self.__send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, pkt)
