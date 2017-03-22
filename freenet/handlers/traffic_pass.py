@@ -4,7 +4,7 @@ import pywind.evtframework.handlers.handler as handler
 import pywind.evtframework.handlers.udp_handler as udp_handler
 import socket, os, time
 import freenet.lib.fdsl_ctl as fdsl_ctl
-import freenet.lib.utils as utils
+import freenet.lib.ippkts as ippkts
 
 
 class _qos(object):
@@ -97,6 +97,7 @@ class p2p_proxy(udp_handler.udp_handler):
     __update_time = 0
 
     __session_id = None
+    __is_udplite = False
 
     def init_func(self, creator_fd, session_id, internal_address, is_udplite=False):
         if not is_udplite:
@@ -104,6 +105,7 @@ class p2p_proxy(udp_handler.udp_handler):
         else:
             proto = 136
 
+        self.__is_udplite = is_udplite
         self.__update_time = time.time()
         self.__internal_ip = internal_address[0]
         self.__byte_internal_ip = socket.inet_aton(internal_address[0])
@@ -131,7 +133,11 @@ class p2p_proxy(udp_handler.udp_handler):
         n_saddr = socket.inet_aton(address[0])
         sport = address[1]
 
-        udp_packets = utils.build_udp_packets(n_saddr, self.__byte_internal_ip, sport, self.__port, message)
+        udp_packets = ippkts.build_udp_packets(
+            n_saddr, self.__byte_internal_ip,
+            sport, self.__port, message,
+            is_udplite=self.__is_udplite
+        )
 
         for udp_pkt in udp_packets:
             self.dispatcher.send_msg_to_tunnel_from_p2p_proxy(self.__session_id, udp_pkt)

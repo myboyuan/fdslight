@@ -178,11 +178,10 @@ class _fdslight_server(dispatcher.dispatcher):
         return
 
     def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
-        if action == proto_utils.ACT_DATA:
-            self.__mbuf.copy2buf(message)
-            size = self.__mbuf.payload_size
-        else:
-            size = len(message)
+        size = len(message)
+        if size > 1500: return False
+
+        if action == proto_utils.ACT_DATA: self.__mbuf.copy2buf(message)
 
         b = self.__access.data_from_recv(fileno, session_id, address, size)
         if not b: return False
@@ -201,14 +200,14 @@ class _fdslight_server(dispatcher.dispatcher):
         return self.__handle_ipv6data_from_tunnel(session_id)
 
     def __handle_ipv6data_from_tunnel(self, session_id):
+        if self.__mbuf.payload_size < 48: return False
+
         return True
 
     def __handle_ipv4data_from_tunnel(self, session_id):
         self.__mbuf.offset = 9
         protocol = self.__mbuf.get_part(1)
 
-        # MTU 最大为1500
-        if self.__mbuf.payload_size > 1500: return False
         if self.__get_ip4_hdrlen() + 8 > self.__mbuf.payload_size: return False
 
         if protocol not in self.__support_ip4_protocols: return False
@@ -361,6 +360,7 @@ class _fdslight_server(dispatcher.dispatcher):
         if self.handler_exists(self.__dns_fileno):
             self.delete_handler(self.__dns_fileno)
         sys.exit(-1)
+
 
 def __start_service(debug):
     if not debug:

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.lib.timer as timer
-import socket, sys
+import socket, random
 import dns.message
 import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
+import freenet.lib.ippkts as ippkts
 
 
 class _host_match(object):
@@ -79,28 +80,18 @@ class dns_base(udp_handler.udp_handler):
     # 新的DNS ID映射到就的DNS ID
     __dns_id_map = {}
 
-    # 空闲的dns ids
-    __empty_dns_ids = []
-    # 当前最大的DNS ID
-    __current_max_dns_id = 0
-    # 最大的DNS ID
-    __max_dns_id = 2000
-
-    def set_dns_id_max(self, max_id):
-        if max_id > 65535: max_id = 65535
-        if max_id < 0: max_id = self.__max_dns_id
-        self.__max_dns_id = max_id
-
     def get_dns_id(self, old_dns_id):
         if old_dns_id not in self.__dns_id_map: return old_dns_id
 
-        if not self.__empty_dns_ids:
-            n_dns_id = self.__empty_dns_ids.pop(0)
-        else:
-            self.__current_max_dns_id += 1
-            n_dns_id = self.__current_max_dns_id
+        n = 0
+        n_dns_id = -1
 
-        if self.__current_max_dns_id > self.__max_dns_id: return -1
+        while n < 10:
+            n_dns_id = random.randint(1, 65535)
+            if n_dns_id in self.__dns_id_map:
+                n += 1
+                continue
+            break
 
         return n_dns_id
 
@@ -108,11 +99,8 @@ class dns_base(udp_handler.udp_handler):
         self.__dns_id_map[dns_id] = value
 
     def del_dns_id_map(self, dns_id):
-        if dns_id in self.__dns_id_map:
-            self.__empty_dns_ids.append(dns_id)
-            del self.__dns_id_map[dns_id]
-        if dns_id == self.__current_max_dns_id: self.__current_max_dns_id -= 1
-        return
+        if dns_id not in self.__dns_id_map: return
+        del self.__dns_id_map[dns_id]
 
     def get_dns_id_map(self, dns_id):
         return self.__dns_id_map[dns_id]
@@ -319,7 +307,7 @@ class dnsc_proxy(dns_base):
                 ''''''
             ''''''
         if not self.__server_side:
-            packets = utils.build_udp_packets(saddr, daddr, 53, dport, message, is_ipv6=self.__is_ipv6)
+            packets = ippkts.build_udp_packets(saddr, daddr, 53, dport, message, is_ipv6=self.__is_ipv6)
             for packet in packets:
                 self.dispatcher.send_msg_to_tun(packet)
 

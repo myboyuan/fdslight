@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-import freenet.lib.checksum as checksum
 import freenet.lib.ipaddr as ipaddr
+import freenet.lib.ipfrag as ipfrag
 import pywind.lib.timer as timer
-import socket
+import socket, random
+import freenet.lib.ippkts as ippkts
+import freenet.lib.utils as utils
 
 
 class _nat_base(object):
@@ -73,41 +75,43 @@ class nat(_nat_base):
     __ip_alloc = None
     __timer = None
     # 映射IP的有效时间
-    __VALID_TIME = 900
+    __VALID_TIME = 660
 
     def __init__(self, subnet):
         super(nat, self).__init__()
         self.__ip_alloc = ipaddr.ipalloc(*subnet, is_ipv6=False)
         self.__timer = timer.timer()
 
-    def get_ippkt2sLan_from_cLan(self, session_id, ippkt):
-        clan_saddr = ippkt[12:16]
+    def get_ippkt2sLan_from_cLan(self, session_id, mbuf):
+        mbuf.offset = 12
+
+        clan_saddr = mbuf.get_part(4)
         slan_saddr = self.find_sLanAddr_by_cLanAddr(session_id, clan_saddr)
 
         if not slan_saddr:
             try:
                 slan_saddr = self.__ip_alloc.get_addr()
             except ipaddr.IpaddrNoEnoughErr:
-                return None
+                return False
             self.add2Lan(session_id, clan_saddr, slan_saddr)
 
-        data_list = list(ippkt)
-        checksum.modify_address(slan_saddr, data_list, checksum.FLAG_MODIFY_SRC_IP)
+        ippkts.modify_ip4address(slan_saddr, mbuf, flags=0)
         self.__timer.set_timeout(slan_saddr, self.__VALID_TIME)
 
-        return bytes(data_list)
+        return True
 
-    def get_ippkt2cLan_from_sLan(self, ippkt):
-        slan_daddr = ippkt[16:20]
+    def get_ippkt2cLan_from_sLan(self, mbuf):
+        mbuf.offset = 16
+
+        slan_daddr = mbuf.get_part(4)
         rs = self.find_cLanAddr_by_sLanAddr(slan_daddr)
 
-        if not rs: return None
+        if not rs: return False
 
-        data_list = list(ippkt)
-        checksum.modify_address(rs["clan_addr"], data_list, checksum.FLAG_MODIFY_DST_IP)
+        ippkts.modify_ip4address(rs["clan_addr"], mbuf, flags=1)
         self.__timer.set_timeout(slan_daddr, self.__VALID_TIME)
 
-        return (rs["session_id"], bytes(data_list),)
+        return (True, rs["session_id"],)
 
     def recycle(self):
         names = self.__timer.get_timeout_names()
@@ -128,7 +132,12 @@ class nat66(object):
     # NAT超时时间
     __NAT_TIMEOUT = 900
 
-    def __init__(self, local_ip6, nat_sessions=2000):
+    # ICMP超时时间
+    __ICMP_TIMEOUT = 10
+
+    __ip6_fragment = None
+
+    def __init__(self, local_ip6):
         """
         :param local_ip6: 本机IPv6地址
         """
@@ -136,6 +145,7 @@ class nat66(object):
         self.__byte_local_ip6 = socket.inet_pton(socket.AF_INET6, local_ip6)
         self.__nat = {}
         self.__nat_reverse = {}
+        self.__ip6_fragment = ipfrag.nat66()
 
     def __get_nat_id(self, mbuf, is_req=True):
         mbuf.offset = 8
@@ -159,7 +169,7 @@ class nat66(object):
             port = mbuf.get_part(2)
             return (
                 b"".join((addr, chr(nexthdr).encode("iso-8859-1"), port,)),
-                port,
+                utils.bytes2number(port)
             )
 
         # ICMPV6
@@ -167,7 +177,7 @@ class nat66(object):
         icmp_id = mbuf.get_part(2)
         return (
             b"".join((addr, chr(nexthdr).encode("iso-8859-1"), icmp_id,)),
-            icmp_id
+            utils.bytes2number(icmp_id)
         )
 
     def __is_support_nat(self, mbuf, is_req=True):
@@ -179,7 +189,7 @@ class nat66(object):
         mbuf.offset = 6
         nexthdr = mbuf.get_part(1)
 
-        if nexthdr in (socket.IPPROTO_TCP, socket.IPPROTO_UDP): return True
+        if nexthdr in ((6, 7, 17, 44, 132, 136,)): return True
         if nexthdr != socket.IPPROTO_ICMPV6: return False
 
         # 检查ICMPv6类型是否支持NAT
@@ -192,20 +202,23 @@ class nat66(object):
 
         return True
 
-    def __modify_ippkt(self, mbuf, new_address, ushort, is_dest=False):
-        """ 修改IP数据包
-        :param new_address: 新的地址
-        :param ushort: 新的unsigned short int
-        :param is_dest:是修改目的信息还是修改源信息,True表示修改目的信息
-        :return:
-        """
-        pass
+    def __get_nat_session(self, nexthdr, ushort):
+        t = b"".join([
+            self.__byte_local_ip6,
+            chr(nexthdr).encode("iso-8859-1"),
+            utils.number2bytes(ushort, 2)
+        ])
 
-    def __get_nat_session(self):
-        return 0
+        if t not in self.__nat_reverse: return ushort
 
-    def __put_nat_session(self, session_id):
-        pass
+        n_session_id = -1
+        n = 0
+        while n < 10:
+            n_session_id = random.randint(1025, 65535)
+            if n_session_id not in self.__nat_reverse: break
+            n += 1
+
+        return n_session_id
 
     def get_nat(self, session_id, mbuf):
         if not self.__is_support_nat(mbuf, is_req=True): return False
@@ -214,8 +227,6 @@ class nat66(object):
             self.__nat[session_id] = {}
 
         pydict = self.__nat[session_id]
-
-        nat_id, old_ushort = self.__get_nat_id(mbuf)
 
         mbuf.offset = 8
         saddr = mbuf.get_part(16)
@@ -226,28 +237,66 @@ class nat66(object):
         mbuf.offset = 6
         nexthdr = mbuf.get_part(1)
 
+        # 对分包进行特殊处理
+        if nexthdr == 44:
+            ippkts.modify_ip6address_for_nat66(self.__byte_local_ip6, 0, mbuf, flags=0)
+            return True
+
+        nat_id, old_ushort = self.__get_nat_id(mbuf)
+
         if nat_id in pydict:
             ushort = pydict[nat_id]
         else:
-            ushort = self.__get_nat_session()
+            ushort = self.__get_nat_session(nexthdr, old_ushort)
+            if ushort < 0: return False
             pydict[nat_id] = ushort
 
-        t = (nexthdr << 16) | ushort
+        t = b"".join([
+            self.__byte_local_ip6,
+            chr(nexthdr).encode("iso-8859-1"),
+            utils.number2bytes(ushort, 2)
+        ])
 
         if t not in self.__nat_reverse:
             self.__nat_reverse[t] = (session_id, nat_id, saddr, old_ushort, {daddr: None})
         else:
             self.__nat_reverse[t][4][daddr] = None
 
-        self.__modify_ippkt(mbuf, self.__byte_local_ip6, ushort, is_dest=False)
-        self.__timer.set_timeout(t, self.__NAT_TIMEOUT)
+        ippkts.modify_ip6address_for_nat66(self.__byte_local_ip6, ushort, mbuf, flags=0)
+        timeout = self.__NAT_TIMEOUT
+        # 减少ICMP的超时时间
+        if nexthdr == 58: timeout = self.__ICMP_TIMEOUT
+        self.__timer.set_timeout(t, timeout)
 
         return True
 
     def get_nat_reverse(self, mbuf):
         if self.__is_support_nat(mbuf, is_req=False): return False
-        nat_id = self.__get_nat_id(mbuf, is_req=False)
-        if nat_id not in self.__nat_reverse: return False
+        mbuf.offset = 6
+        nexthdr = mbuf.get_part(1)
+
+        # 对分包进行特殊处理
+        if nexthdr == 44:
+            return True
+
+        nat_id, old_ushort = self.__get_nat_id(mbuf, is_req=False)
+        if nat_id not in self.__nat_reverse: return
+
+        session_id, nat_id, daddr, ushort, permits = self.__nat_reverse[nat_id]
+
+        # 对接收的数据包进行地址限制,即地址限制型CONE NAT
+        mbuf.offset = 8
+        saddr = mbuf.get_part(16)
+        if saddr not in permits: return False
+
+        ippkts.modify_ip6address_for_nat66(daddr, ushort, mbuf, flags=1)
+
+        timeout = self.__NAT_TIMEOUT
+        # 减少ICMP的超时时间
+        if nexthdr == 58: timeout = self.__ICMP_TIMEOUT
+        self.__timer.set_timeout(nat_id, timeout)
+
+        return True
 
     def __del_nat(self, nat_session_id):
         if nat_session_id not in self.__nat_reverse: return

@@ -14,9 +14,6 @@ class nat66(object):
     __TIMEOUT = 15
 
     def __init__(self):
-        """
-        :param limit_data_size: 限制数据在未分包前的大小,单位是字节
-        """
         self.__timer = timer.timer()
         self.__frag_info = {}
 
