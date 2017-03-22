@@ -17,6 +17,7 @@ import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.nat as nat
 import freenet.handlers.tunnels as tunnels
 import freenet.lib.ipfrag as ipfrag
+import freenet.handlers.traffic_pass as traffic_pass
 
 
 class _fdslight_server(dispatcher.dispatcher):
@@ -56,6 +57,8 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __ip4fragments = None
 
+    __ip4_udp_proxy = None
+
     def init_func(self, debug, configs):
         self.create_poll()
 
@@ -63,6 +66,7 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__debug = debug
 
         self.__ip4fragments = {}
+        self.__ip4_udp_proxy = {}
 
         conn_config = self.__configs["connection"]
         mod_name = "freenet.access.%s" % conn_config["access_module"]
@@ -215,11 +219,16 @@ class _fdslight_server(dispatcher.dispatcher):
 
         # 对UDP和UDPLite进行特殊处理,以支持内网穿透
         if protocol == 17 or protocol == 136:
-            self.__handle_ipv4_dgram_from_tunnel(session_id)
+            is_udplite = False
+            if protocol == 136: is_udplite = True
+            self.__handle_ipv4_dgram_from_tunnel(session_id, is_udplite=is_udplite)
             return True
         self.__mbuf.offset = 0
+        ip4data = self.__mbuf.get_data()
 
-        self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(self.__mbuf.get_data())
+        rs = self.__nat4.get_ippkt2sLan_from_cLan(session_id, ip4data)
+        if not rs: return
+        self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(rs)
         return True
 
     def __send_msg_to_tunnel(self, session_id, action, message):
@@ -298,7 +307,7 @@ class _fdslight_server(dispatcher.dispatcher):
         hdrlen = (n & 0x0f) * 4
         return hdrlen
 
-    def __handle_ipv4_dgram_from_tunnel(self, session_id):
+    def __handle_ipv4_dgram_from_tunnel(self, session_id, is_udplite=False):
         """处理IPV4数据报
         :return:
         """
@@ -309,7 +318,19 @@ class _fdslight_server(dispatcher.dispatcher):
         if not data: return
 
         saddr, daddr, sport, dport, msg = data
+        if session_id not in self.__ip4_udp_proxy:
+            self.__ip4_udp_proxy[session_id] = {}
+        pydict = self.__ip4_udp_proxy[session_id]
 
+        udp_id = "%s-%s" % (saddr, sport,)
+        if udp_id not in pydict:
+            fileno = self.create_handler(
+                -1, traffic_pass.p2p_proxy,
+                session_id, (saddr, sport), is_udplite=is_udplite
+            )
+            pydict[udp_id] = fileno
+        fileno = pydict[udp_id]
+        self.get_handler(fileno).send_msg(msg, (daddr, dport))
 
     def tell_register_session(self, session_id):
         """告知注册session
@@ -324,6 +345,21 @@ class _fdslight_server(dispatcher.dispatcher):
         :return:
         """
         del self.__ip4fragments[session_id]
+
+    def tell_del_udp_proxy(self, session_id, saddr, sport):
+        """告知删除UDP代理
+        :param session_id:
+        :param saddr:
+        :param sport:
+        :return:
+        """
+        if session_id not in self.__ip4_udp_proxy: return
+        pydict = self.__ip4_udp_proxy[session_id]
+        key = "%s-%s" % (saddr, sport)
+
+        if key not in pydict: return
+        del pydict[key]
+        if not pydict: del self.__ip4_udp_proxy[session_id]
 
 
 def __start_service(debug):

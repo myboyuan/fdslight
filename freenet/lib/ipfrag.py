@@ -82,10 +82,10 @@ class ip4_p2p_proxy(object):
         if offset > 2048: return
 
         if offset == 0:
-            daddr, dport = self.__get_pkt_dst_info(mbuf)
+            saddr, daddr, sport, dport = self.__get_pkt_dst_info(mbuf)
             content = self.__get_transfer_content(mbuf)
 
-            self.__frag_data[uniq_id] = (daddr, dport, [content, ])
+            self.__frag_data[uniq_id] = (saddr, daddr, sport, dport, [content, ])
             self.__timer.set_timeout(uniq_id, self.__TIMEOUT)
             return
         elif uniq_id not in self.__frag_data:
@@ -98,9 +98,9 @@ class ip4_p2p_proxy(object):
 
         if mf != 0: return
 
-        daddr, dport, frag_pkts = self.__frag_data[uniq_id]
+        saddr, daddr, sport, dport, frag_pkts = self.__frag_data[uniq_id]
 
-        self.__ok_packets.append(daddr, dport, b"".join(frag_pkts))
+        self.__ok_packets.append(saddr, daddr, sport, dport, b"".join(frag_pkts))
         self.__timer.drop(uniq_id)
 
         del self.__frag_data[uniq_id]
@@ -112,8 +112,8 @@ class ip4_p2p_proxy(object):
         except IndexError:
             return None
 
-    def __get_pkt_dst_info(self, mbuf):
-        """获取数据包目的信息
+    def __get_pkt_addr_info(self, mbuf):
+        """获取数据包的地址信息
         :param mbuf:
         :return:
         """
@@ -123,11 +123,15 @@ class ip4_p2p_proxy(object):
 
         mbuf.offset = hdrlen + 2
         dport = utils.bytes2number(mbuf.get_part(2))
+        mbuf.offset = hdrlen
+        sport = utils.bytes2number(mbuf.get_part(2))
 
         mbuf.offset = 16
         daddr = mbuf.get_part(4)
+        mbuf.offset = 12
+        saddr = mbuf.get_part(4)
 
-        return (socket.inet_ntoa(daddr), dport,)
+        return (socket.inet_ntoa(saddr), socket.inet_ntoa(daddr), sport, dport,)
 
     def __get_transfer_content(self, mbuf, is_off=False):
         """

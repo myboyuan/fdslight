@@ -85,7 +85,10 @@ class nat(_nat_base):
         slan_saddr = self.find_sLanAddr_by_cLanAddr(session_id, clan_saddr)
 
         if not slan_saddr:
-            slan_saddr = self.__ip_alloc.get_addr()
+            try:
+                slan_saddr = self.__ip_alloc.get_addr()
+            except ipaddr.IpaddrNoEnoughErr:
+                return None
             self.add2Lan(session_id, clan_saddr, slan_saddr)
 
         data_list = list(ippkt)

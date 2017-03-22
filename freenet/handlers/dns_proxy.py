@@ -99,6 +99,9 @@ class dns_base(udp_handler.udp_handler):
         else:
             self.__current_max_dns_id += 1
             n_dns_id = self.__current_max_dns_id
+
+        if self.__current_max_dns_id > self.__max_dns_id: return -1
+
         return n_dns_id
 
     def set_dns_id_map(self, dns_id, value):
@@ -108,6 +111,7 @@ class dns_base(udp_handler.udp_handler):
         if dns_id in self.__dns_id_map:
             self.__empty_dns_ids.append(dns_id)
             del self.__dns_id_map[dns_id]
+        if dns_id == self.__current_max_dns_id: self.__current_max_dns_id -= 1
         return
 
     def get_dns_id_map(self, dns_id):
@@ -188,6 +192,7 @@ class dnsd_proxy(dns_base):
         if len(message) < 16: return
         dns_id = (message[0] << 8) | message[1]
         n_dns_id = self.get_dns_id(dns_id)
+        if n_dns_id < 0: return
 
         self.set_dns_id_map(n_dns_id, (dns_id, session_id))
         L = list(message)
@@ -364,6 +369,7 @@ class dnsc_proxy(dns_base):
 
         dns_id = (message[0] << 8) | message[1]
         n_dns_id = self.get_dns_id(dns_id)
+        if n_dns_id < 0: return
 
         if not is_match: flags = None
 
