@@ -123,6 +123,8 @@ class nat(_nat_base):
 
 
 class nat66(object):
+    """IPV6 NAT66实现,不支持数据分片
+    """
     __byte_local_ip6 = None
     __timer = None
 
@@ -189,7 +191,7 @@ class nat66(object):
         mbuf.offset = 6
         nexthdr = mbuf.get_part(1)
 
-        if nexthdr in ((6, 7, 17, 44, 132, 136,)): return True
+        if nexthdr in ((6, 7, 17, 132, 136,)): return True
         if nexthdr != socket.IPPROTO_ICMPV6: return False
 
         # 检查ICMPv6类型是否支持NAT
@@ -275,9 +277,9 @@ class nat66(object):
         mbuf.offset = 6
         nexthdr = mbuf.get_part(1)
 
-        # 对分包进行特殊处理
+        # 丢弃收到的分包
         if nexthdr == 44:
-            return True
+            return False
 
         nat_id, old_ushort = self.__get_nat_id(mbuf, is_req=False)
         if nat_id not in self.__nat_reverse: return

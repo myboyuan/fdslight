@@ -4,39 +4,6 @@ import freenet.lib.utils as utils
 import socket
 
 
-class nat66(object):
-    """处理NAT66的分包
-    """
-    __timer = None
-
-    __frag_info = None
-
-    __TIMEOUT = 15
-
-    def __init__(self):
-        self.__timer = timer.timer()
-        self.__frag_info = {}
-
-    def add_frag(self, session_id, saddr, flow_label):
-        self.__frag_info[flow_label] = (session_id, saddr,)
-        self.__timer.set_timeout(flow_label, self.__TIMEOUT)
-
-    def get_frag_info(self, flow_label):
-        """获取分片信息
-        :param flow_label:
-        :return:
-        """
-        return self.__frag_info.get(flow_label, None)
-
-    def recycle(self):
-        names = self.__timer.get_timeout_names()
-        for name in names:
-            if not self.__timer.exists(name): continue
-            self.__timer.drop(name)
-            del self.__frag_info[name]
-        return
-
-
 class ip4_p2p_proxy(object):
     """处理IPV4 UDP 或者 UDPLite PROXY的数据分包
     此类的作用是对数据进行组包

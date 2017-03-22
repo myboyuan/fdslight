@@ -46,7 +46,7 @@ class _fdslight_server(dispatcher.dispatcher):
     __crypto_configs = None
 
     __support_ip4_protocols = (1, 6, 17, 132, 136,)
-    __support_ip6_protocols = (6, 7, 17, 44, 58, 132, 136,)
+    __support_ip6_protocols = (6, 7, 17, 58, 132, 136,)
 
     __tundev_fileno = -1
 
@@ -219,9 +219,8 @@ class _fdslight_server(dispatcher.dispatcher):
             self.__handle_ipv4_dgram_from_tunnel(session_id, is_udplite=is_udplite)
             return True
         self.__mbuf.offset = 0
-        ip4data = self.__mbuf.get_data()
 
-        rs = self.__nat4.get_ippkt2sLan_from_cLan(session_id, ip4data)
+        rs = self.__nat4.get_ippkt2sLan_from_cLan(session_id, self.__mbuf)
         if not rs: return
         self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(rs)
         return True
@@ -241,7 +240,7 @@ class _fdslight_server(dispatcher.dispatcher):
         ip_ver = self.__mbuf.ip_version()
 
         if ip_ver == 4:
-            rs = self.__nat4.get_ippkt2cLan_from_sLan(message)
+            rs = self.__nat4.get_ippkt2cLan_from_sLan(self.__mbuf)
         else:
             rs = self.__nat6.get_nat_reverse(self.__mbuf)
 
