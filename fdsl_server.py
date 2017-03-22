@@ -243,7 +243,7 @@ class _fdslight_server(dispatcher.dispatcher):
         ip_ver = self.__mbuf.ip_version()
 
         if ip_ver == 6 and not self.__enable_nat66: return
-
+        print("hello--")
         if ip_ver == 4:
             rs = self.__nat4.get_ippkt2cLan_from_sLan(self.__mbuf)
         else:
@@ -265,9 +265,6 @@ class _fdslight_server(dispatcher.dispatcher):
         if not self.handler_exists(fileno): return
 
         self.get_handler(fileno).send_msg(session_id, address, proto_utils.ACT_DNS, message)
-
-    def __send_msg(self, session_id, action, message):
-        pass
 
     def __request_dns(self, session_id, message):
         self.get_handler(self.__dns_fileno).request_dns(session_id, message)
