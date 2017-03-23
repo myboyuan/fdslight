@@ -201,6 +201,8 @@ class _fdslight_server(dispatcher.dispatcher):
 
     def __handle_ipv6data_from_tunnel(self, session_id):
         if self.__mbuf.payload_size < 48: return False
+        # 如果NAT66没开启那么丢弃IPV6数据包
+        if not self.__enable_nat66: return False
 
         return True
 
