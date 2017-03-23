@@ -202,6 +202,15 @@ class _fdslight_server(dispatcher.dispatcher):
         if self.__mbuf.payload_size < 48: return False
         # 如果NAT66没开启那么丢弃IPV6数据包
         if not self.__enable_nat66: return False
+        self.__mbuf.offset = 6
+        nexthdr = self.__mbuf.get_part(1)
+        if nexthdr not in self.__support_ip6_protocols: return False
+
+        b = self.__nat6.get_nat(session_id, self.__mbuf)
+        if not b: return False
+
+        self.__mbuf.offset = 0
+        self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(self.__mbuf.get_data())
 
         return True
 
@@ -247,7 +256,7 @@ class _fdslight_server(dispatcher.dispatcher):
         if ip_ver == 4:
             ok, session_id = self.__nat4.get_ippkt2cLan_from_sLan(self.__mbuf)
         else:
-            ok = self.__nat6.get_nat_reverse(self.__mbuf)
+            ok, session_id = self.__nat6.get_nat_reverse(self.__mbuf)
 
         if not ok: return
 

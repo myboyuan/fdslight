@@ -178,7 +178,7 @@ class _fdslight_client(dispatcher.dispatcher):
         if ip_ver == 6 and nexthdr not in self.__support_ip6_protocols: return
 
         if self.__mode == _MODE_LOCAL:
-            is_dns_req, saddr, daddr, sport, rs = self.__is_dns_request(self.__mbuf)
+            is_dns_req, saddr, daddr, sport, rs = self.__is_dns_request()
             if is_dns_req:
                 self.get_handler(self.__dns_fileno).dnsmsg_from_tun(saddr, daddr, sport, rs)
                 return
@@ -223,7 +223,8 @@ class _fdslight_client(dispatcher.dispatcher):
     def send_msg_to_tun(self, message):
         self.get_handler(self.__tundev_fileno).msg_from_tunnel(message)
 
-    def __is_dns_request(self, mbuf):
+    def __is_dns_request(self):
+        mbuf = self.__mbuf
         ip_ver = mbuf.ip_version()
 
         if ip_ver == 4:
