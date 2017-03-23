@@ -43,7 +43,7 @@ def main():
     paths = [(src_path_1, dst_path_1), (src_path_2, dst_path_2,)]
 
     for src, dst in paths:
-        cmd = "%s %s -o %s -I %s -fPIC -shared -std=c99" % (
+        cmd = "%s %s -o %s -I %s -fPIC -shared -g -std=c99" % (
             CC, src, dst, py_include
         )
         os.system(cmd)
