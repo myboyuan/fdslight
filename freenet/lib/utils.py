@@ -213,3 +213,17 @@ class mbuf(object):
 
     def ip_version(self):
         return (self.__list[0] & 0xf0) >> 4
+
+    @property
+    def payload_size(self):
+        return self.__payload_size
+
+    def replace(self, byte_data):
+        size = len(byte_data)
+        if size > self.__payload_size - self.offset: raise ValueError
+
+        i = self.offset
+        for n in byte_data:
+            self.__list[i] = n
+            i += 1
+        return True
