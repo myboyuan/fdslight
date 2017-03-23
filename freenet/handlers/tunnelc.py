@@ -186,6 +186,7 @@ class udp_tunnel(udp_handler.udp_handler):
         ippkts = self.__encrypt.build_packets(session_id, action, message)
         self.__encrypt.reset()
 
+
         for ippkt in ippkts: self.send(ippkt)
 
         self.add_evt_write(self.fileno)

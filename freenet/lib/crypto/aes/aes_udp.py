@@ -38,7 +38,6 @@ class encrypt(tunnel.builder):
             base_hdr,
             self.__const_fill
         ]
-
         e_data = aes_cfb.encrypt(self.__key, self.__iv, b"".join(seq))
         return iv + e_data
 

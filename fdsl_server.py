@@ -10,7 +10,6 @@ import pywind.evtframework.evt_dispatcher as dispatcher
 import freenet.lib.proc as proc
 import freenet.handlers.dns_proxy as dns_proxy
 import freenet.handlers.tundev as tundev
-import freenet.lib.fn_utils as fn_utils
 import freenet.lib.utils as utils
 import pywind.lib.configfile as configfile
 import freenet.lib.base_proto.utils as proto_utils

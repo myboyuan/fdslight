@@ -321,7 +321,6 @@ class dnsc_proxy(dns_base):
 
     def __handle_msg_for_request(self, saddr, daddr, sport, message):
         size = len(message)
-
         if size < 8: return
 
         try:

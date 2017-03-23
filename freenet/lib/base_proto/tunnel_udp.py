@@ -106,6 +106,7 @@ class builder(object):
         tot_seq = len(tmp_t)
         md5_hash = proto_utils.calc_content_md5(byte_data)
         seq = 1
+
         for block in tmp_t:
             size = len(block)
             base_header = self.__build_proto_header(session_id, md5_hash, data_len, size, tot_seq, seq, action)

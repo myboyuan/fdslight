@@ -7,7 +7,6 @@ sys.path.append("./")
 import pywind.evtframework.evt_dispatcher as dispatcher
 import pywind.lib.timer as timer
 import pywind.lib.configfile as configfile
-import freenet.lib.fn_utils as fn_utils
 import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.proc as proc
