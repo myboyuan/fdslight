@@ -3,6 +3,7 @@
 #include<linux/init.h>
 #include<linux/skbuff.h>
 #include<linux/ip.h>
+#include<linux/ipv6.h>
 #include<net/udp.h>
 #include<linux/netfilter.h>
 #include<linux/netfilter_ipv4.h>
@@ -40,9 +41,35 @@ static struct fdsl_queue *r_queue;
 
 struct fdsl_poll *poll;
 
-static unsigned int tunnel=0;
-static unsigned int udp_proxy_subnet_base=0;
-static unsigned int udp_proxy_subnet_mask=0;
+static char fdsl_tunnel_addr[4];
+static char fdsl_tunnel_addr6[6];
+
+static struct fdsl_subnet subnet;
+static struct fdsl_subnet subnet6;
+
+static void calc_subnet(char *buf,char *ipaddress,unsigned char prefix,char is_ipv6)
+// 计算IP地址子网
+{
+	int n=4;
+	unsigned char a,b;
+	unsigned char tables[]={
+		128,192,224,240,248,252,254,
+	};
+
+	if(is_ipv6) n=16;
+
+	memset(buf,0,n);
+	
+	a=prefix / 8;
+	b=prefix % 8;
+	
+	for(int i=0;i<a;i++){
+		buf[i]=ipaddress[i];
+	}
+	if(b) buf[a]=tables[b-1];
+
+	return 0;
+}
 
 static int chr_open(struct inode *node,struct file *f)
 {
@@ -59,37 +86,57 @@ static int chr_open(struct inode *node,struct file *f)
 	return 0;
 }
 
+static int fdsl_set_udp_proxy_subnet(unsigned long arg)
+{
+    struct fdsl_subnet tmp,*t;
+
+    int err=copy_from_user(&tmp,(unsigned long *)arg,sizeof(struct fdsl_subnet));
+    if(err) return -EINVAL;
+
+    if (tmp.is_ipv6 && tmp.prefix>128) return -EINVAL;
+	if (!tmp.is_ipv6 && tmp.prefix>32) return -EINVAL;
+
+	if(tmp.is_ipv6) t=&subnet;
+	else t=&subnet6;
+
+	calc_subnet(t->address,tmp.address,tmp.prefix,tmp.is_ipv6);
+
+	t->is_ipv6=tmp.is_ipv6;
+	t->prefix=tmp.prefix;
+
+    return 0;
+}
+
 static int fdsl_set_tunnel(unsigned long arg)
 {
-	int err=copy_from_user(&tunnel,(unsigned long *)arg,sizeof(unsigned int));
-	if(err) return -EINVAL;
+	struct fdsl_address tmp;
 
-    tunnel=htonl(tunnel);
+	int err=copy_from_user(&tmp,(unsigned long *)arg,sizeof(struct fdsl_address));
+    if(err) return -EINVAL;
+
+	if(tmp.is_ipv6) memcpy(fdsl_tunnel_addr6,tmp.address,16);
+	else memcpy(fdsl_tunnel_addr,tmp,4);
+
 	return 0;
 }
 
-static int fdsl_set_udp_proxy_subnet(unsigned long arg)
+static int fdsl_is_subnet(char *ipaddress,char is_ipv6)
 {
-    struct fdsl_subnet udp_proxy_subnet;
-    unsigned int mask=0;
-    int t;
+	unsigned char prefix;
+	char buf[16];
+	int n=4;
+	struct fdsl_subnet *t;
 
-    int err=copy_from_user(&udp_proxy_subnet,(unsigned long *)arg,sizeof(struct fdsl_subnet));
+	if(is_ipv6){
+		t=&subnet6;
+		n=16;
+	}else{
+		t=&subnet;
+	}
 
-    if(err) return -EINVAL;
-    if (udp_proxy_subnet.prefix>32) return -EINVAL;
+	calc_subnet(buf,ipaddress,t->prefix,is_ipv6);
 
-    t=32-udp_proxy_subnet.prefix;
-
-    while(t>0){
-        t=t-1;
-        mask|= 1 << t;
-    }
-
-    udp_proxy_subnet_mask=~mask;
-    udp_proxy_subnet_base=udp_proxy_subnet.address;
-
-    return 0;
+	return !memcmp(buf,t->address,n);
 }
 
 static long chr_ioctl(struct file *f,unsigned int cmd,unsigned long arg)
@@ -101,9 +148,8 @@ static long chr_ioctl(struct file *f,unsigned int cmd,unsigned long arg)
         case FDSL_IOC_SET_UDP_PROXY_SUBNET:
             ret=fdsl_set_udp_proxy_subnet(arg);
             break;
-        case FDSL_IOC_SET_TUNNEL_IP:
-            ret=fdsl_set_tunnel(arg);
-            break;
+		case FDSL_IOC_SET_TUNNEL_IP:
+			break;
 		default:
 			ret=-EINVAL;
 			break;
@@ -144,7 +190,7 @@ static unsigned int chr_poll(struct file *f,struct poll_table_struct *wait)
 	return mask;
 }
 
-static unsigned int fdsl_push_packet_to_user(struct iphdr *ip_header)
+static unsigned int fdsl_push_ipv4_packet_to_user(struct iphdr *ip_header)
 {
     int err,tot_len;
 	tot_len=ntohs(ip_header->tot_len);
@@ -157,15 +203,23 @@ static unsigned int fdsl_push_packet_to_user(struct iphdr *ip_header)
     return NF_DROP;
 }
 
-static unsigned int handle_udp_in(struct iphdr *ip_header)
+static unsigned int handle_ipv4_dgram_in(struct iphdr *ip_header)
 // 处理UDP
 {
     unsigned int saddr=(unsigned int)ip_header->saddr;
+	unsigned int daddr=(unsigned int)ip_header->daddr;
+
     saddr=ntohl(saddr);
+	daddr=ntohl(daddr);
 
-    if((saddr & udp_proxy_subnet_mask)!=udp_proxy_subnet_base) return NF_ACCEPT;
+	if(0==memcmp(fdsl_tunnel_addr,(char *)(&daddr),4)) return NF_ACCEPT;
+	if(!fdsl_is_subnet((char *)(&saddr),0)) return NF_ACCEPT;
 
-    return fdsl_push_packet_to_user(ip_header);
+    return fdsl_push_ipv4_packet_to_user(ip_header);
+}
+
+static unsigned int handle_ipv6_dgram_in(struct ipv6hdr *ip_header){
+	return NF_ACCEPT;
 }
 
 static unsigned int nf_handle_in(
@@ -190,7 +244,8 @@ static unsigned int nf_handle_in(
 		)
 {
 	struct iphdr *ip_header;
-	unsigned char protocol;
+	struct ipv6hdr *ip6_header;
+	unsigned char nexthdr;
 	unsigned int daddr;
 
 	if(!flock_flag) return NF_ACCEPT;
@@ -199,15 +254,20 @@ static unsigned int nf_handle_in(
 	ip_header=(struct iphdr *)skb_network_header(skb);
 
 	if(!ip_header) return NF_ACCEPT;
-	daddr=(unsigned int)ip_header->daddr;
 
-	if (daddr==tunnel) return NF_ACCEPT;
+	if(4==ip_header->version){
+		nexthdr=ip_header->protocol;
+	}else{
+		ip6_header=(struct ipv6hdr *)ipv6_hdr(skb);
+		if(!ip6_header) return NF_ACCEPT;
+		nexthdr=ip6_header->nexthdr;
+	}
 
-	protocol=ip_header->protocol;
+	if(nexthdr!=17 && nexthdr!=136) return NF_ACCEPT;
 
-	if (IPPROTO_UDP!=protocol) return NF_ACCEPT;
+	if(4==ip_header->version) return handle_ipv4_dgram_in(ip_header);
 
-	return handle_udp_in(ip_header);
+	return handle_ipv6_dgram_in(ip6_header);
 }
 
 static int create_dev(void)
