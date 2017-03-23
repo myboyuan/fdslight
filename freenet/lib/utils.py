@@ -175,3 +175,42 @@ def is_uint(s):
         return False
 
     return n >= 0
+
+
+class mbuf(object):
+    __MBUF_AREA_SIZE = 1501
+
+    __list = None
+
+    __payload_size = 0
+    offset = 0
+
+    def __init__(self):
+        self.__list = list(bytes(self.__MBUF_AREA_SIZE))
+
+    @property
+    def MBUF_AREA_SIZE(self):
+        return self.__MBUF_AREA_SIZE
+
+    def get_data(self):
+        return bytes(self.__list[self.offset:self.__payload_size])
+
+    def get_part(self, size):
+        if size == 1: return self.__list[self.offset]
+
+        end = self.offset + size
+
+        return bytes(self.__list[self.offset:end])
+
+    def copy2mbuf(self, byte_data):
+        if len(byte_data) > self.__MBUF_AREA_SIZE: return False
+
+        n = 0
+        for i in byte_data:
+            self.__list[n] = i
+            n += 1
+
+        return True
+
+    def ip_version(self):
+        return (self.__list[0] & 0xf0) >> 4

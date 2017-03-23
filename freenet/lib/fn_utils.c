@@ -200,7 +200,8 @@ tuntap_interface_up(PyObject *self, PyObject *args)
 
 	ret = interface_up(interface);
 
-	return ret < 0 ? Py_False : Py_True;
+	if(ret<0) Py_RETURN_FALSE;
+	Py_RETURN_TRUE;
 }
 
 static PyObject *
@@ -213,7 +214,9 @@ tuntap_set_ipaddr(PyObject *self, PyObject *args)
 		return NULL;
 
 	ret = set_ipaddr(interface_name, ip);
-	return ret < 0 ? Py_False : Py_True;
+
+	if(ret<0) Py_RETURN_FALSE;
+	Py_RETURN_TRUE;
 }
 
 static PyObject *
@@ -226,7 +229,7 @@ tuntap_delete(PyObject *self, PyObject *args)
 
 	close(fd);
 
-	return Py_None;
+	Py_RETURN_NONE;
 }
 
 
@@ -265,7 +268,7 @@ get_netcard_ip(PyObject *self,PyObject *args)
     int err;
     if (!PyArg_ParseTuple(args, "s", &eth_name)) return NULL;
     err=get_nc_ip(eth_name,eth_ip);
-    if(err) return Py_None;
+    if(err) Py_RETURN_NONE;
 
     return Py_BuildValue("s",eth_ip);
 }
@@ -280,186 +283,6 @@ static PyMethodDef UtilsMethods[] = {
 	{"get_nc_ip",get_netcard_ip,METH_VARARGS,"get netcard ip address"},
 	{NULL,NULL,0,NULL}
 };
-
-//---
-// 分配到的数据内存大小
-#define MBUF_AREA_SIZE 1501
-
-// mbuf
-typedef struct {
-    PyObject_HEAD
-    unsigned short payload_size;
-    unsigned short offset;
-    char data_area[MBUF_AREA_SIZE];
-} mbuf;
-
-static PyObject *
-mbuf_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-    mbuf *self;
-    self = (mbuf *)type->tp_alloc(type, 0);
-    
-    return (PyObject *)self;
-}
-
-static int
-mbuf_init(mbuf *self, PyObject *args, PyObject *kwds)
-{
-    memset(self->data_area,0,MBUF_AREA_SIZE);
-	self->offset=0;
-
-    return 0;
-}
-
-static void 
-mbuf_dealloc(mbuf *self)
-{
-    return;
-}
-
-static PyMemberDef mbuf_members[]={
-    {"payload_size",T_USHORT,offsetof(mbuf,payload_size),0,"payload_size"},
-    {"offset",T_USHORT,offsetof(mbuf,offset),0,"data offset"},
-    {NULL}
-};
-
-static PyObject *
-mbuf_reset(mbuf *self)
-{
-    memset(self->data_area,0,MBUF_AREA_SIZE);
-    self->payload_size=0;
-	self->offset=0;
-
-    Py_RETURN_NONE;
-}
-
-static PyObject *
-mbuf_copy2buf(mbuf *self,PyObject *args)
-{
-    const char *sts;
-    int length;
-
-    if(!PyArg_ParseTuple(args,"y#",&sts,&length)) return NULL;
-    if(length > MBUF_AREA_SIZE) return NULL;
-
-    memcpy(self->data_area,sts,length);
-    self->payload_size=length;
-
-    Py_RETURN_NONE;
-}
-
-static PyObject *
-mbuf_ip_version(mbuf *self)
-{
-    unsigned int ip_ver=(self->data_area[0] & 0xf0) >>4;
-
-    return PyLong_FromLong(ip_ver);
-}
-
-
-static PyObject *
-mbuf_get_data(mbuf *self)
-{
-	int t=self->payload_size-self->offset;
-	const char *ptr;
-	if(t<0) return NULL;
-
-	ptr=self->data_area+self->offset;
-
-    return Py_BuildValue("y#",ptr,t);
-}
-
-static PyObject *
-mbuf_get_part(mbuf *self,PyObject *args)
-{
-	unsigned short length;
-	const char *ptr;
-	int t=self->payload_size-self->offset;
-
-	if(t<0) return NULL;
-	if(!PyArg_ParseTuple(args,"H",&length)) return NULL;
-	
-	if(length>t) length=t;
-
-	ptr=self->data_area+self->offset;
-
-	if(1==length) return Py_BuildValue("B",ptr[0]);
-
-	return Py_BuildValue("y#",ptr,length);
-}
-
-static PyObject *
-mbuf_replace(mbuf *self,PyObject *args)
-{
-	const char *sts;
-	char *ptr;
-	int length;
-
-	int t=self->payload_size-self->offset;
-
-	if(!PyArg_ParseTuple(args,"y#",&sts,&length)) return Py_True;
-	if(t<length) return Py_False;
-	
-	ptr=self->data_area+self->offset;
-
-	//printf("%s\r\n",sts);
-	memcpy(ptr,sts,length);
-
-	return Py_True;
-}
-
-static PyMethodDef mbuf_methods[]={
-    {"reset", (PyCFunction)mbuf_reset, METH_NOARGS,"reset data buff to zero"},
-    {"copy2buf",(PyCFunction)mbuf_copy2buf,METH_VARARGS,"copy data to buff"},
-    {"get_data",(PyCFunction)mbuf_get_data,METH_NOARGS,"get data from buff"},
-    {"ip_version",(PyCFunction)mbuf_ip_version,METH_NOARGS,"get ip version"},
-	{"replace",(PyCFunction)mbuf_replace,METH_VARARGS,"replace buffer content"},
-	{"get_part",(PyCFunction)mbuf_get_part,METH_VARARGS,"get part data"},
-    {NULL}
-};
-
-
-static PyTypeObject mbuf_type = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    "fn_utils.mbuf",             /* tp_name */
-    sizeof(mbuf),             /* tp_basicsize */
-    0,                         /* tp_itemsize */
-    (destructor)mbuf_dealloc,  /* tp_dealloc */
-    0,                         /* tp_print */
-    0,                         /* tp_getattr */
-    0,                         /* tp_setattr */
-    0,                         /* tp_reserved */
-    0,                         /* tp_repr */
-    0,                         /* tp_as_number */
-    0,          /* tp_as_sequence */
-    0,                         /* tp_as_mapping */
-    0,                         /* tp_hash  */
-    0,                         /* tp_call */
-    0,                         /* tp_str */
-    0,                         /* tp_getattro */
-    0,                         /* tp_setattro */
-    0,                         /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT |
-        Py_TPFLAGS_BASETYPE,   /* tp_flags */
-    "memory buff for ipdata",           /* tp_doc */
-    0,                         /* tp_traverse */
-    0,                         /* tp_clear */
-    0,                         /* tp_richcompare */
-    0,                         /* tp_weaklistoffset */
-    0,                         /* tp_iter */
-    0,                         /* tp_iternext */
-    mbuf_methods,             /* tp_methods */
-    mbuf_members,             /* tp_members */
-    0,                         /* tp_getset */
-    0,                         /* tp_base */
-    0,                         /* tp_dict */
-    0,                         /* tp_descr_get */
-    0,                         /* tp_descr_set */
-    0,                         /* tp_dictoffset */
-    (initproc)mbuf_init,      /* tp_init */
-    0,                         /* tp_alloc */
-    mbuf_new,                 /* tp_new */
-};	
 
 static struct PyModuleDef utilsmodule = {
 	PyModuleDef_HEAD_INIT,
@@ -496,15 +319,9 @@ PyInit_fn_utils(void)
 	};
 
 	int const_count = sizeof(const_names) / sizeof(NULL);
-	
-	mbuf_type.tp_new = PyType_GenericNew;
 
-	if (PyType_Ready(&mbuf_type) < 0)
-        return NULL;
 
 	m = PyModule_Create(&utilsmodule);
-
-	Py_INCREF(&mbuf_type);
 
 	if (NULL == m) return NULL;
 
@@ -514,9 +331,7 @@ PyInit_fn_utils(void)
 		}
 	}
 
-    PyModule_AddObject(m, "mbuf", (PyObject *)&mbuf_type);
 	PyModule_AddStringMacro(m,TUN_DEV_NAME);
-    PyModule_AddIntConstant(m, "MBUF_AREA_SIZE",MBUF_AREA_SIZE);
 
 	return m;
 

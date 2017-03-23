@@ -144,7 +144,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
         self.__access = access.access(self)
 
-        self.__mbuf = fn_utils.mbuf()
+        self.__mbuf = utils.mbuf()
 
         nat_config = configs["nat"]
 

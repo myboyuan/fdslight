@@ -73,7 +73,7 @@ class _fdslight_client(dispatcher.dispatcher):
         else:
             self.__mode = _MODE_GW
 
-        self.__mbuf = fn_utils.mbuf()
+        self.__mbuf = utils.mbuf()
         self.__debug = debug
 
         self.__tundev_fileno = self.create_handler(
