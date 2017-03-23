@@ -273,23 +273,23 @@ class nat66(object):
         return True
 
     def get_nat_reverse(self, mbuf):
-        if self.__is_support_nat(mbuf, is_req=False): return False
+        if self.__is_support_nat(mbuf, is_req=False): return (False,None)
         mbuf.offset = 6
         nexthdr = mbuf.get_part(1)
 
         # 丢弃收到的分包
         if nexthdr == 44:
-            return False
+            return (False,None)
 
         nat_id, old_ushort = self.__get_nat_id(mbuf, is_req=False)
-        if nat_id not in self.__nat_reverse: return
+        if nat_id not in self.__nat_reverse: return (False,None)
 
         session_id, nat_id, daddr, ushort, permits = self.__nat_reverse[nat_id]
 
         # 对接收的数据包进行地址限制,即地址限制型CONE NAT
         mbuf.offset = 8
         saddr = mbuf.get_part(16)
-        if saddr not in permits: return False
+        if saddr not in permits: return (False,None)
 
         ippkts.modify_ip6address_for_nat66(daddr, ushort, mbuf, flags=1)
 
@@ -298,7 +298,7 @@ class nat66(object):
         if nexthdr == 58: timeout = self.__ICMP_TIMEOUT
         self.__timer.set_timeout(nat_id, timeout)
 
-        return True
+        return (True,session_id,)
 
     def __del_nat(self, nat_session_id):
         if nat_session_id not in self.__nat_reverse: return

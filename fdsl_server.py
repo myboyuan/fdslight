@@ -222,7 +222,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
         rs = self.__nat4.get_ippkt2sLan_from_cLan(session_id, self.__mbuf)
         if not rs: return
-        self.__mbuf.offset=0
+        self.__mbuf.offset = 0
         self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(self.__mbuf.get_data())
         return True
 
@@ -244,15 +244,14 @@ class _fdslight_server(dispatcher.dispatcher):
 
         if ip_ver == 6 and not self.__enable_nat66: return
         if ip_ver == 4:
-            rs = self.__nat4.get_ippkt2cLan_from_sLan(self.__mbuf)
+            ok, session_id = self.__nat4.get_ippkt2cLan_from_sLan(self.__mbuf)
         else:
-            rs = self.__nat6.get_nat_reverse(self.__mbuf)
+            ok = self.__nat6.get_nat_reverse(self.__mbuf)
 
-        if not rs: return
+        if not ok: return
 
         self.__mbuf.offset = 0
-        session_id, pkt = rs
-        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, pkt)
+        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, self.__mbuf.get_data())
 
     def send_msg_to_tunnel_from_p2p_proxy(self, session_id, message):
         self.__send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, message)
