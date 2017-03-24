@@ -13,15 +13,16 @@ class _Iniparser(object):
             line_n += 1
 
             # 去除空行
-            t = s.replace(" ", "")
-            t = s.replace("\t", "")
+            t = s.rstrip()
+            t = t.replace("\t", "")
 
             if not t: continue
-            if s[0] == " ": raise IniFileFmtErr(s)
-            if s[0] == "=": raise IniFileFmtErr(s)
-            if s[0] == ";": continue
-            if s[0] == "#": continue
-            rs.append(s)
+
+            if t[0] == " ": raise IniFileFmtErr(s)
+            if t[0] == "=": raise IniFileFmtErr(s)
+            if t[0] == ";": continue
+            if t[0] == "#": continue
+            rs.append(t)
 
         return rs
 
@@ -65,7 +66,6 @@ class _Iniparser(object):
         result = self.__get_result(seq)
 
         return result
-
 
 
 def ini_parse_from_file(fpath):

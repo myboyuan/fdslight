@@ -215,7 +215,6 @@ class _fdslight_client(dispatcher.dispatcher):
         if action == proto_utils.ACT_DNS:
             self.get_handler(self.__dns_fileno).msg_from_tunnel(message)
             return
-
         self.__mbuf.copy2buf(message)
         ip_ver = self.__mbuf.ip_version()
         if ip_ver not in (4, 6,): return
