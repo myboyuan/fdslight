@@ -58,6 +58,8 @@ class _fdslight_client(dispatcher.dispatcher):
     __support_ip4_protocols = (1, 6, 17, 132, 136,)
     __support_ip6_protocols = (6, 7, 17, 44, 58, 132, 136,)
 
+    __dgram_fetch_fileno = -1
+
     def init_func(self, mode, debug, configs):
         self.create_poll()
 
@@ -136,18 +138,33 @@ class _fdslight_client(dispatcher.dispatcher):
 
     def __load_kernel_mod(self):
         os.chdir("driver")
-        if not os.path.isfile("fdslight.ko"):
+        if not os.path.isfile("fdslight_dgram.ko"):
             print("you must install this software")
             sys.exit(-1)
 
+        fpath = "fdslight_etc/kern_version"
+        if not os.path.isfile(fpath):
+            print("you must install this software")
+            sys.exit(-1)
+
+        with open(fpath, "r") as f:
+            cp_ver = f.read()
+            fp = os.popen("uname -r")
+            now_ver = fp.read()
+            fp.close()
+
+        if cp_ver != now_ver:
+            print("the kernel is changed,please reinstall this software")
+            sys.exit(-1)
+
         path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
-        if os.path.exists(path): os.system("rmmod fdslight")
+        if os.path.exists(path): os.system("rmmod fdslight_dgram")
 
         # 开启ip forward
         os.system("echo 1 > /proc/sys/net/ipv4/ip_forward")
         # 禁止接收ICMP redirect 包,防止客户端机器选择最佳路由
         os.system("echo 0 | tee /proc/sys/net/ipv4/conf/*/send_redirects > /dev/null")
-        os.system("insmod fdslight.ko")
+        os.system("insmod fdslight_dgram.ko")
         os.chdir("../")
 
     def handle_msg_from_tun(self, message):
@@ -371,6 +388,11 @@ class _fdslight_client(dispatcher.dispatcher):
         if self.handler_exists(self.__dns_fileno):
             self.delete_handler(self.__dns_fileno)
 
+        if self.__mode == _MODE_GW:
+            self.delete_handler(self.__dgram_fetch_fileno)
+            os.chdir("driver")
+            os.system("rmmod fdslight_dgram")
+            os.chdir("../")
         sys.exit(0)
 
 

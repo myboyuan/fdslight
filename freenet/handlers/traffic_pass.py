@@ -5,6 +5,7 @@ import pywind.evtframework.handlers.udp_handler as udp_handler
 import socket, os, time
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.ippkts as ippkts
+import freenet.lib.utils as utils
 
 
 class _qos(object):
@@ -40,9 +41,33 @@ class traffic_read(handler.handler):
     __tunnel_fd = -1
     __qos = None
 
-    def init_func(self, creator_fd):
+    def init_func(self, creator_fd, tunnel_ip, gw_configs):
+        """
+        :param creator_fd:
+        :param tunnel_ip: 隧道IPV4或者IPV6地址
+        :param gw_configs:
+        :return:
+        """
+        enable_ipv6 = bool(int(gw_configs["enable_ipv6"]))
+        dgram_proxy_subnet, prefix = utils.extract_subnet_info(gw_configs["dgram_proxy_subnet"])
+        dgram_proxy_subnet6, prefix6 = utils.extract_subnet_info(gw_configs["dgram_proxy_subnet6"])
+
         dev_path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
         fileno = os.open(dev_path, os.O_RDONLY)
+
+        byte_subnet = utils.calc_subnet(dgram_proxy_subnet, prefix, is_ipv6=False)
+        byte_subnet6 = utils.calc_subnet(dgram_proxy_subnet6, prefix6, is_ipv6=True)
+
+        r = fdsl_ctl.set_udp_proxy_subnet(fileno,byte_subnet, prefix, False)
+        if enable_ipv6:
+            r = fdsl_ctl.set_udp_proxy_subnet(
+                fileno, byte_subnet6,
+                prefix, True
+            )
+        if utils.is_ipv6_address(tunnel_ip):
+            r = fdsl_ctl.set_tunnel(fileno, socket.inet_pton(socket.AF_INET6, tunnel_ip), True)
+        else:
+            r = fdsl_ctl.set_tunnel(fileno, socket.inet_aton(tunnel_ip), False)
 
         self.__tunnel_fd = creator_fd
         self.__qos = _qos()

@@ -73,7 +73,7 @@ static void calc_subnet(char *buf,char *ipaddress,unsigned char prefix,char is_i
 	for(int i=0;i<a;i++){
 		buf[i]=ipaddress[i];
 	}
-	if(b) buf[a]=tables[b-1];
+	if(b) buf[a]=tables[b-1] & ipaddress[a];
 
 	return;
 }
