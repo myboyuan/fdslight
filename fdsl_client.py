@@ -231,7 +231,6 @@ class _fdslight_client(dispatcher.dispatcher):
         host = socket.inet_ntop(fa, byte_saddr)
 
         self.__update_router_access(host)
-
         self.send_msg_to_tun(message)
 
     def send_msg_to_tunnel(self, action, message):
