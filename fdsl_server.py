@@ -170,6 +170,11 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__nat4 = nat.nat((subnet, prefix,))
         self.__config_gateway(subnet, prefix, eth_name)
 
+        if not debug:
+            fd = open(LOG_FILE, "a+")
+            sys.stderr = fd
+            sys.stdout = fd
+
     def myloop(self):
         if self.__enable_nat66: self.__nat6.recycle()
         self.__nat4.recycle()

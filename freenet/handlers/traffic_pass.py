@@ -41,7 +41,7 @@ class traffic_read(handler.handler):
     __tunnel_fd = -1
     __qos = None
 
-    def init_func(self, creator_fd, tunnel_ip, gw_configs):
+    def init_func(self, creator_fd,gw_configs):
         """
         :param creator_fd:
         :param tunnel_ip: 隧道IPV4或者IPV6地址
@@ -58,16 +58,12 @@ class traffic_read(handler.handler):
         byte_subnet = utils.calc_subnet(dgram_proxy_subnet, prefix, is_ipv6=False)
         byte_subnet6 = utils.calc_subnet(dgram_proxy_subnet6, prefix6, is_ipv6=True)
 
-        r = fdsl_ctl.set_udp_proxy_subnet(fileno,byte_subnet, prefix, False)
+        r = fdsl_ctl.set_udp_proxy_subnet(fileno, byte_subnet, prefix, False)
         if enable_ipv6:
             r = fdsl_ctl.set_udp_proxy_subnet(
                 fileno, byte_subnet6,
                 prefix, True
             )
-        if utils.is_ipv6_address(tunnel_ip):
-            r = fdsl_ctl.set_tunnel(fileno, socket.inet_pton(socket.AF_INET6, tunnel_ip), True)
-        else:
-            r = fdsl_ctl.set_tunnel(fileno, socket.inet_aton(tunnel_ip), False)
 
         self.__tunnel_fd = creator_fd
         self.__qos = _qos()
@@ -77,6 +73,14 @@ class traffic_read(handler.handler):
         self.add_evt_read(self.fileno)
 
         return self.fileno
+
+    def set_tunnel_ip(self, tunnel_ip):
+        if utils.is_ipv6_address(tunnel_ip):
+            r = fdsl_ctl.set_tunnel(self.fileno, socket.inet_pton(socket.AF_INET6, tunnel_ip), True)
+        else:
+            r = fdsl_ctl.set_tunnel(self.fileno, socket.inet_aton(tunnel_ip), False)
+
+        return
 
     def evt_read(self):
         sent_list = self.__qos.get_data()

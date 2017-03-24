@@ -16,14 +16,14 @@ import freenet.handlers.dns_proxy as dns_proxy
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.handlers.tunnelc as tunnelc
 import freenet.lib.file_parser as file_parser
+import freenet.handlers.traffic_pass as traffic_pass
 import dns.resolver
 
 _MODE_GW = 1
 _MODE_LOCAL = 2
 
 PID_FILE = "/tmp/fdslight.pid"
-STDERR_FILE = "/tmp/fdslight.log"
-STDOUT_FILE = "/tmp/fdslight.log"
+LOG_FILE = "/tmp/fdslight.log"
 
 
 class _fdslight_client(dispatcher.dispatcher):
@@ -102,6 +102,10 @@ class _fdslight_client(dispatcher.dispatcher):
 
         if self.__mode == _MODE_GW:
             self.__load_kernel_mod()
+            self.__dgram_fetch_fileno = self.create_handler(
+                -1, traffic_pass.traffic_read,
+                self.__configs["gateway"]
+            )
         else:
             local = configs["local"]
             vir_dns = local["virtual_dns"]
@@ -133,9 +137,10 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__crypto_configs = crypto_configs
 
         if not debug:
-            sys.stderr = open(STDERR_FILE, "a+")
-            sys.stdout = open(STDOUT_FILE, "a+")
-
+            fd = open(LOG_FILE, "a+")
+            sys.stderr = fd
+            sys.stdout = fd
+        ''''''
     def __load_kernel_mod(self):
         os.chdir("driver")
         if not os.path.isfile("fdslight_dgram.ko"):
@@ -342,7 +347,11 @@ class _fdslight_client(dispatcher.dispatcher):
             rs = resolver.query(host, "A")
 
         for anwser in rs:
-            return anwser.__str__()
+            ipaddr = anwser.__str__()
+            break
+        if self.__mode == _MODE_GW: self.__set_tunnel_ip(ipaddr)
+
+        return ipaddr
 
     def myloop(self):
         names = self.__router_timer.get_timeout_names()
@@ -394,6 +403,16 @@ class _fdslight_client(dispatcher.dispatcher):
             os.system("rmmod fdslight_dgram")
             os.chdir("../")
         sys.exit(0)
+
+    def __set_tunnel_ip(self, ip):
+        """设置隧道IP地址
+        :param ip:
+        :return:
+        """
+        if self.__mode == _MODE_GW:
+            self.get_handler(self.__dgram_fetch_fileno).set_tunnel_ip(ip)
+        else:
+            return
 
 
 def __start_service(mode, debug):
