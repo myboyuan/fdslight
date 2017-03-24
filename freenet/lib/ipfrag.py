@@ -36,7 +36,7 @@ class ip4_p2p_proxy(object):
 
         # 处理部分包只有一个分包的情况
         if df or (offset == 0 and mf == 0):
-            daddr, dport = self.__get_pkt_dst_info(mbuf)
+            daddr, dport = self.__get_pkt_addr_info(mbuf)
             content = self.__get_transfer_content(mbuf)
             self.__ok_packets.append((daddr, dport, content,))
             return
