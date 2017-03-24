@@ -51,6 +51,7 @@ class ip4_p2p_proxy(object):
 
             self.__frag_data[uniq_id] = (saddr, daddr, sport, dport, [content, ])
             self.__timer.set_timeout(uniq_id, self.__TIMEOUT)
+
             return
         elif uniq_id not in self.__frag_data:
             return
