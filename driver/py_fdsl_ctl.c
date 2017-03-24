@@ -8,14 +8,21 @@ static PyObject *
 fdsl_set_udp_proxy_subnet(PyObject *self,PyObject *args)
 {
     int fileno;
-    unsigned int ip4;
+    char *sts;
     unsigned char prefix;
+    int is_ipv6;
+    int length;
+
     struct fdsl_subnet subnet;
 
-    if(!PyArg_ParseTuple(args,"iIc",&fileno,&ip4,&prefix)) return NULL;
+    if(!PyArg_ParseTuple(args,"iy#Bp",&fileno,&sts,&length,&prefix,&is_ipv6)) return NULL;
+    
+    if(is_ipv6 && prefix>128) return NULL;
+    if(!is_ipv6 && prefix>32) return NULL;
 
-    subnet.address=ip4;
+    memcpy(subnet.address,sts,length);
     subnet.prefix=prefix;
+    subnet.is_ipv6=is_ipv6;
 
     return PyLong_FromLong(ioctl(fileno,FDSL_IOC_SET_UDP_PROXY_SUBNET,&subnet));
 }
@@ -23,11 +30,15 @@ fdsl_set_udp_proxy_subnet(PyObject *self,PyObject *args)
 static PyObject *
 fdsl_set_tunnel(PyObject *self,PyObject *args)
 {
-    int fileno;
-    unsigned int ip4;
+    int fileno,length,is_ipv6;
+    struct fdsl_address address;
+    char *sts;
 
-    if(!PyArg_ParseTuple(args,"iI",&fileno,&ip4)) return NULL;
-    return PyLong_FromLong(ioctl(fileno,FDSL_IOC_SET_TUNNEL_IP,&ip4));
+    if(!PyArg_ParseTuple(args,"iy#p",&fileno,&sts,&length,&is_ipv6)) return NULL;
+    memcpy(address.address,sts,length);
+    address.is_ipv6=is_ipv6;
+
+    return PyLong_FromLong(ioctl(fileno,FDSL_IOC_SET_TUNNEL_IP,&address));
 }
 
 static PyMethodDef fdsl_ctl_methods[]={

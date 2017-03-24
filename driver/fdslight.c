@@ -7,6 +7,7 @@
 #include<net/udp.h>
 #include<linux/netfilter.h>
 #include<linux/netfilter_ipv4.h>
+#include<linux/netfilter_ipv6.h>
 #include<net/sock.h>
 #include<linux/inet.h>
 #include<linux/fs.h>
@@ -74,7 +75,7 @@ static void calc_subnet(char *buf,char *ipaddress,unsigned char prefix,char is_i
 	}
 	if(b) buf[a]=tables[b-1];
 
-	return 0;
+	return;
 }
 
 static int chr_open(struct inode *node,struct file *f)
@@ -127,7 +128,7 @@ static int fdsl_set_tunnel(unsigned long arg)
 		memcpy(fdsl_tunnel_addr6,tmp.address,16);
 		is_set_tunnel_addr6=1;
 	}else {
-		memcpy(fdsl_tunnel_addr,tmp,4);
+		memcpy(fdsl_tunnel_addr,tmp.address,4);
 		is_set_tunnel_addr=1;
 	}
 
@@ -136,7 +137,6 @@ static int fdsl_set_tunnel(unsigned long arg)
 
 static int fdsl_is_subnet(char *ipaddress,char is_ipv6)
 {
-	unsigned char prefix;
 	char buf[16];
 	int n=4;
 	struct fdsl_subnet *t;
@@ -163,6 +163,7 @@ static long chr_ioctl(struct file *f,unsigned int cmd,unsigned long arg)
             ret=fdsl_set_udp_proxy_subnet(arg);
             break;
 		case FDSL_IOC_SET_TUNNEL_IP:
+			ret=fdsl_set_tunnel(arg);
 			break;
 		default:
 			ret=-EINVAL;
@@ -219,6 +220,7 @@ static unsigned int fdsl_push_ipv4_packet_to_user(struct iphdr *ip_header)
 
 static unsigned int fdsl_push_ipv6_packet_to_user(struct ipv6hdr *ip6_header)
 {
+	int err=0;
 	unsigned short data_len=ntohs(ip6_header->payload_len)+40;
 	err=fdsl_queue_push(r_queue,(char *)ip6_header,data_len);
 	if(err) return NF_ACCEPT;
@@ -247,7 +249,7 @@ static unsigned int handle_ipv4_dgram_in(struct iphdr *ip_header)
 
 static unsigned int handle_ipv6_dgram_in(struct ipv6hdr *ip6_header)
 {
-	unsigned char *sadrr=(ip6_header->saddr).s6_addr;
+	unsigned char *saddr=(ip6_header->saddr).s6_addr;
 	unsigned char *daddr=(ip6_header->daddr).s6_addr;
 
 	if(!is_set_tunnel_addr6 || !is_set_subnet6) return NF_ACCEPT;
@@ -283,7 +285,6 @@ static unsigned int nf_handle_in(
 	struct iphdr *ip_header;
 	struct ipv6hdr *ip6_header;
 	unsigned char nexthdr;
-	unsigned int daddr;
 
 	if(!flock_flag) return NF_ACCEPT;
 	if(!skb) return NF_ACCEPT;
@@ -355,11 +356,19 @@ static struct nf_hook_ops nf_ops={
 	.priority=NF_IP_PRI_FIRST
 };
 
+static struct nf_hook_ops nf6_ops={
+	.hook=nf_handle_in,
+	.hooknum=NF_INET_FORWARD,
+	.pf=PF_INET6,
+	.priority=NF_IP6_PRI_FIRST
+};
+
 static int fdsl_init(void)
 {
 	int ret=create_dev();
 	if(0!=ret) return ret;
 	nf_register_hook(&nf_ops);
+	nf_register_hook(&nf6_ops);
 
 	poll=kmalloc(sizeof(struct fdsl_poll),GFP_ATOMIC);
 	init_waitqueue_head(&poll->inq);
@@ -375,6 +384,7 @@ static void fdsl_exit(void)
 {
 	delete_dev();
 	nf_unregister_hook(&nf_ops);
+	nf_unregister_hook(&nf6_ops);
 	fdsl_queue_release(r_queue);
 
 	kfree(poll);
