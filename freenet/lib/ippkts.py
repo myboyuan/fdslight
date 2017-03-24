@@ -25,6 +25,7 @@ def modify_ip4address(ip_packet, mbuf, flags=0):
     mbuf.offset = 10
     csum = utils.bytes2number(mbuf.get_part(2))
     csum = calc_checksum_for_ip_change(old_ip_packet, ip_packet, csum)
+    mbuf.replace(utils.number2bytes(csum, 2))
 
     if protocol in (6, 17, 132, 136,):
         if protocol == 6:
@@ -40,7 +41,6 @@ def modify_ip4address(ip_packet, mbuf, flags=0):
     else:
         mbuf.offset = 16
 
-    mbuf.replace(utils.number2bytes(csum, 2))
     mbuf.replace(ip_packet)
 
 
