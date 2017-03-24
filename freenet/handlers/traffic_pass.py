@@ -6,40 +6,12 @@ import socket, os, time
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.ippkts as ippkts
 import freenet.lib.utils as utils
-
-
-class _qos(object):
-    __queue = None
-
-    def __init__(self):
-        self.__queue = {}
-
-    def add_data(self, ip_data):
-        saddr = ip_data[12:16]
-        if saddr not in self.__queue: self.__queue[saddr] = []
-        self.__queue[saddr].append(ip_data)
-
-    def get_data(self):
-        results = []
-        names = []
-
-        for saddr in self.__queue:
-            t = self.__queue[saddr]
-            if t: results.append(t.pop(0))
-            if not t: names.append(saddr)
-
-        for saddr in names: del self.__queue[saddr]
-
-        return results
-
-    def has_data(self):
-        return bool(self.__queue)
+import freenet.lib.base_proto.utils as proto_utils
 
 
 class traffic_read(handler.handler):
     """读取局域网的源数据包"""
     __tunnel_fd = -1
-    __qos = None
 
     def init_func(self, creator_fd, gw_configs):
         """
@@ -61,13 +33,13 @@ class traffic_read(handler.handler):
         byte_subnet6 = socket.inet_pton(socket.AF_INET6, subnet6)
 
         r = fdsl_ctl.set_udp_proxy_subnet(fileno, byte_subnet, prefix, False)
+
         r = fdsl_ctl.set_udp_proxy_subnet(
             fileno, byte_subnet6,
             prefix, True
         )
 
         self.__tunnel_fd = creator_fd
-        self.__qos = _qos()
 
         self.set_fileno(fileno)
         self.register(self.fileno)
@@ -84,33 +56,20 @@ class traffic_read(handler.handler):
         return
 
     def evt_read(self):
-        sent_list = self.__qos.get_data()
-
-        if not self.handler_exists(self.__tunnel_fd): return
-        for ip_data in sent_list:
-            self.send_message_to_handler(self.fileno, self.__tunnel_fd, ip_data)
-
-        self.add_to_loop_task(self.fileno)
-        """最多读取20个数据包,防止陷入死循环"""
-        for i in range(20):
+        n = 0
+        while n < 5:
             try:
                 pkt = os.read(self.fileno, 8192)
-                print(pkt)
+                self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_DATA, pkt)
             except BlockingIOError:
                 break
+            n += 1
             if not pkt: continue
-            self.__qos.add_data(pkt)
         return
 
     def delete(self):
         self.unregister(self.fileno)
         os.close(self.fileno)
-
-    def task_loop(self):
-        if not self.__qos.has_data():
-            self.del_loop_task(self.fileno)
-            return
-        self.evt_read()
 
 
 class p2p_proxy(udp_handler.udp_handler):

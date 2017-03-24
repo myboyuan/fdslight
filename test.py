@@ -3,4 +3,4 @@ import socket
 
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-s.sendto(b"hello",("www.google.com",53))
+s.sendto(b"hello",("8.8.8.8",53))
