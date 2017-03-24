@@ -6,7 +6,7 @@ import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.evtframework.handlers.udp_handler as udp_handler
 import socket, time
 import freenet.lib.utils as proto_utils
-
+import freenet.lib.logging as logging
 
 class tcp_tunnel(tcp_handler.tcp_handler):
     __encrypt = None
@@ -38,8 +38,9 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
     def create_tunnel(self, server_address):
         server_ip = self.dispatcher.get_server_ip(server_address[0])
+
         try:
-            self.connect((server_ip, server_address[1]))
+            self.connect((server_ip, server_address[1]),timeout=8)
         except socket.gaierror:
             return False
 
@@ -50,6 +51,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         self.__decrypt.input(rdata)
 
         while self.__decrypt.can_continue_parse():
+            print("SSSS")
             try:
                 self.__decrypt.parse()
             except proto_utils.ProtoError:

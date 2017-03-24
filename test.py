@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 import socket
 
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+import dns.resolver
 
-s.sendto(b"hello",("8.8.8.8",53))
+r = dns.resolver.Resolver()
+r.nameservers=["192.168.1.254"]
+an=r.query("www.google.com")
+
+for rs in an:
+    print(rs)
