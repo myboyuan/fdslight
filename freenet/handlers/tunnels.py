@@ -3,6 +3,7 @@ import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import socket, time
 import freenet.lib.base_proto.utils as proto_utils
+import freenet.lib.logging as logging
 
 
 class tcp_tunnel(tcp_handler.tcp_handler):
@@ -73,6 +74,8 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         self.__encrypt.config(crypto_configs)
         self.__decrypt.config(crypto_configs)
 
+        logging.print_general("tcp_connect", address)
+
         return self.fileno
 
     def tcp_readable(self):
@@ -109,6 +112,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
     def tcp_delete(self):
         self.unregister(self.fileno)
         self.close()
+        logging.print_general("tcp_disconnect", self.__address)
 
     def send_msg(self, session_id, address, action, message):
         sent_pkt = self.__encrypt.build_packet(session_id, action, message)

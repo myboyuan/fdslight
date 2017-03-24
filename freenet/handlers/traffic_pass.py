@@ -6,7 +6,6 @@ import socket, os, time
 import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.lib.ippkts as ippkts
 import freenet.lib.utils as utils
-import freenet.lib.base_proto.utils as proto_utils
 
 
 class traffic_read(handler.handler):
@@ -60,7 +59,7 @@ class traffic_read(handler.handler):
         while n < 5:
             try:
                 pkt = os.read(self.fileno, 8192)
-                self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_DATA, pkt)
+                self.dispatcher.handle_msg_from_dgramdev(pkt)
             except BlockingIOError:
                 break
             n += 1

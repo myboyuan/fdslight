@@ -5,6 +5,7 @@ sys.path.append("./")
 
 PID_FILE = "/tmp/fdslight.pid"
 LOG_FILE = "/tmp/fdslight.log"
+ERR_FILE = "/tmp/fdslight_error.log"
 
 import pywind.evtframework.evt_dispatcher as dispatcher
 import freenet.lib.proc as proc
@@ -17,6 +18,7 @@ import freenet.lib.nat as nat
 import freenet.handlers.tunnels as tunnels
 import freenet.lib.ipfrag as ipfrag
 import freenet.handlers.traffic_pass as traffic_pass
+import freenet.lib.logging as logging
 
 
 class _fdslight_server(dispatcher.dispatcher):
@@ -171,9 +173,8 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__config_gateway(subnet, prefix, eth_name)
 
         if not debug:
-            fd = open(LOG_FILE, "a+")
-            sys.stderr = fd
-            sys.stdout = fd
+            sys.stderr = open(LOG_FILE, "a+")
+            sys.stdout = open(ERR_FILE, "a+")
 
     def myloop(self):
         if self.__enable_nat66: self.__nat6.recycle()
@@ -327,6 +328,7 @@ class _fdslight_server(dispatcher.dispatcher):
         if not data: return
 
         saddr, daddr, sport, dport, msg = data
+
         if session_id not in self.__ip4_udp_proxy:
             self.__ip4_udp_proxy[session_id] = {}
         pydict = self.__ip4_udp_proxy[session_id]
@@ -390,7 +392,14 @@ def __start_service(debug):
 
     configs = configfile.ini_parse_from_file("fdslight_etc/fn_server.ini")
     cls = _fdslight_server()
-    cls.ioloop(debug, configs)
+
+    if debug:
+        cls.ioloop(debug, configs)
+        return
+    try:
+        cls.ioloop(debug, configs)
+    except:
+        logging.print_error()
 
 
 def __stop_service():

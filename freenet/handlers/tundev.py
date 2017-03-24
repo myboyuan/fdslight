@@ -177,7 +177,7 @@ class tundevc(tun_base):
         self.add_evt_read(self.fileno)
 
     def handle_ip_packet_from_read(self, ip_packet):
-        self.dispatcher.handle_msg_from_tun(ip_packet)
+        self.dispatcher.handle_msg_from_tundev(ip_packet)
 
     def handle_ip_packet_for_write(self, ip_packet):
         return ip_packet

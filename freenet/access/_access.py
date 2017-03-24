@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import pywind.lib.timer as timer
 import freenet.lib.base_proto.utils as proto_utils
+import freenet.lib.logging as logging
 
 
 class access(object):
@@ -61,6 +62,7 @@ class access(object):
         self.__sessions[session_id] = [fileno, username, address, priv_data, ]
         self.__timer.set_timeout(session_id, self.__SESSION_TIMEOUT)
         self.__dispatcher.tell_register_session(session_id)
+        logging.print_general("add_session", address)
 
     def get_session_info(self, session_id):
         if session_id not in self.__sessions: return None
@@ -76,8 +78,10 @@ class access(object):
 
         self.__timer.drop(session_id)
         self.handle_close(session_id)
+        fileno, username, address, priv_data = self.__sessions[session_id]
         self.__dispatcher.tell_unregister_session(session_id)
 
+        logging.print_general("del_session",address)
         del self.__sessions[session_id]
 
     def modify_session(self, session_id, fileno, address):
@@ -91,7 +95,7 @@ class access(object):
 
         if a != b:
             self.__sessions[session_id][2] = address
-        self.__sessions[0] = fileno
+        self.__sessions[session_id][0] = fileno
 
     def session_exists(self, session_id):
         return session_id in self.__sessions
@@ -119,6 +123,8 @@ class access(object):
 
     def data_from_recv(self, fileno, session_id, address, pkt_len):
         b = self.handle_recv(fileno, session_id, address, pkt_len)
-        if b: self.__timer.set_timeout(session_id, self.__SESSION_TIMEOUT)
 
+        if b:
+            self.modify_session(session_id, fileno, address)
+            self.__timer.set_timeout(session_id, self.__SESSION_TIMEOUT)
         return b

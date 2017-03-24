@@ -26,49 +26,54 @@ class ip4_p2p_proxy(object):
 
     def add_frag(self, mbuf):
         mbuf.offset = 4
-        uniq_id = utils.bytes2number(mbuf.get_part(2))
+        byte_uniq_id = mbuf.get_part(2)
 
         mbuf.offset = 6
         frag_off = utils.bytes2number(mbuf.get_part(2))
-        df = 0x4000 >> 12
-        mf = 0x2000 >> 11
+        df = 0x4000 >> 14
+        mf = 0x2000 >> 13
         offset = frag_off & 0x1fff
 
+        mbuf.offset = 12
+        saddr = mbuf.get_part(4)
+
         # 处理部分包只有一个分包的情况
-        if df or (offset == 0 and mf == 0):
-            daddr, dport = self.__get_pkt_addr_info(mbuf)
+        if df or (df == 0 and offset == 0 and mf == 0):
+            saddr, daddr, sport, dport = self.__get_pkt_addr_info(mbuf)
+            if dport == 0: return
             content = self.__get_transfer_content(mbuf)
-            self.__ok_packets.append((daddr, dport, content,))
+            self.__ok_packets.append((saddr, daddr, sport, dport, content,))
             return
 
-        if offset % 8 != 0: return
         # 限制分包数目
         if offset > 2048: return
 
+        _id = b"".join([saddr, byte_uniq_id])
         if offset == 0:
             saddr, daddr, sport, dport = self.__get_pkt_addr_info(mbuf)
+            if dport == 0: return
             content = self.__get_transfer_content(mbuf)
 
-            self.__frag_data[uniq_id] = (saddr, daddr, sport, dport, [content, ])
-            self.__timer.set_timeout(uniq_id, self.__TIMEOUT)
+            self.__frag_data[_id] = (saddr, daddr, sport, dport, [content, ])
+            self.__timer.set_timeout(_id, self.__TIMEOUT)
 
             return
-        elif uniq_id not in self.__frag_data:
+        elif _id not in self.__frag_data:
             return
 
         else:
             content = self.__get_transfer_content(mbuf, is_off=True)
-            _, _, frag_pkts = self.__frag_data[uniq_id]
+            _, _, frag_pkts = self.__frag_data[_id]
             frag_pkts.append(content)
 
         if mf != 0: return
 
-        saddr, daddr, sport, dport, frag_pkts = self.__frag_data[uniq_id]
+        saddr, daddr, sport, dport, frag_pkts = self.__frag_data[_id]
 
         self.__ok_packets.append(saddr, daddr, sport, dport, b"".join(frag_pkts))
-        self.__timer.drop(uniq_id)
+        self.__timer.drop(_id)
 
-        del self.__frag_data[uniq_id]
+        del self.__frag_data[_id]
 
     def get_data(self):
         self.recycle()
@@ -83,7 +88,7 @@ class ip4_p2p_proxy(object):
         :return:
         """
         mbuf.offset = 0
-        n = mbuf.get_part(0)
+        n = mbuf.get_part(1)
         hdrlen = (n & 0x0f) * 4
 
         mbuf.offset = hdrlen + 2
@@ -113,7 +118,7 @@ class ip4_p2p_proxy(object):
 
     def __get_pkt_hdr_len(self, mbuf):
         mbuf.offset = 0
-        n = mbuf.get_part(0)
+        n = mbuf.get_part(1)
         hdrlen = (n & 0x0f) * 4
 
         return hdrlen

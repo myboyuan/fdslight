@@ -17,6 +17,7 @@ import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.handlers.tunnelc as tunnelc
 import freenet.lib.file_parser as file_parser
 import freenet.handlers.traffic_pass as traffic_pass
+import freenet.lib.logging as logging
 import dns.resolver
 
 _MODE_GW = 1
@@ -24,11 +25,12 @@ _MODE_LOCAL = 2
 
 PID_FILE = "/tmp/fdslight.pid"
 LOG_FILE = "/tmp/fdslight.log"
+ERR_FILE = "/tmp/fdslight_error.log"
 
 
 class _fdslight_client(dispatcher.dispatcher):
     # 路由超时时间
-    __ROUTER_TIMEOUT = 800
+    __ROUTER_TIMEOUT = 1200
 
     __routers = None
 
@@ -140,9 +142,8 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__crypto_configs = crypto_configs
 
         if not debug:
-            fd = open(LOG_FILE, "a+")
-            sys.stderr = fd
-            sys.stdout = fd
+            sys.stderr = open(LOG_FILE, "a+")
+            sys.stdout = open(ERR_FILE, "a+")
         ''''''
 
     def __load_kernel_mod(self):
@@ -176,7 +177,11 @@ class _fdslight_client(dispatcher.dispatcher):
         os.system("insmod fdslight_dgram.ko")
         os.chdir("../")
 
-    def handle_msg_from_tun(self, message):
+    def handle_msg_from_tundev(self, message):
+        """处理来TUN设备的数据包
+        :param message:
+        :return:
+        """
         self.__mbuf.copy2buf(message)
         ip_ver = self.__mbuf.ip_version()
 
@@ -212,6 +217,34 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__update_router_access(sts_daddr)
         self.send_msg_to_tunnel(action, message)
 
+    def handle_msg_from_dgramdev(self, message):
+        """处理来自fdslight dgram设备的数据包
+        :param message:
+        :return:
+        """
+        self.__mbuf.copy2buf(message)
+        ip_ver = self.__mbuf.ip_version()
+        is_ipv6 = False
+
+        if ip_ver == 4:
+            self.__mbuf.offset = 16
+            fa = socket.AF_INET
+            n = 4
+        else:
+            self.__mbuf.offset = 24
+            fa = socket.AF_INET6
+            n = 16
+            is_ipv6 = True
+
+        byte_daddr = self.__mbuf.get_part(n)
+        sts_daddr = socket.inet_ntop(fa, byte_daddr)
+
+        if sts_daddr not in self.__routers:
+            self.set_router(sts_daddr, timeout=190, is_ipv6=is_ipv6, is_dynamic=True)
+        else:
+            self.__update_router_access(sts_daddr, timeout=190)
+        self.send_msg_to_tunnel(proto_utils.ACT_DATA, message)
+
     def handle_msg_from_tunnel(self, seession_id, action, message):
         if seession_id != self.session_id: return
         if action not in proto_utils.ACTS: return
@@ -223,6 +256,7 @@ class _fdslight_client(dispatcher.dispatcher):
         ip_ver = self.__mbuf.ip_version()
         if ip_ver not in (4, 6,): return
 
+        """
         if ip_ver == 4:
             self.__mbuf.offset = 12
             byte_saddr = self.__mbuf.get_part(4)
@@ -235,6 +269,8 @@ class _fdslight_client(dispatcher.dispatcher):
         host = socket.inet_ntop(fa, byte_saddr)
 
         self.__update_router_access(host)
+        """
+
         self.send_msg_to_tun(message)
 
     def send_msg_to_tunnel(self, action, message):
@@ -359,7 +395,7 @@ class _fdslight_client(dispatcher.dispatcher):
         names = self.__router_timer.get_timeout_names()
         for name in names: self.__del_router(name)
 
-    def set_router(self, host, is_ipv6=False, is_dynamic=True):
+    def set_router(self, host, timeout=None, is_ipv6=False, is_dynamic=True):
         if host in self.__routers: return
 
         if is_ipv6:
@@ -371,7 +407,9 @@ class _fdslight_client(dispatcher.dispatcher):
 
         if not is_dynamic: return
 
-        self.__router_timer.set_timeout(host, self.__ROUTER_TIMEOUT)
+        if not timeout:
+            timeout = self.__ROUTER_TIMEOUT
+        self.__router_timer.set_timeout(host, timeout)
         self.__routers[host] = is_ipv6
 
     def __del_router(self, host):
@@ -387,13 +425,16 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__router_timer.drop(host)
         del self.__routers[host]
 
-    def __update_router_access(self, host):
+    def __update_router_access(self, host, timeout=None):
         """更新路由访问时间
         :param host:
+        :param timeout:如果没有指定,那么使用默认超时
         :return:
         """
         if host not in self.__routers: return
-        self.__router_timer.set_timeout(host, self.__ROUTER_TIMEOUT)
+        if not timeout:
+            timeout = self.__ROUTER_TIMEOUT
+        self.__router_timer.set_timeout(host, timeout)
 
     def __exit(self, signum, frame):
         if self.handler_exists(self.__dns_fileno):
@@ -413,8 +454,7 @@ class _fdslight_client(dispatcher.dispatcher):
         """
         if self.__mode == _MODE_GW:
             self.get_handler(self.__dgram_fetch_fileno).set_tunnel_ip(ip)
-        else:
-            return
+        return
 
 
 def __start_service(mode, debug):
@@ -433,7 +473,14 @@ def __start_service(mode, debug):
     configs = configfile.ini_parse_from_file(config_path)
 
     cls = _fdslight_client()
-    cls.ioloop(mode, debug, configs)
+
+    if debug:
+        cls.ioloop(mode, debug, configs)
+        return
+    try:
+        cls.ioloop(mode, debug, configs)
+    except:
+        logging.print_error()
 
 
 def __stop_service():
