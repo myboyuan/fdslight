@@ -102,10 +102,13 @@ class _fdslight_client(dispatcher.dispatcher):
 
         if self.__mode == _MODE_GW:
             self.__load_kernel_mod()
-            self.__dgram_fetch_fileno = self.create_handler(
-                -1, traffic_pass.traffic_read,
-                self.__configs["gateway"]
-            )
+            udp_global = bool(int(gateway["dgram_global_proxy"]))
+            if udp_global:
+                self.__dgram_fetch_fileno = self.create_handler(
+                    -1, traffic_pass.traffic_read,
+                    self.__configs["gateway"]
+                )
+            ''''''
         else:
             local = configs["local"]
             vir_dns = local["virtual_dns"]
@@ -141,15 +144,16 @@ class _fdslight_client(dispatcher.dispatcher):
             sys.stderr = fd
             sys.stdout = fd
         ''''''
+
     def __load_kernel_mod(self):
         os.chdir("driver")
         if not os.path.isfile("fdslight_dgram.ko"):
             print("you must install this software")
             sys.exit(-1)
 
-        fpath = "fdslight_etc/kern_version"
+        fpath = "../fdslight_etc/kern_version"
         if not os.path.isfile(fpath):
-            print("you must install this software")
+            print("you must install this softwar")
             sys.exit(-1)
 
         with open(fpath, "r") as f:

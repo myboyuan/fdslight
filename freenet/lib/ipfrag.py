@@ -46,7 +46,7 @@ class ip4_p2p_proxy(object):
         if offset > 2048: return
 
         if offset == 0:
-            saddr, daddr, sport, dport = self.__get_pkt_dst_info(mbuf)
+            saddr, daddr, sport, dport = self.__get_pkt_addr_info(mbuf)
             content = self.__get_transfer_content(mbuf)
 
             self.__frag_data[uniq_id] = (saddr, daddr, sport, dport, [content, ])

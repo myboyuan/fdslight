@@ -241,7 +241,7 @@ static unsigned int handle_ipv4_dgram_in(struct iphdr *ip_header)
 
 	if(!is_set_subnet) return NF_ACCEPT;
 
-	if(is_set_tunnel_addr && 0==memcmp(fdsl_tunnel_addr,(char *)(&daddr),4)) 
+	if(is_set_tunnel_addr && 0==memcmp(fdsl_tunnel_addr,(char *)(&daddr),4))
 		return NF_ACCEPT;
 
 	if(!fdsl_is_subnet((char *)(&saddr),0)) return NF_ACCEPT;
@@ -292,7 +292,6 @@ static unsigned int nf_handle_in(
 	if(!flock_flag) return NF_ACCEPT;
 	if(!skb) return NF_ACCEPT;
 	if(!is_set_tunnel_addr && !is_set_tunnel_addr6) return NF_ACCEPT;
-
 	ip_header=(struct iphdr *)skb_network_header(skb);
 
 	if(!ip_header) return NF_ACCEPT;

@@ -18,7 +18,7 @@ class builder(object):
     __session_id = 0
     __fixed_header_size = 0
     # 数据块大小
-    __block_size = 1100
+    __block_size = 1150
 
     def __init__(self, fixed_header_size):
         if fixed_header_size < MIN_FIXED_HEADER_SIZE: raise ValueError(

@@ -41,29 +41,30 @@ class traffic_read(handler.handler):
     __tunnel_fd = -1
     __qos = None
 
-    def init_func(self, creator_fd,gw_configs):
+    def init_func(self, creator_fd, gw_configs):
         """
         :param creator_fd:
         :param tunnel_ip: 隧道IPV4或者IPV6地址
         :param gw_configs:
         :return:
         """
-        enable_ipv6 = bool(int(gw_configs["enable_ipv6"]))
         dgram_proxy_subnet, prefix = utils.extract_subnet_info(gw_configs["dgram_proxy_subnet"])
         dgram_proxy_subnet6, prefix6 = utils.extract_subnet_info(gw_configs["dgram_proxy_subnet6"])
 
         dev_path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
         fileno = os.open(dev_path, os.O_RDONLY)
 
-        byte_subnet = utils.calc_subnet(dgram_proxy_subnet, prefix, is_ipv6=False)
-        byte_subnet6 = utils.calc_subnet(dgram_proxy_subnet6, prefix6, is_ipv6=True)
+        subnet = utils.calc_subnet(dgram_proxy_subnet, prefix, is_ipv6=False)
+        subnet6 = utils.calc_subnet(dgram_proxy_subnet6, prefix6, is_ipv6=True)
+
+        byte_subnet = socket.inet_aton(subnet)
+        byte_subnet6 = socket.inet_pton(socket.AF_INET6, subnet6)
 
         r = fdsl_ctl.set_udp_proxy_subnet(fileno, byte_subnet, prefix, False)
-        if enable_ipv6:
-            r = fdsl_ctl.set_udp_proxy_subnet(
-                fileno, byte_subnet6,
-                prefix, True
-            )
+        r = fdsl_ctl.set_udp_proxy_subnet(
+            fileno, byte_subnet6,
+            prefix, True
+        )
 
         self.__tunnel_fd = creator_fd
         self.__qos = _qos()
@@ -94,6 +95,7 @@ class traffic_read(handler.handler):
         for i in range(20):
             try:
                 pkt = os.read(self.fileno, 8192)
+                print(pkt)
             except BlockingIOError:
                 break
             if not pkt: continue
