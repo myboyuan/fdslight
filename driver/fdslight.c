@@ -47,6 +47,12 @@ static char fdsl_tunnel_addr6[6];
 static struct fdsl_subnet subnet;
 static struct fdsl_subnet subnet6;
 
+static char is_set_tunnel_addr=0;
+static char is_set_tunnel_addr6=0;
+
+static char is_set_subnet=0;
+static char is_set_subnet6=0;
+
 static void calc_subnet(char *buf,char *ipaddress,unsigned char prefix,char is_ipv6)
 // 计算IP地址子网
 {
@@ -104,6 +110,9 @@ static int fdsl_set_udp_proxy_subnet(unsigned long arg)
 	t->is_ipv6=tmp.is_ipv6;
 	t->prefix=tmp.prefix;
 
+	if(t->is_ipv6) is_set_subnet6=1;
+	else is_set_subnet=1;
+
     return 0;
 }
 
@@ -114,8 +123,13 @@ static int fdsl_set_tunnel(unsigned long arg)
 	int err=copy_from_user(&tmp,(unsigned long *)arg,sizeof(struct fdsl_address));
     if(err) return -EINVAL;
 
-	if(tmp.is_ipv6) memcpy(fdsl_tunnel_addr6,tmp.address,16);
-	else memcpy(fdsl_tunnel_addr,tmp,4);
+	if(tmp.is_ipv6) {
+		memcpy(fdsl_tunnel_addr6,tmp.address,16);
+		is_set_tunnel_addr6=1;
+	}else {
+		memcpy(fdsl_tunnel_addr,tmp,4);
+		is_set_tunnel_addr=1;
+	}
 
 	return 0;
 }
@@ -203,6 +217,17 @@ static unsigned int fdsl_push_ipv4_packet_to_user(struct iphdr *ip_header)
     return NF_DROP;
 }
 
+static unsigned int fdsl_push_ipv6_packet_to_user(struct ipv6hdr *ip6_header)
+{
+	unsigned short data_len=ntohs(ip6_header->payload_len)+40;
+	err=fdsl_queue_push(r_queue,(char *)ip6_header,data_len);
+	if(err) return NF_ACCEPT;
+
+	wake_up_interruptible(&poll->inq);
+
+	return NF_ACCEPT;
+}
+
 static unsigned int handle_ipv4_dgram_in(struct iphdr *ip_header)
 // 处理UDP
 {
@@ -212,14 +237,26 @@ static unsigned int handle_ipv4_dgram_in(struct iphdr *ip_header)
     saddr=ntohl(saddr);
 	daddr=ntohl(daddr);
 
+	if(!is_set_subnet || !is_set_tunnel_addr) return NF_ACCEPT;
+
 	if(0==memcmp(fdsl_tunnel_addr,(char *)(&daddr),4)) return NF_ACCEPT;
 	if(!fdsl_is_subnet((char *)(&saddr),0)) return NF_ACCEPT;
 
     return fdsl_push_ipv4_packet_to_user(ip_header);
 }
 
-static unsigned int handle_ipv6_dgram_in(struct ipv6hdr *ip_header){
-	return NF_ACCEPT;
+static unsigned int handle_ipv6_dgram_in(struct ipv6hdr *ip6_header)
+{
+	unsigned char *sadrr=(ip6_header->saddr).s6_addr;
+	unsigned char *daddr=(ip6_header->daddr).s6_addr;
+
+	if(!is_set_tunnel_addr6 || !is_set_subnet6) return NF_ACCEPT;
+
+	if(0==memcmp(fdsl_tunnel_addr6,daddr,16)) return NF_ACCEPT;
+	if(!fdsl_is_subnet(saddr,1)) return NF_ACCEPT;
+
+
+	return fdsl_push_ipv6_packet_to_user(ip6_header);
 }
 
 static unsigned int nf_handle_in(
