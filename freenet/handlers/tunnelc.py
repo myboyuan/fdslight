@@ -80,11 +80,12 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         logging.print_general("disconnect", self.__server_address)
 
     def tcp_error(self):
+        logging.print_general("tcp_error", self.__server_address)
         self.delete_handler(self.fileno)
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
-            logging.print_general("connect_timeout", self.__server_address)
+            logging.print_general("connecting_timeout", self.__server_address)
             self.delete_handler(self.fileno)
             return
 
@@ -92,6 +93,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
         if t - self.__update_time > self.__conn_timeout:
             self.delete_handler(self.fileno)
+            logging.print_general("connected_timeout", self.__server_address)
             return
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
@@ -143,6 +145,7 @@ class udp_tunnel(udp_handler.udp_handler):
         s = socket.socket(fa, socket.SOCK_DGRAM)
 
         self.set_socket(s)
+
         self.__conn_timeout = conn_timeout
         self.__sent_queue = []
 
@@ -184,11 +187,13 @@ class udp_tunnel(udp_handler.udp_handler):
         self.remove_evt_write(self.fileno)
 
     def udp_error(self):
+        logging.print_general("udp_error", self.__server_address)
         self.delete_handler(self.fileno)
 
     def udp_timeout(self):
         t = time.time()
         if t - self.__update_time > self.__conn_timeout:
+            logging.print_general("udp_timeout", self.__server_address)
             self.delete_handler(self.fileno)
             return
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)

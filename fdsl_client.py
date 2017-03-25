@@ -395,7 +395,7 @@ class _fdslight_client(dispatcher.dispatcher):
         if host in self.__routers: return
 
         # 如果禁止了IPV6流量,那么不设置IPV6路由
-        if not self.__enable_ipv6_traffic: return
+        if not self.__enable_ipv6_traffic and is_ipv6: return
         if is_ipv6:
             cmd = "route add -A inet6 %s/128 dev %s" % (host, self.__DEVNAME)
         else:
