@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.lib.timer as timer
-import socket, random
-import dns.message
+import socket, random, sys
+
+try:
+    import dns.message
+except ImportError:
+    print("please install dnspython3 module")
+    sys.exit(-1)
+
 import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.ippkts as ippkts

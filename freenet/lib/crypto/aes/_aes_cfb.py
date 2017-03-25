@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends import default_backend
+import sys
+
+try:
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    from cryptography.hazmat.backends import default_backend
+except ImportError:
+    print("please install cryptography module")
+    sys.exit(-1)
 
 
 def encrypt(key, iv, byte_data):

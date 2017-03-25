@@ -133,6 +133,8 @@ class udp_tunnel(udp_handler.udp_handler):
     __conn_timeout = 0
     __sent_queue = None
 
+    __server_address = None
+
     def init_func(self, creator, crypto, crypto_configs, conn_timeout=720, is_ipv6=False):
         if is_ipv6:
             fa = socket.AF_INET6
@@ -157,7 +159,11 @@ class udp_tunnel(udp_handler.udp_handler):
         try:
             self.connect((server_ip, server_address[1]))
         except socket.gaierror:
+            logging.print_general("not_found_host", server_address)
             return False
+
+        self.__server_address = server_address
+        logging.print_general("udp_open", server_address)
 
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
         self.__update_time = time.time()
@@ -191,6 +197,7 @@ class udp_tunnel(udp_handler.udp_handler):
         self.unregister(self.fileno)
         self.dispatcher.tell_tunnel_close()
         self.close()
+        logging.print_general("udp_close", self.__server_address)
 
     def send_msg_to_tunnel(self, session_id, action, message):
         ippkts = self.__encrypt.build_packets(session_id, action, message)

@@ -147,8 +147,8 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__crypto_configs = crypto_configs
 
         if not debug:
-            sys.stderr = open(LOG_FILE, "a+")
-            sys.stdout = open(ERR_FILE, "a+")
+            sys.stdout = open(LOG_FILE, "a+")
+            sys.stderr = open(ERR_FILE, "a+")
         ''''''
 
     def __load_kernel_mod(self):
