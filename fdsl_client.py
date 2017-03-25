@@ -151,6 +151,8 @@ class _fdslight_client(dispatcher.dispatcher):
             sys.stderr = open(ERR_FILE, "a+")
         ''''''
 
+        signal.signal(signal.SIGUSR1, self.__set_host_rules)
+
     def __load_kernel_mod(self):
         os.chdir("driver")
         if not os.path.isfile("fdslight_dgram.ko"):
@@ -179,6 +181,10 @@ class _fdslight_client(dispatcher.dispatcher):
         os.system("echo 1 > /proc/sys/net/ipv4/ip_forward")
         # 禁止接收ICMP redirect 包,防止客户端机器选择最佳路由
         os.system("echo 0 | tee /proc/sys/net/ipv4/conf/*/send_redirects > /dev/null")
+
+        if self.__enable_ipv6_traffic:
+            os.system("echo 1 >/proc/sys/net/ipv6/conf/all/forwarding")
+
         os.system("insmod fdslight_dgram.ko")
         os.chdir("../")
 
@@ -261,21 +267,6 @@ class _fdslight_client(dispatcher.dispatcher):
         ip_ver = self.__mbuf.ip_version()
         if ip_ver not in (4, 6,): return
 
-        """
-        if ip_ver == 4:
-            self.__mbuf.offset = 12
-            byte_saddr = self.__mbuf.get_part(4)
-            fa = socket.AF_INET
-        else:
-            self.__mbuf.offset = 8
-            byte_saddr = self.__mbuf.get_part(16)
-            fa = socket.AF_INET6
-
-        host = socket.inet_ntop(fa, byte_saddr)
-
-        self.__update_router_access(host)
-        """
-
         self.send_msg_to_tun(message)
 
     def send_msg_to_tunnel(self, action, message):
@@ -339,6 +330,8 @@ class _fdslight_client(dispatcher.dispatcher):
 
     def __set_host_rules(self, signum, frame):
         fpath = "fdslight_etc/host_rules.txt"
+
+        print("set rules")
 
         if not os.path.isfile(fpath):
             print("cannot found host_rules.txt")
