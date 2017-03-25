@@ -98,7 +98,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         self.__update_time = time.time()
 
     def tcp_writable(self):
-        self.remove_evt_read(self.fileno)
+        self.remove_evt_write(self.fileno)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)

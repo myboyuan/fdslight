@@ -51,7 +51,6 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         self.__decrypt.input(rdata)
 
         while self.__decrypt.can_continue_parse():
-            print("SSSS")
             try:
                 self.__decrypt.parse()
             except proto_utils.ProtoError:
@@ -106,7 +105,6 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
     def send_msg_to_tunnel(self, session_id, action, message):
         sent_pkt = self.__encrypt.build_packet(session_id, action, message)
-
         if not self.is_conn_ok():
             self.__sent_queue.append(sent_pkt)
         else:
