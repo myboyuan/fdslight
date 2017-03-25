@@ -531,6 +531,7 @@ def main():
         print(help_doc)
         return
     if u == "host_rules":
+        print("hekki")
         __update_host_rules()
         return
 
