@@ -58,7 +58,7 @@ class _fdslight_client(dispatcher.dispatcher):
     __crypto_configs = None
 
     __support_ip4_protocols = (1, 6, 17, 132, 136,)
-    __support_ip6_protocols = (6, 7, 17, 44, 58, 132, 136,)
+    __support_ip6_protocols = (6, 17, 58, 132, 136,)
 
     __dgram_fetch_fileno = -1
 
