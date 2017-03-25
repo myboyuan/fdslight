@@ -331,8 +331,6 @@ class _fdslight_client(dispatcher.dispatcher):
     def __set_host_rules(self, signum, frame):
         fpath = "fdslight_etc/host_rules.txt"
 
-        print("set rules")
-
         if not os.path.isfile(fpath):
             print("cannot found host_rules.txt")
             self.__exit(signum, frame)
@@ -531,7 +529,6 @@ def main():
         print(help_doc)
         return
     if u == "host_rules":
-        print("hekki")
         __update_host_rules()
         return
 
