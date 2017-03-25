@@ -191,7 +191,7 @@ class nat66(object):
         mbuf.offset = 6
         nexthdr = mbuf.get_part(1)
 
-        if nexthdr in ((6, 7, 17, 132, 136,)): return True
+        if nexthdr in ((6, 7, 17, 43, 132, 136,)): return True
         if nexthdr != socket.IPPROTO_ICMPV6: return False
 
         # 检查ICMPv6类型是否支持NAT
@@ -221,6 +221,7 @@ class nat66(object):
             n += 1
 
         return n_session_id
+
 
     def get_nat(self, session_id, mbuf):
         if not self.__is_support_nat(mbuf, is_req=True): return False
