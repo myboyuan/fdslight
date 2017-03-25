@@ -147,7 +147,7 @@ class nat66(object):
         self.__byte_local_ip6 = socket.inet_pton(socket.AF_INET6, local_ip6)
         self.__nat = {}
         self.__nat_reverse = {}
-        self.__ip6_fragment = ipfrag.nat66()
+        #self.__ip6_fragment = ipfrag.nat66()
 
     def __get_nat_id(self, mbuf, is_req=True):
         mbuf.offset = 8

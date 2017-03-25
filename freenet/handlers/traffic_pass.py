@@ -12,11 +12,12 @@ class traffic_read(handler.handler):
     """读取局域网的源数据包"""
     __tunnel_fd = -1
 
-    def init_func(self, creator_fd, gw_configs):
+    def init_func(self, creator_fd, gw_configs, enable_ipv6=False):
         """
         :param creator_fd:
         :param tunnel_ip: 隧道IPV4或者IPV6地址
         :param gw_configs:
+        :param enable_ipv6:是否开启ipv6支持
         :return:
         """
         dgram_proxy_subnet, prefix = utils.extract_subnet_info(gw_configs["dgram_proxy_subnet"])
@@ -33,11 +34,11 @@ class traffic_read(handler.handler):
 
         r = fdsl_ctl.set_udp_proxy_subnet(fileno, byte_subnet, prefix, False)
 
-        r = fdsl_ctl.set_udp_proxy_subnet(
-            fileno, byte_subnet6,
-            prefix, True
-        )
-
+        if enable_ipv6:
+            r = fdsl_ctl.set_udp_proxy_subnet(
+                fileno, byte_subnet6,
+                prefix, True
+            )
         self.__tunnel_fd = creator_fd
 
         self.set_fileno(fileno)

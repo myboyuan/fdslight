@@ -62,6 +62,9 @@ class _fdslight_client(dispatcher.dispatcher):
 
     __dgram_fetch_fileno = -1
 
+    # 是否开启IPV6流量
+    __enable_ipv6_traffic = False
+
     def init_func(self, mode, debug, configs):
         self.create_poll()
 
@@ -86,6 +89,8 @@ class _fdslight_client(dispatcher.dispatcher):
         public = configs["public"]
         gateway = configs["gateway"]
 
+        self.__enable_ipv6_traffic = bool(int(public["enable_ipv6_traffic"]))
+
         is_ipv6 = utils.is_ipv6_address(public["remote_dns"])
 
         if self.__mode == _MODE_GW:
@@ -108,7 +113,7 @@ class _fdslight_client(dispatcher.dispatcher):
             if udp_global:
                 self.__dgram_fetch_fileno = self.create_handler(
                     -1, traffic_pass.traffic_read,
-                    self.__configs["gateway"]
+                    self.__configs["gateway"], enable_ipv6=self.__enable_ipv6_traffic
                 )
             ''''''
         else:
@@ -398,8 +403,10 @@ class _fdslight_client(dispatcher.dispatcher):
     def set_router(self, host, timeout=None, is_ipv6=False, is_dynamic=True):
         if host in self.__routers: return
 
+        # 如果禁止了IPV6流量,那么不设置IPV6路由
+        if not self.__enable_ipv6_traffic: return
         if is_ipv6:
-            cmd = "route add -A inet6 -host %s dev %s" % (host, self.__DEVNAME)
+            cmd = "route add -A inet6 %s/128 dev %s" % (host, self.__DEVNAME)
         else:
             cmd = "route add -host %s dev %s" % (host, self.__DEVNAME)
 
@@ -417,7 +424,7 @@ class _fdslight_client(dispatcher.dispatcher):
         is_ipv6 = self.__routers[host]
 
         if is_ipv6:
-            cmd = "route del -A inet6 -host %s dev %s" % (host, self.__DEVNAME)
+            cmd = "route del -A inet6 %s/128 dev %s" % (host, self.__DEVNAME)
         else:
             cmd = "route del -host %s dev %s" % (host, self.__DEVNAME)
 

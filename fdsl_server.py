@@ -122,11 +122,11 @@ class _fdslight_server(dispatcher.dispatcher):
 
         if enable_ipv6:
             self.__tcp6_fileno = self.create_handler(
-                -1, tunnels.tcp_handler,
+                -1, tunnels.tcp_tunnel,
                 listen6_tcp, self.__tcp_crypto, self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=True
             )
             self.__udp6_fileno = self.create_handler(
-                -1, tunnels.udp_handler,
+                -1, tunnels.udp_tunnel,
                 listen6_udp, self.__udp_crypto, self.__crypto_configs, is_ipv6=True
             )
 
@@ -210,6 +210,7 @@ class _fdslight_server(dispatcher.dispatcher):
         if not self.__enable_nat66: return False
         self.__mbuf.offset = 6
         nexthdr = self.__mbuf.get_part(1)
+
         if nexthdr not in self.__support_ip6_protocols: return False
 
         b = self.__nat6.get_nat(session_id, self.__mbuf)
@@ -306,7 +307,7 @@ class _fdslight_server(dispatcher.dispatcher):
         :return:
         """
         # 添加一条到tun设备的IPv6路由
-        cmd = "route add -A inet6 -host %s dev %s" % (ip6address, self.__DEVNAME)
+        cmd = "route add -A inet6 %s/128 dev %s" % (ip6address, self.__DEVNAME)
         os.system(cmd)
         # 开启IPV6流量重定向
         os.system("echo 1 >/proc/sys/net/ipv6/conf/all/forwarding")
