@@ -62,7 +62,7 @@ class access(object):
         self.__sessions[session_id] = [fileno, username, address, priv_data, ]
         self.__timer.set_timeout(session_id, self.__SESSION_TIMEOUT)
         self.__dispatcher.tell_register_session(session_id)
-        logging.print_general("add_session", address)
+        logging.print_general("add_session:%s" % username, address)
 
     def get_session_info(self, session_id):
         if session_id not in self.__sessions: return None
@@ -81,7 +81,7 @@ class access(object):
         fileno, username, address, priv_data = self.__sessions[session_id]
         self.__dispatcher.tell_unregister_session(session_id)
 
-        logging.print_general("del_session",address)
+        logging.print_general("del_session:%s" % username, address)
         del self.__sessions[session_id]
 
     def modify_session(self, session_id, fileno, address):

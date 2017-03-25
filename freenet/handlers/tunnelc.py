@@ -8,6 +8,7 @@ import socket, time
 import freenet.lib.utils as proto_utils
 import freenet.lib.logging as logging
 
+
 class tcp_tunnel(tcp_handler.tcp_handler):
     __encrypt = None
     __decrypt = None
@@ -16,6 +17,8 @@ class tcp_tunnel(tcp_handler.tcp_handler):
     __update_time = 0
     __conn_timeout = 0
     __sent_queue = None
+
+    __server_address = None
 
     def init_func(self, creator, crypto, crypto_configs, conn_timeout=720, is_ipv6=False):
         if is_ipv6:
@@ -40,10 +43,13 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         server_ip = self.dispatcher.get_server_ip(server_address[0])
 
         try:
-            self.connect((server_ip, server_address[1]),timeout=8)
+            self.connect((server_ip, server_address[1]), timeout=8)
+            logging.print_general("connecting", server_address)
         except socket.gaierror:
+            logging.print_general("not_found_host", server_address)
             return False
 
+        self.__server_address = server_address
         return True
 
     def tcp_readable(self):
@@ -71,12 +77,14 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         self.dispatcher.tell_tunnel_close()
         self.unregister(self.fileno)
         self.close()
+        logging.print_general("disconnect", self.__server_address)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
+            logging.print_general("connect_timeout", self.__server_address)
             self.delete_handler(self.fileno)
             return
 
@@ -92,6 +100,8 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+
+        logging.print_general("connected", self.__server_address)
 
         # 发送还没有连接的时候堆积的数据包
         if not self.__sent_queue: self.add_evt_write(self.fileno)
@@ -185,7 +195,6 @@ class udp_tunnel(udp_handler.udp_handler):
     def send_msg_to_tunnel(self, session_id, action, message):
         ippkts = self.__encrypt.build_packets(session_id, action, message)
         self.__encrypt.reset()
-
 
         for ippkt in ippkts: self.send(ippkt)
 

@@ -375,7 +375,11 @@ class _fdslight_server(dispatcher.dispatcher):
     def __exit(self, signum, frame):
         if self.handler_exists(self.__dns_fileno):
             self.delete_handler(self.__dns_fileno)
-        sys.exit(-1)
+        if self.handler_exists(self.__tcp6_fileno):
+            self.delete_handler(self.__tcp6_fileno)
+        if self.handler_exists(self.__tcp_fileno):
+            self.delete_handler(self.__tcp_fileno)
+        sys.exit(0)
 
 
 def __start_service(debug):
