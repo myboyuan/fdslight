@@ -232,7 +232,6 @@ def modify_icmp6_echo_for_change(byte_ip, new_icmpid, mbuf, flags=0):
 
     mbuf.replace(utils.number2bytes(csum, 2))
 
-
 __IP_HDR_SIZE = 20
 
 
