@@ -429,6 +429,10 @@ class _fdslight_server(dispatcher.dispatcher):
             self.delete_handler(self.__tcp6_fileno)
         if self.handler_exists(self.__tcp_fileno):
             self.delete_handler(self.__tcp_fileno)
+
+        for ip6host in self.__ip6_routers:
+            self.__del_ip6_router(ip6host)
+
         sys.exit(0)
 
 
