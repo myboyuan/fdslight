@@ -343,6 +343,7 @@ class _fdslight_server(dispatcher.dispatcher):
         cmd = "route add -A inet6 %s/128 dev %s" % (ip6host, nat_config["eth_name"])
         os.system(cmd)
         self.__router6_timer.set_timeout(ip6host, self.__IP6_ROUTER_TIMEOUT)
+        self.__ip6_routers[ip6host] = None
 
     def __update_ip6_router(self, ip6host):
         if ip6host not in self.__ip6_routers: return
