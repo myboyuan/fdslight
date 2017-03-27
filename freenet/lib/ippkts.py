@@ -230,6 +230,7 @@ def modify_icmp6_echo_for_change(byte_ip, new_icmpid, mbuf, flags=0):
         csum = fn_utils.calc_incre_csum(csum, icmpid, new_icmpid)
         mbuf.replace(utils.number2bytes(new_icmpid, 2))
 
+    mbuf.offset=42
     mbuf.replace(utils.number2bytes(csum, 2))
 
 __IP_HDR_SIZE = 20
