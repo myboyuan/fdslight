@@ -134,6 +134,9 @@ class wsgi(object):
 
     def handle(self):
         if self.__is_finish:
+            if not self.__is_resp_hdr:
+                self.__output_hdr_func(self.__resp_status, self.__resp_headers)
+                self.__is_resp_hdr = True
             self.__finish_func()
             return
         try:
