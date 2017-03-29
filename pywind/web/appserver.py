@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import pywind.evtframework.evt_dispatcher as dispatcher
-import pywind.web.handler.scgi as scgi
+import pywind.web.handlers.scgi as scgi
 
 
 class appserver(dispatcher.dispatcher):

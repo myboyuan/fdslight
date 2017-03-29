@@ -215,7 +215,7 @@ class _request(object):
 
     def __get_post_form_type(self):
         match_set = (
-            "application/x-www-form-urlencoded",
+            "application/x-static-form-urlencoded",
             "multipart/form-data",
             "text/plain",
         )
