@@ -69,21 +69,26 @@ def build_function_call(call_id, namespace, func_name, *args, **kwargs):
     return json.dumps(pydict)
 
 
-def build_function_return(call_id, return_val=None, is_class=False, is_err=False, err_code=None):
+def build_function_return(call_id, return_val=None, is_resource=False, is_err=False, err_code=None):
     """构建函数返回值
+    注意:如果返回值为资源时,返回值只能为Unicode字符串,数字
     :param call_id: 
     :param return_val: 
-    :param is_class:是否是类实例
+    :param is_resource:是否是资源,比如文件,类对象这些需要保存状态的对象
     :param is_err:是否发生故障
     :param err_code:故障码
     :return: 
     """
+    if is_resource:
+        if not isinstance(return_val, int) and not isinstance(return_val, str):
+            raise ProtocolErr("the return value must be string or int when it is resource")
+
     pydict = {
         "call_id": call_id,
         "return": return_val,
         "is_err": is_err,
         "err_code": err_code,
-        "is_class": is_class
+        "is_resource": is_resource
     }
 
     return json.dumps(pydict)

@@ -3,15 +3,42 @@
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.RPC.lib.protocol as rpc_protocol
 
-import time
+import time, socket
 
 
 class rpcd_listener(tcp_handler.tcp_handler):
-    def init_func(self, creator, listen_address):
-        pass
+    def init_func(self, creator, listen_address, is_ipv6=False):
+        if is_ipv6:
+            fa = socket.AF_INET6
+        else:
+            fa = socket.AF_INET
+
+        s = socket.socket(fa, socket.SOCK_STREAM)
+
+        if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+
+        self.set_socket(s)
+        self.bind(listen_address)
+
+        return self.fileno
+
+    def after(self):
+        self.listen(10)
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
 
     def tcp_accept(self):
-        pass
+        while 1:
+            try:
+                cs, address = self.accept()
+            except BlockingIOError:
+                break
+            self.create_handler(self.fileno, rpc_handler, cs, address)
+        return
+
+    def tcp_delete(self):
+        self.unregister(self.fileno)
+        self.close()
 
 
 class rpc_handler(tcp_handler.tcp_handler):
@@ -159,17 +186,17 @@ class rpc_handler(tcp_handler.tcp_handler):
         """
         pass
 
-    def return_function_result(self, call_id, return_val=None, is_class=False, is_err=None, err_code=None):
+    def return_function_result(self, call_id, return_val=None, is_resource=False, is_err=None, err_code=None):
         """返回函数结果
         :param call_id: 
         :param return_val: 
-        :param is_class:
+        :param is_resource:
         :param is_err: 
         :param err_code: 
         :return: 
         """
         sts = rpc_protocol.build_function_return(
-            call_id, return_val=return_val, is_class=is_class,
+            call_id, return_val=return_val, is_class=is_resource,
             is_err=is_err, err_code=err_code
         )
 
