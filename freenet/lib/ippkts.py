@@ -44,7 +44,7 @@ def modify_ip4address(ip_packet, mbuf, flags=0):
     mbuf.replace(ip_packet)
 
 
-def modify_ip6address_for_nat66(ip_packet, ushort_number, mbuf, flags=0):
+def modify_ip6address(ip_packet, mbuf, flags=0):
     """
     :param ip_packet:
     :param ushort_number:新分配的number,如果是分包,那么这个值任意
@@ -56,7 +56,7 @@ def modify_ip6address_for_nat66(ip_packet, ushort_number, mbuf, flags=0):
     nexthdr = mbuf.get_part(1)
 
     if nexthdr == 58:
-        modify_icmp6_echo_for_change(ip_packet, ushort_number, mbuf, flags=flags)
+        modify_icmp6_echo_for_change(ip_packet, mbuf, flags=flags)
 
     if nexthdr in (6, 17, 132, 136,):
         if nexthdr == 6:
@@ -203,11 +203,10 @@ def _calc_checksum(pacekt, size):
     return (~checksum) & 0xffff
 
 
-def modify_icmp6_echo_for_change(byte_ip, new_icmpid, mbuf, flags=0):
+def modify_icmp6_echo_for_change(byte_ip, mbuf, flags=0):
     """修改ICMPv6报文
     :param byte_ip:
     :param new_icmpid:
-    :param mbuf:
     :param flags:0表示修改请求报文,1表示表示修改响应报文
     :return:
     """
@@ -223,15 +222,9 @@ def modify_icmp6_echo_for_change(byte_ip, new_icmpid, mbuf, flags=0):
 
     csum = calc_checksum_for_ip_change(old_byte_ip, byte_ip, csum, is_ipv6=True)
 
-    mbuf.offset = 44
-    icmpid = utils.bytes2number(mbuf.get_part(2))
-
-    if icmpid != new_icmpid:
-        csum = fn_utils.calc_incre_csum(csum, icmpid, new_icmpid)
-        mbuf.replace(utils.number2bytes(new_icmpid, 2))
-
-    mbuf.offset=42
+    mbuf.offset = 42
     mbuf.replace(utils.number2bytes(csum, 2))
+
 
 __IP_HDR_SIZE = 20
 

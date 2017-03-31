@@ -162,18 +162,6 @@ class dnsd_proxy(dns_base):
         self.del_dns_id_map(dns_id)
         self.__timer.drop(dns_id)
 
-        # 对IPV6数据包进行特殊处理
-        try:
-            msg = dns.message.from_wire(message)
-        except:
-            return
-
-        for rrset in msg.answer:
-            for cname in rrset:
-                ip = cname.__str__()
-                if not utils.is_ipv6_address(ip): continue
-                self.dispatcher.set_ip6_router(ip)
-            ''''''
         self.dispatcher.response_dns(session_id, bytes(L))
 
     def udp_writable(self):

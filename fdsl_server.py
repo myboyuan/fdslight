@@ -19,7 +19,6 @@ import freenet.handlers.tunnels as tunnels
 import freenet.lib.ipfrag as ipfrag
 import freenet.handlers.traffic_pass as traffic_pass
 import freenet.lib.logging as logging
-import pywind.lib.timer as timer
 
 
 class _fdslight_server(dispatcher.dispatcher):
@@ -46,25 +45,20 @@ class _fdslight_server(dispatcher.dispatcher):
     __crypto_configs = None
 
     __support_ip4_protocols = (1, 6, 17, 132, 136,)
-    __support_ip6_protocols = (6, 17, 58, 132, 136,)
+    __support_ip6_protocols = (6, 17, 43, 58, 132, 136,)
 
     __tundev_fileno = -1
 
     __DEVNAME = "fdslight"
 
     # 是否开启NAT66
-    __enable_nat66 = False
+    __enable_nat6 = False
 
     __IP6_ROUTER_TIMEOUT = 900
 
     __ip4fragments = None
 
     __ip4_udp_proxy = None
-
-    # IPV6l路由超时
-    __router6_timer = None
-
-    __ip6_routers = None
 
     def init_func(self, debug, configs):
         self.create_poll()
@@ -74,7 +68,6 @@ class _fdslight_server(dispatcher.dispatcher):
 
         self.__ip4fragments = {}
         self.__ip4_udp_proxy = {}
-        self.__ip6_routers = {}
 
         signal.signal(signal.SIGINT, self.__exit)
 
@@ -167,17 +160,17 @@ class _fdslight_server(dispatcher.dispatcher):
         )
 
         enable_ipv6 = bool(int(nat_config["enable_nat66"]))
-        ip6addr = nat_config["local_ip6"]
+        subnet, prefix = utils.extract_subnet_info(nat_config["virtual_ip6_subnet"])
         eth_name = nat_config["eth_name"]
+        ip6_gw = nat_config["ip6_gw"]
 
         if enable_ipv6:
-            self.__nat6 = nat.nat66(ip6addr)
-            self.__enable_nat66 = True
-            self.__router6_timer = timer.timer()
-            self.__config_gateway6(ip6addr, ip6addr, eth_name)
+            self.__nat6 = nat.nat((subnet, prefix,), is_ipv6=True)
+            self.__enable_nat6 = True
+            self.__config_gateway6(subnet, prefix, ip6_gw, eth_name)
 
         subnet, prefix = utils.extract_subnet_info(nat_config["virtual_ip_subnet"])
-        self.__nat4 = nat.nat((subnet, prefix,))
+        self.__nat4 = nat.nat((subnet, prefix,), is_ipv6=False)
         self.__config_gateway(subnet, prefix, eth_name)
 
         if not debug:
@@ -185,13 +178,8 @@ class _fdslight_server(dispatcher.dispatcher):
             sys.stderr = open(ERR_FILE, "a+")
 
     def myloop(self):
-        if self.__enable_nat66:
+        if self.__enable_nat6:
             self.__nat6.recycle()
-            names = self.__router6_timer.get_timeout_names()
-            for name in names:
-                if not self.__router6_timer.exists(name): continue
-                self.__del_ip6_router(name)
-            ''''''
         self.__nat4.recycle()
         self.__access.access_loop()
         return
@@ -221,22 +209,16 @@ class _fdslight_server(dispatcher.dispatcher):
     def __handle_ipv6data_from_tunnel(self, session_id):
         if self.__mbuf.payload_size < 48: return False
         # 如果NAT66没开启那么丢弃IPV6数据包
-        if not self.__enable_nat66: return False
+        if not self.__enable_nat6: return False
         self.__mbuf.offset = 6
         nexthdr = self.__mbuf.get_part(1)
 
         if nexthdr not in self.__support_ip6_protocols: return False
 
-        b = self.__nat6.get_nat(session_id, self.__mbuf)
+        b = self.__nat6.get_ippkt2sLan_from_cLan(session_id, self.__mbuf)
         if not b: return False
 
         self.__mbuf.offset = 24
-
-        byte_daddr = self.__mbuf.get_part(16)
-        sts_daddr = socket.inet_ntop(socket.AF_INET6, byte_daddr)
-
-        self.__update_ip6_router(sts_daddr)
-
         self.__mbuf.offset = 0
         self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(self.__mbuf.get_data())
 
@@ -280,11 +262,11 @@ class _fdslight_server(dispatcher.dispatcher):
 
         ip_ver = self.__mbuf.ip_version()
 
-        if ip_ver == 6 and not self.__enable_nat66: return
+        if ip_ver == 6 and not self.__enable_nat6: return
         if ip_ver == 4:
             ok, session_id = self.__nat4.get_ippkt2cLan_from_sLan(self.__mbuf)
         else:
-            ok, session_id = self.__nat6.get_nat_reverse(self.__mbuf)
+            ok, session_id = self.__nat6.get_ippkt2cLan_from_sLan(self.__mbuf)
 
         if not ok: return
 
@@ -321,7 +303,7 @@ class _fdslight_server(dispatcher.dispatcher):
         os.system("iptables -t nat -A POSTROUTING -s %s/%s -o %s -j MASQUERADE" % (subnet, prefix, eth_name,))
         os.system("iptables -A FORWARD -s %s/%s -j ACCEPT" % (subnet, prefix))
 
-    def __config_gateway6(self, ip6address, ip6_gw, eth_name):
+    def __config_gateway6(self, ip6_subnet, prefix, ip6_gw, eth_name):
         """配置IPV6网关
         :param ip6address:
         :param ip6_gw:
@@ -329,39 +311,16 @@ class _fdslight_server(dispatcher.dispatcher):
         :return:
         """
         # 添加一条到tun设备的IPv6路由
-        cmd = "route add -A inet6 %s/128 dev %s" % (ip6address, self.__DEVNAME)
+        cmd = "route add -A inet6 %s/%s dev %s" % (ip6_subnet, prefix, self.__DEVNAME)
         os.system(cmd)
         # 开启IPV6流量重定向
         os.system("echo 1 >/proc/sys/net/ipv6/conf/all/forwarding")
-        os.system("ip -6 route add default via %s dev %s" % (ip6_gw, eth_name,))
 
-    def set_ip6_router(self, ip6host):
-        if ip6host in self.__ip6_routers: return
-        # 不开启NAT66那么就不设置IPV6路由
-        if not self.__enable_nat66: return
+        fd = os.popen("ip -6 route add default via %s dev %s" % (ip6_gw, eth_name,))
+        fd.close()
 
-        nat_config = self.__configs["nat"]
-
-        cmd = "route add -A inet6 %s/128 dev %s" % (ip6host, nat_config["eth_name"])
-        os.system(cmd)
-        self.__router6_timer.set_timeout(ip6host, self.__IP6_ROUTER_TIMEOUT)
-        self.__ip6_routers[ip6host] = None
-
-    def __update_ip6_router(self, ip6host):
-        if ip6host not in self.__ip6_routers: return
-
-        self.__router6_timer.set_timeout(ip6host, self.__IP6_ROUTER_TIMEOUT)
-
-    def __del_ip6_router(self, ip6host):
-        if ip6host not in self.__ip6_routers: return
-
-        nat_config = self.__configs["nat"]
-
-        cmd = "route del -A inet6 %s/128 dev %s" % (ip6host, nat_config["eth_name"])
-
-        os.system(cmd)
-        self.__router6_timer.drop(ip6host)
-        del self.__ip6_routers[ip6host]
+        os.system("ip6tables -t nat -A POSTROUTING -s %s/%s -o %s -j MASQUERADE" % (ip6_subnet, prefix, eth_name,))
+        os.system("ip6tables -A FORWARD -s %s/%s -j ACCEPT" % (ip6_subnet, prefix))
 
     def __get_ip4_hdrlen(self):
         self.__mbuf.offset = 0
@@ -431,9 +390,6 @@ class _fdslight_server(dispatcher.dispatcher):
             self.delete_handler(self.__tcp6_fileno)
         if self.handler_exists(self.__tcp_fileno):
             self.delete_handler(self.__tcp_fileno)
-
-        for ip6host in self.__ip6_routers:
-            self.__del_ip6_router(ip6host)
 
         sys.exit(0)
 
