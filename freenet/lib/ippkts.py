@@ -104,12 +104,11 @@ def calc_checksum_for_ip_change(old_ip_packet, new_ip_packet, old_checksum, is_i
     return final_checksum
 
 
-def modify_tcpudp_for_change(ip_packet, mbuf, proto, port=None, flags=0, is_ipv6=False):
+def modify_tcpudp_for_change(ip_packet, mbuf, proto,flags=0, is_ipv6=False):
     """ 修改传输层(SCTP,TCP,UDP,UDPLite,)内容
     :param ip_packet:
     :param ip_packet_list:
     :param proto: 0表示计算的UDP,SCTP以及UDPLITE,1表示计算的TCP
-    :param port:端口为None那么不修改端口,如果为数字那么就会修改端口
     :param flags: 0 表示修改时的源地址,1表示修改的是目的地址
     :param is_ipv6:表示是否是否是IPV6
     :return:
@@ -149,18 +148,6 @@ def modify_tcpudp_for_change(ip_packet, mbuf, proto, port=None, flags=0, is_ipv6
     # 如果旧的校检和为0,说明不需要进行校检和计算
     if csum == 0: return
 
-    # 当端口不为None的时候,那么就修改端口
-    if port != None:
-        if flags == 0:
-            mbuf.offset = hdr_len
-        else:
-            mbuf.offset = hdr_len + 2
-        old_port = utils.bytes2number(mbuf.get_part(2))
-        # 端口不一样那么更改端口
-        if old_port != port:
-            csum = fn_utils.calc_incre_csum(csum, old_port, port)
-            mbuf.replace(utils.number2bytes(port, 2))
-        ''''''
     csum = calc_checksum_for_ip_change(old_ip_packet, ip_packet, csum, is_ipv6=is_ipv6)
     mbuf.replace(utils.number2bytes(csum, 2))
 
