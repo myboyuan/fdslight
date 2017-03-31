@@ -274,7 +274,7 @@ class nat66(object):
         return True
 
     def get_nat_reverse(self, mbuf):
-        if self.__is_support_nat(mbuf, is_req=False): return (False, None)
+        if not self.__is_support_nat(mbuf, is_req=False): return (False, None)
         mbuf.offset = 6
         nexthdr = mbuf.get_part(1)
 

@@ -174,7 +174,7 @@ class _fdslight_server(dispatcher.dispatcher):
             self.__nat6 = nat.nat66(ip6addr)
             self.__enable_nat66 = True
             self.__router6_timer = timer.timer()
-            self.__config_gateway6(ip6addr)
+            self.__config_gateway6(ip6addr, ip6addr, eth_name)
 
         subnet, prefix = utils.extract_subnet_info(nat_config["virtual_ip_subnet"])
         self.__nat4 = nat.nat((subnet, prefix,))
@@ -321,9 +321,10 @@ class _fdslight_server(dispatcher.dispatcher):
         os.system("iptables -t nat -A POSTROUTING -s %s/%s -o %s -j MASQUERADE" % (subnet, prefix, eth_name,))
         os.system("iptables -A FORWARD -s %s/%s -j ACCEPT" % (subnet, prefix))
 
-    def __config_gateway6(self, ip6address):
+    def __config_gateway6(self, ip6address, ip6_gw, eth_name):
         """配置IPV6网关
         :param ip6address:
+        :param ip6_gw:
         :param eth_name:
         :return:
         """
@@ -332,6 +333,7 @@ class _fdslight_server(dispatcher.dispatcher):
         os.system(cmd)
         # 开启IPV6流量重定向
         os.system("echo 1 >/proc/sys/net/ipv6/conf/all/forwarding")
+        os.system("ip -6 route add default via %s dev %s" % (ip6_gw, eth_name,))
 
     def set_ip6_router(self, ip6host):
         if ip6host in self.__ip6_routers: return
