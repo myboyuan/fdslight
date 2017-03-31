@@ -104,7 +104,7 @@ def calc_checksum_for_ip_change(old_ip_packet, new_ip_packet, old_checksum, is_i
     return final_checksum
 
 
-def modify_tcpudp_for_change(ip_packet, mbuf, proto,flags=0, is_ipv6=False):
+def modify_tcpudp_for_change(ip_packet, mbuf, proto, flags=0, is_ipv6=False):
     """ 修改传输层(SCTP,TCP,UDP,UDPLite,)内容
     :param ip_packet:
     :param ip_packet_list:
