@@ -316,8 +316,7 @@ class _fdslight_server(dispatcher.dispatcher):
         # 开启IPV6流量重定向
         os.system("echo 1 >/proc/sys/net/ipv6/conf/all/forwarding")
 
-        fd = os.popen("ip -6 route add default via %s dev %s" % (ip6_gw, eth_name,))
-        fd.close()
+        os.system("ip -6 route add default via %s dev %s" % (ip6_gw, eth_name,))
 
         os.system("ip6tables -t nat -A POSTROUTING -s %s/%s -o %s -j MASQUERADE" % (ip6_subnet, prefix, eth_name,))
         os.system("ip6tables -A FORWARD -s %s/%s -j ACCEPT" % (ip6_subnet, prefix))
