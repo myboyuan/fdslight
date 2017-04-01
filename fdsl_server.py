@@ -261,7 +261,6 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__mbuf.copy2buf(message)
 
         ip_ver = self.__mbuf.ip_version()
-
         if ip_ver == 6 and not self.__enable_nat6: return
         if ip_ver == 4:
             ok, session_id = self.__nat4.get_ippkt2cLan_from_sLan(self.__mbuf)
