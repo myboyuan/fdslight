@@ -37,7 +37,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             try:
                 cs, address = self.accept()
                 self.create_handler(
-                    self.fileno,_tcp_tunnel_handler, self.__crypto,
+                    self.fileno, _tcp_tunnel_handler, self.__crypto,
                     self.__crypto_configs, cs, address, self.__conn_timeout
                 )
             except BlockingIOError:
@@ -64,6 +64,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         self.__address = address
         self.__conn_timeout = conn_timeout
         self.__update_time = time.time()
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
         self.set_socket(cs)
         self.register(self.fileno)

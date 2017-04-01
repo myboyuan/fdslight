@@ -67,7 +67,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
                 if not pkt_info: break
                 self.dispatcher.handle_msg_from_tunnel(*pkt_info)
             ''''''
-            self.__update_time = time.time()
+        self.__update_time = time.time()
         return
 
     def tcp_writable(self):
