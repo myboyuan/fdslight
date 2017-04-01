@@ -253,6 +253,8 @@ class _fdslight_server(dispatcher.dispatcher):
         session_info = self.__access.get_session_info(session_id)
         fileno = session_info[0]
 
+        if not self.handler_exists(fileno): return
+
         self.get_handler(fileno).send_msg(session_id, session_info[2], action, message)
 
     def send_msg_to_tunnel_from_tun(self, message):
