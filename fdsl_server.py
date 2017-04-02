@@ -190,6 +190,14 @@ class _fdslight_server(dispatcher.dispatcher):
 
         if action == proto_utils.ACT_DATA: self.__mbuf.copy2buf(message)
 
+        # 删除旧的连接
+        if self.__access.session_exists(session_id):
+            session_info = self.__access.get_session_info(session_id)
+            old_fileno = session_info[0]
+
+            if old_fileno not in (self.__udp6_fileno, self.__udp_fileno,):
+                self.delete_handler(old_fileno)
+
         b = self.__access.data_from_recv(fileno, session_id, address, size)
         if not b: return False
         if action == proto_utils.ACT_DNS:
@@ -361,11 +369,14 @@ class _fdslight_server(dispatcher.dispatcher):
         """
         self.__ip4fragments[session_id] = ipfrag.ip4_p2p_proxy()
 
-    def tell_unregister_session(self, session_id):
+    def tell_unregister_session(self, session_id, fileno):
         """告知取消session注册
         :param session_id:
+        :param fileno:
         :return:
         """
+        if fileno not in (self.__udp_fileno, self.__udp6_fileno):
+            self.delete_handler(fileno)
         del self.__ip4fragments[session_id]
 
     def tell_del_udp_proxy(self, session_id, saddr, sport):
