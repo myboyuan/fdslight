@@ -96,7 +96,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
                 session_id, action, message = pkt_info
                 self.dispatcher.handle_msg_from_tunnel(self.fileno, session_id, self.__address, action, message)
             ''''''
-        self.__update_time = time.time()
+        return
 
     def tcp_writable(self):
         self.remove_evt_write(self.fileno)

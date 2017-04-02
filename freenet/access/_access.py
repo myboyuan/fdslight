@@ -126,5 +126,4 @@ class access(object):
 
         if b:
             self.modify_session(session_id, fileno, address)
-            self.__timer.set_timeout(session_id, self.__SESSION_TIMEOUT)
         return b
