@@ -195,9 +195,11 @@ class _fdslight_server(dispatcher.dispatcher):
             session_info = self.__access.get_session_info(session_id)
             old_fileno = session_info[0]
 
-            if old_fileno not in (self.__udp6_fileno, self.__udp_fileno,):
-                self.delete_handler(old_fileno)
-
+            if old_fileno != fileno:
+                if old_fileno not in (self.__udp6_fileno, self.__udp_fileno,):
+                    self.delete_handler(old_fileno)
+                ''''''
+            ''''''
         b = self.__access.data_from_recv(fileno, session_id, address, size)
         if not b: return False
         if action == proto_utils.ACT_DNS:
