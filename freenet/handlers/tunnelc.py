@@ -119,8 +119,6 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         sent_pkt = self.__encrypt.build_packet(session_id, action, message)
         if not self.is_conn_ok():
             self.__sent_queue.append(sent_pkt)
-        else:
-            self.__update_time = time.time()
         self.writer.write(sent_pkt)
         self.add_evt_write(self.fileno)
         self.__encrypt.reset()
