@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-import urllib.parse, time, os, random, hashlib, shutil
+import hashlib
+import os
+import random
+import time
+import urllib.parse
+
 import pywind.lib.reader as reader
 import pywind.web.lib.multipart as http_multipart
 
@@ -420,6 +425,11 @@ class handler(object):
         content_length = len(byte_data)
         self.set_header("Content-Length", content_length)
         self.__wait_sent.append(byte_data)
+
+    def finish_with_bytes(self, content_type, byte_data):
+        self.set_status("200 OK")
+        self.set_header("Content-Length", content_type)
+        self.finish(byte_data)
 
     def get_header_date(self, seconds):
         """生成WEB常用的GMT时间格式"""
