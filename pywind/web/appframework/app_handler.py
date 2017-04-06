@@ -428,7 +428,7 @@ class handler(object):
 
     def finish_with_bytes(self, content_type, byte_data):
         self.set_status("200 OK")
-        self.set_header("Content-Length", content_type)
+        self.set_header("Content-Type", content_type)
         self.finish(byte_data)
 
     def get_header_date(self, seconds):
