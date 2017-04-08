@@ -348,3 +348,37 @@ def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_udplite=
         e = b + step
 
     return pkts
+
+
+def __build_ipv6_hdr(flow_label, payload_length, nexthdr, hop_limit, saddr, daddr):
+    """构建IPV6通用头
+    :param flow_label: 
+    :param payload_length: 
+    :param nexthdr: 
+    :param hop_limit: 
+    :param saddr: 
+    :param daddr: 
+    :return: 
+    """
+    # flow_label = random.randint(1, 0x0fffff)
+    byte_seq = [
+        utils.number2bytes(6 << 4, 1),
+        utils.number2bytes(flow_label & 0x0fffff, 3),
+        utils.number2bytes(payload_length, 2),
+        utils.number2bytes(nexthdr, 1),
+        utils.number2bytes(hop_limit, 1),
+        saddr, daddr
+    ]
+
+    return b"".join(byte_seq)
+
+
+def __build_ipv6_fragment_hdr(nexthdr, frag_off, m_flag, frag_id):
+    frag_off = (frag_off << 3) | m_flag
+    byte_seq = [
+        utils.number2bytes(nexthdr, 1),
+        b"\0", utils.number2bytes(frag_off, 2),
+        utils.number2bytes(frag_id, 4),
+    ]
+
+    return b"".join(byte_seq)
