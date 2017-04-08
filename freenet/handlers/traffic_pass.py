@@ -106,7 +106,7 @@ class p2p_proxy(udp_handler.udp_handler):
         self.__is_ipv6 = is_ipv6
         self.__update_time = time.time()
         self.__internal_ip = internal_address[0]
-        self.__byte_internal_ip = socket.inet_pton(fa, internal_address)
+        self.__byte_internal_ip = socket.inet_pton(fa, self.__internal_ip)
         self.__port = internal_address[1]
 
         s = socket.socket(fa, socket.SOCK_DGRAM, proto)
