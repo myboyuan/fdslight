@@ -3,6 +3,7 @@
 import os, sys
 import pywind.evtframework.handlers.handler as handler
 import freenet.lib.fn_utils as fn_utils
+import freenet.lib.simple_qos as simple_qos
 
 try:
     import fcntl
@@ -20,6 +21,8 @@ class tun_base(handler.handler):
     __current_write_queue_n = 0
 
     __BLOCK_SIZE = 16 * 1024
+
+    __qos = None
 
     def __create_tun_dev(self, name):
         """创建tun 设备
@@ -51,6 +54,7 @@ class tun_base(handler.handler):
             sys.exit(-1)
 
         self.__creator_fd = creator_fd
+        self.__qos = simple_qos.qos()
 
         self.set_fileno(tun_fd)
         fcntl.fcntl(tun_fd, fcntl.F_SETFL, os.O_NONBLOCK)
@@ -62,13 +66,19 @@ class tun_base(handler.handler):
         pass
 
     def evt_read(self):
-        for i in range(5):
+        for i in range(10):
             try:
                 ip_packet = os.read(self.fileno, self.__BLOCK_SIZE)
             except BlockingIOError:
                 return
+            self.__qos.add_to_queue(ip_packet)
+        self.add_to_loop_task(self.fileno)
+
+    def task_loop(self):
+        results = self.__qos.get_queue()
+        for ip_packet in results:
             self.handle_ip_packet_from_read(ip_packet)
-        return
+        if not results: self.del_loop_task(self.fileno)
 
     def evt_write(self):
         try:
