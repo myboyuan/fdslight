@@ -159,7 +159,7 @@ class p2p_proxy(udp_handler.udp_handler):
         self.delete_handler(self.fileno)
 
     def udp_delete(self):
-        self.dispatcher.tell_del_udp_proxy(self.__session_id, self.__internal_ip, self.__port)
+        self.dispatcher.tell_del_dgram_proxy(self.__session_id, self.__internal_ip, self.__port)
         self.unregister(self.fileno)
         self.close()
 
