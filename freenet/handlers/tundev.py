@@ -70,9 +70,8 @@ class tun_base(handler.handler):
             try:
                 ip_packet = os.read(self.fileno, self.__BLOCK_SIZE)
             except BlockingIOError:
-                return
+                break
             self.__qos.add_to_queue(ip_packet)
-        self.add_to_loop_task(self.fileno)
 
         while 1:
             results = self.__qos.get_queue()
