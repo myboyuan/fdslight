@@ -45,7 +45,7 @@ class _fdslight_server(dispatcher.dispatcher):
     __crypto_configs = None
 
     __support_ip4_protocols = (1, 6, 17, 132, 136,)
-    __support_ip6_protocols = (6, 17, 43, 58, 132, 136,)
+    __support_ip6_protocols = (6, 17, 44, 58, 132, 136,)
 
     __tundev_fileno = -1
 
@@ -246,7 +246,7 @@ class _fdslight_server(dispatcher.dispatcher):
         if protocol == 17 or protocol == 136:
             is_udplite = False
             if protocol == 136: is_udplite = True
-            self.__handle_ipv4_dgram_from_tunnel(session_id, is_udplite=is_udplite)
+            self.__handle_dgram_from_tunnel(session_id, is_udplite=is_udplite, is_ipv6=False)
             return True
         self.__mbuf.offset = 0
 

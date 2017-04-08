@@ -131,7 +131,7 @@ class _fdslight_client(dispatcher.dispatcher):
             vir_dns6 = local["virtual_dns6"]
 
             self.set_router(vir_dns, is_ipv6=False, is_dynamic=False)
-            self.set_router(vir_dns6, is_ipv6=True, is_dynamic=False)
+            if self.__enable_ipv6_traffic: self.set_router(vir_dns6, is_ipv6=True, is_dynamic=False)
 
         conn = configs["connection"]
 
