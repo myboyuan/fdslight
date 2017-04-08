@@ -56,9 +56,9 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __IP6_ROUTER_TIMEOUT = 900
 
-    __ip4fragments = None
+    __ipfragments = None
 
-    __ip4_udp_proxy = None
+    __dgram_proxy = None
 
     def init_func(self, debug, configs):
         self.create_poll()
@@ -66,8 +66,8 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__configs = configs
         self.__debug = debug
 
-        self.__ip4fragments = {}
-        self.__ip4_udp_proxy = {}
+        self.__ipfragments = {}
+        self.__dgram_proxy = {}
 
         signal.signal(signal.SIGINT, self.__exit)
 
@@ -338,11 +338,16 @@ class _fdslight_server(dispatcher.dispatcher):
         hdrlen = (n & 0x0f) * 4
         return hdrlen
 
-    def __handle_ipv4_dgram_from_tunnel(self, session_id, is_udplite=False):
-        """处理IPV4数据报
+    def __handle_dgram_from_tunnel(self, session_id, is_ipv6=False, is_udplite=False):
+        """处理IPV4 以及IPv6数据报
         :return:
         """
-        ipfragment = self.__ip4fragments[session_id]
+        ip4fragment, ip6fragment = self.__ipfragments[session_id]
+
+        if is_ipv6:
+            ipfragment = ip6fragment
+        else:
+            ipfragment = ip4fragment
         ipfragment.add_frag(self.__mbuf)
 
         data = ipfragment.get_data()
@@ -350,18 +355,18 @@ class _fdslight_server(dispatcher.dispatcher):
 
         saddr, daddr, sport, dport, msg = data
 
-        if session_id not in self.__ip4_udp_proxy:
-            self.__ip4_udp_proxy[session_id] = {}
-        pydict = self.__ip4_udp_proxy[session_id]
+        if session_id not in self.__dgram_proxy:
+            self.__dgram_proxy[session_id] = {}
+        pydict = self.__dgram_proxy[session_id]
 
-        udp_id = "%s-%s" % (saddr, sport,)
-        if udp_id not in pydict:
+        dgram_id = "%s-%s" % (saddr, sport,)
+        if dgram_id not in pydict:
             fileno = self.create_handler(
                 -1, traffic_pass.p2p_proxy,
-                session_id, (saddr, sport), is_udplite=is_udplite
+                session_id, (saddr, sport), is_udplite=is_udplite, is_ipv6=is_ipv6
             )
-            pydict[udp_id] = fileno
-        fileno = pydict[udp_id]
+            pydict[dgram_id] = fileno
+        fileno = pydict[dgram_id]
         self.get_handler(fileno).send_msg(msg, (daddr, dport))
 
     def tell_register_session(self, session_id):
@@ -369,7 +374,7 @@ class _fdslight_server(dispatcher.dispatcher):
         :param session_id:
         :return:
         """
-        self.__ip4fragments[session_id] = ipfrag.ip4_p2p_proxy()
+        self.__ipfragments[session_id] = (ipfrag.ip4_p2p_proxy(), ipfrag.ip6_p2p_proxy(),)
 
     def tell_unregister_session(self, session_id, fileno):
         """告知取消session注册
@@ -379,22 +384,22 @@ class _fdslight_server(dispatcher.dispatcher):
         """
         if fileno not in (self.__udp_fileno, self.__udp6_fileno):
             self.delete_handler(fileno)
-        del self.__ip4fragments[session_id]
+        del self.__ipfragments[session_id]
 
-    def tell_del_udp_proxy(self, session_id, saddr, sport):
+    def tell_del_dgram_proxy(self, session_id, saddr, sport):
         """告知删除UDP代理
         :param session_id:
         :param saddr:
         :param sport:
         :return:
         """
-        if session_id not in self.__ip4_udp_proxy: return
-        pydict = self.__ip4_udp_proxy[session_id]
+        if session_id not in self.__dgram_proxy: return
+        pydict = self.__dgram_proxy[session_id]
         key = "%s-%s" % (saddr, sport)
 
         if key not in pydict: return
         del pydict[key]
-        if not pydict: del self.__ip4_udp_proxy[session_id]
+        if not pydict: del self.__dgram_proxy[session_id]
 
     def __exit(self, signum, frame):
         if self.handler_exists(self.__dns_fileno):

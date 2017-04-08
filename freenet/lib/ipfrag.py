@@ -211,5 +211,5 @@ class ip6_p2p_proxy(object):
         for uniq_id in uniq_ids:
             if not self.__timer.exists(uniq_id): continue
             self.__timer.drop(uniq_id)
-            del self.__frag_data[uniq_id]
+            del self.__fragdata[uniq_id]
         return

@@ -89,23 +89,35 @@ class p2p_proxy(udp_handler.udp_handler):
     __session_id = None
     __is_udplite = False
 
-    def init_func(self, creator_fd, session_id, internal_address, is_udplite=False):
+    __is_ipv6 = False
+
+    def init_func(self, creator_fd, session_id, internal_address, is_udplite=False, is_ipv6=False):
         if not is_udplite:
             proto = 17
         else:
             proto = 136
 
+        if is_ipv6:
+            fa = socket.AF_INET6
+        else:
+            fa = socket.AF_INET
+
         self.__is_udplite = is_udplite
+        self.__is_ipv6 = is_ipv6
         self.__update_time = time.time()
         self.__internal_ip = internal_address[0]
-        self.__byte_internal_ip = socket.inet_aton(internal_address[0])
+        self.__byte_internal_ip = socket.inet_pton(fa, internal_address)
         self.__port = internal_address[1]
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, proto)
+        s = socket.socket(fa, socket.SOCK_DGRAM, proto)
         self.__permits = {}
 
         self.set_socket(s)
-        self.bind(("0.0.0.0", 0))
+
+        if is_ipv6:
+            self.bind(("::", 0))
+        else:
+            self.bind(("0.0.0.0", 0))
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
@@ -123,10 +135,17 @@ class p2p_proxy(udp_handler.udp_handler):
         n_saddr = socket.inet_aton(address[0])
         sport = address[1]
 
+        if self.__is_ipv6:
+            mtu = 1280
+        else:
+            mtu = 1500
+
         udp_packets = ippkts.build_udp_packets(
             n_saddr, self.__byte_internal_ip,
             sport, self.__port, message,
-            is_udplite=self.__is_udplite
+            mtu=mtu,
+            is_udplite=self.__is_udplite,
+            is_ipv6=self.__is_ipv6
         )
 
         for udp_pkt in udp_packets:

@@ -253,8 +253,18 @@ class dnsc_proxy(dns_base):
     __udp_client = None
     __is_ipv6 = False
 
-    def init_func(self, creator, address, debug=False, server_side=False):
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    def init_func(self, creator, address, debug=False, server_side=False, is_ipv6=False):
+        if is_ipv6:
+            fa = socket.AF_INET6
+        else:
+            fa = socket.AF_INET
+
+        self.__is_ipv6 = is_ipv6
+
+        s = socket.socket(fa, socket.SOCK_DGRAM)
+
+        if server_side and is_ipv6:
+            s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
 
         self.set_socket(s)
         self.__server_side = server_side
@@ -289,7 +299,7 @@ class dnsc_proxy(dns_base):
         dns_id = (message[0] << 8) | message[1]
         if not self.dns_id_map_exists(dns_id): return
 
-        saddr, daddr, dport, n_dns_id, flags = self.get_dns_id_map(dns_id)
+        saddr, daddr, dport, n_dns_id, flags, is_ipv6 = self.get_dns_id_map(dns_id)
         self.del_dns_id_map(dns_id)
         L = list(message)
         L[0:2] = (
@@ -307,13 +317,24 @@ class dnsc_proxy(dns_base):
                 ''''''
             ''''''
         if not self.__server_side:
-            packets = ippkts.build_udp_packets(saddr, daddr, 53, dport, message)
+            if self.__is_ipv6:
+                mtu = 1280
+            else:
+                mtu = 1500
+            packets = ippkts.build_udp_packets(saddr, daddr, 53, dport, message, mtu=mtu, is_ipv6=self.__is_ipv6)
             for packet in packets:
                 self.dispatcher.send_msg_to_tun(packet)
 
             self.del_dns_id_map(dns_id)
             self.__timer.drop(dns_id)
             return
+
+        if self.__is_ipv6 != is_ipv6 and self.__server_side:
+            if self.__is_ipv6:
+                is_ipv6 = False
+            else:
+                is_ipv6 = True
+            self.dispatcher.send_msg_to_other_dnsservice_for_dns_response(message, is_ipv6=is_ipv6)
 
         if self.__is_ipv6:
             sts_daddr = socket.inet_ntop(socket.AF_INET6, daddr)
@@ -325,7 +346,7 @@ class dnsc_proxy(dns_base):
         self.sendto(message, (sts_daddr, dport))
         self.add_evt_write(self.fileno)
 
-    def __handle_msg_for_request(self, saddr, daddr, sport, message):
+    def __handle_msg_for_request(self, saddr, daddr, sport, message, is_ipv6=False):
         size = len(message)
         if size < 8: return
 
@@ -360,7 +381,7 @@ class dnsc_proxy(dns_base):
 
         if not is_match: flags = None
 
-        self.set_dns_id_map(n_dns_id, (daddr, saddr, sport, dns_id, flags))
+        self.set_dns_id_map(n_dns_id, (daddr, saddr, sport, dns_id, flags, is_ipv6,))
 
         L = list(message)
         L[0:2] = (
@@ -391,8 +412,8 @@ class dnsc_proxy(dns_base):
         self.__host_match.clear()
         for rule in rules: self.__host_match.add_rule(rule)
 
-    def dnsmsg_from_tun(self, saddr, daddr, sport, message):
-        self.__handle_msg_for_request(saddr, daddr, sport, message)
+    def dnsmsg_from_tun(self, saddr, daddr, sport, message, is_ipv6=False):
+        self.__handle_msg_for_request(saddr, daddr, sport, message, is_ipv6=is_ipv6)
 
     def udp_timeout(self):
         names = self.__timer.get_timeout_names()
@@ -408,7 +429,7 @@ class dnsc_proxy(dns_base):
                 byte_saddr = socket.inet_pton(socket.AF_INET6, address[0])
             else:
                 byte_saddr = socket.inet_pton(socket.AF_INET, address[0])
-            self.__handle_msg_for_request(byte_saddr, None, address[1], message)
+            self.__handle_msg_for_request(byte_saddr, None, address[1], message, is_ipv6=self.__is_ipv6)
             return
         self.__handle_msg_from_response(message)
 

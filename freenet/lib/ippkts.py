@@ -213,9 +213,6 @@ def modify_icmp6_echo_for_change(byte_ip, mbuf, flags=0):
     mbuf.replace(utils.number2bytes(csum, 2))
 
 
-__IP_HDR_SIZE = 20
-
-
 def build_ip_packet(pkt_len, protocol, saddr, daddr, message, pkt_id=1, flags_df=0, flags_mf=0, offset=0):
     """创建IP数据包
     :param pkt_len:包长度
@@ -228,7 +225,7 @@ def build_ip_packet(pkt_len, protocol, saddr, daddr, message, pkt_id=1, flags_df
     :param offset:包偏移
     :return ip_pkt:
     """
-    if pkt_len < __IP_HDR_SIZE: raise ValueError("the value of pkt_len must be less than 20")
+    if pkt_len < 20: raise ValueError("the value of pkt_len must be less than 20")
     if protocol < 0 or protocol > 255: raise ValueError("the value of protocol is wrong")
 
     tpl = b'E\x00\x00\x14\x00\x01\x00\x00@\x00z\xea\x00\x00\x00\x00\x00\x00\x00\x00'
@@ -274,7 +271,7 @@ def build_ip_packet(pkt_len, protocol, saddr, daddr, message, pkt_id=1, flags_df
     return b"".join((bytes(L), message,))
 
 
-def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_udplite=False):
+def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_udplite=False, is_ipv6=False):
     """构建UDP数据包"""
     if mtu > 1500 or mtu < 576: raise ValueError("the value of mtu is wrong!")
     msg_len = 8 + len(message)
@@ -305,12 +302,37 @@ def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_udplite=
         (bytes(udp_hdr), message,)
     )
 
+    if not is_ipv6:
+        pkt_id = random.randint(1, 65535)
+    else:
+        pkt_id = random.randint(1, 0xffffffff)
+        flow_label = random.randint(1, 0x0fffff)
+
     pkts = []
     flags_df = 0
-    step = mtu - __IP_HDR_SIZE - (mtu - __IP_HDR_SIZE) % 8
+
+    if is_udplite:
+        p = 136
+    else:
+        p = 17
+
+    if is_ipv6 and mtu - 40 <= msg_len:
+        ipv6hdr = __build_ipv6_hdr(flow_label, msg_len, p, 128, saddr, daddr)
+        ip6data = b"".join([ipv6hdr, message, ])
+
+        return [ip6data, ]
+
+    if is_ipv6:
+        # IPV6分包在扩展头提供,因此要算成48
+        ip_hdr_size = 48
+    else:
+        ip_hdr_size = 20
+
+    step = mtu - ip_hdr_size - (mtu - ip_hdr_size) % 8
+
     b = 0
     e = step
-    pkt_id = random.randint(1, 65535)
+
     # pkt_id = 1
     n = 0
     every_offset = int(step / 8)
@@ -329,17 +351,18 @@ def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_udplite=
         else:
             flags_mf = 1
 
-        if is_udplite:
-            p = 136
-        else:
-            p = 17
-
         offset = n * every_offset
-        ippkt = build_ip_packet(slice_size + __IP_HDR_SIZE, p,
-                                saddr, daddr, bdata, pkt_id=pkt_id,
-                                flags_df=flags_df, flags_mf=flags_mf,
-                                offset=offset
-                                )
+
+        if not is_ipv6:
+            ippkt = build_ip_packet(slice_size + 20, p,
+                                    saddr, daddr, bdata, pkt_id=pkt_id,
+                                    flags_df=flags_df, flags_mf=flags_mf,
+                                    offset=offset
+                                    )
+        else:
+            ipv6hdr = __build_ipv6_hdr(flow_label, slice_size, 44, 128, saddr, daddr)
+            frag_hdr = __build_ipv6_fragment_hdr(p, offset, flags_mf, pkt_id)
+            ippkt = b"".join([ipv6hdr, frag_hdr, bdata, ])
 
         pkts.append(ippkt)
         if finish: break

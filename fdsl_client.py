@@ -47,6 +47,8 @@ class _fdslight_client(dispatcher.dispatcher):
     __tunnel_fileno = -1
 
     __dns_fileno = -1
+
+    __dns_listen6 = -1
     __tundev_fileno = -1
 
     __session_id = None
@@ -96,9 +98,16 @@ class _fdslight_client(dispatcher.dispatcher):
         if self.__mode == _MODE_GW:
             self.__dns_fileno = self.create_handler(
                 -1, dns_proxy.dnsc_proxy,
-                gateway["dnsserver_bind"], debug=debug, server_side=True
+                gateway["dnsserver_bind"], debug=debug, server_side=True, is_ipv6=False
             )
             self.get_handler(self.__dns_fileno).set_parent_dnsserver(public["remote_dns"], is_ipv6=is_ipv6)
+
+            if self.__enable_ipv6_traffic:
+                self.__dns_listen6 = self.create_handler(
+                    -1, dns_proxy.dnsc_proxy,
+                    gateway["dnsserver_bind6"], debug=debug, server_side=True, is_ipv6=True
+                )
+                self.get_handler(self.__dns_listen6).set_parent_dnsserver(public["remote_dns"], is_ipv6=is_ipv6)
         else:
             self.__dns_fileno = self.create_handler(
                 -1, dns_proxy.dnsc_proxy,
@@ -119,8 +128,10 @@ class _fdslight_client(dispatcher.dispatcher):
         else:
             local = configs["local"]
             vir_dns = local["virtual_dns"]
-            is_ipv6 = utils.is_ipv6_address(vir_dns)
-            self.set_router(vir_dns, is_ipv6=is_ipv6, is_dynamic=False)
+            vir_dns6 = local["virtual_dns6"]
+
+            self.set_router(vir_dns, is_ipv6=False, is_dynamic=False)
+            self.set_router(vir_dns6, is_ipv6=True, is_dynamic=False)
 
         conn = configs["connection"]
 
@@ -199,6 +210,7 @@ class _fdslight_client(dispatcher.dispatcher):
         if ip_ver not in (4, 6,): return
 
         action = proto_utils.ACT_DATA
+        is_ipv6 = False
 
         if ip_ver == 4:
             self.__mbuf.offset = 9
@@ -207,6 +219,7 @@ class _fdslight_client(dispatcher.dispatcher):
             byte_daddr = self.__mbuf.get_part(4)
             fa = socket.AF_INET
         else:
+            is_ipv6 = True
             self.__mbuf.offset = 6
             nexthdr = self.__mbuf.get_part(1)
             self.__mbuf.offset = 24
@@ -222,7 +235,7 @@ class _fdslight_client(dispatcher.dispatcher):
         if self.__mode == _MODE_LOCAL:
             is_dns_req, saddr, daddr, sport, rs = self.__is_dns_request()
             if is_dns_req:
-                self.get_handler(self.__dns_fileno).dnsmsg_from_tun(saddr, daddr, sport, rs)
+                self.get_handler(self.__dns_fileno).dnsmsg_from_tun(saddr, daddr, sport, rs, is_ipv6=is_ipv6)
                 return
 
         self.__update_router_access(sts_daddr)
@@ -268,6 +281,22 @@ class _fdslight_client(dispatcher.dispatcher):
         if ip_ver not in (4, 6,): return
 
         self.send_msg_to_tun(message)
+
+    def send_msg_to_other_dnsservice_for_dns_response(self, message, is_ipv6=False):
+        """当启用IPV4和IPv6双协议栈的时候
+        此函数的作用是两个局域网DNS服务相互发送消息
+        :param message: 
+        :param is_ipv6:发送的目标是否是IPv6 DNS服务 
+        :return: 
+        """
+        # 没有开启IPv6的时候,禁止向另外的DNS服务发送消息
+        if not self.__enable_ipv6_traffic: return
+        if is_ipv6:
+            fileno = self.__dns_listen6
+        else:
+            fileno = self.__dns_fileno
+
+        self.send_message_to_handler(-1, fileno, message)
 
     def send_msg_to_tunnel(self, action, message):
         if not self.handler_exists(self.__tunnel_fileno):
