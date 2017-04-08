@@ -125,7 +125,6 @@
 *.vpngate.net:1
 *.akamai.net:1
 *.github.io:1
-*.github.com:1
 *.githubusercontent.com:1
 *.bit.ly:1
 *.dyndns.org:1
