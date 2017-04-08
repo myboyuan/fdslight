@@ -27,6 +27,7 @@ class scgid_listen(tcp_handler.tcp_handler):
 
         if use_unix_socket and os.path.exists(listen): os.remove(listen)
 
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.set_socket(s)
         self.bind(listen)
         return self.fileno
