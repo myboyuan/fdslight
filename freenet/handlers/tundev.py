@@ -54,7 +54,7 @@ class tun_base(handler.handler):
             sys.exit(-1)
 
         self.__creator_fd = creator_fd
-        self.__qos = simple_qos.qos()
+        self.__qos = simple_qos.qos(simple_qos.QTYPE_DST)
 
         self.set_fileno(tun_fd)
         fcntl.fcntl(tun_fd, fcntl.F_SETFL, os.O_NONBLOCK)
