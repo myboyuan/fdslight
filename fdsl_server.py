@@ -225,6 +225,15 @@ class _fdslight_server(dispatcher.dispatcher):
 
         if nexthdr not in self.__support_ip6_protocols: return False
 
+        self.__mbuf.offset = 40
+        nexthdr = self.__mbuf.get_part(1)
+
+        if nexthdr in (17, 136,):
+            is_udplite = False
+            if nexthdr == 136: is_udplite = True
+            self.__handle_dgram_from_tunnel(session_id, is_ipv6=True, is_udplite=is_udplite)
+            return True
+
         b = self.__nat6.get_ippkt2sLan_from_cLan(session_id, self.__mbuf)
         if not b: return False
 
