@@ -370,7 +370,34 @@ class handler(object):
 
     def handle(self):
         """重写这个方法,以添加自己的处理逻辑"""
-        pass
+        self.set_status("403 Forbidden")
+        self.finish()
+
+    def redirect(self, uri, qs_seq=None, stcode=302):
+        """
+        :param uri:重定向URI 
+        :param qs_seq: 地址栏的query string,格式为[(name1,value1),(name2,value2),..]
+        :param stcode: 
+        :return: 
+        """
+        if stcode not in (301, 302): raise ValueError("the stcode must be from 301,302")
+
+        if stcode == 301:
+            status = "301 Moved Permanently"
+        else:
+            status = "302 Move temporarily"
+
+        if qs_seq:
+            seq = []
+            for k, v in qs_seq:
+                seq.append("%s=%s" % (k, v,))
+            location = "%s?%s" % (uri, "&".join(seq))
+        else:
+            location = uri
+
+        self.set_status(status)
+        self.set_header("Location", location)
+        self.finish()
 
     def __handle(self):
         if not self.__is_start_response and not self.request.recv_ok():
