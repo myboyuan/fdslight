@@ -1,8 +1,35 @@
 #!/usr/bin/env python3
 """语法执行器"""
 
+import pywind.lib.template.syntax_parser as syntax_parser
+
+
+class ExecuteErr(Exception): pass
+
 
 class execute(object):
+    __exe_objects = None
+
+    __kwargs = None
+
+    __ext_block_functions = None
+    __ext_functions = None
+
+    # 运行步骤1
+    __run_step1 = None
+
+    # 结果缓冲区
+    __buff = None
+
+    def __init__(self):
+        self.__exe_objects = {}
+        self.__kwargs = {}
+
+        self.__ext_block_functions = {}
+        self.__ext_functions = {}
+        self.__run_step1 = []
+        self.__buff = []
+
     def register_ext_function(self, funcname, funcobj, is_block_func=False):
         """注册扩展函数
         :param funcname:字符串函数名 
@@ -10,7 +37,12 @@ class execute(object):
         :param is_block_func:是否是块函数
         :return: 
         """
-        pass
+        if is_block_func:
+            self.__ext_block_functions[funcname] = funcobj
+        else:
+            self.__ext_functions[funcname] = funcobj
+
+        return
 
     def unregister_ext_function(self, funcname, is_block_func=False):
         """删除扩展函数
@@ -18,7 +50,13 @@ class execute(object):
         :param is_block_func:是否是块函数 
         :return: 
         """
-        pass
+        if is_block_func:
+            pydict = self.__ext_block_functions
+        else:
+            pydict = self.__ext_functions
+
+        if funcname not in pydict: return
+        del pydict[funcname]
 
     def set_exe_object(self, name, value):
         """设置执行对象
@@ -26,6 +64,36 @@ class execute(object):
         :param value: 
         :return: 
         """
+        self.__exe_objects[name] = value
+
+    def put_to_buff(self, content):
+        self.__buff.append(content)
+
+    def exe(self, name):
+        if name not in self.__exe_objects: raise ExecuteErr("cannot found execute object '%s'" % name)
+
+        sts = self.__exe_objects[name]
+        rs = syntax_parser.parse(sts)
+
+        if not rs[0]:
+            return []
+
+        results = rs[1]
+        for flag, content in results:
+            if flag==syntax_parser.SYNTAX_FLAG_NONE:
+                self.__run_step1.append((self.put_to_buff, content,))
+                continue
+
+        return results
+
+    def __getattr__(self, item):
         pass
 
 
+fd = open("./syntax.txt", "r")
+
+exe = execute()
+exe.set_exe_object("test", fd.read())
+fd.close()
+
+print(exe.exe("test"))

@@ -1,9 +1,10 @@
-${def_func("myname")}
-
-${end_def_func("myname")}
-
-${block("myblock")}
-
-${end_block("myblock")}
-
+<body>
 ${inherit("name.html")}
+
+<%block name="">    </%block>
+<%block name=""/>
+
+${import("my.html")}
+
+${include("test.html")}
+</body>
