@@ -73,14 +73,16 @@ class execute(object):
         if name not in self.__exe_objects: raise ExecuteErr("cannot found execute object '%s'" % name)
 
         sts = self.__exe_objects[name]
-        rs = syntax_parser.parse(sts)
+        cls = syntax_parser.parser()
+
+        rs = cls.parse(sts)
 
         if not rs[0]:
             return []
 
         results = rs[1]
         for flag, content in results:
-            if flag==syntax_parser.SYNTAX_FLAG_NONE:
+            if flag == syntax_parser.SYNTAX_FLAG_NONE:
                 self.__run_step1.append((self.put_to_buff, content,))
                 continue
 

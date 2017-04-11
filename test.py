@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-import socket
 
-import dns.resolver
+sts = """for n in range(100):
+    if n > 10: n = n + 10, print(n)"""
 
-r = dns.resolver.Resolver()
-r.nameservers=["192.168.1.254"]
-an=r.query("static.google.com")
 
-for rs in an:
-    print(rs)
+def hello():
+
+    exec(sts)
+
+hello()
