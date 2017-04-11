@@ -38,6 +38,8 @@ class _compile_line(object):
         pos += 1
         s2 = line_sts[pos:].lstrip()
 
+        if not s1: return [(True, s2,)]
+
         return [(False, s1,), (True, s2,)]
 
     def __parse2(self, line_sts):
@@ -52,7 +54,7 @@ class _compile_line(object):
                 results.append((False, line_sts,))
                 break
             s1 = line_sts[0:pos]
-            results.append((False, s1,))
+            if s1: results.append((False, s1,))
             pos += 2
             line_sts = line_sts[pos:]
             pos = line_sts.find("}")
@@ -101,4 +103,4 @@ class parser(object):
 
 
 cls = _compile_line()
-print(cls.compile("%for name in hello:print()"))
+print(cls.compile("${name}%for name in hello:print()"))
