@@ -1,0 +1,8 @@
+${def_func("myname")}
+
+${end_def_func("myname")}
+
+${block("myblock")}
+
+${end_block("myblock")}
+
