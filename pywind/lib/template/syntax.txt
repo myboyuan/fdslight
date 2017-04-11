@@ -6,3 +6,4 @@ ${block("myblock")}
 
 ${end_block("myblock")}
 
+${inherit("name.html")}
