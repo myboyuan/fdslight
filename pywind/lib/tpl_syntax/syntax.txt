@@ -6,7 +6,6 @@
 </%block>
 <%block name="hello" />
 
-${self.imp()}
 
 <%
     for name in ["a","b"]:
