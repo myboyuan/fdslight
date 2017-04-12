@@ -23,6 +23,9 @@ TYPE_PYCODE = 2
 TYPE_PYSYNTAX = 3
 
 
+# 为include
+
+
 class parser(object):
     def __get_quot_content(self, sts, quot):
         """
@@ -150,6 +153,7 @@ class parser(object):
             sts = sts[pos:]
 
         return results
+
 
     def __aligin_pycode(self, sts):
         """对齐Python代码

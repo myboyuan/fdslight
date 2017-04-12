@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import pywind.lib.tpl_syntax.syntax_execute as core_execute
+import pywind.lib.tpl.syntax_execute as core_execute
 import os, importlib
 
 
@@ -14,6 +14,8 @@ class template(object):
 
     # 执行对象,一个模版文件代表一个执行对象
     __exe_objects = None
+
+    __render_content = None
 
     def __ext_inherit(self, uri):
         """实现继承功能
@@ -34,27 +36,14 @@ class template(object):
         exeobj._gen_syntax_tree(text_content)
         self.__exe_objects.append(exeobj)
 
-    def __ext_include(self, uri):
-        """实现包含功能
+    def __ext_dyn_include(self, uri):
+        """在执行期间动态包含文件
         :param uri: 
         :return: 
         """
-        return self.render(uri, **self.__kwargs)
+        content = self.__include(uri)
 
-    def __ext_import(self, m):
-        """实现有限制的import功能
-        :param m: 
-        :return: 
-        """
-        mobj = importlib.import_module(m)
-
-        return mobj
-
-    def __ext_content(self):
-        """把内容插入到父模版中
-        :return: 
-        """
-        return ""
+        return self.render_string(content, **self.__kwargs)
 
     def __init__(self, user_exts={}):
         """
@@ -64,6 +53,7 @@ class template(object):
         self.__user_exts = user_exts
         self.__directories = []
         self.__exe_objects = []
+        self.__render_content = []
 
     def set_find_directories(self, directories):
         """设置查找目录
@@ -74,6 +64,16 @@ class template(object):
             raise ValueError("the directories must be tuple or list")
         self.__directories = directories
 
+    def __include(self, uri):
+        fpath = self.__get_fpath(uri)
+        if not fpath: raise TemplateErr("cannot found include file '%s'" % uri)
+
+        with open(fpath, "r") as f:
+            content = f.read()
+        f.close()
+
+        return content
+
     def __register_exts(self, exeobj):
         """注册扩展
         :return: 
@@ -82,10 +82,10 @@ class template(object):
         for k, v in self.__user_exts:
             exeobj.register_ext_attr(k, v)
 
-        exeobj.register_ext_attr("include", self.__ext_include)
         exeobj.register_ext_attr("inherit", self.__ext_inherit)
-        exeobj.register_ext_attr("imp", self.__ext_import)
-        exeobj.register_ext_attr("content", self.__ext_content)
+        exeobj._set_include_func(self.__include)
+        exeobj.register_ext_attr("include", self.__ext_dyn_include)
+        exeobj.register_ext_attr("time", importlib.import_module("time"))
 
     def __get_fpath(self, uri):
         for d in self.__directories:
@@ -110,14 +110,11 @@ class template(object):
     def render_string(self, s, **kwargs):
         self.__kwargs = kwargs
 
-
         exeobj = core_execute.execute(**kwargs)
 
         self.__register_exts(exeobj)
+
         exeobj._gen_syntax_tree(s)
-
-        results = []
-
         exeobj_a = exeobj
 
         while 1:
@@ -129,19 +126,15 @@ class template(object):
             for k, v in exeobj_a.block_map.items():
                 exeobj_b.block_map[k] = v
 
-            exeobj_b._exe()
-            content = exeobj_b._get_buff_content()
             exeobj_a = exeobj_b
-            results.append(content)
 
         exeobj_a._exe()
-        results.append(exeobj_a._get_buff_content())
 
-        return "".join(results)
+        return exeobj_a._get_buff_content()
 
 
 tpl = template()
-tpl.set_find_directories(["./"])
-rs=tpl.render("syntax.txt",name=1000)
+tpl.set_find_directories(["./test"])
+rs = tpl.render("child.html", name="this is template")
 
 print(rs)

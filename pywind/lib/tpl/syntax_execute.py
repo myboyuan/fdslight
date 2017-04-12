@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """核心语法执行器"""
 
-import pywind.lib.tpl_syntax.syntax_parser as syntax_parser
+import pywind.lib.tpl.syntax_parser as syntax_parser
 
 
 class ExecuteErr(Exception): pass
@@ -21,6 +21,8 @@ class execute(object):
     __parser = None
 
     __syntax_tree = None
+
+    __include_func = None
 
     def __init__(self, **kwargs):
         self.__kwargs = kwargs
@@ -86,17 +88,63 @@ class execute(object):
             self.__exe_pycode(v)
 
     def _gen_syntax_tree(self, sts):
+        is_ok, sts = self.__pre_include(sts)
         syntax_tree, block_map = self.__parser.parse(sts)
+
         self.block_map = block_map
-        self.__syntax_tree = syntax_tree
+        self.__syntax_tree = self.__exe_syntax_tree_pysyntax(syntax_tree)
+
+    def __exe_syntax_tree_pysyntax(self, syntax_tree):
+        """执行语法树中的python语法,注意不是python代码块
+        :param syntax_tree: 
+        :return: 返回执行之后的语法树
+        """
+        results = []
+        for flags, v in syntax_tree:
+            if flags != syntax_parser.TYPE_PYSYNTAX:
+                results.append((flags, v))
+                continue
+            rs = self.__exe_pysyntax(v)
+            results.append((syntax_parser.TYPE_TEXT, rs,))
+
+        return results
+
+    def _set_include_func(self, func):
+        """设置文件包含函数,该函数返回字符串内容
+        :param func: 
+        :return: 
+        """
+        self.__include_func = func
+
+    def __pre_include(self, sts):
+        """预处理实现文件包含
+        :param sts: 
+        :return: 
+        """
+        is_ok = True
+        results = []
+        tmplist = sts.split("\n")
+        for s in tmplist:
+            t = s.lstrip()
+            if t[0:2] == "##":
+                is_ok = False
+                fpath = t[2:].strip()
+                sts = self.__include_func(fpath)
+
+                while not is_ok:
+                    is_ok, sts_t = self.__pre_include(sts)
+                    results.append(sts_t)
+                if is_ok: continue
+            results.append(s)
+
+        return (is_ok, "\n".join(results))
 
     def _exe(self):
         self.__exe_from_syntax_tree(self.__syntax_tree)
 
     def __getattr__(self, item):
         if item == "V": return self.__kwargs
-        if item == "show":
-            return self.__show
+        if item == "show": return self.__show
 
         if item not in self.__ext_attrs:
             raise ExecuteErr("cannot found property or attr '%s'" % item)
