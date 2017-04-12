@@ -1,0 +1,15 @@
+<body>
+<%block name="zzz">    hello,world ${self.V["name"]}
+
+<%
+%>
+</%block>
+<%block name="hello" />
+
+${self.imp()}
+
+<%
+    for name in ["a","b"]:
+        self.show("%s " % name)
+%>
+</body>

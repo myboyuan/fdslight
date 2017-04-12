@@ -1,7 +1,0 @@
-<body>
-<%block name="zzz">    </%block>
-<%block name="hello" />
-<%
-    for name in self.v(""):
-        self.show("%s=%s" % (name,value))
-%>

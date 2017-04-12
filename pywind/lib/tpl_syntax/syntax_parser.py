@@ -9,6 +9,20 @@ class SyntaxErr(Exception): pass
 class ParserErr(Exception): pass
 
 
+### 对应文本类型
+# 为普通文本
+TYPE_TEXT = 0
+
+# 为block
+TYPE_BLOCK = 1
+
+# 为Python代码
+TYPE_PYCODE = 2
+
+# 为python语法,即 ${xxx} 这样的字符串
+TYPE_PYSYNTAX = 3
+
+
 class parser(object):
     def __get_quot_content(self, sts, quot):
         """
@@ -36,7 +50,7 @@ class parser(object):
             name = self.__get_quot_content(tag_content, "'")
         return name
 
-    def __parse_single_syntax(self, s):
+    def __parse_single_syntax(self, sts):
         """解析美元符号
         :param sts: 
         :return: 
@@ -137,11 +151,76 @@ class parser(object):
 
         return results
 
+    def __aligin_pycode(self, sts):
+        """对齐Python代码
+        :param sts: 
+        :return: 
+        """
+        tmplist = sts.split("\n")
+        aligned_results = []
+
+        n = 0
+        flags = False
+        for s in tmplist:
+            if not s:
+                aligned_results.append(s)
+                continue
+            if not flags:
+                while 1:
+                    ch = s[n]
+                    if ch != "\t" and ch != " ": break
+                    n += 1
+                flags = True
+            aligned_results.append(s[n:])
+
+        return "\n".join(aligned_results)
+
     def parse(self, sts):
+        block_map = {}
+
         results = self.__parse_tpl_block(sts)
+
+        tmp_seq_a = []
 
         # 首先处理block标签
         for flags, v in results:
-            if not flags: continue
-            block_content, s = v
+            if flags:
+                block_content, s = v
+                name = self.__parse_block_tag_name_property(block_content)
+                if name: block_map[name] = s
+                tmp_seq_a.append((True, name,))
+                continue
+            tmp_seq_a.append((False, v,))
 
+        # 处理Python代码块
+        tmp_seq_b = []
+        for flags, v in tmp_seq_a:
+            if flags:
+                tmp_seq_b.append((TYPE_BLOCK, v,))
+                continue
+            rs = self.__parse_pycode_block(v)
+            for flags, v in rs:
+                if flags:
+                    tmp_seq_b.append((TYPE_PYCODE, self.__aligin_pycode(v)))
+                else:
+                    tmp_seq_b.append((TYPE_TEXT, v,))
+
+        # 处理Python单个语句块
+        tmp_seq_c = []
+        for flags, v in tmp_seq_b:
+            if flags != TYPE_TEXT:
+                tmp_seq_c.append((flags, v,))
+                continue
+            rs = self.__parse_single_syntax(v)
+            for flags, v in rs:
+                if flags:
+                    tmp_seq_c.append((TYPE_PYSYNTAX, v,))
+                else:
+                    tmp_seq_c.append((TYPE_TEXT, v))
+
+        # 解析block内部的文字
+        for k in block_map:
+            t, _ = self.parse(block_map[k])
+            block_map[k] = t
+
+        return (tmp_seq_c, block_map,)
