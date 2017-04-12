@@ -43,7 +43,10 @@ class template(object):
         """
         content = self.__include(uri)
 
-        return self.render_string(content, **self.__kwargs)
+        tpl = template(user_exts=self.__user_exts)
+        tpl.set_find_directories(self.__directories)
+
+        return tpl.render_string(content, **self.__kwargs)
 
     def __init__(self, user_exts={}):
         """
@@ -133,8 +136,10 @@ class template(object):
         return exeobj_a._get_buff_content()
 
 
+"""
 tpl = template()
 tpl.set_find_directories(["./test"])
 rs = tpl.render("child.html", name="this is template")
 
 print(rs)
+"""
