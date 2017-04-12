@@ -10,15 +10,33 @@ class ParserErr(Exception): pass
 
 
 class parser(object):
-    def __parse_block_tag_property(self, tag_content, property_name):
-        """获取块标签的属性值
-        :param tag_content:块标签内容 
-        :param property_name: 属性名
+    def __get_quot_content(self, sts, quot):
+        """
+        :param sts: 
+        :param quot: 是单引号还是双引号
         :return: 
         """
-        pass
+        p = sts.find(quot)
+        if p < 0: return ""
+        a = p + 1
+        sts = sts[a:]
+        p = sts.find(quot)
+        if p < 0: return ""
 
-    def parse_single_syntax(self, s):
+        return sts[0:p]
+
+    def __parse_block_tag_name_property(self, tag_content):
+        """获取block标签的name属性,注意,block只能包含且必须包含name属性
+        :param tag_content:块标签内容 
+        :return: 
+        """
+        # 获取引号的内容
+        name = self.__get_quot_content(tag_content, "\"")
+        if not name:
+            name = self.__get_quot_content(tag_content, "'")
+        return name
+
+    def __parse_single_syntax(self, s):
         """解析美元符号
         :param sts: 
         :return: 
@@ -43,7 +61,7 @@ class parser(object):
 
         return results
 
-    def parse_pycode_block(self, sts):
+    def __parse_pycode_block(self, sts):
         results = []
 
         start = "<%"
@@ -75,7 +93,7 @@ class parser(object):
 
         return results
 
-    def parse_tpl_block(self, sts):
+    def __parse_tpl_block(self, sts):
         """解析模版块
         :param sts: 
         :return: 
@@ -118,3 +136,12 @@ class parser(object):
             sts = sts[pos:]
 
         return results
+
+    def parse(self, sts):
+        results = self.__parse_tpl_block(sts)
+
+        # 首先处理block标签
+        for flags, v in results:
+            if not flags: continue
+            block_content, s = v
+

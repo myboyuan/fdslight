@@ -75,7 +75,7 @@ class execute(object):
         sts = self.__exe_objects[name]
         cls = syntax_parser.parser()
 
-        rs = cls.parse_tpl_block(sts)
+        rs = cls.parse(sts)
 
         print(rs)
 
