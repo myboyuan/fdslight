@@ -58,21 +58,53 @@ class parser(object):
             ''''''
         return results
 
-    def __parse_block(self, sts, start_begin, end_begin):
+    def __parse_block(self, sts, start, end):
         """解析块内容
         :param sts: 
-        :param start_begin: 
-        :param end_begin: 
+        :param start: 
+        :param end: 
         :return: 
         """
         results = []
 
-        while 1:
-            pos = sts.find(start_begin)
+        size_begin = len(start)
+        size_end = len(end)
 
+        while 1:
+            pos = sts.find(start)
+            if pos < 0:
+                results.append((False, sts,))
+                break
+            s1 = sts[0:pos]
+            if s1: results.append((False, s1,))
+
+            pos += size_begin
+            sts_bak = sts
+            sts = sts[pos:]
+
+            pos = sts.find(end)
+            if pos < 0:
+                results.append((False, sts_bak,))
+                break
+
+            results.append((True, sts[0:pos]))
+            pos += size_end
+            sts = sts[pos:]
+
+        return results
 
     def __parse_step1(self, sts):
-        pass
+        tmp_results = self.__parse_block(sts, "<%block", "/>")
+        results = []
+
+        for flags, s in tmp_results:
+            if flags:
+                results.append((flags, s,))
+                continue
+            t = self.__parse_block(s, "<%block", "</%block>")
+            results += t
+
+        return results
 
     def __parse_step2(self, sts):
         pass
