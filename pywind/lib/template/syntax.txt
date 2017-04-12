@@ -1,15 +1,7 @@
 <body>
-${self.inherit("name.html")}
-
-<%block name="">    </%block>
-<%block name=""/>
-
-${self.import("my.py")}
-
+<%block name="zzz">    </%block>
+<%block name="hello" />
 <%
     for name in self.v(""):
         self.show("%s=%s" % (name,value))
 %>
-
-${self.include("test.html")}
-</body>

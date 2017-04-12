@@ -2,26 +2,6 @@
 """核心语法解析器,实现核心语法解析功能
 """
 
-### 表示从何种语法标志获取解析结果的
-# 没有任何语法标志
-SYNTAX_FLAG_NONE = 0
-
-# 从<%block name=''>解析而来
-SYNTAX_FLAG_BLOCK_BEGIN = 1
-# 从<%block name=''/>解析而来
-SYNTAX_FLAG_BLOCK_BEGIN_AND_END = 2
-
-# 从</%block>解析而来
-SYNTAX_FLAG_BLOCK_END = 3
-
-# Pyhton代码开始
-SYNTAX_FLAG_PYCODE_BEGIN = 4
-# Python代码结束
-SYNTAX_FLAG_PYCODE_END = 5
-
-# 从美元符号解析得来的
-SYNTAX_FLAG_DOL = 6
-
 
 class SyntaxErr(Exception): pass
 
@@ -30,45 +10,47 @@ class ParserErr(Exception): pass
 
 
 class parser(object):
-    def __parse_step3(self, s):
+    def __parse_block_tag_property(self, tag_content, property_name):
+        """获取块标签的属性值
+        :param tag_content:块标签内容 
+        :param property_name: 属性名
+        :return: 
+        """
+        pass
+
+    def parse_single_syntax(self, s):
         """解析美元符号
         :param sts: 
         :return: 
         """
         results = []
 
-        tmplist = s.split("\n")
+        while 1:
+            pos = sts.find("${")
+            if pos < 0:
+                results.append((False, sts,))
+                break
+            s1 = sts[0:pos]
+            if s1: results.append((False, s1,))
+            pos += 2
+            sts = sts[pos:]
+            pos = sts.find("}")
+            if pos < 1: raise SyntaxErr
+            s2 = sts[0:pos]
+            results.append((True, s2,))
+            pos += 1
+            sts = sts[pos:]
 
-        for sts in tmplist:
-            while 1:
-                pos = sts.find("${")
-                if pos < 0:
-                    results.append((SYNTAX_FLAG_NONE, sts,))
-                    break
-                s1 = sts[0:pos]
-                if s1: results.append((SYNTAX_FLAG_NONE, s1,))
-                pos += 2
-                sts = sts[pos:]
-                pos = sts.find("}")
-                if pos < 1: raise SyntaxErr
-                s2 = sts[0:pos]
-                results.append((SYNTAX_FLAG_DOL, s2,))
-                pos += 1
-                sts = sts[pos:]
-            ''''''
         return results
 
-    def __parse_block(self, sts, start, end):
-        """解析块内容
-        :param sts: 
-        :param start: 
-        :param end: 
-        :return: 
-        """
+    def parse_pycode_block(self, sts):
         results = []
 
-        size_begin = len(start)
-        size_end = len(end)
+        start = "<%"
+        end = "%>"
+
+        size_begin = 2
+        size_end = 2
 
         while 1:
             pos = sts.find(start)
@@ -93,21 +75,46 @@ class parser(object):
 
         return results
 
-    def __parse_step1(self, sts):
-        tmp_results = self.__parse_block(sts, "<%block", "/>")
+    def parse_tpl_block(self, sts):
+        """解析模版块
+        :param sts: 
+        :return: 
+        """
         results = []
 
-        for flags, s in tmp_results:
-            if flags:
-                results.append((flags, s,))
+        while 1:
+            pos = sts.find("<%block")
+            if pos < 0:
+                results.append((False, sts))
+                break
+
+            t_sts = sts[pos:]
+            t = t_sts.find(">")
+            t += pos
+
+            if t < 1:
+                results.append((False, sts))
+                break
+            tt = t - 1
+            t = t + 1
+
+            s1 = sts[0:pos]
+            s2 = sts[pos:t]
+
+            if sts[tt] == "/":
+                results.append((False, s1))
+                results.append((True, (s2, "",),))
+                sts = sts[t:]
                 continue
-            t = self.__parse_block(s, "<%block", "</%block>")
-            results += t
+            pos = sts.find("</%block>")
+
+            if pos < 9:
+                results.append((False, sts))
+                break
+            s3 = sts[t:pos]
+            pos += 9
+            results.append((False, s1,))
+            results.append((True, (s2, s3,),))
+            sts = sts[pos:]
 
         return results
-
-    def __parse_step2(self, sts):
-        pass
-
-    def parse(self, sts):
-        pass

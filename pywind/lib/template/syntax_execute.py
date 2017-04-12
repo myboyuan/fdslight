@@ -75,18 +75,9 @@ class execute(object):
         sts = self.__exe_objects[name]
         cls = syntax_parser.parser()
 
-        rs = cls.parse(sts)
+        rs = cls.parse_tpl_block(sts)
 
-        if not rs[0]:
-            return []
-
-        results = rs[1]
-        for flag, content in results:
-            if flag == syntax_parser.SYNTAX_FLAG_NONE:
-                self.__run_step1.append((self.put_to_buff, content,))
-                continue
-
-        return results
+        print(rs)
 
     def __getattr__(self, item):
         pass
@@ -98,4 +89,4 @@ exe = execute()
 exe.set_exe_object("test", fd.read())
 fd.close()
 
-print(exe.exe("test"))
+exe.exe("test")
