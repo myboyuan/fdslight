@@ -82,7 +82,7 @@ class template(object):
         :return: 
         """
 
-        for k, v in self.__user_exts:
+        for k, v in self.__user_exts.items():
             exeobj.register_ext_attr(k, v)
 
         exeobj.register_ext_attr("inherit", self.__ext_inherit)
