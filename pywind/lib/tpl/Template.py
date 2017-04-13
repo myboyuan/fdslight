@@ -136,7 +136,6 @@ class template(object):
         exeobj_a._exe()
 
         return exeobj_a._get_buff_content()
-
 """
 tpl = template()
 tpl.set_find_directories(["./test"])
