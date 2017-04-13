@@ -87,8 +87,10 @@ class template(object):
 
         exeobj.register_ext_attr("inherit", self.__ext_inherit)
         exeobj._set_include_func(self.__include)
+
         exeobj.register_ext_attr("include", self.__ext_dyn_include)
         exeobj.register_ext_attr("time", importlib.import_module("time"))
+        exeobj.register_ext_attr("re", importlib.import_module("re"))
 
     def __get_fpath(self, uri):
         for d in self.__directories:
@@ -134,7 +136,6 @@ class template(object):
         exeobj_a._exe()
 
         return exeobj_a._get_buff_content()
-
 
 """
 tpl = template()
