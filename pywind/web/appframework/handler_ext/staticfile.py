@@ -2,7 +2,7 @@
 """实现静态文件文件功能"""
 
 import pywind.web.appframework.app_handler as app_handler
-import os
+import os, hashlib
 
 
 class staticfile(app_handler.handler):
@@ -11,6 +11,9 @@ class staticfile(app_handler.handler):
     __is_responsed_header = False
     # 是否根据时间来生成304响应,默认根据文件MD5值
     __304_by_time = False
+
+    # 是否通过修改时间来判断文件是否发生修改
+    cmp_file_modify_by_mtime = False
 
     def initialize(self):
         self.__mime_map = {
@@ -28,6 +31,7 @@ class staticfile(app_handler.handler):
             "eot": "application/vnd.ms-fontobject",
             "otf": "application/font-otf",
             "json": "application/json;charset=utf-8",
+            "woff2":"application/font-woff2",
         }
         self.__read_size = 0
         self.__is_finish = False
@@ -65,10 +69,18 @@ class staticfile(app_handler.handler):
 
             stat = os.stat(fpath)
 
-            if not self.__is_modified(stat.st_mtime):
+            if self.cmp_file_modify_by_mtime:
+                is_modified = self.__is_modified_by_mtime(stat.st_mtime)
+            else:
+                file_md5 = self.__calc_file_md5(fpath)
+                if_none_match = self.request.environ.get("HTTP_IF_NONE_MATCH", "")
+                is_modified = if_none_match == file_md5
+
+            if is_modified:
                 self.set_status("304 Not Modified")
                 self.finish()
                 return
+
             self.__file_size = stat.st_size
             self.__file_object = open(fpath, "rb")
 
@@ -79,10 +91,11 @@ class staticfile(app_handler.handler):
                 ("Last-Modified", self.get_header_date(stat.st_mtime),),
             ])
 
+            if not self.cmp_file_modify_by_mtime: self.set_header("Etag", file_md5)
+
         byte_data = self.__async_read_file()
         if byte_data == b"": self.finish()
         self.write(byte_data)
-
 
     def get_file_ext_name(self, path):
         """获取文件扩展名"""
@@ -117,7 +130,19 @@ class staticfile(app_handler.handler):
             self.__file_object.close()
         self.__file_object = None
 
-    def __is_modified(self, mtime):
+    def __calc_file_md5(self, fpath):
+        md5 = hashlib.md5()
+        fdst = open(fpath, "rb")
+
+        while 1:
+            rdata = fdst.read(8192)
+            if not rdata: break
+            md5.update(rdata)
+        fdst.close()
+
+        return md5.hexdigest()
+
+    def __is_modified_by_mtime(self, mtime):
         try:
             sts = self.request.environ["HTTP_IF_MODIFIED_SINCE"]
         except KeyError:
