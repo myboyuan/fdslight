@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import re
+
 
 class tag_filter(object):
     """HTML标签过滤"""
@@ -38,4 +40,11 @@ class tag_filter(object):
 
     def get_result(self):
         """获取过滤结果"""
+        pass
+
+    def __get_syntax_tree(self, sts):
+        """获取标签语法树
+        :param sts: 
+        :return: 
+        """
         pass
