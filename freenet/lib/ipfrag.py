@@ -28,6 +28,10 @@ class ip4_p2p_proxy(object):
         mbuf.offset = 4
         byte_uniq_id = mbuf.get_part(2)
 
+        # 检查IP数据包长度是否合法
+        mbuf.offset = 2
+        if utils.bytes2number(mbuf.get_part(2)) != mbuf.payload_size: return
+
         mbuf.offset = 6
         frag_off = utils.bytes2number(mbuf.get_part(2))
         df = 0x4000 >> 14
@@ -41,33 +45,36 @@ class ip4_p2p_proxy(object):
         if offset > 2048: return
 
         _id = b"".join([saddr, byte_uniq_id])
+
         if offset == 0:
             saddr, daddr, sport, dport = self.__get_pkt_addr_info(mbuf)
             if dport == 0: return
             content = self.__get_transfer_content(mbuf)
-            if mf == 0:
-                self.__ok_packets.append((saddr, daddr, sport, dport, content,))
-                return
             self.__frag_data[_id] = (saddr, daddr, sport, dport, [content, ])
             self.__timer.set_timeout(_id, self.__TIMEOUT)
 
-            return
-        elif _id not in self.__frag_data:
+        if _id not in self.__frag_data:
             return
 
-        else:
+        if offset != 0:
             content = self.__get_transfer_content(mbuf, is_off=True)
-            _, _, frag_pkts = self.__frag_data[_id]
+            _, _, _, _, frag_pkts = self.__frag_data[_id]
             frag_pkts.append(content)
 
-        if mf != 0: return
-
+        # if mf != 0: return
         saddr, daddr, sport, dport, frag_pkts = self.__frag_data[_id]
 
-        self.__ok_packets.append(saddr, daddr, sport, dport, b"".join(frag_pkts))
-        self.__timer.drop(_id)
-
-        del self.__frag_data[_id]
+        t = []
+        while 1:
+            try:
+                t.append(frag_pkts.pop(0))
+            except IndexError:
+                break
+            ''''''
+        self.__ok_packets.append((saddr, daddr, sport, dport, b"".join(t)))
+        if mf == 0:
+            self.__timer.drop(_id)
+            del self.__frag_data[_id]
 
     def get_data(self):
         self.recycle()
