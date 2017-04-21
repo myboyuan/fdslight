@@ -37,8 +37,8 @@ class ip4_p2p_proxy(object):
         mbuf.offset = 12
         saddr = mbuf.get_part(4)
 
-        # 处理部分包只有一个分包的情况
-        if df or (df == 0 and offset == 0 and mf == 0):
+        # 处理没有分包的情况
+        if offset == 0 and mf == 0:
             saddr, daddr, sport, dport = self.__get_pkt_addr_info(mbuf)
             if dport == 0: return
             content = self.__get_transfer_content(mbuf)
