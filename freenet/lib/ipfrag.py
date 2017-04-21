@@ -14,7 +14,7 @@ class ip4_p2p_proxy(object):
     __ok_packets = None
 
     # 超时时间,超时就丢弃分包
-    __TIMEOUT = 5
+    __TIMEOUT = 8
 
     def __init__(self):
         """
