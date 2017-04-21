@@ -37,14 +37,6 @@ class ip4_p2p_proxy(object):
         mbuf.offset = 12
         saddr = mbuf.get_part(4)
 
-        # 处理没有分包的情况
-        if offset == 0 and mf == 0:
-            saddr, daddr, sport, dport = self.__get_pkt_addr_info(mbuf)
-            if dport == 0: return
-            content = self.__get_transfer_content(mbuf)
-            self.__ok_packets.append((saddr, daddr, sport, dport, content,))
-            return
-
         # 限制分包数目
         if offset > 2048: return
 
@@ -53,7 +45,9 @@ class ip4_p2p_proxy(object):
             saddr, daddr, sport, dport = self.__get_pkt_addr_info(mbuf)
             if dport == 0: return
             content = self.__get_transfer_content(mbuf)
-
+            if mf == 0:
+                self.__ok_packets.append((saddr, daddr, sport, dport, content,))
+                return
             self.__frag_data[_id] = (saddr, daddr, sport, dport, [content, ])
             self.__timer.set_timeout(_id, self.__TIMEOUT)
 
