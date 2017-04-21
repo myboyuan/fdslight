@@ -71,8 +71,6 @@ class traffic_read(handler.handler):
         self.unregister(self.fileno)
         os.close(self.fileno)
 
-
-
 class p2p_proxy(udp_handler.udp_handler):
     # 代理超时时间
     __PROXY_TIMEOUT = 180
