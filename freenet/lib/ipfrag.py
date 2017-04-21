@@ -57,7 +57,7 @@ class ip4_p2p_proxy(object):
             _, _, _, _, frag_pkts = self.__frag_data[_id]
             frag_pkts.append(content)
 
-        if mf != 0 and offset == 0 and (mbuf.payload_size > 576 and mbuf.payload_size < 1500): return
+        if mf != 0 and mbuf.payload_size < 1490: return
         saddr, daddr, sport, dport, frag_pkts = self.__frag_data[_id]
 
         t = []
