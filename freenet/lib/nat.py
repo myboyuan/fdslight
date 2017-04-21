@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import freenet.lib.ipaddr as ipaddr
-import freenet.lib.ipfrag as ipfrag
+import freenet.lib.ip6dgram as ipfrag
 import pywind.lib.timer as timer
 import socket, random
 import freenet.lib.ippkts as ippkts

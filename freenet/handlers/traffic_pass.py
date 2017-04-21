@@ -72,6 +72,77 @@ class traffic_read(handler.handler):
         os.close(self.fileno)
 
 
+class ip4_raw_send(handler.handler):
+    """把数据包发送到局域网的设备"""
+    __creator_fd = -1
+    __sent = None
+    __socket = None
+
+    def init_func(self, creator_fd):
+        self.__creator_fd = creator_fd
+        self.__sent = []
+
+        family = socket.AF_INET
+
+        s = socket.socket(family, socket.SOCK_RAW,
+                          socket.IPPROTO_UDP | socket.IPPROTO_ICMP | socket.IPPROTO_UDP | 136)
+        s.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+        s.setblocking(0)
+
+        self.__socket = s
+        self.set_fileno(s.fileno())
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
+
+        return self.fileno
+
+    def evt_read(self):
+        """丢弃所有收到的包"""
+        while 1:
+            try:
+                _ = self.__socket.recvfrom(8192)
+            except BlockingIOError:
+                break
+            ''''''
+        return
+
+    def evt_write(self):
+        if not self.__sent: self.remove_evt_write(self.fileno)
+
+        while 1:
+            try:
+                ippkt = self.__sent.pop(0)
+            except IndexError:
+                break
+
+            ip_ver = (ippkt[0] & 0xf0) >> 4
+            # 目前只支持IPv4
+            if ip_ver != 4: continue
+
+            dst_addr_pkt = ippkt[16:20]
+            dst_addr = socket.inet_ntoa(dst_addr_pkt)
+            pkt_len = (ippkt[2] << 8) | ippkt[3]
+            try:
+                sent_len = self.__socket.sendto(ippkt, (dst_addr, 0))
+            except BlockingIOError:
+                self.__sent.insert(0, ippkt)
+                return
+
+            if pkt_len > sent_len:
+                self.__sent.insert(0, ippkt)
+                break
+            ''''''
+        return
+
+    def message_from_handler(self, from_fd, byte_data):
+        self.add_evt_write(self.fileno)
+        self.__sent.append(byte_data)
+
+    def delete(self):
+        self.unregister(self.fileno)
+        self.__socket.close()
+
+
 class p2p_proxy(udp_handler.udp_handler):
     # 代理超时时间
     __PROXY_TIMEOUT = 180
@@ -175,6 +246,12 @@ class p2p_proxy(udp_handler.udp_handler):
     def send_msg(self, message, address):
         self.add_evt_write(self.fileno)
         self.sendto(message, address)
+        self.add_permit(address)
 
+    def add_permit(self, address):
+        """允许接收的数据包来源
+        :param address: 
+        :return: 
+        """
         addr_id = "%s-%s" % address
         if addr_id not in self.__permits: self.__permits[addr_id] = None

@@ -16,9 +16,10 @@ import pywind.lib.configfile as configfile
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.nat as nat
 import freenet.handlers.tunnels as tunnels
-import freenet.lib.ipfrag as ipfrag
+import freenet.lib.ip6dgram as ip6dgram
 import freenet.handlers.traffic_pass as traffic_pass
 import freenet.lib.logging as logging
+import freenet.lib.fn_utils as fn_utils
 
 
 class _fdslight_server(dispatcher.dispatcher):
@@ -56,9 +57,11 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __IP6_ROUTER_TIMEOUT = 900
 
-    __ipfragments = None
+    __ip6_dgram = None
 
     __dgram_proxy = None
+
+    __raw_fileno = None
 
     def init_func(self, debug, configs):
         self.create_poll()
@@ -66,7 +69,7 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__configs = configs
         self.__debug = debug
 
-        self.__ipfragments = {}
+        self.__ip6_dgram = {}
         self.__dgram_proxy = {}
 
         signal.signal(signal.SIGINT, self.__exit)
@@ -143,6 +146,10 @@ class _fdslight_server(dispatcher.dispatcher):
             -1, tundev.tundevs, self.__DEVNAME
         )
 
+        self.__raw_fileno = self.create_handler(
+            -1, traffic_pass.ip4_raw_send
+        )
+
         self.__access = access.access(self)
 
         self.__mbuf = utils.mbuf()
@@ -217,9 +224,16 @@ class _fdslight_server(dispatcher.dispatcher):
         return self.__handle_ipv6data_from_tunnel(session_id)
 
     def __handle_ipv6data_from_tunnel(self, session_id):
-        if self.__mbuf.payload_size < 48: return False
         # 如果NAT66没开启那么丢弃IPV6数据包
         if not self.__enable_nat6: return False
+
+        if self.__mbuf.payload_size < 48: return False
+
+        # 检查IPV6数据包长度是否合法
+        self.__mbuf.offset = 4
+        payload_length = utils.bytes2number(self.__mbuf.get_part(2))
+        if payload_length + 40 != self.__mbuf.payload_size: return False
+
         self.__mbuf.offset = 6
         nexthdr = self.__mbuf.get_part(1)
 
@@ -231,7 +245,7 @@ class _fdslight_server(dispatcher.dispatcher):
         if nexthdr in (17, 136,):
             is_udplite = False
             if nexthdr == 136: is_udplite = True
-            self.__handle_dgram_from_tunnel(session_id, is_ipv6=True, is_udplite=is_udplite)
+            self.__handle_ipv6_dgram_from_tunnel(session_id, is_udplite=is_udplite)
             return True
 
         b = self.__nat6.get_ippkt2sLan_from_cLan(session_id, self.__mbuf)
@@ -247,7 +261,13 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__mbuf.offset = 9
         protocol = self.__mbuf.get_part(1)
 
-        if self.__get_ip4_hdrlen() + 8 > self.__mbuf.payload_size: return False
+        hdrlen = self.__get_ip4_hdrlen()
+        if hdrlen + 8 < 28: return False
+
+        # 检查IP数据报长度是否合法
+        self.__mbuf.offset = 2
+        payload_length = utils.bytes2number(self.__mbuf.get_part(2))
+        if payload_length != self.__mbuf.payload_size: return False
 
         if protocol not in self.__support_ip4_protocols: return False
 
@@ -255,7 +275,7 @@ class _fdslight_server(dispatcher.dispatcher):
         if protocol == 17 or protocol == 136:
             is_udplite = False
             if protocol == 136: is_udplite = True
-            self.__handle_dgram_from_tunnel(session_id, is_udplite=is_udplite, is_ipv6=False)
+            self.__handle_ipv4_dgram_from_tunnel(session_id, is_udplite=is_udplite)
             return True
         self.__mbuf.offset = 0
 
@@ -264,6 +284,72 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__mbuf.offset = 0
         self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(self.__mbuf.get_data())
         return True
+
+    def __handle_ipv4_dgram_from_tunnel(self, session_id, is_udplite=False):
+        mbuf = self.__mbuf
+        mbuf.offset = 4
+
+        mbuf.offset = 6
+        frag_off = utils.bytes2number(mbuf.get_part(2))
+
+        df = 0x4000 >> 14
+        mf = 0x2000 >> 13
+        offset = frag_off & 0x1fff
+
+        if offset == 0:
+            sts_saddr, sts_daddr, sport, dport = self.__get_ipv4_dgram_pkt_addr_info()
+            if dport == 0: return False
+
+        # 把源地址和checksum设置为0
+        mbuf.offset = 12
+        mbuf.replace(b"\0\0\0\0")
+
+        mbuf.offset = 10
+        mbuf.replace(b"\0\0")
+        ##
+
+        if offset != 0:
+            mbuf.offset = 0
+            self.send_message_to_handler(-1, self.__raw_fileno, mbuf.get_data())
+            return
+
+        _id = "%s-%s" % (sts_saddr, sport,)
+
+        fileno = -1
+        if session_id in self.__dgram_proxy:
+            pydict = self.__dgram_proxy[session_id]
+            if _id in pydict: fileno = pydict[_id]
+
+        if fileno < 0:
+            fileno = self.create_handler(
+                -1, traffic_pass.p2p_proxy,
+                session_id, (sts_saddr, sport,), is_udplite=is_udplite, is_ipv6=False
+            )
+        self.get_handler(fileno).add_permit((sts_daddr, dport,))
+        _, new_sport = self.get_handler(fileno).getsockname()
+
+        hdrlen = self.__get_ip4_hdrlen()
+        # 替换源端口
+        mbuf.offset = hdrlen
+        mbuf.replace(utils.number2bytes(new_sport, 2))
+
+        # 如果不是UDPLITE那么checksum设为0,否则重新计算checksum
+        mbuf.offset = hdrlen + 6
+        if not is_udplite:
+            mbuf.replace(b"\0\0")
+        else:
+            csum = utils.bytes2number(mbuf.get_part(2))
+            csum = fn_utils.calc_incre_csum(csum, sport, new_sport)
+            mbuf.replace(utils.number2bytes(csum, 2))
+
+        if session_id not in self.__dgram_proxy:
+            self.__dgram_proxy[session_id] = {}
+
+        pydict = self.__dgram_proxy[session_id]
+        pydict[_id] = fileno
+
+        mbuf.offset = 0
+        self.send_message_to_handler(-1, self.__raw_fileno, mbuf.get_data())
 
     def __send_msg_to_tunnel(self, session_id, action, message):
         if not self.__access.session_exists(session_id): return
@@ -347,19 +433,36 @@ class _fdslight_server(dispatcher.dispatcher):
         hdrlen = (n & 0x0f) * 4
         return hdrlen
 
-    def __handle_dgram_from_tunnel(self, session_id, is_ipv6=False, is_udplite=False):
-        """处理IPV4 以及IPv6数据报
+    def __get_ipv4_dgram_pkt_addr_info(self):
+        """获取数据包的地址信息
+        :param mbuf:
         :return:
         """
-        ip4fragment, ip6fragment = self.__ipfragments[session_id]
+        mbuf = self.__mbuf
 
-        if is_ipv6:
-            ipfragment = ip6fragment
-        else:
-            ipfragment = ip4fragment
-        ipfragment.add_frag(self.__mbuf)
+        hdrlen = self.__get_ip4_hdrlen()
 
-        data = ipfragment.get_data()
+        mbuf.offset = hdrlen + 2
+        dport = utils.bytes2number(mbuf.get_part(2))
+        mbuf.offset = hdrlen
+        sport = utils.bytes2number(mbuf.get_part(2))
+
+        mbuf.offset = 16
+        daddr = mbuf.get_part(4)
+        mbuf.offset = 12
+        saddr = mbuf.get_part(4)
+
+        return (socket.inet_ntoa(saddr), socket.inet_ntoa(daddr), sport, dport,)
+
+    def __handle_ipv6_dgram_from_tunnel(self, session_id, is_udplite=False):
+        """处理IPV6 dgram数据报
+        :return:
+        """
+        dgram_proxy = self.__ip6_dgram[session_id]
+
+        dgram_proxy.add_frag(self.__mbuf)
+
+        data = dgram_proxy.get_data()
         if not data: return
 
         saddr, daddr, sport, dport, msg = data
@@ -372,7 +475,7 @@ class _fdslight_server(dispatcher.dispatcher):
         if dgram_id not in pydict:
             fileno = self.create_handler(
                 -1, traffic_pass.p2p_proxy,
-                session_id, (saddr, sport), is_udplite=is_udplite, is_ipv6=is_ipv6
+                session_id, (saddr, sport), is_udplite=is_udplite, is_ipv6=True
             )
             pydict[dgram_id] = fileno
         fileno = pydict[dgram_id]
@@ -383,7 +486,7 @@ class _fdslight_server(dispatcher.dispatcher):
         :param session_id:
         :return:
         """
-        self.__ipfragments[session_id] = (ipfrag.ip4_p2p_proxy(), ipfrag.ip6_p2p_proxy(),)
+        self.__ip6_dgram[session_id] = ip6dgram.ip6_dgram_proxy()
 
     def tell_unregister_session(self, session_id, fileno):
         """告知取消session注册
@@ -393,7 +496,7 @@ class _fdslight_server(dispatcher.dispatcher):
         """
         if fileno not in (self.__udp_fileno, self.__udp6_fileno):
             self.delete_handler(fileno)
-        del self.__ipfragments[session_id]
+        del self.__ip6_dgram[session_id]
 
     def tell_del_dgram_proxy(self, session_id, saddr, sport):
         """告知删除UDP代理
