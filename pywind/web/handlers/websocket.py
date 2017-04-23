@@ -197,6 +197,9 @@ class ws_handler(tcp_handler.tcp_handler):
         self.unregister(self.fileno)
         self.close()
 
+    def tcp_timeout(self):
+        pass
+
     def getmsg(self):
         """获取websocket消息
         :return: 
