@@ -148,6 +148,15 @@ class ws_handler(tcp_handler.tcp_handler):
 
         return True
 
+    def __handle_ping(self):
+        pass
+
+    def __handle_pong(self):
+        pass
+
+    def __handle_close(self):
+        pass
+
     def on_handshake(self, request, headers):
         """重写这个方法
         :param request: 
@@ -176,15 +185,45 @@ class ws_handler(tcp_handler.tcp_handler):
             return
 
         self.__decoder.input(rdata)
-        self.ws_readable()
 
-    @property
-    def decoder(self):
-        return self.__decoder
+        while self.__decoder.continue_parse():
+            self.__decoder.parse()
+            if self.__decoder.frame_ok():
+                data = self.__decoder.get_data()
+                self.__handle_readable(
+                    data, self.__decoder.fin, self.__decoder.rsv,
+                    self.__decoder.opcode, self.__decoder.frame_ok()
+                )
+                self.__decoder.reset()
+            ''''''
+        return
 
-    @property
-    def encoder(self):
-        return self.__encoder
+    def __handle_close(self):
+        pass
+
+    def __handle_readable(self, message, fin, rsv, opcode, frame_finish):
+        """
+        
+        :param message: 
+        :param fin: 
+        :param rsv: 
+        :param opcode: 
+        :param frame_finish: 
+        :return: 
+        """
+        if opcode == 0x8:
+            self.__handle_close()
+            return
+
+        if opcode == 0x9:
+            self.__handle_ping()
+            return
+
+        if opcode == 0xa:
+            self.__handle_pong()
+            return
+
+        self.ws_readable(message, fin, rsv, opcode, frame_finish)
 
     def tcp_writable(self):
         self.remove_evt_write(self.fileno)
@@ -215,17 +254,16 @@ class ws_handler(tcp_handler.tcp_handler):
         """
         pass
 
-    def ws_readable(self):
-        """重写这个方法
+    def ws_readable(self, message, fin, rsv, opcode, frame_finish):
+        """
+        :param message: 
+        :param fin: 
+        :param rsv: 
+        :param opcode:
+        :param is_finish: 
         :return: 
         """
-        while self.decoder.continue_parse():
-            self.decoder.parse()
-
-            if self.decoder.frame_ok():
-                data = self.decoder.get_data()
-                self.decoder.reset()
-                print(data)
+        pass
 
     def ws_writable(self):
         """重写这个方法
