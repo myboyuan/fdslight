@@ -3,7 +3,7 @@
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.web.lib.websocket as websocket
 import pywind.web.lib.httputils as httputils
-import socket
+import socket, time
 
 
 class ws_listener(tcp_handler.tcp_handler):
@@ -53,8 +53,15 @@ class ws_handler(tcp_handler.tcp_handler):
 
     __is_handshake = None
 
+    __LOOP_TIMEOUT = 20
+    __update_time = 0
+
     # 自定义的握手响应头
     __ext_handshake_resp_headers = None
+
+    __is_close = False
+
+    __is_sent_ping = False
 
     def init_func(self, creator, cs, caddr):
         self.__caddr = caddr
@@ -64,10 +71,13 @@ class ws_handler(tcp_handler.tcp_handler):
 
         self.__is_handshake = False
         self.__ext_handshake_resp_headers = []
+        self.__is_close = False
 
         self.set_socket(cs)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
         return self.fileno
 
@@ -148,14 +158,36 @@ class ws_handler(tcp_handler.tcp_handler):
 
         return True
 
-    def __handle_ping(self):
-        pass
+    def __handle_ping(self, message):
+        self.__send_pong(message)
 
     def __handle_pong(self):
-        pass
+        self.__is_sent_ping = False
+        self.__update_time = time.time()
 
     def __handle_close(self):
-        pass
+        if not self.__is_close:
+            self.ws_close()
+            self.delete_this_no_sent_data()
+            return
+
+        self.delete_handler(self.fileno)
+
+    def __send_ping(self):
+        wrap_msg = self.__encoder.build_ping()
+
+        self.__is_sent_ping = True
+        self.__update_time = time.time()
+        self.writer.write(wrap_msg)
+        self.add_evt_write(self.fileno)
+
+    def __send_pong(self, message):
+        wrap_msg = self.__encoder.build_pong(message)
+
+        self.__update_time = time.time()
+
+        self.writer.write(self.fileno)
+        self.add_evt_write(wrap_msg)
 
     def on_handshake(self, request, headers):
         """重写这个方法
@@ -174,7 +206,8 @@ class ws_handler(tcp_handler.tcp_handler):
         self.__ext_handshake_resp_headers.append((name, value,))
 
     def set_ws_timeout(self, timeout):
-        self.__conn_timeout = timeout
+        self.__conn_timeout = int(timeout)
+        if self.__conn_timeout < 1: raise ValueError("wrong timeout value")
 
     def tcp_readable(self):
         rdata = self.reader.read()
@@ -196,10 +229,9 @@ class ws_handler(tcp_handler.tcp_handler):
                 )
                 self.__decoder.reset()
             ''''''
-        return
+        self.__update_time = time.time()
 
-    def __handle_close(self):
-        pass
+        return
 
     def __handle_readable(self, message, fin, rsv, opcode, frame_finish):
         """
@@ -211,19 +243,19 @@ class ws_handler(tcp_handler.tcp_handler):
         :param frame_finish: 
         :return: 
         """
-        if opcode == 0x8:
+        if opcode == websocket.OP_CLOSE:
             self.__handle_close()
             return
 
-        if opcode == 0x9:
-            self.__handle_ping()
+        if opcode == websocket.OP_PING:
+            self.__handle_ping(message)
             return
 
-        if opcode == 0xa:
+        if opcode == websocket.OP_PONG:
             self.__handle_pong()
             return
 
-        self.ws_readable(message, fin, rsv, opcode, frame_finish)
+        if message: self.ws_readable(message, fin, rsv, opcode, frame_finish)
 
     def tcp_writable(self):
         self.remove_evt_write(self.fileno)
@@ -237,22 +269,35 @@ class ws_handler(tcp_handler.tcp_handler):
         self.close()
 
     def tcp_timeout(self):
-        pass
+        if not self.__is_handshake:
+            self.delete_handler(self.fileno)
+            return
 
-    def getmsg(self):
-        """获取websocket消息
-        :return: 
-        """
-        pass
+        t = time.time()
 
-    def sendmsg(self, msg, *args, **kwargs):
+        if t - self.__update_time >= self.__conn_timeout:
+            if self.__is_close or self.__is_sent_ping:
+                self.delete_handler(self.fileno)
+                return
+            self.__send_ping()
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+
+    def sendmsg(self, msg, fin, rsv, opcode):
         """发送websocket消息
         :param msg: 
         :param args: 
         :param kwargs: 
         :return: 
         """
-        pass
+        if opcode in (0x8, 0x9, 0xa,): raise ValueError("ping,pong,close frame cannot be sent by this function")
+        if self.__is_close: raise ValueError("the connection is closed,you should not send data")
+
+        self.__update_time = time.time()
+
+        wrap_msg = self.__encoder.build_frame(msg, fin, rsv, opcode)
+
+        self.add_evt_write(self.fileno)
+        self.writer.write(wrap_msg)
 
     def ws_readable(self, message, fin, rsv, opcode, frame_finish):
         """
@@ -271,8 +316,19 @@ class ws_handler(tcp_handler.tcp_handler):
         """
         pass
 
-    def ws_close(self):
-        """socket关闭的时候将会调用此方法,重写这个方法
+    def ws_close(self, code=None):
+        """关闭ws连接
         :return: 
         """
-        pass
+        if not code:
+            code = ""
+        else:
+            code = str(code)
+
+        wrap_msg = self.__encoder.build_close(code.encode("iso-8859-1"))
+
+        self.__is_close = True
+        self.add_evt_write(self.fileno)
+        self.writer.write(wrap_msg)
+
+        self.__update_time = time.time()
