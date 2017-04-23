@@ -63,6 +63,8 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __raw_fileno = None
 
+    __ip6_udp_cone_nat = False
+
     def init_func(self, debug, configs):
         self.create_poll()
 
@@ -170,6 +172,7 @@ class _fdslight_server(dispatcher.dispatcher):
         subnet, prefix = utils.extract_subnet_info(nat_config["virtual_ip6_subnet"])
         eth_name = nat_config["eth_name"]
         ip6_gw = nat_config["ip6_gw"]
+        self.__ip6_udp_cone_nat = bool(int(nat_config.get("ip6_udp_cone_nat", 0)))
 
         if enable_ipv6:
             self.__nat6 = nat.nat((subnet, prefix,), is_ipv6=True)
@@ -242,7 +245,7 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__mbuf.offset = 40
         nexthdr = self.__mbuf.get_part(1)
 
-        if nexthdr in (17, 136,):
+        if nexthdr in (17, 136,) and self.__ip6_udp_cone_nat:
             is_udplite = False
             if nexthdr == 136: is_udplite = True
             self.__handle_ipv6_dgram_from_tunnel(session_id, is_udplite=is_udplite)
