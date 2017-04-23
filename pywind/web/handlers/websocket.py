@@ -6,7 +6,7 @@ import socket
 
 
 class ws_listener(tcp_handler.tcp_handler):
-    def init_func(self, creator, listen, conn_timeout=600, is_ipv6=False):
+    def init_func(self, creator, listen, is_ipv6=False):
         if is_ipv6:
             fa = socket.AF_INET6
         else:
@@ -50,8 +50,7 @@ class ws_handler(tcp_handler.tcp_handler):
     __encoder = None
     __decoder = None
 
-    def init_func(self, creator, cs, caddr, conn_timeout):
-        self.__conn_timeout = conn_timeout
+    def init_func(self, creator, cs, caddr):
         self.__caddr = caddr
 
         self.__decoder = websocket.decoder()
@@ -65,8 +64,12 @@ class ws_handler(tcp_handler.tcp_handler):
     def caddr(self):
         return self.__caddr
 
+    def set_ws_timeout(self, timeout):
+        self.__conn_timeout = timeout
+
     def tcp_readable(self):
-        pass
+        rdata = self.reader.read()
+
 
     def tcp_writable(self):
         pass
