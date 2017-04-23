@@ -54,6 +54,9 @@ class ws_handler(tcp_handler.tcp_handler):
         self.__conn_timeout = conn_timeout
         self.__caddr = caddr
 
+        self.__decoder = websocket.decoder()
+        self.__encoder = websocket.encoder()
+
         self.set_socket(cs)
 
         return self.fileno
@@ -75,12 +78,19 @@ class ws_handler(tcp_handler.tcp_handler):
         self.unregister(self.fileno)
         self.close()
 
-    @property
-    def encoder(self):
+    def getmsg(self):
+        """获取websocket消息
+        :return: 
+        """
         pass
 
-    @property
-    def decoder(self):
+    def sendmsg(self, msg, *args, **kwargs):
+        """发送websocket消息
+        :param msg: 
+        :param args: 
+        :param kwargs: 
+        :return: 
+        """
         pass
 
     def ws_readable(self):
