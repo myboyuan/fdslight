@@ -221,14 +221,17 @@ class ws_handler(tcp_handler.tcp_handler):
 
         while self.__decoder.continue_parse():
             self.__decoder.parse()
-            if self.__decoder.frame_ok():
-                data = self.__decoder.get_data()
-                self.__handle_readable(
-                    data, self.__decoder.fin, self.__decoder.rsv,
-                    self.__decoder.opcode, self.__decoder.frame_ok()
-                )
-                self.__decoder.reset()
-            ''''''
+            data = self.__decoder.get_data()
+
+            if not data: continue
+
+            data = self.__decoder.get_data()
+            self.__handle_readable(
+                data, self.__decoder.fin, self.__decoder.rsv,
+                self.__decoder.opcode, self.__decoder.frame_ok()
+            )
+
+            if self.__decoder.frame_ok(): self.__decoder.reset()
         self.__update_time = time.time()
 
         return
