@@ -221,6 +221,7 @@ class ws_handler(tcp_handler.tcp_handler):
 
         while self.__decoder.continue_parse():
             self.__decoder.parse()
+            if not self.__decoder.can_read_data(): continue
             data = self.__decoder.get_data()
             self.__handle_readable(
                 data, self.__decoder.fin, self.__decoder.rsv,
