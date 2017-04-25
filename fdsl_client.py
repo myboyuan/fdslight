@@ -167,7 +167,7 @@ class _fdslight_client(dispatcher.dispatcher):
         signal.signal(signal.SIGUSR1, self.__set_host_rules)
 
     def __load_kernel_mod(self):
-        os.chdir("driver")
+        os.chdir("%s/driver" % BASE_DIR)
         if not os.path.isfile("fdslight_dgram.ko"):
             print("you must install this software")
             sys.exit(-1)
