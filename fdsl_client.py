@@ -146,6 +146,7 @@ class _fdslight_client(dispatcher.dispatcher):
             sys.exit(-1)
 
         crypto_fpath = "%s/fdslight_etc/%s" % (BASE_DIR, conn["crypto_configfile"])
+        print(crypto_fpath)
 
         if not os.path.isfile(crypto_fpath):
             print("crypto configfile not exists")
@@ -499,7 +500,7 @@ def __start_service(mode, debug):
         proc.write_pid(PID_FILE)
 
     config_path = "%s/fdslight_etc/fn_client.ini" % BASE_DIR
-    print(BASE_DIR)
+
     configs = configfile.ini_parse_from_file(config_path)
 
     cls = _fdslight_client()
