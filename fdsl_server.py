@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 import sys, getopt, os, signal, importlib, socket
 
-BASE_DIR = os.path.dirname(__file__)
+BASE_DIR = os.path.dirname(sys.argv[0])
+
+if not BASE_DIR: BASE_DIR = "."
+
 sys.path.append(BASE_DIR)
 
 PID_FILE = "/tmp/fdslight.pid"
