@@ -4,7 +4,7 @@ import sys, os
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
-print(os.getcwd())
+if not BASE_DIR: BASE_DIR = "."
 
 sys.path.append(BASE_DIR)
 
