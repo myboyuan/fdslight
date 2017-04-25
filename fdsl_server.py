@@ -539,7 +539,8 @@ def __start_service(debug):
         if pid != 0: sys.exit(0)
         proc.write_pid(PID_FILE)
 
-    configs = configfile.ini_parse_from_file("fdslight_etc/fn_server.ini")
+    d = os.path.dirname(__file__)
+    configs = configfile.ini_parse_from_file("%s/fdslight_etc/fn_server.ini" % d)
     cls = _fdslight_server()
 
     if debug:
