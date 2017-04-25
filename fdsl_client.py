@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-import sys
+import sys, os
 
-BASE_DIR = sys.argv[0]
+BASE_DIR = os.path.dirname(sys.argv[0])
 
 sys.path.append(BASE_DIR)
 
