@@ -146,6 +146,7 @@ class _fdslight_client(dispatcher.dispatcher):
             sys.exit(-1)
 
         crypto_fpath = "%s/fdslight_etc/%s" % (BASE_DIR, conn["crypto_configfile"])
+        print(crypto_fpath)
 
         if not os.path.isfile(crypto_fpath):
             print("crypto configfile not exists")
