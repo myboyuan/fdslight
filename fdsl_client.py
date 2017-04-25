@@ -496,7 +496,8 @@ def __start_service(mode, debug):
         if pid != 0: sys.exit(0)
         proc.write_pid(PID_FILE)
 
-    config_path = "fdslight_etc/fn_client.ini"
+    d = os.path.dirname(__file__)
+    config_path = "%s/fdslight_etc/fn_client.ini" % d
     configs = configfile.ini_parse_from_file(config_path)
 
     cls = _fdslight_client()
