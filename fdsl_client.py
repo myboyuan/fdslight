@@ -360,7 +360,7 @@ class _fdslight_client(dispatcher.dispatcher):
         return self.__session_id
 
     def __set_host_rules(self, signum, frame):
-        fpath = "fdslight_etc/host_rules.txt"
+        fpath = "%s/fdslight_etc/host_rules.txt" % BASE_DIR
 
         if not os.path.isfile(fpath):
             print("cannot found host_rules.txt")
@@ -471,7 +471,7 @@ class _fdslight_client(dispatcher.dispatcher):
 
         if self.__mode == _MODE_GW:
             self.delete_handler(self.__dgram_fetch_fileno)
-            os.chdir("driver")
+            os.chdir("%s/driver" % BASE_DIR)
             os.system("rmmod fdslight_dgram")
             os.chdir("../")
         sys.exit(0)
