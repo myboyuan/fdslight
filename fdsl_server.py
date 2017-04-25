@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import sys, getopt, os, signal, importlib, socket
 
-sys.path.append("./")
+BASE_DIR = os.path.dirname(__file__)
+sys.path.append(BASE_DIR)
 
 PID_FILE = "/tmp/fdslight.pid"
 LOG_FILE = "/tmp/fdslight.log"
@@ -90,7 +91,7 @@ class _fdslight_server(dispatcher.dispatcher):
         tcp_crypto = "freenet.lib.crypto.%s.%s_tcp" % (crypto_mod_name, crypto_mod_name)
         udp_crypto = "freenet.lib.crypto.%s.%s_udp" % (crypto_mod_name, crypto_mod_name)
 
-        crypto_configfile = "./fdslight_etc/%s" % conn_config["crypto_configfile"]
+        crypto_configfile = "%s/fdslight_etc/%s" % (BASE_DIR, conn_config["crypto_configfile"])
 
         try:
             self.__tcp_crypto = importlib.import_module(tcp_crypto)
@@ -539,8 +540,7 @@ def __start_service(debug):
         if pid != 0: sys.exit(0)
         proc.write_pid(PID_FILE)
 
-    d = os.path.dirname(__file__)
-    configs = configfile.ini_parse_from_file("%s/fdslight_etc/fn_server.ini" % d)
+    configs = configfile.ini_parse_from_file("%s/fdslight_etc/fn_server.ini" % BASE_DIR)
     cls = _fdslight_server()
 
     if debug:

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
-import sys
+import sys, os
 
-sys.path.append("./")
+BASE_DIR = os.path.dirname(__file__)
+
+sys.path.append(BASE_DIR)
 
 import pywind.evtframework.evt_dispatcher as dispatcher
 import pywind.lib.timer as timer
@@ -143,7 +145,7 @@ class _fdslight_client(dispatcher.dispatcher):
             print("cannot found tcp or udp crypto module")
             sys.exit(-1)
 
-        crypto_fpath = "./fdslight_etc/%s" % conn["crypto_configfile"]
+        crypto_fpath = "%s/fdslight_etc/%s" % (BASE_DIR, conn["crypto_configfile"])
 
         if not os.path.isfile(crypto_fpath):
             print("crypto configfile not exists")
@@ -497,7 +499,7 @@ def __start_service(mode, debug):
         proc.write_pid(PID_FILE)
 
     d = os.path.dirname(__file__)
-    config_path = "%s/fdslight_etc/fn_client.ini" % d
+    config_path = "%s/fdslight_etc/fn_client.ini" % BASE_DIR
     configs = configfile.ini_parse_from_file(config_path)
 
     cls = _fdslight_client()
