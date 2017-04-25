@@ -4,6 +4,8 @@ import sys, os
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
+print(os.getcwd())
+
 sys.path.append(BASE_DIR)
 
 import pywind.evtframework.evt_dispatcher as dispatcher
