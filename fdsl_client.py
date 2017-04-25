@@ -167,12 +167,13 @@ class _fdslight_client(dispatcher.dispatcher):
         signal.signal(signal.SIGUSR1, self.__set_host_rules)
 
     def __load_kernel_mod(self):
-        os.chdir("%s/driver" % BASE_DIR)
-        if not os.path.isfile("fdslight_dgram.ko"):
+        ko_file = "%s/driver/fdslight_dgram.ko"
+
+        if not os.path.isfile(ko_file):
             print("you must install this software")
             sys.exit(-1)
 
-        fpath = "../fdslight_etc/kern_version"
+        fpath = "%s/fdslight_etc/kern_version" % BASE_DIR
         if not os.path.isfile(fpath):
             print("you must install this softwar")
             sys.exit(-1)
@@ -198,8 +199,7 @@ class _fdslight_client(dispatcher.dispatcher):
         if self.__enable_ipv6_traffic:
             os.system("echo 1 >/proc/sys/net/ipv6/conf/all/forwarding")
 
-        os.system("insmod fdslight_dgram.ko")
-        os.chdir(BASE_DIR)
+        os.system("insmod %s" % ko_file)
 
     def handle_msg_from_tundev(self, message):
         """处理来TUN设备的数据包
