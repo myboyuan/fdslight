@@ -21,7 +21,7 @@ class sql_helper(object):
         self.__data_list.append(" WHERE %s" % where)
         return self
 
-    def _from(self, table):
+    def from_(self, table):
         self.__data_list.append(
             " FROM %s%s" % (self.__prefix, table,)
         )
