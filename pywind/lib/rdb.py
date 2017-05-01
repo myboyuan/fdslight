@@ -76,6 +76,14 @@ class sql_helper(object):
     def append(self, sts):
         self.__data_list.append(" %s" % sts)
 
+    def limit(self, limit):
+        self.__data_list.append(" LIMIT %s" % limit)
+        return self
+
+    def offset(self, offset):
+        self.__data_list.append(" OFFSET %s" % offset)
+        return self
+
 
 def build_value_map(field_seq, value_seq):
     """Python默认返回tuple结果,没有包含字段,此函数生成 `字段->值`映射
