@@ -33,11 +33,18 @@ class sql_helper(object):
         )
         return self
 
-    def insert(self, table, values, fields=None):
+    def insert(self, table, **kwargs):
         self.__data_list += [
             "INSERT INTO ",
             "%s%s" % (self.__prefix, table),
         ]
+
+        fields = []
+        values = []
+        for k, v in kwargs.items():
+            fields.append(k)
+            values.append(v)
+
         if fields: self.__data_list.append(
             " (%s)" % ",".join(fields)
         )
