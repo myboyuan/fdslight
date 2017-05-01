@@ -54,9 +54,9 @@ class sql_helper(object):
 
         return self
 
-    def update(self, table, map_v):
+    def update(self, table, **kwargs):
         seq = []
-        for k, v in map_v.items(): seq.append("%s=%s" % (k, v,))
+        for k, v in kwargs.items(): seq.append("%s=%s" % (k, v,))
 
         self.__data_list.append(
             "UPDATE %s%s SET %s" % (self.__prefix, table, ",".join(seq))
