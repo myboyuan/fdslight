@@ -52,6 +52,8 @@ class _request(object):
     __args = None
     __kwargs = None
 
+    __cookie = None
+
     def __init__(self, env, *args, **kwargs):
         self.__qs_params = {}
         self.__stream_params = {}
@@ -61,6 +63,7 @@ class _request(object):
         self.__reader = reader.reader()
         self.__args = args
         self.__kwargs = kwargs
+        self.__cookie = None
 
         self.__init()
 
@@ -127,6 +130,33 @@ class _request(object):
     @property
     def environ(self):
         return self.__env
+
+    @property
+    def cookie(self):
+        if self.__cookie == None: return self.__cookie
+        self.__cookie = {}
+
+        sts = self.environ.get("HTTP_COOKIE", "")
+        tmplist = sts.split(";")
+
+        for s in tmplist:
+            s = s.lstrip()
+            p = s.find("=")
+            if s < 1: continue
+            name = s[0:p]
+            p += 1
+            value = s[p:]
+
+            if name not in self.__cookie:
+                self.__cookie[name] = value
+            else:
+                if not isinstance(self.__cookie[name], list):
+                    self.__cookie[name] = [self.__cookie[name], value]
+                else:
+                    self.__cookie[name].append(value)
+                ''''''
+            ''''''
+        return
 
     def recv_ok(self):
         """数据是否接收完毕"""
