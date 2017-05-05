@@ -17,6 +17,9 @@ def __calc_udp_csum(saddr, daddr, udp_data):
     data = b"".join(seq)
     csum = fn_utils.calc_csum(data)
 
+    csum_t = _calc_checksum(data, len(data))
+    print(csum,csum_t)
+
     if csum == 0: return 0xffff
 
     return csum
@@ -313,13 +316,11 @@ def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_udplite=
             msg_len & 0x00ff,
             0, 0,
         ]
-    """
+
     if not is_udplite:
         csum = __calc_udp_csum(saddr, daddr, b"".join([bytes(udp_hdr), message]))
         udp_hdr[6] = (csum & 0xff00) >> 8
         udp_hdr[7] = csum & 0xff
-        print(csum)
-    """
 
     pkt_data = b"".join(
         (bytes(udp_hdr), message,)
