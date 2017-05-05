@@ -155,6 +155,8 @@ register.mesh.com:1
 # PS4
 *.llnwd.net:0
 *.ubisoft.com:1
+*.srv.nintendo.net:1
+*.baas.nintendo.com:1
 
 ### 开发相关
 *.spice-space.org:1
