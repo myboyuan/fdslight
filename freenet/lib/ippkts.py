@@ -15,10 +15,9 @@ def __calc_udp_csum(saddr, daddr, udp_data):
 
     if 0 != size % 2: seq.append(b"\0")
     data = b"".join(seq)
-    csum = fn_utils.calc_csum(data)
+    # csum = fn_utils.calc_csum(data)
 
-    csum_t = _calc_checksum(data, len(data))
-    print(csum,csum_t)
+    csum = _calc_checksum(data, len(data))
 
     if csum == 0: return 0xffff
 
