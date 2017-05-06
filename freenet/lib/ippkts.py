@@ -3,8 +3,7 @@
 """
 import freenet.lib.fn_utils as fn_utils
 import freenet.lib.utils as utils
-import random
-#import socket
+import random, socket
 
 
 def __calc_udp_csum(saddr, daddr, udp_data, is_ipv6=False):
@@ -25,9 +24,9 @@ def __calc_udp_csum(saddr, daddr, udp_data, is_ipv6=False):
         size += 1
 
     data = b"".join(seq)
-    #csum = socket.htons(fn_utils.calc_csum(data, size))
+    csum = socket.htons(fn_utils.calc_csum(data, size))
 
-    csum = __calc_checksum(data, size)
+    # csum = __calc_checksum(data, size)
     # import socket
     # print(csum,socket.htons(csum_t))
 
