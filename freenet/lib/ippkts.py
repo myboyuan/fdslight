@@ -25,6 +25,8 @@ def __calc_udp_csum(saddr, daddr, udp_data, is_ipv6=False):
     data = b"".join(seq)
     csum = fn_utils.calc_csum(data, size)
 
+    print(csum,_calc_checksum(data,size))
+
     if csum == 0: return 0xffff
 
     return csum
