@@ -3,7 +3,7 @@
 """
 import freenet.lib.fn_utils as fn_utils
 import freenet.lib.utils as utils
-import random
+import random, socket
 
 
 def __calc_udp_csum(saddr, daddr, udp_data, is_ipv6=False):
@@ -24,8 +24,11 @@ def __calc_udp_csum(saddr, daddr, udp_data, is_ipv6=False):
         size += 1
 
     data = b"".join(seq)
-    csum = __calc_checksum(data, size)
-    #print(csum,csum_t)
+    csum = socket.htons(fn_utils.calc_csum(data, size))
+
+    # csum = __calc_checksum(data, size)
+    # import socket
+    # print(csum,socket.htons(csum_t))
 
     if csum == 0: return 0xffff
 
@@ -439,6 +442,7 @@ def __build_ipv6_fragment_hdr(nexthdr, frag_off, m_flag, frag_id):
 
     return b"".join(byte_seq)
 
+
 """
 import os
 
@@ -455,6 +459,5 @@ seq = [
 
 data2 = b"".join(seq)
 
-
-print(__calc_udp_csum(addr,addr,data2))
+print(__calc_udp_csum(addr, addr, data2))
 """
