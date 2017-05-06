@@ -325,14 +325,13 @@ def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_udplite=
             msg_len & 0x00ff,
             0, 0,
         ]
-    """
+
     if not is_udplite:
         csum = __calc_udp_csum(saddr, daddr,
                                b"".join([bytes(udp_hdr), message]),
                                is_ipv6=is_ipv6)
         udp_hdr[6] = (csum & 0xff00) >> 8
         udp_hdr[7] = csum & 0xff
-    """
 
     pkt_data = b"".join(
         (bytes(udp_hdr), message,)
@@ -441,3 +440,16 @@ def __build_ipv6_fragment_hdr(nexthdr, frag_off, m_flag, frag_id):
     ]
 
     return b"".join(byte_seq)
+
+
+"""
+import os
+
+data = os.urandom(1600)
+pkts = build_udp_packets(b"\0\0\0\0", b"\0\0\0\0", 9999, 9999, data, mtu=1450)
+
+for pkt in pkts:
+    n = (pkt[6] << 8) | pkt[7]
+    offset= n & 0x1fff
+    print(offset)
+"""

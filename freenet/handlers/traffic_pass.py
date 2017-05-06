@@ -209,7 +209,7 @@ class p2p_proxy(udp_handler.udp_handler):
         if self.__is_ipv6:
             mtu = 1280
         else:
-            mtu = 1420
+            mtu = 1440
 
         udp_packets = ippkts.build_udp_packets(
             n_saddr, self.__byte_internal_ip,
