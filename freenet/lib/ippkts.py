@@ -10,22 +10,24 @@ def __calc_udp_csum(saddr, daddr, udp_data, is_ipv6=False):
     size = len(udp_data)
     seq = [
         saddr, daddr, b'\x00\x11',
-        utils.number2bytes(size), udp_data
+        utils.number2bytes(size, 2),
+        udp_data,
     ]
-
-    if 0 != size % 2:
-        seq.append(b"\0")
-        size += 1
 
     if is_ipv6:
         size += 24
     else:
         size += 12
 
+    if 0 != size % 2:
+        seq.append(b"\0")
+        size += 1
+
     data = b"".join(seq)
     csum = fn_utils.calc_csum(data, size)
 
-    print(csum,_calc_checksum(data,size))
+    # csum = __calc_checksum(data, size)
+    # print(csum, fn_utils.calc_csum(data, size))
 
     if csum == 0: return 0xffff
 
@@ -192,7 +194,7 @@ def _calc_incre_checksum(old_checksum, old_field, new_field):
     return (~chksum) & 0xffff
 
 
-def _calc_checksum(pacekt, size):
+def __calc_checksum(pacekt, size):
     """计算校检和
     :param pacekt:
     :param size:
