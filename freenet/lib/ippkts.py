@@ -24,10 +24,8 @@ def __calc_udp_csum(saddr, daddr, udp_data, is_ipv6=False):
         size += 1
 
     data = b"".join(seq)
-    csum = fn_utils.calc_csum(data, size)
-
-    # csum = __calc_checksum(data, size)
-    # print(csum, fn_utils.calc_csum(data, size))
+    csum = __calc_checksum(data, size)
+    #print(csum,csum_t)
 
     if csum == 0: return 0xffff
 
@@ -441,15 +439,22 @@ def __build_ipv6_fragment_hdr(nexthdr, frag_off, m_flag, frag_id):
 
     return b"".join(byte_seq)
 
-
 """
 import os
 
 data = os.urandom(1600)
-pkts = build_udp_packets(b"\0\0\0\0", b"\0\0\0\0", 9999, 9999, data, mtu=1450)
+pkts = build_udp_packets(b"\0\0\0\1", b"\0\0\0\1", 9999, 9999, data, mtu=1450)
 
-for pkt in pkts:
-    n = (pkt[6] << 8) | pkt[7]
-    offset= n & 0x1fff
-    print(offset)
+addr = b"\0\0\0\1"
+length = 1400
+
+seq = [
+    pkts[0][20:],
+    pkts[1][20:],
+]
+
+data2 = b"".join(seq)
+
+
+print(__calc_udp_csum(addr,addr,data2))
 """

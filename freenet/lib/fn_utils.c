@@ -28,23 +28,25 @@ static unsigned short csum_incremental_update_modified(unsigned short old_csum,
 }
 
 /* 计算校检和 */
-static unsigned short calc_checksum(const unsigned char *buffer,int size)
+static unsigned short calc_checksum(unsigned short *buffer,int size)
 {
-    unsigned long cksum=0;
-    unsigned char a=0,b=1;
+        unsigned long sum;
 
-    while (size>1){
-        cksum+= (buffer[a] << 8) | buffer[b];
-        size-=2;
-        a+=2;b+=2;
-    }
-    if(size){
-        cksum+=buffer[a];
-    }
-    cksum=(cksum >>16)+(cksum & 0xffff);
-    cksum+=(cksum >>16);
+        sum = 0;
+        while (size > 1) {
+                sum += *buffer++;
+                size -= 2;
+        }
 
-    return (unsigned short)(~cksum);
+        /*  Add left-over byte, if any */
+        if (size)
+                sum += *(unsigned char *)buffer;
+
+        /*  Fold 32-bit sum to 16 bits */
+        while (sum >> 16)
+                sum  = (sum & 0xffff) + (sum >> 16);
+
+        return (unsigned short)(~sum);
 }
 
 /**
@@ -258,7 +260,7 @@ calc_csum(PyObject *self,PyObject *args)
 
     if(!PyArg_ParseTuple(args,"y#i",&sts,&size,&udp_size)) return NULL;
 
-    csum=calc_checksum((unsigned char *)sts,udp_size);
+    csum=calc_checksum((unsigned short *)sts,udp_size);
 
     return PyLong_FromLong(csum);
 }
