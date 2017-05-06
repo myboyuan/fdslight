@@ -6,16 +6,24 @@ import freenet.lib.utils as utils
 import random
 
 
-def __calc_udp_csum(saddr, daddr, udp_data):
+def __calc_udp_csum(saddr, daddr, udp_data, is_ipv6=False):
     size = len(udp_data)
     seq = [
         saddr, daddr, b'\x00\x11',
         utils.number2bytes(size), udp_data
     ]
 
-    if 0 != size % 2: seq.append(b"\0")
+    if 0 != size % 2:
+        seq.append(b"\0")
+        size += 1
+
+    if is_ipv6:
+        size += 24
+    else:
+        size += 12
+
     data = b"".join(seq)
-    csum = fn_utils.calc_csum(data)
+    csum = fn_utils.calc_csum(data, size)
 
     if csum == 0: return 0xffff
 
@@ -313,12 +321,12 @@ def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_udplite=
             msg_len & 0x00ff,
             0, 0,
         ]
-    """
+
     if not is_udplite:
         csum = __calc_udp_csum(saddr, daddr, b"".join([bytes(udp_hdr), message]))
         udp_hdr[6] = (csum & 0xff00) >> 8
         udp_hdr[7] = csum & 0xff
-    """
+
 
     pkt_data = b"".join(
         (bytes(udp_hdr), message,)
