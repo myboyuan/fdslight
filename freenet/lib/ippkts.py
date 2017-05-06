@@ -345,7 +345,7 @@ def build_udp_packets(saddr, daddr, sport, dport, message, mtu=1500, is_udplite=
         flow_label = random.randint(1, 0x0fffff)
 
     pkts = []
-    flags_df = 0
+    flags_df = 1
 
     if is_udplite:
         p = 136
