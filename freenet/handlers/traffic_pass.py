@@ -202,6 +202,7 @@ class p2p_proxy(udp_handler.udp_handler):
 
     def udp_readable(self, message, address):
         addr_id = "%s-%s" % address
+        addr_id = address[0]
         if addr_id not in self.__permits:
             print(address[0], "not permit")
             return
@@ -259,4 +260,5 @@ class p2p_proxy(udp_handler.udp_handler):
         :return: 
         """
         addr_id = "%s-%s" % address
+        addr_id = address[0]
         if addr_id not in self.__permits: self.__permits[addr_id] = None
