@@ -21,9 +21,11 @@ class builder(object):
     __block_size = 1150
     __max_pkt_size = 0
 
-    def __init__(self, fixed_header_size):
+    def __init__(self, fixed_header_size, pkt_size=1232):
         if fixed_header_size < MIN_FIXED_HEADER_SIZE: raise ValueError(
             "the header size can not less than %s" % MIN_FIXED_HEADER_SIZE)
+
+        self.__block_size = pkt_size - fixed_header_size
         self.__fixed_header_size = fixed_header_size
         self.__max_pkt_size = self.__block_size * 2
 
@@ -75,7 +77,7 @@ class builder(object):
 
         return b"".join(L)
 
-    def __get_sent_raw_data(self, data_len, byte_data, redundancy=False):
+    def __get_sent_raw_data(self, data_len, byte_data):
         """获取要发送的原始数据"""
         data_block_size = self.__block_size - self.__fixed_header_size
         tmplist = []
@@ -89,27 +91,20 @@ class builder(object):
             e += data_block_size
             tmplist.append(t)
 
-        # 没有开启冗余那么直接返回
-        if not redundancy:
-            ret_v = tuple(tmplist)
-            return ret_v
-
         # 如果有2个数据块,那么启用数据冗余,减少丢包率
         if len(tmplist) == 2:
             a, b = tuple(tmplist)
-            if not redundancy: ret_v = tuple(tmplist)
             ret_v = self.__gen_raib(a, b)
         else:
             # 只有一个数据块那么就不启用数据冗余
             ret_v = tuple(tmplist)
         return ret_v
 
-    def build_packets(self, session_id, action, byte_data, redundancy=False):
+    def build_packets(self, session_id, action, byte_data):
         """
         :param session_id: 
         :param action: 
         :param byte_data: 
-        :param redundancy: 是否开启数据冗余
         :return: 
         """
         if len(session_id) != 16: raise proto_utils.ProtoError("the size of session_id must be 16")
@@ -234,28 +229,6 @@ class parser(object):
             return (session_id, action, real_body,)
 
         if pkt_md5 != self.__pkt_md5 and self.__data_area: self.reset()
-
-        # 处理没有数据冗余的情况
-        if tot_seg == 2:
-            self.__data_area[seq] = real_body
-            # 超过2的是非法序号
-            if seq > 2: return None
-            if seq != 2:
-                self.__pkt_md5 = pkt_md5
-                return None
-            # 只收到了一个序号为2的数据包那么直接丢弃
-            if 1 not in self.__data_area and 2 not in self.__data_area:
-                self.reset()
-                return None
-            body_data = b"".join([
-                self.__data_area[1], self.__data_area[2]
-            ])
-            if not self.__check_data_is_modify(pkt_md5, body_data):
-                self.reset()
-                return None
-
-            self.reset()
-            return (session_id, action, body_data,)
 
         # 最大分段只能是3段
         if tot_seg > 3: return None
