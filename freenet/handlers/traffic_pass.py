@@ -190,6 +190,8 @@ class p2p_proxy(udp_handler.udp_handler):
         else:
             self.bind(("0.0.0.0", 0))
 
+        print("hello----")
+
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
