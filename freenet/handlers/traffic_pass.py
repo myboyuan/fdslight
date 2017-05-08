@@ -200,7 +200,10 @@ class p2p_proxy(udp_handler.udp_handler):
 
     def udp_readable(self, message, address):
         addr_id = "%s-%s" % address
-        if addr_id not in self.__permits: return
+        if addr_id not in self.__permits:
+            print(address[0], "not permit")
+            return
+        print(address[0])
 
         self.__update_time = time.time()
         n_saddr = socket.inet_aton(address[0])
