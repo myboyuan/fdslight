@@ -199,7 +199,8 @@ class p2p_proxy(udp_handler.udp_handler):
         return self.fileno
 
     def udp_readable(self, message, address):
-        addr_id = "%s-%s" % address
+        #addr_id = "%s-%s" % address
+        addr_id = address[0]
         if addr_id not in self.__permits: return
 
         self.__update_time = time.time()
@@ -253,5 +254,6 @@ class p2p_proxy(udp_handler.udp_handler):
         :param address: 
         :return: 
         """
-        addr_id = "%s-%s" % address
+        # addr_id = "%s-%s" % address
+        addr_id = address[0]
         if addr_id not in self.__permits: self.__permits[addr_id] = None
