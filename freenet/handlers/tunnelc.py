@@ -134,12 +134,15 @@ class udp_tunnel(udp_handler.udp_handler):
     __sent_queue = None
 
     __server_address = None
+    __redundancy = None
 
-    def init_func(self, creator, crypto, crypto_configs, conn_timeout=720, is_ipv6=False):
+    def init_func(self, creator, crypto, crypto_configs, redundancy=False, conn_timeout=720, is_ipv6=False):
         if is_ipv6:
             fa = socket.AF_INET6
         else:
             fa = socket.AF_INET
+        self.__redundancy = redundancy
+
         s = socket.socket(fa, socket.SOCK_DGRAM)
 
         self.set_socket(s)
@@ -203,7 +206,9 @@ class udp_tunnel(udp_handler.udp_handler):
         logging.print_general("udp_close", self.__server_address)
 
     def send_msg_to_tunnel(self, session_id, action, message):
-        ippkts = self.__encrypt.build_packets(session_id, action, message)
+        ippkts = self.__encrypt.build_packets(
+            session_id, action, message, redundancy=self.__redundancy
+        )
         self.__encrypt.reset()
 
         for ippkt in ippkts: self.send(ippkt)

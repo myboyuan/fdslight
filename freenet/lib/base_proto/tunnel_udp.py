@@ -77,13 +77,16 @@ class builder(object):
 
         return b"".join(L)
 
-    def __get_sent_raw_data(self, data_len, byte_data):
+    def __get_sent_raw_data(self, data_len, byte_data, redundancy=False):
         """获取要发送的原始数据"""
+        if data_len == 0: return [b"", ]
+
+        # 不开启数据冗余那么直接返回
+        if not redundancy: return [byte_data, ]
+
         data_block_size = self.__block_size - self.__fixed_header_size
         tmplist = []
         b, e = (0, data_block_size,)
-
-        if data_len == 0: return [b"", ]
 
         while b < data_len:
             t = byte_data[b:e]
@@ -100,11 +103,12 @@ class builder(object):
             ret_v = tuple(tmplist)
         return ret_v
 
-    def build_packets(self, session_id, action, byte_data):
+    def build_packets(self, session_id, action, byte_data, redundancy=False):
         """
         :param session_id: 
         :param action: 
         :param byte_data: 
+        :param redundancy:是否开启UDP数据冗余
         :return: 
         """
         if len(session_id) != 16: raise proto_utils.ProtoError("the size of session_id must be 16")
@@ -115,7 +119,7 @@ class builder(object):
             raise proto_utils.ProtoError("the size of byte data muse be less than %s" % self.__max_pkt_size + 1)
 
         data_seq = []
-        tmp_t = self.__get_sent_raw_data(data_len, byte_data)
+        tmp_t = self.__get_sent_raw_data(data_len, byte_data, redundancy=redundancy)
         tot_seq = len(tmp_t)
         md5_hash = proto_utils.calc_content_md5(byte_data)
         seq = 1

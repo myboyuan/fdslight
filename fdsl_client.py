@@ -378,6 +378,7 @@ class _fdslight_client(dispatcher.dispatcher):
         enable_ipv6 = bool(int(conn["enable_ipv6"]))
         conn_timeout = int(conn["conn_timeout"])
         tunnel_type = conn["tunnel_type"]
+        redundancy = bool(int(conn.get("udp_tunnel_redundancy", 1)))
 
         if tunnel_type.lower() == "udp":
             handler = tunnelc.udp_tunnel
@@ -386,9 +387,16 @@ class _fdslight_client(dispatcher.dispatcher):
             handler = tunnelc.tcp_tunnel
             crypto = self.__tcp_crypto
 
+        kwargs = {
+            "conn_timeout": conn_timeout,
+            "is_ipv6": enable_ipv6,
+        }
+
+        if tunnel_type.lower() == "udp": kwargs["redundancy"] = redundancy
+
         self.__tunnel_fileno = self.create_handler(
             -1, handler,
-            crypto, self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=enable_ipv6
+            crypto, self.__crypto_configs, **kwargs
         )
 
         self.get_handler(self.__tunnel_fileno).create_tunnel((host, port,))
