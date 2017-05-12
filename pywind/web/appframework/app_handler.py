@@ -348,11 +348,16 @@ class handler(object):
         try:
             self.__request.init()
         except MethodNotAllowErr:
-            pass
+            self.set_status("405 Method Not Allowed")
+            self.finish()
         except ContentLengthTooLongErr:
-            pass
+            self.set_status("413 Request Entity Too Large")
+            self.set_header("Content-Length", 0)
+            self.finish()
         except RequestErr:
-            pass
+            self.set_status("400 Bad Request")
+            self.set_header("Content-Length", 0)
+            self.finish()
 
     def on_recv_stream(self):
         """根据需要重写这个方法,接受http body流"""
