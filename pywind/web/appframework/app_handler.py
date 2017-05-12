@@ -65,8 +65,6 @@ class _request(object):
         self.__kwargs = kwargs
         self.__cookie = None
 
-        self.__init()
-
     @property
     def args(self):
         return self.__args
@@ -75,7 +73,7 @@ class _request(object):
     def kwargs(self):
         return self.__kwargs
 
-    def __init(self):
+    def init(self):
         m = self.environ["REQUEST_METHOD"].upper()
         if m not in self.__allow_request_methods: raise MethodNotAllowErr("not allow method %s" % m)
         self.__content_length = int(self.environ["CONTENT_LENGTH"])
@@ -346,6 +344,15 @@ class handler(object):
         self.__request = _request(environ, *args, **kwargs)
 
         self.__continue = self.initialize()
+
+        try:
+            self.__request.init()
+        except MethodNotAllowErr:
+            pass
+        except ContentLengthTooLongErr:
+            pass
+        except RequestErr:
+            pass
 
     def on_recv_stream(self):
         """根据需要重写这个方法,接受http body流"""
