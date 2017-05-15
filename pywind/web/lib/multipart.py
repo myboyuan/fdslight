@@ -246,3 +246,19 @@ class parser(object):
 
     def is_start(self):
         return self.__is_start
+
+    @property
+    def content_type(self):
+        return self.__content_type
+
+    @property
+    def size(self):
+        return 0
+
+    @property
+    def can_parse(self):
+        if not self.__is_start: return False
+        if self.__current_step != 3: return False
+        if self.__current_step == 3 and self.__reader.size() == 0: return False
+
+        return True

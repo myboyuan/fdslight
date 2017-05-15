@@ -48,6 +48,7 @@ class _request(object):
 
     __tmpfile_fd = None
     __tmpfile_name = ""
+    __tmpfile_data = b""
 
     __args = None
     __kwargs = None
@@ -168,12 +169,30 @@ class _request(object):
             self.__multipart = http_multipart.parser(self.__multipart_boundary)
 
         self.__multipart.input(self.__reader.read())
+
         while 1:
             self.__multipart.parse()
-            if self.__multipart.is_start():
-                data = self.__multipart.get_data()
-                if not data: continue
+            if not self.__multipart.is_start(): break
+            if not self.__multipart.can_parse: break
+
+            is_file = self.__multipart.is_file()
+            if is_file:
+                self.__handle_multipart_file()
+            else:
+                self.__handle_multipart_nofile()
         return
+
+    def __handle_multipart_file(self):
+        """处理multipart文件数据
+        :return: 
+        """
+        pass
+
+    def __handle_multipart_nofile(self):
+        """处理multipart非文件数据
+        :return: 
+        """
+        pass
 
     def handle_body(self):
         if self.recv_ok(): return
