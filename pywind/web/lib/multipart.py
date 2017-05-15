@@ -107,6 +107,8 @@ class parser(object):
 
     __data_list = None
 
+    __size = 0
+
     def __init__(self, boundary):
         self.__byte_begin_boundary = ("--%s\r\n" % boundary).encode("iso-8859-1")
         self.__byte_end_boundary = ("--%s--\r\n" % boundary).encode("iso-8859-1")
@@ -219,6 +221,7 @@ class parser(object):
         self.__is_file = False
         self.__current_step = 1
         self.__is_start = False
+        self.__size = 0
 
     def all_finish(self):
         return self.__all_finish
@@ -252,7 +255,7 @@ class parser(object):
 
     @property
     def size(self):
-        return 0
+        return self.__size
 
     @property
     def can_parse(self):

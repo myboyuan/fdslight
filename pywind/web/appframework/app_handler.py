@@ -12,6 +12,9 @@ import pywind.web.lib.multipart as http_multipart
 class RequestErr(Exception): pass
 
 
+class ForbiddenErr(Exception): pass
+
+
 class MethodNotAllowErr(Exception): pass
 
 
@@ -22,8 +25,6 @@ class ResponseErr(Exception): pass
 
 
 class _request(object):
-    MAX_BODY_SIZE = 8 * 1024 * 1024
-
     __qs_params = None
     __stream_params = None
 
@@ -56,6 +57,11 @@ class _request(object):
 
     __multipart = None
 
+    # 最大的POST文本大小
+    __max_post_size = 2 * 1024 * 1024
+    # 最大的内容长度
+    __max_content_length = 4 * 1024 * 1024
+
     def __init__(self, env, *args, **kwargs):
         self.__qs_params = {}
         self.__stream_params = {}
@@ -67,6 +73,15 @@ class _request(object):
         self.__kwargs = kwargs
         self.__cookie = None
         self.__multipart = None
+
+    def config(self, name, value):
+        if name not in (
+                "tmp_dir", "max_post_size", "max_content_length",
+        ): raise ValueError("wrong config name")
+
+        if name == "tmp_dir": self.__tmp_dir = value
+        if name == "max_post_size": self.__max_post_size = value
+        if name == "max_content_length": self.__max_content_length = value
 
     @property
     def args(self):
@@ -81,7 +96,7 @@ class _request(object):
         if m not in self.__allow_request_methods: raise MethodNotAllowErr("not allow method %s" % m)
         self.__content_length = int(self.environ["CONTENT_LENGTH"])
 
-        if self.__content_length > self.MAX_BODY_SIZE: raise ContentLengthTooLongErr
+        if self.__content_length > self.__max_content_length: raise ContentLengthTooLongErr
 
         if m != "POST":
             self.__init_other_m()
@@ -226,9 +241,14 @@ class _request(object):
         """处理multipart非文件数据
         :return: 
         """
+        if self.__multipart.size > self.__max_post_size:
+            raise ForbiddenErr("the post content is too long")
+
         if self.__multipart.single_finish():
             data = self.__multipart.get_data()
             name = self.__multipart.name
+
+            self.__multipart.reset()
 
             if name not in self.__stream_params:
                 self.__stream_params[name] = []
@@ -298,10 +318,6 @@ class _request(object):
     def files(self):
         return self.__files
 
-    def set_tmp_dir(self, directory):
-        """设置临时目录"""
-        self.__tmp_dir = directory
-
     def release(self):
         """释放占用的资源"""
         # 清理http body临时文件
@@ -330,6 +346,12 @@ class _request(object):
         """
         if self.environ["REQUEST_METHOD"] == "POST": return None
         return self.__reader
+
+    def flush_stream(self):
+        """清除流
+        :return: 
+        """
+        self.environ["wsgi.input"].read()
 
 
 class handler(object):
@@ -375,8 +397,21 @@ class handler(object):
             self.finish()
 
     def on_recv_stream(self):
-        """根据需要重写这个方法,接受http body流"""
-        self.request.handle_body()
+        """根据需要重写这个方法,接受http body流
+        :return Boolean: True表示正常,False表示处理发生错误
+        """
+        if self.__is_finish:
+            self.request.flush_stream()
+            return False
+        try:
+            self.request.handle_body()
+        except ForbiddenErr:
+            self.set_status("403 Forbidden")
+            self.set_header("Content-Length", 0)
+
+            return False
+
+        return True
 
     @property
     def request(self):
