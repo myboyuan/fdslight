@@ -45,7 +45,7 @@ class parser(object):
         line = self.__reader.readline(2)
         if line != b"\r\n": raise MultipartErr("wrong part master")
 
-        return {"is_file": is_file, "name": name, "filename": filename, "content_type": content_type,}
+        return {"is_file": is_file, "name": name, "filename": filename, "content_type": content_type, }
 
     def __get_content_type(self, byte_data):
         try:
@@ -148,6 +148,93 @@ class parser(object):
             except IndexError:
                 break
         return b"".join(tmplist)
+
+
+class async_parser(object):
+    """异步的multipart解析器
+    """
+    __byte_begin_boundary = None
+    __byte_end_boundary = None
+
+    # 当前的解析步骤
+    __current_step = 0
+
+    # 单个块是否结束
+    __single_finish = False
+
+    # 是否是文件
+    __is_file = False
+
+    # 是否已经全部解析完毕
+    __all_finish = False
+
+    # 上传名
+    __name = None
+    # 上传文件名
+    __filename = None
+
+    __reader = None
+
+    # 单个内容块是否开始解析
+    __is_start = False
+
+    def __init__(self, boundary):
+        self.__byte_begin_boundary = ("--%s\r\n" % boundary).encode("iso-8859-1")
+        self.__byte_end_boundary = ("--%s--\r\n" % boundary).encode("iso-8859-1")
+        self.__reader = reader.reader()
+        self.__all_finish = False
+        self.reset()
+
+    def __step_1(self):
+        """解析content-disposition
+        :return: 
+        """
+        pass
+
+    def __step_2(self):
+        """解析content-type
+        :return: 
+        """
+        pass
+
+    def __step_3(self):
+        """读取内容部分
+        :return: 
+        """
+        pass
+
+    def input(self, byte_data):
+        if self.all_finish(): return
+        self.__reader._putvalue(byte_data)
+
+    def parser(self):
+        if self.all_finish(): return
+
+
+
+    def reset(self):
+        self.__single_finish = False
+        self.__is_file = False
+        self.__current_step = 1
+        self.__is_start = False
+
+    def all_finish(self):
+        return self.__all_finish
+
+    def single_finish(self):
+        return self.__single_finish
+
+    def is_file(self):
+        return self.__is_file
+
+    @property
+    def name(self):
+        return self.__name
+
+    @property
+    def filename(self):
+        return self.__filename
+
 
 """
 fd = open("./test.txt", "rb")
