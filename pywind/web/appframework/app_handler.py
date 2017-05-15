@@ -216,7 +216,8 @@ class _request(object):
             name = self.__multipart.name
             file_name = self.__multipart.filename
             content_type = self.__multipart.content_type
-            size = self.__multipart.size
+            # 减去尾部的"\r\n"
+            size = self.__multipart.size - 2
 
             if name not in self.__files:
                 self.__files[name] = []
@@ -253,9 +254,9 @@ class _request(object):
             if name not in self.__stream_params:
                 self.__stream_params[name] = []
 
-            pyseq = self.__stream_params[data]
+            pyseq = self.__stream_params[name]
             try:
-                pyseq.append(data.decode("utf-8"))
+                pyseq.append(data[0:-2].decode("utf-8"))
             except UnicodeDecodeError:
                 return
         return

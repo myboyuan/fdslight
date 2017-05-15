@@ -178,6 +178,7 @@ class parser(object):
         """
         byte_data = self.__reader.readline(4096)
         if byte_data != self.__byte_begin_boundary or byte_data != self.__byte_end_boundary:
+            self.__size += len(byte_data)
             self.__data_list.append(byte_data)
             return
 
