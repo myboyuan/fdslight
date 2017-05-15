@@ -54,6 +54,8 @@ class _request(object):
 
     __cookie = None
 
+    __multipart = None
+
     def __init__(self, env, *args, **kwargs):
         self.__qs_params = {}
         self.__stream_params = {}
@@ -64,6 +66,7 @@ class _request(object):
         self.__args = args
         self.__kwargs = kwargs
         self.__cookie = None
+        self.__multipart = None
 
     @property
     def args(self):
@@ -161,68 +164,15 @@ class _request(object):
         return self.read_size == self.content_length
 
     def __handle_multipart_body(self):
-        if not self.recv_ok():
-            if not self.__tmpfile_fd:
-                tmpname = self.__get_tmpfile_name()
-                self.__tmpfile_name = tmpname
-                path = "%s/%s" % (self.__tmp_dir, tmpname,)
-                self.__tmpfile_fd = open(path, "wb")
-            self.__tmpfile_fd.write(self.__reader.read())
-            return
-        multipart = http_multipart.parser(self.__tmpfile_fd, self.__multipart_boundary)
-        is_get_hdr = False
-        info = None
-        tmpfile_fd = None
-        is_file = False
-        data_list = []
+        if not self.__multipart:
+            self.__multipart = http_multipart.parser(self.__multipart_boundary)
 
-        while not multipart.all_ok():
-            if not multipart.single_ok() and not is_get_hdr:
-                is_get_hdr = True
-                info = multipart.get_info()
-                is_file = info["is_file"]
-                if is_file:
-                    tmpname = self.__get_tmpfile_name()
-                    path = "%s/%s" % (self.__tmp_dir, tmpname,)
-                    tmpfile_fd = open(path, "wb")
-                ''''''
-            if is_get_hdr and not multipart.single_ok():
-                try:
-                    multipart.parse()
-                except http_multipart.MultipartErr:
-                    # 关闭占用的文件资源
-                    if tmpfile_fd: tmpfile_fd.close()
-                    raise RequestErr("wrong multipart format")
-                # 去除结尾的\r\n
-                if multipart.single_ok():
-                    is_get_hdr = False
-                    part_data = multipart.get_part_data()[0:-2]
-                else:
-                    part_data = multipart.get_part_data()
-                tmpfile_fd.write(part_data)
-                name = info["name"]
-                if multipart.single_ok():
-                    multipart.reset()
-                    if not is_file:
-                        try:
-                            sts = b"".join(data_list).decode()
-                        except UnicodeDecodeError:
-                            raise RequestErr("wrong UTF coding")
-                        if name not in self.__stream_params: self.__stream_params[name] = []
-                        self.__stream_params[name].append(sts)
-                        data_list = []
-                    else:
-                        tmpfile_fd.close()
-                        tmpfile_fd = None
-                        if name not in self.__files: self.__files[name] = []
-                        self.__files[name].append({
-                            "tmp_name": info["tmp_name"],
-                            "filename": info["filename"],
-                            "content_type": info["content_type"],
-                        })
-                    is_file = False
-                """"""
-            """"""
+        self.__multipart.input(self.__reader.read())
+        while 1:
+            self.__multipart.parse()
+            if self.__multipart.is_start():
+                data = self.__multipart.get_data()
+                if not data: continue
         return
 
     def handle_body(self):
