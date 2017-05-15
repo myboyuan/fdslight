@@ -179,10 +179,9 @@ class parser(object):
             self.__data_list.append(byte_data)
             return
 
-        if byte_data == self.__byte_begin_boundary:
-            self.__single_finish = True
-        else:
+        if byte_data == self.__byte_end_boundary:
             self.__all_finish = True
+        self.__single_finish = True
 
         return
 

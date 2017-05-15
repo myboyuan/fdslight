@@ -48,7 +48,6 @@ class _request(object):
 
     __tmpfile_fd = None
     __tmpfile_name = ""
-    __tmpfile_data = b""
 
     __args = None
     __kwargs = None
@@ -186,13 +185,60 @@ class _request(object):
         """处理multipart文件数据
         :return: 
         """
-        pass
+        if not self.__tmpfile_fd:
+            self.__tmpfile_name = self.__get_tmpfile_name()
+            fpath = "%s/%s" % (self.__tmp_dir, self.__tmpfile_name,)
+            self.__tmpfile_fd = open(fpath, "wb")
+
+        data = self.__multipart.get_data()
+
+        if self.__multipart.single_finish():
+            # 去除尾部的"\r\n"
+            data = data[0:-2]
+        self.__tmpfile_fd.write(data)
+
+        if self.__multipart.single_finish():
+            name = self.__multipart.name
+            file_name = self.__multipart.filename
+            content_type = self.__multipart.content_type
+            size = self.__multipart.size
+
+            if name not in self.__files:
+                self.__files[name] = []
+
+            pyseq = self.__files[name]
+            pyseq.append(
+                {
+                    "file_name": file_name,
+                    "tmp_name": self.__tmpfile_name,
+                    "size": size,
+                    "content_type": content_type
+                }
+            )
+
+            self.__multipart.reset()
+            self.__tmpfile_fd.close()
+            self.__tmpfile_fd = None
+
+        return
 
     def __handle_multipart_nofile(self):
         """处理multipart非文件数据
         :return: 
         """
-        pass
+        if self.__multipart.single_finish():
+            data = self.__multipart.get_data()
+            name = self.__multipart.name
+
+            if name not in self.__stream_params:
+                self.__stream_params[name] = []
+
+            pyseq = self.__stream_params[data]
+            try:
+                pyseq.append(data.decode("utf-8"))
+            except UnicodeDecodeError:
+                return
+        return
 
     def handle_body(self):
         if self.recv_ok(): return
