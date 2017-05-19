@@ -69,39 +69,48 @@ class scgid(tcp_handler.tcp_handler):
     def __parse_scgi_header(self):
         size = self.reader.size()
         rdata = self.reader.read()
-        data_bak = rdata
+        rdata_bak = rdata
         pos = rdata.find(b":")
-        t = pos + 1
 
         if pos < 0 and size > 16: raise scgiErr("cannot found length")
         try:
-            tot_len = int(rdata[0:pos])
+            hdr_size = int(rdata[0:pos]) + 1
         except ValueError:
             raise scgiErr("invalid length character")
         pos += 1
+
         rdata = rdata[pos:]
         if rdata[0:14] != b"CONTENT_LENGTH": raise scgiErr("cannot found content_length at first")
-        rdata = rdata[15:]
-        pos = rdata.find(b"\0")
+
+        t = rdata[15:]
+        pos = t.find(b"\0")
+
         if pos < 0: raise scgiErr("cannot found content_length border")
 
         try:
-            content_length = int(rdata[0:pos])
+            content_length = int(t[0:pos])
         except ValueError:
             raise scgiErr("invalid content_length character")
 
         pos += 1
-        rdata = rdata[pos:]
-        hdr_size = tot_len - content_length
+        hdr_data = rdata[0:hdr_size]
 
-        if (len(data_bak[t:])) < hdr_size + 1: return (False, None, None,)
+        if len(hdr_data) != hdr_size:
+            self.reader._putvalue(rdata_bak)
+            return (False, None, None,)
 
-        if rdata[-1] != ord(","): raise scgiErr("cannot found scgi character ',' ")
+        hdr_data = rdata[pos:hdr_size]
+        sts = hdr_data.decode("iso-8859-1")
 
-        sts = rdata[0:-2].decode("iso-8859-1")
+        if sts[-1] != ",": raise scgiErr("wrong scgi header end")
+
+        sts = sts[0:-2]
         tmplist = sts.split("\0")
         Lsize = len(tmplist)
-        if Lsize % 2 != 0: raise scgiErr("invalid scgi master")
+
+        if Lsize % 2 != 0:
+            raise scgiErr("wrong scgi request")
+
         cgi_env = {}
         a, b = (0, 1,)
 
@@ -113,9 +122,8 @@ class scgid(tcp_handler.tcp_handler):
             b = b + 2
 
         cgi_env["CONTENT_LENGTH"] = content_length
-        t = t + hdr_size + 1
 
-        return (True, cgi_env, data_bak[t:],)
+        return (True, cgi_env, rdata[hdr_size:],)
 
     def init_func(self, creator_fd, cs, caddr, configs):
         self.__creator = creator_fd

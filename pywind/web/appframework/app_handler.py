@@ -106,6 +106,8 @@ class _request(object):
     def __init_post_m(self):
         """post方法的初始化"""
         form_type = self.__get_post_form_type()
+        self.__form_type = form_type
+
         if form_type == self.__FORM_TYPE_UNKOWN: raise RequestErr("unkown form type")
         if form_type == self.__FORM_TYPE_PLAIN: pass
         if form_type == self.__FORM_TYPE_MULTIPART:
@@ -267,12 +269,27 @@ class _request(object):
         rsize = self.content_length - self.read_size
         w_data = byte_data[0:rsize]
 
+        req_method = self.environ["REQUEST_METHOD"]
+        # 只允许put和post方法有流数据
+        if req_method not in ("PUT", "POST",): return
+
         self.__reader._putvalue(w_data)
         self.__read_size += len(w_data)
 
-        if self.environ["REQUEST_METHOD"].upper() == "POST" and self.__form_type == self.__FORM_TYPE_MULTIPART:
+        if req_method and self.__form_type == self.__FORM_TYPE_MULTIPART:
             self.__handle_multipart_body()
             return
+
+        if req_method and self.__form_type == self.__FORM_TYPE_URLENCODED:
+            self.__handle_urlencoded_body()
+            return
+
+    def __handle_urlencoded_body(self):
+        if not self.recv_ok(): return
+        rdata = self.__reader.read()
+
+        sts = rdata.decode("iso-8859-1")
+        self.__stream_params = urllib.parse.parse_qs(sts)
 
     def __get_argument(self, arguments, name, default, is_seq=False):
         if name not in arguments: return default
@@ -342,10 +359,8 @@ class _request(object):
 
     def get_raw_body(self):
         """获取未加工的http body文件对象
-        :return object,对于POST上传类型,始终返回值为None,
         """
-        if self.environ["REQUEST_METHOD"] == "POST": return None
-        return self.__reader
+        return self.__reader.read()
 
     def flush_stream(self):
         """清除流
@@ -408,7 +423,10 @@ class handler(object):
         except ForbiddenErr:
             self.set_status("403 Forbidden")
             self.set_header("Content-Length", 0)
-
+            return False
+        except RequestErr:
+            self.set_status("400 Bad Request")
+            self.set_header("Content-Length", 0)
             return False
 
         return True
