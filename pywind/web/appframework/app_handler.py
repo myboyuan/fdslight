@@ -509,23 +509,28 @@ class handler(object):
         self.set_header("Location", location)
         self.finish()
 
-    def __handle(self):
-        if not self.__is_start_response and not self.request.recv_ok():
-            self.on_recv_stream()
-            return
-        if self.request.recv_ok(): self.handle()
-
     def __iter__(self):
-        if not self.__continue: return self
-        if not self.__is_finish: self.__handle()
+        if not self.request.recv_ok():
+            self.on_recv_stream()
+            return self
+
+        if not self.__continue:
+            self.__response_header()
+            return self
+
+        if not self.__is_finish: self.handle()
 
         if self.__is_start_response and not self.__is_response_header:
-            stcode = int(self.__resp_status[0:3])
-            self.__start_response(self.__resp_status, self.__resp_headers)
-            if stcode >= 200:
-                self.__is_response_header = True
+            self.__response_header()
 
         return self
+
+    def __response_header(self):
+        stcode = int(self.__resp_status[0:3])
+        self.__start_response(self.__resp_status, self.__resp_headers)
+        if stcode >= 200:
+            self.__is_response_header = True
+        return
 
     def __next__(self):
         try:
