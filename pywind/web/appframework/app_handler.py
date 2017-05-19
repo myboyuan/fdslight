@@ -158,7 +158,7 @@ class _request(object):
         for s in tmplist:
             s = s.lstrip()
             p = s.find("=")
-            if s < 1: continue
+            if p < 1: continue
             name = s[0:p]
             p += 1
             value = s[p:]
@@ -172,7 +172,7 @@ class _request(object):
                     self.__cookie[name].append(value)
                 ''''''
             ''''''
-        return
+        return self.__cookie
 
     def recv_ok(self):
         """数据是否接收完毕"""
@@ -284,7 +284,7 @@ class _request(object):
 
     def __get_post_form_type(self):
         match_set = (
-            "application/x-static-form-urlencoded",
+            "application/x-www-form-urlencoded",
             "multipart/form-data",
             "text/plain",
         )
@@ -292,12 +292,11 @@ class _request(object):
         content_type = self.environ.get("CONTENT_TYPE", "")
         match_rs = self.__FORM_TYPE_UNKOWN
 
-        for s in match_set:
-            p = content_type.lower().find(s)
-            if p != 0: continue
-            if p == match_set[0]: match_rs = self.__FORM_TYPE_URLENCODED
-            if p == match_set[1]: match_rs = self.__FORM_TYPE_MULTIPART
-            if p == match_set[2]: match_rs = self.__FORM_TYPE_PLAIN
+        s = content_type.lower()
+
+        if s == match_set[0]: match_rs = self.__FORM_TYPE_URLENCODED
+        if s == match_set[1]: match_rs = self.__FORM_TYPE_MULTIPART
+        if s == match_set[2]: match_rs = self.__FORM_TYPE_PLAIN
 
         return match_rs
 
