@@ -149,7 +149,7 @@ class _request(object):
 
     @property
     def cookie(self):
-        if self.__cookie == None: return self.__cookie
+        if self.__cookie != None: return self.__cookie
         self.__cookie = {}
 
         sts = self.environ.get("HTTP_COOKIE", "")
