@@ -76,6 +76,8 @@ class sql_helper(object):
     def append(self, sts):
         self.__data_list.append(" %s" % sts)
 
+        return self
+
     def limit(self, limit):
         self.__data_list.append(" LIMIT %s" % limit)
         return self
