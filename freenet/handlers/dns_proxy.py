@@ -375,6 +375,9 @@ class dnsc_proxy(dns_base):
         if pos > 0 and self.__debug: print(host)
         is_match, flags = self.__host_match.match(host)
 
+        # 如果flags为2,那么丢弃DNS请求
+        if flags == 2: return
+
         dns_id = (message[0] << 8) | message[1]
         n_dns_id = self.get_dns_id(dns_id)
         if n_dns_id < 0: return
