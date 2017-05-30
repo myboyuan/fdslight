@@ -177,7 +177,8 @@ register.mesh.com:1
 *.goodtv.tv:1
 
 ### 广告屏蔽列表
-*.baidu.com:2
+img1.126.net:2
+img2.126.net:2
 
 
 ### 政府机构
