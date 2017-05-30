@@ -149,6 +149,7 @@ register.mesh.com:1
 *.jwpcdn.com:1
 *.ntdimg.com:1
 *.jwpltx.com:1
+*.hk01.com:1
 
 ### 游戏相关
 *.rockstargames.com:1
@@ -177,9 +178,10 @@ register.mesh.com:1
 *.goodtv.tv:1
 
 ### 广告屏蔽列表
-img1.126.net:2
-img2.126.net:2
-als.baidu.com:2
+#img1.126.net:2
+#img2.126.net:2
+#als.baidu.com:2
+#ss0.bdstatic.com:2
 
 ### 政府机构
 # 中华民国政府
