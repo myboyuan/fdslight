@@ -1,11 +1,28 @@
 #!/usr/bin/env python3
 
-sts = """for n in range(100):
-    if n > 10: n = n + 10, print(n)"""
+import pywind.evtframework.evt_dispatcher as dispatcher
+import freenet.handlers.socks5 as socks5_handlers
 
 
-def hello():
+class socks5server(dispatcher.dispatcher):
+    __configs = None
 
-    exec(sts)
+    def __init__(self):
+        super(socks5server, self).__init__()
 
-hello()
+    def debug_run(self):
+        self.create_poll()
+
+        fd = self.create_handler(
+            -1, socks5_handlers.sserverd,
+            ("127.0.0.1", 8000)
+        )
+
+        self.get_handler(fd).after()
+
+    def init_func(self):
+        self.debug_run()
+
+
+app = socks5server()
+app.ioloop()

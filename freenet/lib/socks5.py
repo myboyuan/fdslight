@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+import socket
+
+
 class ProtocolErr(Exception):
     pass
 
@@ -33,7 +36,7 @@ def build_handshake_response(method):
     return bytes([5, method])
 
 
-def parse_request(byte_data, is_udp=False):
+def parse_request_and_udpdata(byte_data, is_udp=False):
     """地址请求解析
     :param byte_data:
     :param is_udp
@@ -112,26 +115,43 @@ def parse_request(byte_data, is_udp=False):
     else:
         data = b""
 
-    return (cmd, atyp, fragment, address, dport, data,)
+    if atyp == 1:
+        sts_addr = socket.inet_ntop(socket.AF_INET, address)
+    if atyp == 3:
+        sts_addr = address.decode("iso-8859-1")
+    if atyp == 4:
+        sts_addr = socket.inet_ntop(socket.AF_INET6, address)
+
+    return (cmd, atyp, fragment, sts_addr, dport, data,)
 
 
-def build_response(rep, atyp, byte_bind_addr, bind_port):
-    """构建连接响应
-    :param rep:
+def build_response_and_udpdata(rep_frag, atyp, bind_addr, bind_port, is_udp=False, udp_data=b""):
+    """构建连接响应或者UDP数据
+    :param rep_frag:
     :param atyp:
     :param byte_bind_addr:
     :param bind_port:
     :return:
     """
-    seq = [
-        5, rep, 0, atyp,
-    ]
+    if atyp not in (1, 3, 4): raise ValueError("wrong atpy value")
+
+    if atyp == 1:
+        byte_bind_addr = socket.inet_pton(socket.AF_INET, bind_addr)
+    if atyp == 3:
+        byte_bind_addr = bind_addr.encode("iso-8859-1")
+    if atyp == 4:
+        byte_bind_addr = socket.inet_pton(socket.AF_INET6, bind_addr)
+
+    if not is_udp:
+        seq = [
+            5, rep_frag, 0, atyp,
+        ]
+    else:
+        seq = [
+            0, 0, rep_frag, atyp,
+        ]
 
     res_seq = [bytes(seq)]
-
-    if atyp not in (1, 3, 4): raise ValueError("wrong atpy value")
-    if not isinstance(byte_bind_addr, bytes):
-        raise ValueError("byte_bind_addr must be bytes type")
 
     size = len(byte_bind_addr)
 
@@ -152,5 +172,7 @@ def build_response(rep, atyp, byte_bind_addr, bind_port):
             [(bind_port & 0xff00) >> 8, bind_port & 0xff]
         )
     )
+
+    if is_udp: res_seq.append(udp_data)
 
     return b"".join(res_seq)
