@@ -115,37 +115,33 @@ class _fdslight_server(dispatcher.dispatcher):
 
         enable_ipv6 = bool(int(conn_config["enable_ipv6"]))
 
-        tcp_port = int(conn_config["listen_tcp_port"])
-        udp_port = int(conn_config["listen_udp_port"])
+        listen_port = int(conn_config["listen_port"])
 
         conn_timeout = int(conn_config["conn_timeout"])
 
         listen_ip = conn_config["listen_ip"]
         listen_ip6 = conn_config["listen_ip6"]
 
-        listen_tcp = (listen_ip, tcp_port,)
-        listen_udp = (listen_ip, udp_port,)
-
-        listen6_tcp = (listen_ip6, tcp_port,)
-        listen6_udp = (listen_ip6, udp_port,)
+        listen = (listen_ip, listen_port,)
+        listen6 = (listen_ip6, listen_port)
 
         if enable_ipv6:
             self.__tcp6_fileno = self.create_handler(
                 -1, tunnels.tcp_tunnel,
-                listen6_tcp, self.__tcp_crypto, self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=True
+                listen6, self.__tcp_crypto, self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=True
             )
             self.__udp6_fileno = self.create_handler(
                 -1, tunnels.udp_tunnel,
-                listen6_udp, self.__udp_crypto, self.__crypto_configs, is_ipv6=True
+                listen6, self.__udp_crypto, self.__crypto_configs, is_ipv6=True
             )
 
         self.__tcp_fileno = self.create_handler(
             -1, tunnels.tcp_tunnel,
-            listen_tcp, self.__tcp_crypto, self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=False
+            listen, self.__tcp_crypto, self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=False
         )
         self.__udp_fileno = self.create_handler(
             -1, tunnels.udp_tunnel,
-            listen_udp, self.__udp_crypto, self.__crypto_configs, is_ipv6=False
+            listen, self.__udp_crypto, self.__crypto_configs, is_ipv6=False
         )
 
         self.__tundev_fileno = self.create_handler(
