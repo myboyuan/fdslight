@@ -71,11 +71,11 @@ class _sserverd_handler(tcp_handler.tcp_handler):
     __caddr = None
     __host_match = None
 
-    __clients = None
-    __clients_reverse = None
-
-    __af = None
     __is_ipv6 = None
+
+    __fileno = None
+
+    __delete_flags = None
 
     def init_func(self, creator, cs, caddr, host_match, is_ipv6=False):
         self.__is_auth = False
@@ -83,8 +83,7 @@ class _sserverd_handler(tcp_handler.tcp_handler):
         self.__caddr = caddr
         self.__is_connected = False
         self.__host_match = host_match
-        self.__clients = {}
-        self.__clients_reverse = {}
+        self.__delete_flags = False
 
         if is_ipv6:
             self.__af = socket.AF_INET6
@@ -130,14 +129,19 @@ class _sserverd_handler(tcp_handler.tcp_handler):
         if atyp == 3:
             is_match, flags = self.__host_match.match(address)
             if is_match: return
-        if cmd == 1:
-            name = "%s-%s" % (address, dport)
-            fileno = self.create_handler(self.fileno, (address, dport,))
 
+        if atyp == 4:
+            is_ipv6 = True
+        else:
+            is_ipv6 = self.__is_ipv6
+
+        if cmd == 1:
+            self.__fileno = self.create_handler(self.fileno, sclient_tcp, (address, dport,), is_ipv6=is_ipv6)
         self.__is_connecting = True
 
     def __send_data(self):
-        pass
+        read_data = self.reader.read()
+        self.send_message_to_handler(self.fileno, self.__fileno, read_data)
 
     def tcp_readable(self):
         if not self.__is_auth:
@@ -146,7 +150,6 @@ class _sserverd_handler(tcp_handler.tcp_handler):
         if not self.__is_connecting:
             self.__do_connect()
             return
-
         if not self.__is_connected: return
 
         self.__send_data()
@@ -158,60 +161,58 @@ class _sserverd_handler(tcp_handler.tcp_handler):
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):
+        if self.handler_exists(self.__fileno) and not self.__delete_flags:
+            self.__delete_flags = True
+            self.delete_handler(self.__fileno)
         self.unregister(self.fileno)
         self.close()
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd not in ("tell_delete"): return
-
-        address, = args
-        name = "%s-%s" % address
-
-        if cmd == "tell_delete":
-
-            if name not in self.__clients: return
-            fileno, atyp, dst_address = self.__clients[name]
-
-            del self.__clients[name]
-            del self.__clients_reverse[fileno]
-
-            return
-
         if cmd == "tell_connected":
-            address, bind_address, = args
+            address, = args
+            self.__is_connected = True
+
             if self.__is_ipv6:
-                atyp = 1
-            else:
                 atyp = 4
+            else:
+                atyp = 1
 
             sent_data = socks5.build_response_and_udpdata(
-                0, atyp,
-                socket.inet_pton(self.__af, bind_address[0]), bind_address[1]
+                0, atyp, address[0], address[1]
             )
             self.add_evt_write(self.fileno)
             self.writer.write(sent_data)
-            return
-        return
 
-    def message_from_tunnel(self, c_ip, c_port, message):
-        pass
+        return True
 
-    def message_from_handler(self, from_fd, message):
-        pass
+    def message_from_proxy(self, message):
+        self.add_evt_write(self.fileno)
+        self.writer.write(message)
 
 
 class sclient_tcp(tcp_handler.tcp_handler):
     __creator = None
 
-    # 超时时间为20分钟
-    __TIMEOUT = 1200
+    # 超时时间为15分钟
+    __TIMEOUT = 900
 
     __update_time = 0
     __address = None
 
-    def init_func(self, creator, address, is_ipv6=False):
+    __sclient_address = None
+
+    # 连接成功之后的回调函数
+    __connected_callback = None
+
+    # 数据接收函数
+    __recv_callback = None
+
+    def init_func(self, creator, connected_callback, recv_callback, sclient_address, address, is_ipv6=False):
         self.__creator = creator
         self.__address = address
+        self.__sclient_address = sclient_address
+        self.__connected_callback = connected_callback
+        self.__recv_callback = recv_callback
 
         if is_ipv6:
             af = socket.AF_INET6
@@ -230,19 +231,21 @@ class sclient_tcp(tcp_handler.tcp_handler):
 
         self.__update_time = time.time()
 
-        ipaddr, port = self.socket.getsockname()
+        address = self.socket.getsockname()
 
-        self.ctl_handler(self.fileno, self.__creator, "tell_connected", (ipaddr, port,))
+        self.__connected_callback(self.fileno, self.__sclient_address, address)
 
     def tcp_readable(self):
         self.set_timeout(self.fileno, 10)
         self.__update_time = time.time()
 
+        read_data = self.reader.read()
+        self.send_message_to_handler(self.fileno, self.__creator, read_data)
+
     def tcp_writable(self):
         self.remove_evt_write(self.fileno)
 
     def tcp_delete(self):
-        self.ctl_handler(self.fileno, self.__creator, "tell_delete", self.__address)
         self.unregister(self.fileno)
         self.close()
 
@@ -255,6 +258,10 @@ class sclient_tcp(tcp_handler.tcp_handler):
             self.set_timeout(self.fileno, 10)
             return
         self.delete_handler(self.fileno)
+
+    def send_message(self, message):
+        self.writer.write(message)
+        self.add_evt_write(self.fileno)
 
 
 class sclient_udp(udp_handler.udp_handler):
