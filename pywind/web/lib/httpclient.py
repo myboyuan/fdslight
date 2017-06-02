@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import socket, ssl
+import pywind.web.lib.httputils as httputils
 
 
 class _httpclient(object):
@@ -41,7 +42,7 @@ class _httpclient(object):
     def get_headers(self):
         return self.__headers
 
-    def request(self, method, url, qs_seq=None):
+    def request(self, method, host, path="/", qs_seq=None):
         """重写这个方法
         :param method:
         :param url:
@@ -115,11 +116,24 @@ class _httpclient(object):
 
 
 class _http1x_client(_httpclient):
-    pass
+    def request(self, method, host, path="/", qs_seq=None):
+        m = method.upper()
+        if not qs_seq:
+            uri = path
+        else:
+            uri = "%s?%s" % (path, "&".join(qs_seq))
+
+        header = httputils.build_http1x_req_header(
+            m, uri, self.get_headers()
+        )
+
+        self.write_data(header.encode("iso-8859-1"))
+        return
 
 
 class _http2x_client(_httpclient):
-    pass
+    def request(self, method, host, path="/", qs_seq=None):
+        pass
 
 
 class httpclient(object):
@@ -145,16 +159,17 @@ class httpclient(object):
         """
         self.__response_body_callback = func
 
-    def request(self, method, url, qs_seq=None, ssl_on=False, auto_http2=False, ipv6_on=False):
+    def request(self, method, host, path="/", qs_seq=None, ssl_on=False, auto_http2=False, ipv6_on=False):
         """请求页面
         :param method 请求方法
-        :param url 请求url
+        :param host 请求主机
+        :param path 请求路径
         :param qs_seq 执行字符串
         :param ssl_on: 是否打开SSL加密传输
         :param auto_http2: 是否自动升级到HTTP2,注意该选项只有开启SSL ON才生效,并且需要支持ALPN,否则会报错
         :param ipv6_on:是否开启IPV6请求
         """
-        self.__http_instance.request(method, url, qs_seq=qs_seq)
+        self.__http_instance.request(method, host, path=path, qs_seq=qs_seq)
 
     def set_request_header(self, name, value):
         self.__http_instance.set_request_header(name, value)
