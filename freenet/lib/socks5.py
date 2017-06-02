@@ -36,7 +36,6 @@ def build_handshake_response(method):
 def parse_request(byte_data, is_udp=False):
     """地址请求解析
     :param byte_data:
-    :param is_udp
     :return:
     """
     ver = byte_data[0]
