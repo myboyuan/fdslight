@@ -36,18 +36,29 @@ def build_handshake_response(method):
 def parse_request(byte_data, is_udp=False):
     """地址请求解析
     :param byte_data:
+    :param is_udp
     :return:
     """
-    ver = byte_data[0]
-    if ver != 5: raise ProtocolErr("wrong socks version")
 
-    try:
-        cmd = byte_data[1]
-    except IndexError:
-        raise ProtocolErr("wrong socks protocol")
+    if not is_udp:
+        ver = byte_data[0]
+        if ver != 5: raise ProtocolErr("wrong socks version")
 
-    if cmd not in (1, 2, 3,):
-        raise ProtocolErr("wrong socks command")
+        try:
+            cmd = byte_data[1]
+        except IndexError:
+            raise ProtocolErr("wrong socks protocol")
+
+        if cmd not in (1, 2, 3,):
+            raise ProtocolErr("wrong socks command")
+
+        fragment = 0
+    else:
+        try:
+            fragment = byte_data[2]
+        except IndexError:
+            raise ProtocolErr("wrong socks protocol")
+        cmd = 0
 
     try:
         atyp = byte_data[3]
@@ -94,7 +105,14 @@ def parse_request(byte_data, is_udp=False):
     except IndexError:
         raise ProtocolErr("wrong socks protocol")
 
-    return (atyp, address, dport,)
+    e = b + 1
+
+    if is_udp:
+        data = byte_data[e:]
+    else:
+        data = b""
+
+    return (cmd, atyp, fragment, address, dport, data,)
 
 
 def build_response(rep, atyp, byte_bind_addr, bind_port):
