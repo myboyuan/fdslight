@@ -3,6 +3,7 @@
 """
 
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
+import pywind.evtframework.handlers.udp_handler as udp_handler
 import freenet.lib.host_match as host_match
 import freenet.lib.socks5 as socks5
 import socket, time
@@ -70,11 +71,16 @@ class _sserverd_handler(tcp_handler.tcp_handler):
 
     __atyp = 0
 
+    # 数据包是否要发送到隧道
+    __is_sent_to_tunnel = False
+
     def init_func(self, creator, cs, caddr, host_match, udp_global_subnet):
         self.__host_match = host_match
         self.__udp_global_subnet = udp_global_subnet
         self.__conn_is_ipv6 = False
         self.__proxy_client_fileno = -1
+        self.__is_sent_to_tunnel = False
+
         self.set_socket(cs)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
@@ -118,16 +124,30 @@ class _sserverd_handler(tcp_handler.tcp_handler):
 
         self.__is_connecting = True
         if cmd == 1:
-            self.__handle_tcp_connect(atyp, sts_address, dport)
+            self.__handle_tcp_connect(atyp, sts_address, dport, rdata)
+        if cmd == 3:
+            pass
 
-    def __handle_tcp_connect(self, atyp, address, port):
+    def __handle_udp_connect(self, atyp, address, port, message):
+        pass
+
+    def __handle_tcp_connect(self, atyp, address, port, message):
+        """
+        :param atyp:
+        :param address:
+        :param port:
+        :param message:从客户端接收的原始消息
+        :return:
+        """
         if atyp == 3:
             is_match, flags = self.__host_match.match(address)
 
             # 只处理标志为1的规则
             if is_match and flags == 1:
-                pass
-                # return
+                self.__is_sent_to_tunnel = True
+                self.__is_connecting = True
+                self.dispatcher.send_socks5_msg_to_tunnel(self.fileno, message)
+                return
 
         if atyp == 4:
             is_ipv6 = True
@@ -143,6 +163,10 @@ class _sserverd_handler(tcp_handler.tcp_handler):
 
     def __send_data_from_local(self):
         rdata = self.reader.read()
+
+        if self.__is_sent_to_tunnel:
+            self.dispatcher.send_socks5_msg_to_tunnel(self.fileno, rdata)
+            return
 
         if not self.handler_exists(self.__proxy_client_fileno):
             self.delete_handler(self.fileno)
@@ -172,6 +196,9 @@ class _sserverd_handler(tcp_handler.tcp_handler):
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):
+        if self.handler_exists(self.__proxy_client_fileno):
+            self.delete_handler(self.__proxy_client_fileno)
+
         self.unregister(self.fileno)
         self.close()
 
@@ -197,6 +224,11 @@ class _sserverd_handler(tcp_handler.tcp_handler):
         self.__send_data_to_local(message)
 
     def message_from_tunnel(self, message):
+        if not self.__is_connected:
+            if message[1] != 0:
+                self.delete_handler(self.fileno)
+                return
+            self.__is_connected = True
         self.__send_data_to_local(message)
 
 
@@ -263,3 +295,89 @@ class sclient_tcp(tcp_handler.tcp_handler):
     def message_from_handler(self, from_fd, message):
         self.writer.write(message)
         self.add_evt_write(self.fileno)
+
+
+class sclient_udp(udp_handler.udp_handler):
+    __addrinfo = None
+    __creator = None
+    __forward_to_tunnel = None
+    __is_ipv6 = None
+    __client_ipaddr = None
+    __client_port = None
+
+    # 允许收到的数据包
+    __permits = None
+
+    def init_func(self, creator, client_ipaddr, is_ipv6=False, forward_to_tunnel=False):
+        """
+        :param creator:
+        :param forward_to_tunnel: 是否吧数据转发到隧道
+        :return:
+        """
+
+        self.__creator = creator
+        self.__forward_to_tunnel = forward_to_tunnel
+        self.__is_ipv6 = is_ipv6
+        self.__client_ipaddr = client_ipaddr
+        self.__permits = {}
+
+        if is_ipv6:
+            af = socket.AF_INET6
+            bindaddr = ("::", 0)
+        else:
+            af = socket.AF_INET
+            bindaddr = ("0.0.0.0", 0)
+
+        s = socket.socket(af, socket.SOCK_DGRAM)
+
+        self.set_socket(s)
+        self.bind(bindaddr)
+
+        addrinfo = self.getsockname()
+        self.__addrinfo = addrinfo
+
+        self.ctl_handler(self.fileno, self.__creator, "tell_connect_ok", addrinfo)
+
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
+
+        return self.fileno
+
+    def udp_readable(self, message, address):
+        # 处理客户端发送过来的数据包
+        if address[0] == self.__client_ipaddr:
+            self.__client_port = address[1]
+            try:
+                cmd, fragment, atyp, sts_address, dport, data = socks5.parse_request_and_udpdata(message, is_udp=True)
+            except socks5.ProtocolErr:
+                return
+
+            self.__permits[dport] = address
+            if self.__forward_to_tunnel:
+                self.dispatcher.send_socks5_msg_to_tunnel(self.fileno, message)
+                return
+            return
+
+        if not self.__client_port: return
+
+    def udp_writable(self):
+        self.remove_evt_write(self.fileno)
+
+    def udp_delete(self):
+        self.unregister(self.fileno)
+        self.close()
+
+    def udp_error(self):
+        self.delete_handler(self.fileno)
+
+    def message_from_tunnel(self, message):
+        try:
+            cmd, fragment, atyp, sts_address, dport, data = socks5.parse_request_and_udpdata(message, is_udp=True)
+        except socks5.ProtocolErr:
+            return
+
+        self.sendto(message, (sts_address, dport))
+
+    def __send_message_from_local(self, message, address):
+        self.add_evt_write(self.fileno)
+        self.sendto(message, address)

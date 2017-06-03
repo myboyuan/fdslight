@@ -24,6 +24,8 @@ import freenet.lib.ip6dgram as ip6dgram
 import freenet.handlers.traffic_pass as traffic_pass
 import freenet.lib.logging as logging
 import freenet.lib.fn_utils as fn_utils
+import freenet.lib.socks5 as socks5
+import freenet.handlers.socks5s as socks5s
 
 
 class _fdslight_server(dispatcher.dispatcher):
@@ -69,6 +71,8 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __ip6_udp_cone_nat = False
 
+    __socks5_proxy = None
+
     def init_func(self, debug, configs):
         self.create_poll()
 
@@ -77,6 +81,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
         self.__ip6_dgram = {}
         self.__dgram_proxy = {}
+        self.__socks5_proxy = {}
 
         signal.signal(signal.SIGINT, self.__exit)
 
@@ -196,8 +201,8 @@ class _fdslight_server(dispatcher.dispatcher):
 
     def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
         size = len(message)
-        if size > utils.MBUF_AREA_SIZE: return False
 
+        if size > utils.MBUF_AREA_SIZE: return False
         if action == proto_utils.ACT_IPDATA: self.__mbuf.copy2buf(message)
 
         # 删除旧的连接
@@ -211,12 +216,60 @@ class _fdslight_server(dispatcher.dispatcher):
                 ''''''
             ''''''
         b = self.__access.data_from_recv(fileno, session_id, address, size)
+
         if not b: return False
+        if action not in proto_utils.ACTS: return False
+
         if action == proto_utils.ACT_DNS:
             self.__request_dns(session_id, message)
             return True
 
+        if action == proto_utils.ACT_SOCKS5:
+            return self.__handle_socks5_from_tunnel(session_id, message)
+
         return self.__handle_ipdata_from_tunnel(session_id)
+
+    def __handle_socks5_from_tunnel(self, session_id, message):
+        size = len(message)
+        if size < 8: return False
+
+        connid = utils.bytes2number(message[0:8])
+
+        if session_id not in self.__socks5_proxy:
+            self.__socks5_proxy[session_id] = {}
+
+        pydict = self.__socks5_proxy[session_id]
+
+        if connid in pydict:
+            fileno = pydict[connid]
+            self.get_handler(fileno).message_from_tunnel(message[8:])
+            return
+        # 处理新传入的连接
+        try:
+            cmd, fragment, atyp, sts_address, dport, data = socks5.parse_request_and_udpdata(message)
+        except socks5.ProtocolErr:
+            if not pydict: del self.__socks5_proxy[session_id]
+            return False
+
+        # 去除BIND命令支持
+        if cmd not in (1, 3,):
+            if not pydict: del self.__socks5_proxy[session_id]
+            return
+
+        if atyp == 4:
+            is_ipv6 = True
+        else:
+            is_ipv6 = False
+
+        if cmd == 1:
+            fileno = self.create_handler(
+                -1, socks5s.sclient_tcp,
+                session_id, connid, atyp, (sts_address, dport,), is_ipv6=is_ipv6
+            )
+            pydict[connid] = fileno
+            return
+
+            # 处理socks5的UDP代理
 
     def __handle_ipdata_from_tunnel(self, session_id):
         ip_ver = self.__mbuf.ip_version()
@@ -364,6 +417,10 @@ class _fdslight_server(dispatcher.dispatcher):
         if not self.handler_exists(fileno): return
 
         self.get_handler(fileno).send_msg(session_id, session_info[2], action, message)
+
+    def send_socks5_msg_to_tunnel(self, session_id, connid, message):
+        sent_msg = utils.number2bytes(connid, 8) + message
+        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_SOCKS5, sent_msg)
 
     def send_msg_to_tunnel_from_tun(self, message):
         if len(message) > utils.MBUF_AREA_SIZE: return
@@ -515,6 +572,17 @@ class _fdslight_server(dispatcher.dispatcher):
         if key not in pydict: return
         del pydict[key]
         if not pydict: del self.__dgram_proxy[session_id]
+
+    def tell_del_socks5_proxy(self, session_id, connid):
+        """告知删除socks5代理
+        :param session_id:
+        :param connid:
+        :return:
+        """
+        if session_id not in self.__socks5_proxy: return
+        pydict = self.__socks5_proxy
+        if connid in pydict: del pydict[connid]
+        if not pydict: del self.__socks5_proxy[session_id]
 
     def __exit(self, signum, frame):
         if self.handler_exists(self.__dns_fileno):

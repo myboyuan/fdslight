@@ -280,6 +280,15 @@ class _fdslight_client(dispatcher.dispatcher):
         if action == proto_utils.ACT_DNS:
             self.get_handler(self.__dns_fileno).msg_from_tunnel(message)
             return
+
+        if action == proto_utils.ACT_SOCKS5:
+            size = len(message)
+            if size < 15: return
+            fileno = utils.bytes2number(message[0:8])
+            if not self.handler_exists(fileno): return
+            self.get_handler(fileno).message_from_tunnel(message[8:])
+            return
+
         self.__mbuf.copy2buf(message)
         ip_ver = self.__mbuf.ip_version()
         if ip_ver not in (4, 6,): return
@@ -308,6 +317,10 @@ class _fdslight_client(dispatcher.dispatcher):
 
         handler = self.get_handler(self.__tunnel_fileno)
         handler.send_msg_to_tunnel(self.session_id, action, message)
+
+    def send_socks5_msg_to_tunnel(self, fileno, message):
+        sent_msg = utils.number2bytes(fileno, 8) + message
+        self.send_msg_to_tunnel(proto_utils.ACT_SOCKS5, sent_msg)
 
     def send_msg_to_tun(self, message):
         self.get_handler(self.__tundev_fileno).msg_from_tunnel(message)
