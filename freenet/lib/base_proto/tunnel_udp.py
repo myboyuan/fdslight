@@ -115,7 +115,7 @@ class builder(object):
 
         data_len = len(byte_data)
 
-        if data_len > self.__max_pkt_size:
+        if data_len > self.__max_pkt_size and redundancy:
             raise proto_utils.ProtoError("the size of byte data muse be less than %s" % self.__max_pkt_size + 1)
 
         data_seq = []

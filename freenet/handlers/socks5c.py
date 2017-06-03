@@ -3,11 +3,18 @@
 """
 
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
+import freenet.lib.host_match as host_match
 import socket
 
 
 class sserverd(tcp_handler.tcp_handler):
-    def init_func(self, creator, listen, listen_ipv6=False):
+    __host_match = None
+    __udp_global_subnet = None
+
+    def init_func(self, creator, listen, host_match, udp_global_subnet, listen_ipv6=False):
+        self.__host_match = host_match.host_match()
+        self.__udp_global_subnet = udp_global_subnet
+
         if listen_ipv6:
             af = socket.AF_INET6
         else:
@@ -33,7 +40,7 @@ class sserverd(tcp_handler.tcp_handler):
                 cs, address = self.accept()
                 self.create_handler(
                     self.fileno, _sserverd_handler,
-                    cs, address
+                    cs, address, self.__host_match
                 )
             except BlockingIOError:
                 break
@@ -46,7 +53,10 @@ class sserverd(tcp_handler.tcp_handler):
 
 
 class _sserverd_handler(tcp_handler.tcp_handler):
-    def init_func(self, creator, caddr):
+    __host_match = None
+    __udp_global_subnet = None
+
+    def init_func(self, creator, cs, caddr, host_match, udp_global_subnet):
         pass
 
     def tcp_readable(self):
