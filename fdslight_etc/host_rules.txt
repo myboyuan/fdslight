@@ -1,0 +1,193 @@
+### --------------重要说明--------------------------
+## 后面的 ":1" 表示解析DNS并且走代理,如果是":0"表示DNS走加密,并不走代理,":2"表示丢弃DNS请求,可用于广告屏蔽等其他用途
+
+# 美国顶级网站
+*.google.com:1
+*.google.com.hk:1
+*.google.co.jp:1
+*.googledrive.com:1
+*.youtube.com:1
+*.googleapis.com:1
+*.gmail.com:1
+*.ytimg.com:1
+*.blogger.com:1
+*.blogspot.com:1
+*.blogspot.hk:1
+*.blogspot.sg:1
+*.googlezip.net:1
+*.yahoo.com:1
+*.googleusercontent.com:1
+*.ytimg.com:1
+*.yimg.com:1
+*.gstatic.com:1
+*.ggpht.com:1
+*.googlevideo.com:1
+*.youtube-nocookie.com:1
+*.googleadservices.com:1
+*.gvt1.com:1
+*.gvt2.com:1
+*.gvt3.com:1
+*.google-analytics.com:1
+*.googlesyndication.com:1
+*.yahoo.com:1
+*.googlesyndication.com:1
+*.googletagmanager.com:1
+*.g.co:1
+*.live.com:1
+*.live.net:1
+
+#  社交网络
+*.facebook.com:1
+*.fbcdn.net:1
+*.twitter.com:1
+*.twimg.com:1
+*.t.co:1
+*.instagram.com:1
+*.xing.com:1
+*.instagram.com:1
+*.line.me:1
+*.line-scdn.net:0
+*.viber.com:1
+*.whatsapp.net:0
+*.naver.jp:0
+*.telegram.org:1
+
+# 防止skype重定向到gmw.cn
+*.skype.com:1
+
+### 音视频媒体网站
+*.nicovideo.jp:1
+*.spotify.com:1
+*.scdn.co:1
+*.soundcloud.com:1
+*.sndcdn.com:1
+*.netflix.com:1
+
+# 博客
+*.wordpress.com:1
+*.ameblo.jp:1
+
+# 论坛及讨论区
+*.bannedbook.org:1
+
+###  国际媒体
+*.dongtaiwang.com:1
+*.epochtimes.com:1
+*.secretchina.com:1
+*.kanzhongguo.com:1
+*.renminbao.com:1
+*.ntdtv.com:1
+*.bcchinese.net:1
+*.ntdtv.com.tw:1
+*.chinadigitaltimes.net:1
+*.reuters.com:1
+*.reutersmedia.net:1
+*.aboluowang.com:1
+*.ablwang.com:1
+#  梵蒂冈广播电台
+*.vaticanradio.org:1
+# BBC
+*.bbc.com:1
+*.bbc.co.uk:1
+# 法广
+*.rfi.fr:1
+*.soundofhope.org:1
+# 纽约时报
+*.nytimes.com:1
+# 美国之音
+*.voachinese.com:1
+*.voanews.com:1
+# 自由亚洲电台
+*.rfa.org:1
+*.udn.com:1
+*.udn.com.tw:1
+# 苹果日报
+*.nextmedia.com:1
+# 华尔街日报
+*.wsj.com:1
+
+# 苹果日报
+*.appledaily.com:1
+*.appledaily.com.tw:1
+
+# 网络存储
+*.dropbox.com:1
+*.dropboxstatic.com:0
+*.onedrive.com:0
+*.dropboxusercontent.com:1
+*.livefilestore.com:1
+
+# 其它网站
+*.wikipedia.org:1
+*.wikimedia.org:1
+*.akamaihd.net:1
+*.chinadigitaltimes.net:1
+*.vpngate.net:1
+*.akamai.net:1
+*.github.io:1
+*.githubusercontent.com:1
+*.bit.ly:1
+*.dyndns.org:1
+*.doubleclick.net:1
+*.fastly.net:1
+*.blogsmithmedia.com:1
+*.aolcdn.com:1
+*.apkpure.com:1
+static.adzerk.net:1
+dl.delivery.mp.microsoft.com:1
+*.wns.windows.com:1
+*.data.microsoft.com:1
+*.telemetry.microsoft.com:1
+register.mesh.com:1
+*.akadns.net:1
+*.mengniang.org:0
+*.v2ex.com:0
+*.uukanshu.com:1
+*.jsdelivr.net:0
+*.cloudfront.net:0
+*.cloudflare.com:1
+*.jwpcdn.com:1
+*.ntdimg.com:1
+*.jwpltx.com:1
+*.hk01.com:1
+
+### 游戏相关
+*.rockstargames.com:1
+# PS4
+*.llnwd.net:0
+*.ubisoft.com:1
+
+#*.srv.nintendo.net:1
+#*.baas.nintendo.com:1
+#*.nintendowifi.net:1
+
+### 开发相关
+*.spice-space.org:1
+*.gnu.org:1
+*.android.com:1
+*.golang.org:1
+*.python-excel.org:1
+*.freebsd.org:0
+
+### 宗教及非政府机构
+# 香港教会
+*.hkchurch.org:1
+*.minghui.org:1
+*.zhengjian.org:1
+*.xinsheng.net:1
+*.goodtv.tv:1
+
+### 广告屏蔽列表
+#img1.126.net:2
+#img2.126.net:2
+#als.baidu.com:2
+#ss0.bdstatic.com:2
+
+### 政府机构
+# 中华民国政府
+*.gov.tw:1
+
+# 色情网站
+*.sex.com:1
+zh.foxtube.com:1
+*.fxtimg.com:1
