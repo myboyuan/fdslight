@@ -115,7 +115,7 @@ class builder(object):
 
         data_len = len(byte_data)
 
-        if data_len > self.__max_pkt_size:
+        if data_len > self.__max_pkt_size and redundancy:
             raise proto_utils.ProtoError("the size of byte data muse be less than %s" % self.__max_pkt_size + 1)
 
         data_seq = []
@@ -312,7 +312,7 @@ b = builder(MIN_FIXED_HEADER_SIZE)
 data = list(bytes(1400))
 data.append(69)
 
-edata = b.build_packets(bytes(16), ACT_DATA, bytes(data))
+edata = b.build_packets(bytes(16), ACT_IPDATA, bytes(data))
 edata.pop(1)
 # print(edata)
 

@@ -2,11 +2,17 @@
 
 import hashlib, json
 
-ACT_DATA = 1
+ACT_IPDATA = 1
 ACT_DNS = 2
 
+# 表示是TCP SOCKS5代理
+ACT_SOCKS5_TCP = 3
+
+# 表示的是UDP SOCKS5代理
+ACT_SOCKS5_UDP = 4
+
 ACTS = (
-    ACT_DATA, ACT_DNS,
+    ACT_IPDATA, ACT_DNS, ACT_SOCKS5_TCP, ACT_SOCKS5_UDP,
 )
 
 
