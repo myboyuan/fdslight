@@ -73,6 +73,9 @@ class _fdslight_client(dispatcher.dispatcher):
 
     __only_socks5 = None
 
+    __http_proxy_fileno = -1
+    __socks5_proxy_fileno = -1
+
     def init_func(self, mode, debug, configs, only_socks5=False):
         self.create_poll()
 
