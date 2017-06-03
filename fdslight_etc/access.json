@@ -1,8 +1,5 @@
 [
   {
     "username":"test","password":"test"
-  },
-  {
-    "username":"guest","password":"guest"
   }
 ]
