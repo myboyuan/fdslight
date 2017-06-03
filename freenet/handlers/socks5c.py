@@ -4,6 +4,7 @@
 
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.evtframework.handlers.udp_handler as udp_handler
+import freenet.lib.utils as utils
 import freenet.lib.host_match as host_match
 import freenet.lib.socks5 as socks5
 import socket, time
@@ -126,10 +127,29 @@ class _sserverd_handler(tcp_handler.tcp_handler):
         if cmd == 1:
             self.__handle_tcp_connect(atyp, sts_address, dport, rdata)
         if cmd == 3:
-            pass
+            self.__handle_udp_connect(atyp, self.getpeername()[0], dport, rdata)
+        return
 
     def __handle_udp_connect(self, atyp, address, port, message):
-        pass
+        if port == 0:
+            self.delete_handler(self.fileno)
+            return
+
+        if atyp == 4:
+            is_ipv6 = True
+        else:
+            is_ipv6 = False
+
+        if utils.check_is_from_subnet(address, self.__udp_global_subnet[0], self.__udp_global_subnet[1]):
+            forward_to_tunnel = True
+        else:
+            forward_to_tunnel = False
+
+        self.__proxy_client_fileno = self.create_handler(
+            self.fileno, sclient_udp,
+            (address, port,), is_ipv6=is_ipv6,
+            forward_to_tunnel=forward_to_tunnel
+        )
 
     def __handle_tcp_connect(self, atyp, address, port, message):
         """
@@ -139,6 +159,9 @@ class _sserverd_handler(tcp_handler.tcp_handler):
         :param message:从客户端接收的原始消息
         :return:
         """
+        if port == 0:
+            self.delete_handler(self.fileno)
+            return
         if atyp == 3:
             is_match, flags = self.__host_match.match(address)
 
@@ -302,23 +325,24 @@ class sclient_udp(udp_handler.udp_handler):
     __creator = None
     __forward_to_tunnel = None
     __is_ipv6 = None
-    __client_ipaddr = None
-    __client_port = None
+    __client_address = None
 
     # 允许收到的数据包
     __permits = None
 
-    def init_func(self, creator, client_ipaddr, is_ipv6=False, forward_to_tunnel=False):
+    __TIMEOUT = 180
+    __update_time = 0
+
+    def init_func(self, creator, client_address, is_ipv6=False, forward_to_tunnel=False):
         """
         :param creator:
         :param forward_to_tunnel: 是否吧数据转发到隧道
         :return:
         """
-
         self.__creator = creator
         self.__forward_to_tunnel = forward_to_tunnel
         self.__is_ipv6 = is_ipv6
-        self.__client_ipaddr = client_ipaddr
+        self.__client_address = client_address
         self.__permits = {}
 
         if is_ipv6:
@@ -337,6 +361,8 @@ class sclient_udp(udp_handler.udp_handler):
         self.__addrinfo = addrinfo
 
         self.ctl_handler(self.fileno, self.__creator, "tell_connect_ok", addrinfo)
+        self.__update_time = time.time()
+        self.set_timeout(self.fileno, 10)
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
@@ -345,20 +371,31 @@ class sclient_udp(udp_handler.udp_handler):
 
     def udp_readable(self, message, address):
         # 处理客户端发送过来的数据包
-        if address[0] == self.__client_ipaddr:
+
+        # 如果与协商的端口不一致,那么丢弃数据包
+        if address[0] == self.__client_address and address[1] != self.__client_address[1]:
+            return
+
+        if address[0] == self.__client_address[0]:
             self.__client_port = address[1]
             try:
                 cmd, fragment, atyp, sts_address, dport, data = socks5.parse_request_and_udpdata(message, is_udp=True)
             except socks5.ProtocolErr:
                 return
 
-            self.__permits[dport] = address
+            # 暂不支持分包
+            if fragment != 0: return
+            if dport == 0: return
+
+            self.__permits[dport] = None
             if self.__forward_to_tunnel:
                 self.dispatcher.send_socks5_msg_to_tunnel(self.fileno, message)
                 return
             return
+        if address[1] not in self.__permits: return
 
-        if not self.__client_port: return
+        self.__update_time = time.time()
+        self.__send_message_from_local(message, address)
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
@@ -368,16 +405,23 @@ class sclient_udp(udp_handler.udp_handler):
         self.close()
 
     def udp_error(self):
-        self.delete_handler(self.fileno)
+        self.ctl_handler(self.fileno, self.__creator, "tell_delete")
 
     def message_from_tunnel(self, message):
         try:
             cmd, fragment, atyp, sts_address, dport, data = socks5.parse_request_and_udpdata(message, is_udp=True)
         except socks5.ProtocolErr:
             return
-
+        self.__update_time = time.time()
         self.sendto(message, (sts_address, dport))
 
     def __send_message_from_local(self, message, address):
         self.add_evt_write(self.fileno)
         self.sendto(message, address)
+
+    def udp_timeout(self):
+        t = time.time()
+        if t - self.__update_time > self.__TIMEOUT:
+            self.ctl_handler(self.fileno, self.__creator, "tell_delete")
+            return
+        self.set_timeout(self.fileno, 10)

@@ -124,8 +124,11 @@ class sclient_udp(udp_handler.udp_handler):
         except socks5.ProtocolErr:
             return
 
-        if dport == 0: return
+        # 暂时不支持分包
+        if fragment != 0: return
+        if fragment == 0 and dport == 0: return
 
+        self.__permits[dport] = None
         self.__update_time = time.time()
 
         self.add_evt_write(self.fileno)
