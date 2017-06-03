@@ -196,10 +196,6 @@ class _fdslight_server(dispatcher.dispatcher):
 
     def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
         size = len(message)
-        if size > utils.MBUF_AREA_SIZE: return False
-
-        if action == proto_utils.ACT_DATA: self.__mbuf.copy2buf(message)
-
         # 删除旧的连接
         if self.__access.session_exists(session_id):
             session_info = self.__access.get_session_info(session_id)
@@ -212,6 +208,11 @@ class _fdslight_server(dispatcher.dispatcher):
             ''''''
         b = self.__access.data_from_recv(fileno, session_id, address, size)
         if not b: return False
+
+        if size > utils.MBUF_AREA_SIZE: return False
+        if action not in proto_utils.ACTS: return False
+
+        if action == proto_utils.ACT_DATA: self.__mbuf.copy2buf(message)
         if action == proto_utils.ACT_DNS:
             self.__request_dns(session_id, message)
             return True
