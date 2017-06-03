@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""socks5本地服务端实现
+"""socks5本地代理实现
 """
 
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
@@ -29,11 +29,14 @@ class sserverd(tcp_handler.tcp_handler):
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         self.set_socket(s)
-
-        self.register(self.fileno)
-        self.add_evt_read(self.fileno)
+        self.bind(listen)
 
         return self.fileno
+
+    def after(self):
+        self.listen(10)
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
 
     def tcp_accept(self):
         while 1:
@@ -65,12 +68,13 @@ class _sserverd_handler(tcp_handler.tcp_handler):
 
     __proxy_client_fileno = None
 
+    __atyp = 0
+
     def init_func(self, creator, cs, caddr, host_match, udp_global_subnet):
         self.__host_match = host_match
         self.__udp_global_subnet = udp_global_subnet
         self.__conn_is_ipv6 = False
         self.__proxy_client_fileno = -1
-
         self.set_socket(cs)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
@@ -95,16 +99,56 @@ class _sserverd_handler(tcp_handler.tcp_handler):
         if not is_no_auth:
             self.delete_handler(self.fileno)
             return
-
         sent_data = socks5.build_handshake_response(0)
         self.__send_data_to_local(sent_data)
         self.__is_auth = True
 
     def __do_connecting(self):
-        pass
+        rdata = self.reader.read()
+        try:
+            cmd, fragment, atyp, sts_address, dport, data = socks5.parse_request_and_udpdata(rdata, is_udp=False)
+        except socks5.ProtocolErr:
+            self.delete_handler(self.fileno)
+            return
+
+        # 去除BIND支持,bind已经很少使用
+        if cmd not in (1, 3,):
+            self.delete_handler(self.fileno)
+            return
+
+        self.__is_connecting = True
+        if cmd == 1:
+            self.__handle_tcp_connect(atyp, sts_address, dport)
+
+    def __handle_tcp_connect(self, atyp, address, port):
+        if atyp == 3:
+            is_match, flags = self.__host_match.match(address)
+
+            # 只处理标志为1的规则
+            if is_match and flags == 1:
+                pass
+                # return
+
+        if atyp == 4:
+            is_ipv6 = True
+        else:
+            is_ipv6 = False
+
+        self.__conn_is_ipv6 = is_ipv6
+        self.__atyp = atyp
+
+        self.__proxy_client_fileno = self.create_handler(
+            self.fileno, sclient_tcp, (address, port,), is_ipv6=is_ipv6
+        )
 
     def __send_data_from_local(self):
-        pass
+        rdata = self.reader.read()
+
+        if not self.handler_exists(self.__proxy_client_fileno):
+            self.delete_handler(self.fileno)
+            return
+
+        self.send_message_to_handler(self.fileno, self.__proxy_client_fileno, rdata)
 
     def tcp_readable(self):
         if not self.__is_auth:
@@ -137,7 +181,11 @@ class _sserverd_handler(tcp_handler.tcp_handler):
             return True
 
         if cmd == "tell_connect_ok":
-            pass
+            address, = args
+            sent_data = socks5.build_response_and_udpdata(0, self.__atyp, address[0], address[1])
+            self.__send_data_to_local(sent_data)
+            self.__is_connected = True
+            return True
 
         return False
 
@@ -154,6 +202,9 @@ class _sserverd_handler(tcp_handler.tcp_handler):
 
 class sclient_tcp(tcp_handler.tcp_handler):
     __creator = None
+
+    __TIMEOUT = 900
+    __update_time = 0
 
     def init_func(self, creator, address, is_ipv6=False):
         self.__creator = creator
@@ -176,7 +227,10 @@ class sclient_tcp(tcp_handler.tcp_handler):
 
         addrinfo = self.socket.getsockname()
 
+        self.__update_time = time.time()
+
         self.ctl_handler(self.fileno, self.__creator, "tell_connect_ok", addrinfo)
+        self.set_timeout(self.fileno, 10)
 
     def tcp_readable(self):
         rdata = self.reader.read()
@@ -198,4 +252,14 @@ class sclient_tcp(tcp_handler.tcp_handler):
         if not self.is_conn_ok():
             self.ctl_handler(self.fileno, self.__creator, "tell_delete")
             return
-        return
+
+        t = time.time()
+        if t - self.__update_time > self.__TIMEOUT:
+            self.ctl_handler(self.fileno, self.__creator, "tell_delete")
+            return
+
+        self.set_timeout(self.fileno, 10)
+
+    def message_from_handler(self, from_fd, message):
+        self.writer.write(message)
+        self.add_evt_write(self.fileno)

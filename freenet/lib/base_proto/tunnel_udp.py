@@ -312,7 +312,7 @@ b = builder(MIN_FIXED_HEADER_SIZE)
 data = list(bytes(1400))
 data.append(69)
 
-edata = b.build_packets(bytes(16), ACT_DATA, bytes(data))
+edata = b.build_packets(bytes(16), ACT_IPDATA, bytes(data))
 edata.pop(1)
 # print(edata)
 

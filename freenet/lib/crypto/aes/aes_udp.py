@@ -111,7 +111,7 @@ key = "hello"
 builder = encrypt()
 builder.config({"key":key})
 
-packets = builder.build_packets(bytes(16),tunnel.ACT_DATA,b"hello")
+packets = builder.build_packets(bytes(16),tunnel.ACT_IPDATA,b"hello")
 
 parser = decrypt()
 parser.config({"key":"hello"})

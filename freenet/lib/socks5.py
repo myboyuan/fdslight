@@ -176,4 +176,6 @@ def build_response_and_udpdata(rep_frag, atyp, bind_addr, bind_port, udp_data=No
         )
     )
 
+    if udp_data: res_seq.append(udp_data)
+
     return b"".join(res_seq)

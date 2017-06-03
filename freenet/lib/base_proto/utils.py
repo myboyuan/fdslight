@@ -2,14 +2,14 @@
 
 import hashlib, json
 
-ACT_DATA = 1
+ACT_IPDATA = 1
 ACT_DNS = 2
 
 # 表示是SOCKS5代理
 ACT_SOCKS5 = 3
 
 ACTS = (
-    ACT_DATA, ACT_DNS, ACT_SOCKS5,
+    ACT_IPDATA, ACT_DNS, ACT_SOCKS5,
 )
 
 
