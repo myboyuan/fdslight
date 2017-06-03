@@ -73,7 +73,10 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __socks5_proxy = None
 
-    def init_func(self, debug, configs):
+    # 是否只有socks5代理
+    __only_socks5 = False
+
+    def init_func(self, debug, configs, only_socks5=False):
         self.create_poll()
 
         self.__configs = configs
@@ -82,6 +85,7 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__ip6_dgram = {}
         self.__dgram_proxy = {}
         self.__socks5_proxy = {}
+        self.__only_socks5 = only_socks5
 
         signal.signal(signal.SIGINT, self.__exit)
 
@@ -149,6 +153,12 @@ class _fdslight_server(dispatcher.dispatcher):
             listen, self.__udp_crypto, self.__crypto_configs, is_ipv6=False
         )
 
+        if only_socks5:
+            if not debug:
+                sys.stdout = open(LOG_FILE, "a+")
+                sys.stderr = open(ERR_FILE, "a+")
+            return
+
         self.__tundev_fileno = self.create_handler(
             -1, tundev.tundevs, self.__DEVNAME
         )
@@ -193,18 +203,15 @@ class _fdslight_server(dispatcher.dispatcher):
             sys.stderr = open(ERR_FILE, "a+")
 
     def myloop(self):
-        if self.__enable_nat6:
-            self.__nat6.recycle()
-        self.__nat4.recycle()
+        if not self.__only_socks5:
+            if self.__enable_nat6:
+                self.__nat6.recycle()
+            self.__nat4.recycle()
         self.__access.access_loop()
         return
 
     def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
         size = len(message)
-
-        if size > utils.MBUF_AREA_SIZE: return False
-        if action == proto_utils.ACT_IPDATA: self.__mbuf.copy2buf(message)
-
         # 删除旧的连接
         if self.__access.session_exists(session_id):
             session_info = self.__access.get_session_info(session_id)
@@ -218,7 +225,13 @@ class _fdslight_server(dispatcher.dispatcher):
         b = self.__access.data_from_recv(fileno, session_id, address, size)
 
         if not b: return False
+        if self.__only_socks5 and action not in (proto_utils.ACT_SOCKS5_TCP, proto_utils.ACT_SOCKS5_UDP):
+            return False
+
         if action not in proto_utils.ACTS: return False
+
+        if size > utils.MBUF_AREA_SIZE and action == proto_utils.ACT_IPDATA: return False
+        if action == proto_utils.ACT_IPDATA: self.__mbuf.copy2buf(message)
 
         if action == proto_utils.ACT_DNS:
             self.__request_dns(session_id, message)
@@ -255,19 +268,25 @@ class _fdslight_server(dispatcher.dispatcher):
             if not pydict: del self.__socks5_proxy[session_id]
             return False
 
+        if atyp == 4:
+            is_ipv6 = True
+        else:
+            is_ipv6 = False
+
         # 处理UDP协议
         if is_udp:
+            if dport == 0: return False
+            fileno = self.create_handler(
+                -1, socks5s.sclient_udp,
+                session_id, connid, is_ipv6=is_ipv6
+            )
+            pydict[connid] = fileno
             return True
 
         # 去除BIND命令支持
         if cmd not in (1, 3,):
             if not pydict: del self.__socks5_proxy[session_id]
             return
-
-        if atyp == 4:
-            is_ipv6 = True
-        else:
-            is_ipv6 = False
 
         if cmd == 1:
             fileno = self.create_handler(
@@ -646,9 +665,10 @@ def __stop_service():
 def main():
     help_doc = """
     -d      debug | start | stop    debug,start or stop application
+    --only-socks5  only open socks5 proxy
     """
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "u:m:d:")
+        opts, args = getopt.getopt(sys.argv[1:], "u:m:d:", ["--only-socks5"])
     except getopt.GetoptError:
         print(help_doc)
         return

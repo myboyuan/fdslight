@@ -135,6 +135,7 @@ class sclient_udp(udp_handler.udp_handler):
         self.sendto(data, (sts_address, dport,))
 
     def udp_delete(self):
+        self.dispatcher.tell_del_socks5_proxy(self.__session_id, self.__connid)
         self.unregister(self.fileno)
         self.close()
 

@@ -71,7 +71,9 @@ class _fdslight_client(dispatcher.dispatcher):
     # 是否开启IPV6流量
     __enable_ipv6_traffic = False
 
-    def init_func(self, mode, debug, configs):
+    __only_socks5 = None
+
+    def init_func(self, mode, debug, configs, only_socks5=False):
         self.create_poll()
 
         signal.signal(signal.SIGINT, self.__exit)
@@ -79,6 +81,7 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__router_timer = timer.timer()
         self.__routers = {}
         self.__configs = configs
+        self.__only_socks5 = only_socks5
 
         if mode == "local":
             self.__mode = _MODE_LOCAL
