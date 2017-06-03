@@ -200,7 +200,6 @@ class _fdslight_server(dispatcher.dispatcher):
         if self.__access.session_exists(session_id):
             session_info = self.__access.get_session_info(session_id)
             old_fileno = session_info[0]
-            print(old_fileno, fileno)
             if old_fileno != fileno:
                 if old_fileno not in (self.__udp6_fileno, self.__udp_fileno,):
                     self.delete_handler(old_fileno)
@@ -208,7 +207,6 @@ class _fdslight_server(dispatcher.dispatcher):
             ''''''
         b = self.__access.data_from_recv(fileno, session_id, address, size)
         if not b: return False
-
         if size > utils.MBUF_AREA_SIZE: return False
         if action not in proto_utils.ACTS: return False
 
