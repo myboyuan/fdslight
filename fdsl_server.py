@@ -224,12 +224,16 @@ class _fdslight_server(dispatcher.dispatcher):
             self.__request_dns(session_id, message)
             return True
 
-        if action == proto_utils.ACT_SOCKS5:
-            return self.__handle_socks5_from_tunnel(session_id, message)
+        if action in (proto_utils.ACT_SOCKS5_TCP, proto_utils.ACT_SOCKS5_UDP):
+            if action == proto_utils.ACT_SOCKS5_UDP:
+                is_udp = True
+            else:
+                is_udp = False
+            return self.__handle_socks5_from_tunnel(session_id, message, is_udp=is_udp)
 
         return self.__handle_ipdata_from_tunnel(session_id)
 
-    def __handle_socks5_from_tunnel(self, session_id, message):
+    def __handle_socks5_from_tunnel(self, session_id, message, is_udp=False):
         size = len(message)
         if size < 8: return False
 
@@ -244,12 +248,16 @@ class _fdslight_server(dispatcher.dispatcher):
             fileno = pydict[connid]
             self.get_handler(fileno).message_from_tunnel(message[8:])
             return
-        # 处理新传入的连接
+
         try:
             cmd, fragment, atyp, sts_address, dport, data = socks5.parse_request_and_udpdata(message)
         except socks5.ProtocolErr:
             if not pydict: del self.__socks5_proxy[session_id]
             return False
+
+        # 处理UDP协议
+        if is_udp:
+            return True
 
         # 去除BIND命令支持
         if cmd not in (1, 3,):
@@ -418,9 +426,15 @@ class _fdslight_server(dispatcher.dispatcher):
 
         self.get_handler(fileno).send_msg(session_id, session_info[2], action, message)
 
-    def send_socks5_msg_to_tunnel(self, session_id, connid, message):
+    def send_socks5_msg_to_tunnel(self, session_id, connid, message, is_udp=False):
         sent_msg = utils.number2bytes(connid, 8) + message
-        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_SOCKS5, sent_msg)
+
+        if is_udp:
+            act = proto_utils.ACT_SOCKS5_UDP
+        else:
+            act = proto_utils.ACT_SOCKS5_TCP
+
+        self.__send_msg_to_tunnel(session_id, act, sent_msg)
 
     def send_msg_to_tunnel_from_tun(self, message):
         if len(message) > utils.MBUF_AREA_SIZE: return

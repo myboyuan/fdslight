@@ -281,7 +281,7 @@ class _fdslight_client(dispatcher.dispatcher):
             self.get_handler(self.__dns_fileno).msg_from_tunnel(message)
             return
 
-        if action == proto_utils.ACT_SOCKS5:
+        if action in (proto_utils.ACT_SOCKS5_TCP, proto_utils.ACT_SOCKS5_UDP,):
             size = len(message)
             if size < 15: return
             fileno = utils.bytes2number(message[0:8])
@@ -320,7 +320,7 @@ class _fdslight_client(dispatcher.dispatcher):
 
     def send_socks5_msg_to_tunnel(self, fileno, message):
         sent_msg = utils.number2bytes(fileno, 8) + message
-        self.send_msg_to_tunnel(proto_utils.ACT_SOCKS5, sent_msg)
+        self.send_msg_to_tunnel(proto_utils.ACT_SOCKS5_TCP, sent_msg)
 
     def send_msg_to_tun(self, message):
         self.get_handler(self.__tundev_fileno).msg_from_tunnel(message)
