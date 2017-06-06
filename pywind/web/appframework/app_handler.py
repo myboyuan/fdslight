@@ -311,9 +311,9 @@ class _request(object):
 
         s = content_type.lower()
 
-        if s == match_set[0]: match_rs = self.__FORM_TYPE_URLENCODED
-        if s == match_set[1]: match_rs = self.__FORM_TYPE_MULTIPART
-        if s == match_set[2]: match_rs = self.__FORM_TYPE_PLAIN
+        if s.find(match_set[0]) == 0: match_rs = self.__FORM_TYPE_URLENCODED
+        if s.find(match_set[1]) == 0: match_rs = self.__FORM_TYPE_MULTIPART
+        if s.find(match_set[2]) == 0: match_rs = self.__FORM_TYPE_PLAIN
 
         return match_rs
 
@@ -413,7 +413,7 @@ class handler(object):
 
     def on_recv_stream(self):
         """根据需要重写这个方法,接受http body流
-        :return Boolean: True表示正常,False表示处理发生错误
+        :return Boolean: True表示接收边鄙,False表示未接收完毕
         """
         if self.__is_finish:
             self.request.flush_stream()
@@ -423,10 +423,12 @@ class handler(object):
         except ForbiddenErr:
             self.set_status("403 Forbidden")
             self.set_header("Content-Length", 0)
+            self.finish()
             return False
         except RequestErr:
             self.set_status("400 Bad Request")
             self.set_header("Content-Length", 0)
+            self.finish()
             return False
 
         return True
@@ -510,6 +512,10 @@ class handler(object):
         self.finish()
 
     def __iter__(self):
+        if self.__is_finish and self.__is_start_response and not self.__is_response_header:
+            self.__response_header()
+            return self
+
         if not self.request.recv_ok():
             self.on_recv_stream()
             return self
