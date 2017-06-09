@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import pywind.web.lib.httputils as httputils
+import pywind.web.lib.httpchunked as httpchunked
 import pywind.lib.reader as reader
 
 
@@ -78,13 +79,16 @@ class _httpclient(object):
 
 
 class http1xclient(_httpclient):
-    __headers = None
+    __req_headers = None
     __resp_header_ok = None
     __resp_body_ok = None
 
+    __resp_headers = None
+    __resp_status = None
+
     def __init__(self):
         super(http1xclient, self).__init__()
-        self.__headers = []
+        self.__req_headers = []
         self.__resp_header_ok = False
         self.__resp_body_ok = False
 
@@ -97,8 +101,8 @@ class http1xclient(_httpclient):
         else:
             uri = "%s?%s" % (path, "&".join(qs_seq))
 
-        self.__headers.append(("Host", host))
-        sts = httputils.build_http1x_req_header(method, uri, self.__headers)
+        self.__req_headers.append(("Host", host))
+        sts = httputils.build_http1x_req_header(method, uri, self.__req_headers)
 
         return sts.encode("iso-8859-1")
 
@@ -132,8 +136,31 @@ class http1xclient(_httpclient):
         except httputils.Http1xHeaderErr:
             raise HttpErr("wrong http response header")
 
+        _, status = resp
+
+        self.__resp_status = int(status[0:3])
+        self.__resp_headers = fields
         self.__resp_header_ok = True
-        self.reader._putvalue(body_data)
+
+        if self.__resp_status == 200:
+            self.reader._putvalue(body_data)
+        return
+
+    def __parse_content_length(self):
+        if self.__resp_status != 200: return 0
+
+        # 是否有length标记
+        is_length = False
+        # 是否有chunked标记
+        is_chunked = False
+
+        for k, v in self.__resp_headers:
+            name = k.lower()
+            if name == "content-length": is_length = True
+            if name == "transfer-encoding" and v.lower() == "chunked": is_chunked = True
+
+        if is_length and is_chunked: raise HttpErr("conflict header about content-length and chunked")
+
 
     def __parse_response_body(self):
         pass

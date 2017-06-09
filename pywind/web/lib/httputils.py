@@ -18,7 +18,6 @@ def build_http1x_req_header(method, uri, seq):
     for k, v in seq:
         sts = "%s: %s\r\n" % (k, v,)
         tmplist.append(sts)
-
     tmplist.append("\r\n")
 
     return "".join(tmplist)
@@ -77,22 +76,22 @@ def parse_htt1x_request_header(sts):
 def parse_http1x_response_header(sts):
     p = sts.find("\r\n")
     first_line = sts[0:p]
-    if p < 4: raise Http1xHeaderErr("wrong http master:%s" % first_line)
+    if p < 10: raise Http1xHeaderErr("wrong http master:%s" % first_line)
+
+    pos = first_line.find(" ")
+    if pos != 8: raise Http1xHeaderErr("wrong http master:%s" % first_line)
+
+    version = first_line[0:pos]
+    status = first_line[pos:].lstrip()
+
     try:
-        stcode = int(first_line[0:3])
+        stcode = int(status[0:3])
     except ValueError:
         raise Http1xHeaderErr("wrong http response status:%s" % stcode)
 
-    tmplist = first_line.split(" ")
-    tmplist = __drop_nul_seq_elements(tmplist)
-    t = tuple(tmplist)
+    if version.lower() not in ("http/1.0", "http/1.1",):
+        raise Http1xHeaderErr("not support http version %s" % version)
 
-    status, version = t
-    try:
-        n_ver = float(version[4:])
-    except ValueError:
-        raise Http1xHeaderErr("wrong http version number")
-    if n_ver not in (1.0, 1.1,): raise Http1xHeaderErr("not support http version %s" % n_ver)
     p += 2
 
-    return (t, get_http1x_map(sts[p:]))
+    return ((version, status,), get_http1x_map(sts[p:]))
