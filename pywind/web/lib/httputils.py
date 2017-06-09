@@ -4,7 +4,7 @@ class Http1xHeaderErr(Exception): pass
 
 
 def build_http1x_resp_header(status, seq, version="1.1"):
-    tmplist = ["HTTP/%s %s\r\n" % (version,status)]
+    tmplist = ["HTTP/%s %s\r\n" % (version, status)]
     for k, v in seq:
         sts = "%s: %s\r\n" % (k, v,)
         tmplist.append(sts)
@@ -15,7 +15,10 @@ def build_http1x_resp_header(status, seq, version="1.1"):
 
 def build_http1x_req_header(method, uri, seq):
     tmplist = ["%s %s HTTP/1.1\r\n" % (method, uri,)]
-    for k, v in seq: sts = "%s: %s\r\n" % (k, v,)
+    for k, v in seq:
+        sts = "%s: %s\r\n" % (k, v,)
+        tmplist.append(sts)
+
     tmplist.append("\r\n")
 
     return "".join(tmplist)

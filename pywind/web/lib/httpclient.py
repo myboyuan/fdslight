@@ -1,190 +1,148 @@
 #!/usr/bin/env python3
 
-import socket, ssl
 import pywind.web.lib.httputils as httputils
+import pywind.lib.reader as reader
+
+
+class HttpErr(Exception): pass
 
 
 class _httpclient(object):
-    __headers = None
-    __socket = None
-
-    __io_wait = None
-
-    __connect_ok = None
+    __reader = None
 
     def __init__(self):
-        self.__headers = []
-        self.__socket = None
-        self.__io_wait = True
-        self.__connect_ok = False
+        self.__reader = reader.reader()
 
-    def set_request_header(self, name, value):
-        self.__headers.append((name, value,))
+    @property
+    def reader(self):
+        return self.__reader
 
-    def set_request_headers(self, seq):
-        self.__headers += seq
-
-    def set_socket(self, host, ssl_on=False, ipv6_on=False, io_wait=True):
-        if ipv6_on:
-            af = socket.AF_INET6
-        else:
-            af = socket.AF_INET
-
-        self.__io_wait = io_wait
-
-        self.__socket = socket.socket(af, socket.SOCK_STREAM)
-        if ssl_on:
-            self.__socket = ssl.wrap_socket(self.__socket)
-
-        if io_wait:
-            self.__socket.connect(host)
-
-    def get_headers(self):
-        return self.__headers
-
-    def request(self, method, host, path="/", qs_seq=None):
+    def build_request(self, host, path="/", qs_seq=None):
         """重写这个方法
-        :param method:
-        :param url:
+        :param host:
+        :param path:
         :param qs_seq:
+        :return bytes:
+        """
+
+    def parse_response_data(self, byte_data):
+        """解析响应数据,重写这个方法
+        :param byte_data:
         :return:
         """
         pass
 
-    def request_header_ok(self):
-        """头部请求是否已经发送完毕,重写这个方法
-        :return:
+    def build_send_body(self, byte_data):
+        """一次性发送body数据,重写这个方法
+        :param byte_data:
+        :return bytes:
         """
         pass
 
-    def request_body_ok(self):
-        """body部分是否已经发送完毕,重写这个方法
+    def build_send_body_part(self, byte_data):
+        """分批次发送body数据,注意需要手动设置content length
+        :param byte_data:
+        :return bytes:
+        """
+        pass
+
+    def parse_response_body(self, byte_data):
+        """重写这个方法
+        :param byte_data:
         :return:
         """
         pass
 
     def response_header_ok(self):
-        """头部响应是否已经接收完毕,重写这个方法
-        :return:
+        """响应头部是否完成,重写这个方法
+        :return Boolean:
         """
         pass
 
     def response_body_ok(self):
-        """body响应是否已经接收完毕,重写这个方法
+        """响应数据是否完成,重写这个方法
+        :return Boolean:
+        """
+        pass
+
+    def set_header(self, name, value):
+        """重写这个方法
+        :param name:
+        :param value:
         :return:
         """
         pass
 
-    def get_body_data(self):
-        """获取body数据,重写这个方法
-        :return:
-        """
-        pass
-
-    def parse_cookie(self, sts):
-        """解析COOKIE
-        :param sts:
-        :return:
-        """
-        pass
-
-    def connect_ok(self):
-        """检测连接是否成功
-        :return:
-        """
-        pass
-
-    def write_data(self, byte_data):
-        """写入数据
-        :param byte_data:
-        :return:
-        """
-        pass
-
-    def read_data(self, byte_data):
-        """读取数据
-        :param byte_data:
-        :return:
-        """
-        pass
-
-    def loop(self):
-        """循环函数
-        :return:
-        """
-        pass
+    def set_headers(self, seq):
+        for k, v in seq: self.set_header(k, v)
 
 
-class _http1x_client(_httpclient):
-    def request(self, method, host, path="/", qs_seq=None):
-        m = method.upper()
+class http1xclient(_httpclient):
+    __headers = None
+    __resp_header_ok = None
+    __resp_body_ok = None
+
+    def __init__(self):
+        super(http1xclient, self).__init__()
+        self.__headers = []
+        self.__resp_header_ok = False
+        self.__resp_body_ok = False
+
+    def build_request(self, method, host, path="/", qs_seq=None):
+        self.__host = host
+        method = method.upper()
+
         if not qs_seq:
             uri = path
         else:
             uri = "%s?%s" % (path, "&".join(qs_seq))
 
-        header = httputils.build_http1x_req_header(
-            m, uri, self.get_headers()
-        )
+        self.__headers.append(("Host", host))
+        sts = httputils.build_http1x_req_header(method, uri, self.__headers)
 
-        self.write_data(header.encode("iso-8859-1"))
-        return
+        return sts.encode("iso-8859-1")
 
+    def build_send_body(self, byte_data):
+        return byte_data
 
-class _http2x_client(_httpclient):
-    def request(self, method, host, path="/", qs_seq=None):
+    def set_header(self, name, value):
+        if name.lower() == "host": return
+
+    def build_send_body_part(self, byte_data):
+        return byte_data
+
+    def __parse_header(self):
+        size = self.reader.size()
+        rdata = self.reader.read()
+
+        p = rdata.find(b"\r\n\r\n")
+
+        if p > 0 and p < 10: raise HttpErr("wrong http1x response header")
+        if p < 0 and size > 8192: raise HttpErr("the http1x response header too long")
+
+        if p < 0: return
+        p += 4
+        header_data = rdata[0:p]
+        body_data = rdata[p:]
+
+        sts = header_data.decode("iso-8859-1")
+
+        try:
+            resp, fields = httputils.parse_http1x_response_header(sts)
+        except httputils.Http1xHeaderErr:
+            raise HttpErr("wrong http response header")
+
+        self.__resp_header_ok = True
+        self.reader._putvalue(body_data)
+
+    def __parse_response_body(self):
         pass
 
+    def parse_response_data(self, byte_data):
+        self.reader._putvalue(byte_data)
 
-class httpclient(object):
-    __http_instance = None
+        if not self.__resp_header_ok:
+            self.__parse_header()
 
-    __request_body_callback = None
-    __response_body_callback = None
-
-    def __init__(self):
-        self.__http_instance = _http1x_client()
-
-    def set_request_body_callback(self, func):
-        """设置请求body部分回调函数
-        :param func
-        :return:
-        """
-        self.__request_body_callback = func
-
-    def set_response_body_callback(self, func):
-        """设置响应body部分回调函数
-        :param func:
-        :return:
-        """
-        self.__response_body_callback = func
-
-    def request(self, method, host, path="/", qs_seq=None, ssl_on=False, auto_http2=False, ipv6_on=False):
-        """请求页面
-        :param method 请求方法
-        :param host 请求主机
-        :param path 请求路径
-        :param qs_seq 执行字符串
-        :param ssl_on: 是否打开SSL加密传输
-        :param auto_http2: 是否自动升级到HTTP2,注意该选项只有开启SSL ON才生效,并且需要支持ALPN,否则会报错
-        :param ipv6_on:是否开启IPV6请求
-        """
-        self.__http_instance.request(method, host, path=path, qs_seq=qs_seq)
-
-    def set_request_header(self, name, value):
-        self.__http_instance.set_request_header(name, value)
-
-    def set_request_headers(self, seq):
-        self.__http_instance.set_request_headers(seq)
-
-    def waiting(self):
-        """等待处理
-        :return:
-        """
-        self.__http_instance.loop()
-
-    def response_ok(self):
-        """是否已经响应完毕
-        :return:
-        """
-        pass
+        if not self.__resp_header_ok: return
+        self.__parse_response_body()
