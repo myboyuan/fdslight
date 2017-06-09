@@ -2,7 +2,7 @@
 import pywind.lib.reader as reader
 
 
-class chunkedErr(Exception): pass
+class ChunkedErr(Exception): pass
 
 
 class parser(object):
@@ -18,13 +18,14 @@ class parser(object):
         self.__results = []
 
     def input(self, byte_data):
+        if self.__is_ok: return
         self.__reader._putvalue(byte_data)
 
     def parse(self):
         if not self.__is_start:
             sts = self.__reader.readline(10)
             pos = sts.find(b"\r\n")
-            if pos < 1 and len(sts) == 10: raise chunkedErr("wrong chunked length:%s" % sts.decode())
+            if pos < 1 and len(sts) == 10: raise ChunkedErr("wrong chunked length:%s" % sts.decode())
             if pos < 1:
                 self.__reader._putvalue(sts)
                 return
@@ -32,12 +33,16 @@ class parser(object):
             try:
                 self.__chunk_size = int(sts, 16)
             except ValueError:
-                raise chunkedErr("wrong chunked length:%s" % sts.decode())
+                raise ChunkedErr("wrong chunked length:%s" % sts.decode())
             self.__is_start = True
 
-        if self.__reader.size() < self.__chunk_size + 2: return
+        if self.__reader.size() < self.__chunk_size + 2:
+            if self.__reader.size() > self.MAX_MEM_SIZE:
+                raise ChunkedErr("the size of chunked more than MAX_MEM_SIZE")
+            return
         byte_data = self.__reader.read(self.__chunk_size + 2)
         self.__results.append(byte_data[0:-2])
+        if self.__chunk_size == 0: self.__is_ok = True
         self.__reset()
         self.parse()
 
@@ -68,4 +73,9 @@ class parser(object):
         self.__is_start = False
 
     def __del__(self):
+        self.__reader.flush()
+
+    def reset(self):
+        self.__reset()
+        self.__is_ok = False
         self.__reader.flush()

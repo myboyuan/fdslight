@@ -107,7 +107,7 @@ class wsgi(object):
         self.__chunked.input(body_data)
         try:
             self.__chunked.parse()
-        except httpchunked.chunkedErr:
+        except httpchunked.ChunkedErr:
             self.__handle_error("500 Internal Server Error", [], traceback.format_exc())
             return
 
