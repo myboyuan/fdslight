@@ -41,6 +41,7 @@ class wsgi(object):
         self.__output_hdr_func = output_hdr_func
         self.__output_body_func = output_body_func
         self.__finish_func = finish_func
+        self.__resp_content_length = 0
 
         wsgi_env = self.__convert2wsgi_env(cgi_env)
 
@@ -170,11 +171,13 @@ class wsgi(object):
             self.__handle_error("500 Internal Server Error", [], "http master has responsed!")
             return
 
+        """
         if self.__resp_stcode >= 300:
             self.__output_hdr_func(status, response_headers, )
             self.__is_finish = True
             self.__is_resp_hdr = True
             return
+        """
 
         self.__resp_status = status
         self.__resp_headers = response_headers
