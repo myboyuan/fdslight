@@ -63,6 +63,7 @@ class httpclient(tcp_handler.tcp_handler):
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+        self.add_evt_write(self.fileno)
 
     def evt_read(self):
         try:
@@ -85,7 +86,16 @@ class httpclient(tcp_handler.tcp_handler):
 
         rdata = self.reader.read()
 
+    def send_data(self, byte_data):
+        pass
+
     def tcp_writable(self):
+
+        rs = self.__req_callback(self)
+        if not rs:
+            self.delete_handler(self.fileno)
+            return
+
         self.remove_evt_write(self.fileno)
 
     def tcp_delete(self):
