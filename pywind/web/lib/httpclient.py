@@ -124,7 +124,7 @@ class _parser(object):
             return
 
         size = len(body_data)
-        n = self.__responsed_length - self.__content_length
+        n = self.__content_length - self.__responsed_length
 
         if size <= n:
             self.__responsed_length += size
@@ -205,7 +205,7 @@ class http1x_builder(_builder):
         else:
             uri = "%s?%s" % (path, "&".join(qs_seq))
 
-        self.__req_headers.append(("Host", host))
+        headers.append(("Host", host))
         sts = httputils.build_http1x_req_header(method, uri, headers)
 
         return sts.encode("iso-8859-1")
@@ -241,11 +241,8 @@ class http1x_parser(_parser):
         self.set_status(int(status[0:3]))
         self.set_headers(fields)
 
-        if self.status == 200:
-            self.reader._putvalue(body_data)
-
+        self.reader._putvalue(body_data)
         self.header_ok = True
-        return
 
     def unwrap_body(self, body_data):
         return body_data
@@ -257,3 +254,27 @@ class http2x_parser(_parser):
 
 class http2x_builder(_builder):
     pass
+
+
+"""
+import socket
+
+s = socket.socket()
+s.connect(("www.baidu.com", 80))
+
+parser = http1x_parser()
+builder = http1x_builder()
+
+builder.set_header("User-Agent", "Firefox")
+
+header = builder.get_header_data("GET", "www.baidu.com")
+
+s.send(header)
+data = s.recv(4096)
+parser.parse(data)
+
+print(parser.headers)
+print(parser.get_data())
+
+s.close()
+"""
