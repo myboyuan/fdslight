@@ -7,7 +7,6 @@ import pywind.lib.reader as reader
 
 class HttpErr(Exception): pass
 
-
 class _builder(object):
     __req_headers = None
 
