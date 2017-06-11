@@ -7,6 +7,7 @@ import pywind.lib.reader as reader
 
 class HttpErr(Exception): pass
 
+
 class _builder(object):
     __req_headers = None
 
@@ -171,7 +172,13 @@ class _parser(object):
         self.__status = stcode
 
     def set_headers(self, headers):
-        self.__headers = headers
+        seq = []
+
+        # 为保证http1x和http2x协议的一致性
+        # 字段名全部转换成小写
+        for k, v in headers:
+            seq.append((k.lower(), v))
+        self.__headers = seq
 
     @property
     def status(self):
@@ -253,6 +260,99 @@ class http2x_parser(_parser):
 
 class http2x_builder(_builder):
     pass
+
+
+class client(object):
+    __method = None
+    __host = None
+    __path = None
+    __qs_seq = None
+
+    __req_callback = None
+    __resp_callback = None
+    __err_callback = None
+
+    __evtfw = None
+
+    __fileno = None
+    # 是否已经发送过头部数据
+    __is_sent_header = False
+
+    __sent_body_ok = None
+
+    timeout = 10
+    headers = None
+
+    def __init__(self, req_callback, resp_callback, err_callback):
+        from pywind.global_vars import global_vars
+
+        self.__evtfw = global_vars["pyw.ioevtfw.dispatcher"]
+        self.__fileno = None
+
+        self.__req_callback = req_callback
+        self.__resp_callback = resp_callback
+        self.__err_callback = err_callback
+
+        self.__sent_ok = False
+        self.headers = []
+
+    def request(self, method, host, path="/", qs_seq=None, ssl_on=False, port=None, is_ipv6=False):
+        import pywind.web.handlers.httpclient as httpclient_handler
+
+        if ssl_on and not port:
+            port = 443
+        if not ssl_on and not port:
+            port = 80
+
+        self.__method = method
+        self.__host = host
+        self.__path = path
+        self.__qs_seq = qs_seq
+
+        if not self.__fileno:
+            self.__fileno = self.__evtfw.create_handler(
+                -1, httpclient_handler.httpclient,
+                (host, port,),
+                self.__request_callback,
+                self.__response_callback,
+                self.__error_callback,
+                timeout=self.timeout,
+                ssl_on=ssl_on,
+                is_ipv6=is_ipv6
+            )
+        self.__is_sent_header = False
+        self.__sent_body_ok = False
+
+    def __request_callback(self, http_builder):
+        if not self.__is_sent_header:
+            http_builder.set_headers(self.headers)
+            header_data = http_builder.get_header_data(
+                self.__method, self.__host,
+                path=self.__path,
+                qs_seq=self.__qs_seq
+            )
+            self.send_data(header_data)
+            self.__is_sent_header = True
+
+        self.__sent_body_ok = self.__req_callback()
+        return self.__sent_body_ok
+
+    def __response_callback(self, http_parser):
+        self.__resp_callback(http_parser.get_data())
+
+    def __error_callback(self):
+        self.__err_callback()
+
+    @property
+    def cookie(self):
+        pass
+
+    @property
+    def status(self):
+        pass
+
+    def send_data(self, byte_data):
+        self.__evtfw.get_handler(self.__fileno).send_data(byte_data)
 
 
 """
