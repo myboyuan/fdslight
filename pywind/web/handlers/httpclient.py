@@ -123,7 +123,7 @@ class httpclient(tcp_handler.tcp_handler):
                 self.__builder = httpclient_lib.http1x_builder()
             else:
                 self.__builder = httpclient_lib.http2x_builder()
-        self.__request_ok = self.__req_callback()
+        self.__request_ok = self.__req_callback(self.__builder)
 
     def tcp_delete(self):
         self.unregister(self.fileno)
