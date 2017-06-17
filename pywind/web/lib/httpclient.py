@@ -3,6 +3,7 @@
 import pywind.web.lib.httputils as httputils
 import pywind.web.lib.httpchunked as httpchunked
 import pywind.lib.reader as reader
+import pywind.lib.writer as writer
 import socket
 
 
@@ -356,11 +357,20 @@ class client(object):
     # 故障码ƒ
     __errcode = -1
 
+    __reader = None
+    __writer = None
+
+    __connect_ok = None
+    __port = None
+
     def __init__(self, call_func, is_ipv6=False, timeout=10):
         self.__callback = call_func
         self.__sent_ok = False
         self.headers = []
         self.__is_ipv6 = is_ipv6
+        self.__reader = reader.reader()
+        self.__writer = writer.writer()
+        self.__connect_ok = False
 
     def request(self, method, host, path="/", qs_seq=None, ssl_on=False, port=None):
 
@@ -369,6 +379,7 @@ class client(object):
         if not ssl_on and not port:
             port = 80
 
+        self.__port = port
         self.__method = method
         self.__host = host
         self.__path = path
@@ -383,7 +394,11 @@ class client(object):
             else:
                 af = socket.AF_INET
             self.__socket = socket.socket(af, socket.SOCK_STREAM)
+
         return
+
+    def __connect(self):
+        n = self.__socket.connect_ex((self.__host, self.__port))
 
     @property
     def cookies(self):
@@ -394,7 +409,7 @@ class client(object):
         return self.__parser.status
 
     def send_data(self, byte_data):
-        self.__evtfw.get_handler(self.__fileno).send_data(byte_data)
+        self.__writer.write(byte_data)
 
     def reset(self):
         if self.__parser:
