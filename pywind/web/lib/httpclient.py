@@ -65,6 +65,7 @@ class _parser(object):
     __is_start = False
 
     __data = None
+    __cookies = None
 
     def __init__(self):
         self.__reader = reader.reader()
@@ -74,6 +75,7 @@ class _parser(object):
         self.__responsed_length = 0
         self.__is_start = False
         self.__data = []
+        self.__cookies = []
 
     def __parse_content_length(self):
         is_length = False
@@ -135,6 +137,38 @@ class _parser(object):
 
         self.__data.append(body_data)
 
+    def __parse_cookie(self, sts):
+        """解析单个cookie
+        :param sts:
+        :return:
+        """
+        sts = sts.lstrip()
+        if sts[0:4] != "name": return None
+        tmplist = sts.split(";")
+        tmplist2 = []
+
+        for s in tmplist:
+            if s: tmplist2.append(s.strip())
+        s = tmplist2.pop()
+        ret = {}
+
+        sec = False
+        if s.lower() == "secure":
+            sec = True
+        else:
+            tmplist2.append(s)
+        if sec and not self.__ssl_on: return None
+
+        for s in tmplist2:
+            p = s.find("=")
+            if p < 1: continue
+            name = s[0:p].strip()
+            p += 1
+            val = s[p:].strip()
+            ret[name] = val
+
+        return ret
+
     def response_ok(self):
         if self.__is_chunked:
             return self.__chunked.is_ok()
@@ -180,6 +214,12 @@ class _parser(object):
             seq.append((k.lower(), v))
         self.__headers = seq
 
+        for k, v in self.__headers:
+            if k != "set-cookie": continue
+            cookie = self.__parse_cookie(v)
+            if not cookie: continue
+            self.__cookies.append(cookie)
+
     @property
     def status(self):
         return self.__status
@@ -194,12 +234,21 @@ class _parser(object):
         self.__content_length = 0
         self.__responsed_length = 0
         self.__is_start = False
+        self.__cookies = []
 
     def get_data(self):
         data = b"".join(self.__data)
         self.__data = []
 
         return data
+
+    @property
+    def cookies(self):
+        return self.__cookies
+
+    @property
+    def status(self):
+        return self.__status
 
 
 class http1x_builder(_builder):
@@ -283,6 +332,11 @@ class client(object):
     timeout = 10
     headers = None
 
+    __ssl_on = None
+
+    __parser = None
+    __builder = None
+
     def __init__(self, req_callback, resp_callback, err_callback):
         from pywind.global_vars import global_vars
 
@@ -308,6 +362,7 @@ class client(object):
         self.__host = host
         self.__path = path
         self.__qs_seq = qs_seq
+        self.__ssl_on = ssl_on
 
         if not self.__fileno:
             self.__fileno = self.__evtfw.create_handler(
@@ -334,25 +389,34 @@ class client(object):
             self.send_data(header_data)
             self.__is_sent_header = True
 
+        self.__builder = http_builder
         self.__sent_body_ok = self.__req_callback()
         return self.__sent_body_ok
 
     def __response_callback(self, http_parser):
+        self.__parser = http_parser
         self.__resp_callback(http_parser.get_data())
 
     def __error_callback(self):
         self.__err_callback()
 
     @property
-    def cookie(self):
-        pass
+    def cookies(self):
+        return self.__parser.cookies
 
     @property
     def status(self):
-        pass
+        return self.__parser.status
 
     def send_data(self, byte_data):
         self.__evtfw.get_handler(self.__fileno).send_data(byte_data)
+
+    def reset(self):
+        if self.__parser:
+            self.__parser.reset()
+        if self.__builder:
+            self.__builder.reset()
+        return
 
 
 """
