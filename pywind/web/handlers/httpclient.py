@@ -56,15 +56,18 @@ class httpclient(tcp_handler.tcp_handler):
         return self.fileno
 
     def connect_ok(self):
-        ctx = ssl._create_unverified_context()
-        ver_info = ssl.OPENSSL_VERSION_INFO
+        if self.__ssl_on:
+            ctx = ssl._create_unverified_context()
+            ver_info = ssl.OPENSSL_VERSION_INFO
 
+        is_alpn = False
         # 只有Opessl 1,0,2及其以上才支持ALPN
-        if ver_info[0] >= 1 and ver_info[1] >= 0 and ver_info[1] >= 2:
-            is_alpn = True
-        else:
-            is_alpn = False
-
+        if self.__ssl_on:
+            if ver_info[0] >= 1 and ver_info[1] >= 0 and ver_info[1] >= 2:
+                is_alpn = True
+            else:
+                is_alpn = False
+            ''''''
         if self.__ssl_on and is_alpn:
             # ctx.set_alpn_protocols(['h2', 'http/1.1'])
             ctx.set_alpn_protocols(['http/1.1'])
@@ -87,7 +90,7 @@ class httpclient(tcp_handler.tcp_handler):
 
     def evt_write(self):
         try:
-            super(httpclient, self).evt_read()
+            super(httpclient, self).evt_write()
         except ssl.SSLWantReadError:
             pass
 
@@ -110,11 +113,12 @@ class httpclient(tcp_handler.tcp_handler):
 
         self.set_timeout(self.fileno, self.__timeout)
         rdata = self.reader.read()
+
         self.__parser.parse(rdata)
         self.__resp_callback(self.__parser)
 
     def tcp_writable(self):
-        if not self.__is_selected_protocol: return
+        if not self.__is_selected_protocol and self.__ssl_on: return
         self.remove_evt_write(self.fileno)
         if self.__request_ok: return
 

@@ -10,16 +10,19 @@ class HttpErr(Exception): pass
 
 class _builder(object):
     __req_headers = None
+    __user_agent = None
 
     def __init__(self):
         self.__req_headers = []
+        self.__user_agent = 'Mozilla/5.0'
 
-    def wrap_header(self, method, host, path, qs_seq, headers):
+    def wrap_header(self, method, host, path, qs_seq, user_agent, headers):
         """生成请求头
         :param method:
         :param path:
         :param qs_seq:
         :param headers
+        :param user_agent:
         :return bytes:
         """
         pass
@@ -33,13 +36,16 @@ class _builder(object):
 
     def set_header(self, name, value):
         if name.lower() == "host": return
+        if name.lower() == "user-agent":
+            self.__user_agent = value
+            return
         self.__req_headers.append((name, value,))
 
     def set_headers(self, seq):
         for k, v in seq: self.set_header(k, v)
 
     def get_header_data(self, method, host, path="/", qs_seq=None):
-        return self.wrap_header(method, host, path, qs_seq, self.__req_headers)
+        return self.wrap_header(method, host, path, qs_seq, self.__user_agent, self.__req_headers)
 
     def get_body_data(self, body_data):
         return self.wrap_body(body_data)
@@ -252,7 +258,7 @@ class _parser(object):
 
 
 class http1x_builder(_builder):
-    def wrap_header(self, method, host, path, qs_seq, headers):
+    def wrap_header(self, method, host, path, qs_seq, user_agent, headers):
         method = method.upper()
 
         if not qs_seq:
@@ -261,6 +267,7 @@ class http1x_builder(_builder):
             uri = "%s?%s" % (path, "&".join(qs_seq))
 
         headers.append(("Host", host))
+        headers.append(("User-Agent", user_agent))
         sts = httputils.build_http1x_req_header(method, uri, headers)
 
         return sts.encode("iso-8859-1")
@@ -416,6 +423,11 @@ class client(object):
             self.__parser.reset()
         if self.__builder:
             self.__builder.reset()
+        return
+
+    def close(self):
+        if self.__fileno:
+            self.__evtfw.delete_handler(self.__fileno)
         return
 
 
