@@ -3,6 +3,7 @@
 import pywind.web.lib.httputils as httputils
 import pywind.web.lib.httpchunked as httpchunked
 import pywind.lib.reader as reader
+import socket
 
 
 class HttpErr(Exception): pass
@@ -318,19 +319,22 @@ class http2x_builder(_builder):
     pass
 
 
+### 故障码大全
+
+# 连接失败
+ERR_CONN_FAIL = 1
+# 连接超市
+ERR_TIMEOUT = 2
+
+
 class client(object):
     __method = None
     __host = None
     __path = None
     __qs_seq = None
 
-    __req_callback = None
-    __resp_callback = None
-    __err_callback = None
+    __callback = None
 
-    __evtfw = None
-
-    __fileno = None
     # 是否已经发送过头部数据
     __is_sent_header = False
 
@@ -344,21 +348,21 @@ class client(object):
     __parser = None
     __builder = None
 
-    def __init__(self, req_callback, resp_callback, err_callback):
-        from pywind.global_vars import global_vars
+    __socket = None
+    __is_ipv6 = None
+    __connect_ok = False
 
-        self.__evtfw = global_vars["pyw.ioevtfw.dispatcher"]
-        self.__fileno = None
+    __is_error = False
+    # 故障码ƒ
+    __errcode = -1
 
-        self.__req_callback = req_callback
-        self.__resp_callback = resp_callback
-        self.__err_callback = err_callback
-
+    def __init__(self, call_func, is_ipv6=False, timeout=10):
+        self.__callback = call_func
         self.__sent_ok = False
         self.headers = []
+        self.__is_ipv6 = is_ipv6
 
-    def request(self, method, host, path="/", qs_seq=None, ssl_on=False, port=None, is_ipv6=False):
-        import pywind.web.handlers.httpclient as httpclient_handler
+    def request(self, method, host, path="/", qs_seq=None, ssl_on=False, port=None):
 
         if ssl_on and not port:
             port = 443
@@ -370,42 +374,16 @@ class client(object):
         self.__path = path
         self.__qs_seq = qs_seq
         self.__ssl_on = ssl_on
-
-        if not self.__fileno:
-            self.__fileno = self.__evtfw.create_handler(
-                -1, httpclient_handler.httpclient,
-                (host, port,),
-                self.__request_callback,
-                self.__response_callback,
-                self.__error_callback,
-                timeout=self.timeout,
-                ssl_on=ssl_on,
-                is_ipv6=is_ipv6
-            )
         self.__is_sent_header = False
         self.__sent_body_ok = False
 
-    def __request_callback(self, http_builder):
-        if not self.__is_sent_header:
-            http_builder.set_headers(self.headers)
-            header_data = http_builder.get_header_data(
-                self.__method, self.__host,
-                path=self.__path,
-                qs_seq=self.__qs_seq
-            )
-            self.send_data(header_data)
-            self.__is_sent_header = True
-
-        self.__builder = http_builder
-        self.__sent_body_ok = self.__req_callback()
-        return self.__sent_body_ok
-
-    def __response_callback(self, http_parser):
-        self.__parser = http_parser
-        self.__resp_callback(http_parser.get_data())
-
-    def __error_callback(self):
-        self.__err_callback()
+        if not self.__socket:
+            if self.__is_ipv6:
+                af = socket.AF_INET6
+            else:
+                af = socket.AF_INET
+            self.__socket = socket.socket(af, socket.SOCK_STREAM)
+        return
 
     @property
     def cookies(self):
@@ -426,9 +404,26 @@ class client(object):
         return
 
     def close(self):
-        if self.__fileno:
-            self.__evtfw.delete_handler(self.__fileno)
+        if self.__socket:
+            self.__socket.close()
+            self.__socket = None
         return
+
+    def is_error(self):
+        return self.__is_error
+
+    def request_ok(self):
+        pass
+
+    def response_ok(self):
+        pass
+
+    def get_data(self):
+        pass
+
+    @property
+    def err_code(self):
+        return self.__errcode
 
 
 """
