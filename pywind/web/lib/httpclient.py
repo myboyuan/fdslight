@@ -417,7 +417,7 @@ class client(object):
         return
 
     def __send_header(self):
-        if not self.__ssl_on:
+        if not self.__ssl_on or not self.__is_http2:
             self.__builder = http1x_builder()
         if self.__is_http2:
             self.__builder = http2x_builder()
@@ -429,7 +429,13 @@ class client(object):
         self.__writer.write(hdr_data)
 
     def __handle_resp_header(self):
-        pass
+        if not self.__ssl_on or not self.__is_http2:
+            self.__parser = http1x_parser()
+        if self.__is_http2:
+            self.__parser = http2x_parser()
+
+        rdata = self.__reader.read()
+        self.__parser.parse(rdata)
 
     def __handle_resp_body(self):
         pass
