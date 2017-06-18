@@ -4,7 +4,7 @@ import pywind.web.lib.httputils as httputils
 import pywind.web.lib.httpchunked as httpchunked
 import pywind.lib.reader as reader
 import pywind.lib.writer as writer
-import socket
+import socket, time
 
 
 class HttpErr(Exception): pass
@@ -320,21 +320,11 @@ class http2x_builder(_builder):
     pass
 
 
-### 故障码大全
-
-# 连接失败
-ERR_CONN_FAIL = 1
-# 连接超市
-ERR_TIMEOUT = 2
-
-
 class client(object):
     __method = None
     __host = None
     __path = None
     __qs_seq = None
-
-    __callback = None
 
     # 是否已经发送过头部数据
     __is_sent_header = False
@@ -363,14 +353,30 @@ class client(object):
     __connect_ok = None
     __port = None
 
-    def __init__(self, call_func, is_ipv6=False, timeout=10):
-        self.__callback = call_func
+    __timeout = 0
+
+    __update_time = 0
+
+    __request_ok = None
+
+    __response_header_ok = None
+    __response_ok = None
+
+    # 需要发送的内容长度
+    __send_length = 0
+    # 已经发送的内容长度
+    __sent_length = 0
+
+    def __init__(self, is_ipv6=False, timeout=10):
         self.__sent_ok = False
         self.headers = []
         self.__is_ipv6 = is_ipv6
         self.__reader = reader.reader()
         self.__writer = writer.writer()
         self.__connect_ok = False
+        self.__timeout = timeout
+        self.__request_ok = False
+        self.__response_ok = False
 
     def request(self, method, host, path="/", qs_seq=None, ssl_on=False, port=None):
 
@@ -394,11 +400,22 @@ class client(object):
             else:
                 af = socket.AF_INET
             self.__socket = socket.socket(af, socket.SOCK_STREAM)
-
         return
 
     def __connect(self):
-        n = self.__socket.connect_ex((self.__host, self.__port))
+        err = self.__socket.connect_ex((self.__host, self.__port))
+        if not err:
+            self.__connect_ok = True
+        return
+
+    def __send_header(self):
+        pass
+
+    def __handle_resp_header(self):
+        pass
+
+    def __handle_resp_body(self):
+        pass
 
     @property
     def cookies(self):
@@ -439,6 +456,24 @@ class client(object):
     @property
     def err_code(self):
         return self.__errcode
+
+    def handle(self):
+        if not self.__connect_ok:
+            self.__connect()
+            return
+
+        if not self.__is_sent_header:
+            self.__send_header()
+            return
+
+        if not self.__request_ok: return
+        if not self.__response_header_ok:
+            self.__handle_resp_header()
+            return
+        if not self.__response_ok:
+            self.__handle_resp_body()
+            return
+        return
 
 
 """
