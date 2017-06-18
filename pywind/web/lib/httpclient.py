@@ -6,6 +6,11 @@ import pywind.lib.reader as reader
 import pywind.lib.writer as writer
 import socket, time
 
+try:
+    import ssl
+except ImportError:
+    pass
+
 
 class HttpErr(Exception): pass
 
@@ -27,7 +32,7 @@ class _builder(object):
         :param user_agent:
         :return bytes:
         """
-        pass
+        return b""
 
     def wrap_body(self, byte_data):
         """装饰HTTP BODY
@@ -367,6 +372,8 @@ class client(object):
     # 已经发送的内容长度
     __sent_length = 0
 
+    __is_http2 = None
+
     def __init__(self, is_ipv6=False, timeout=10):
         self.__sent_ok = False
         self.headers = []
@@ -377,6 +384,7 @@ class client(object):
         self.__timeout = timeout
         self.__request_ok = False
         self.__response_ok = False
+        self.__is_http2 = False
 
     def request(self, method, host, path="/", qs_seq=None, ssl_on=False, port=None):
 
@@ -409,7 +417,16 @@ class client(object):
         return
 
     def __send_header(self):
-        pass
+        if not self.__ssl_on:
+            self.__builder = http1x_builder()
+        if self.__is_http2:
+            self.__builder = http2x_builder()
+
+        hdr_data = self.__builder.get_header_data(
+            self.__method, self.__host, self.__path, self.__qs_seq
+        )
+        self.__is_sent_header = True
+        self.__writer.write(hdr_data)
 
     def __handle_resp_header(self):
         pass
