@@ -29,6 +29,7 @@ class parser(object):
             if pos < 1:
                 self.__reader._putvalue(sts)
                 return
+            sts = sts.decode("iso-8859-1")
             sts = "0x%s" % sts
             try:
                 self.__chunk_size = int(sts, 16)
@@ -36,6 +37,7 @@ class parser(object):
                 raise ChunkedErr("wrong chunked length:%s" % sts.decode())
             self.__is_start = True
 
+        print(self.__chunk_size)
         if self.__reader.size() < self.__chunk_size + 2:
             if self.__reader.size() > self.MAX_MEM_SIZE:
                 raise ChunkedErr("the size of chunked more than MAX_MEM_SIZE")

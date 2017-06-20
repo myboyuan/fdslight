@@ -4,12 +4,7 @@ import pywind.web.lib.httputils as httputils
 import pywind.web.lib.httpchunked as httpchunked
 import pywind.lib.reader as reader
 import pywind.lib.writer as writer
-import socket, time
-
-try:
-    import ssl
-except ImportError:
-    pass
+import socket, time, ssl
 
 
 class HttpErr(Exception): pass
@@ -133,6 +128,7 @@ class _parser(object):
                 raise HttpErr("wrong chunked body")
 
             data = self.__chunked.get_chunk()
+
             if not data: return
             self.__data.append(data)
 
@@ -207,8 +203,8 @@ class _parser(object):
 
         if not self.header_ok:
             self.__parse_header()
-
         if not self.header_ok: return
+
         self.__parse_body()
 
     @property
@@ -374,6 +370,11 @@ class client(object):
 
     __is_http2 = None
 
+    __tls_ctx = None
+    __alpn_on = None
+
+    __write_ok = None
+
     def __init__(self, is_ipv6=False, timeout=10):
         self.__sent_ok = False
         self.headers = []
@@ -385,6 +386,8 @@ class client(object):
         self.__request_ok = False
         self.__response_ok = False
         self.__is_http2 = False
+        self.__alpn_on = False
+        self.__write_ok = False
 
     def request(self, method, host, path="/", qs_seq=None, ssl_on=False, port=None):
 
@@ -414,6 +417,49 @@ class client(object):
         err = self.__socket.connect_ex((self.__host, self.__port))
         if not err:
             self.__connect_ok = True
+            if self.__ssl_on:
+                self.__tls_ctx = ssl._create_unverified_context()
+
+                ssl_verinfo = ssl.OPENSSL_VERSION_INFO
+                # 只有openssl 1.0.2版本及其以上才支持ALPN
+                if ssl_verinfo[0] >= 1 and ssl_verinfo[1] >= 0 and ssl_verinfo[1] >= 2:
+                    self.__alpn_on = True
+
+                if self.__alpn_on:
+                    alpn_protocols = ["http/1.1"]
+                    self.__tls_ctx.set_alpn_protocols(alpn_protocols)
+                self.__socket = self.__tls_ctx.wrap_socket(self.__socket)
+            self.__socket.setblocking(0)
+        return
+
+    def __write(self):
+        size = self.__writer.size()
+        data = self.__writer._getvalue()
+
+        try:
+            sent_size = self.__socket.send(data)
+        except BlockingIOError:
+            self.__write_ok = False
+            self.__writer.write(data)
+        except ssl.SSLWantWriteError:
+            pass
+
+        if size == sent_size:
+            self.__write_ok = True
+            return
+
+        bdata = data[sent_size:]
+
+        self.__writer.write(bdata)
+        self.__write_ok = False
+
+    def __read(self):
+        while 1:
+            try:
+                rdata = self.__socket.recv(4096)
+            except BlockingIOError:
+                break
+            self.__reader._putvalue(rdata)
         return
 
     def __send_header(self):
@@ -427,6 +473,7 @@ class client(object):
         )
         self.__is_sent_header = True
         self.__writer.write(hdr_data)
+        self.__write()
 
     def __handle_resp_header(self):
         if not self.__ssl_on or not self.__is_http2:
@@ -434,11 +481,17 @@ class client(object):
         if self.__is_http2:
             self.__parser = http2x_parser()
 
+        self.__read()
         rdata = self.__reader.read()
         self.__parser.parse(rdata)
 
+        if self.__parser.header_ok:
+            self.__response_header_ok = True
+
     def __handle_resp_body(self):
-        pass
+        self.__read()
+        self.__parser.parse(self.__reader.read())
+        rdata = self.__parser.get_data()
 
     @property
     def cookies(self):
@@ -488,14 +541,11 @@ class client(object):
         if not self.__is_sent_header:
             self.__send_header()
             return
-
-        if not self.__request_ok: return
         if not self.__response_header_ok:
             self.__handle_resp_header()
             return
         if not self.__response_ok:
             self.__handle_resp_body()
-            return
         return
 
 
@@ -521,3 +571,9 @@ print(parser.get_data())
 
 s.close()
 """
+
+hc = client()
+hc.request("GET", "www.baidu.com")
+
+while 1:
+    hc.handle()
