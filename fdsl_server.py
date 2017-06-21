@@ -337,19 +337,12 @@ class _fdslight_server(dispatcher.dispatcher):
 
         mbuf.offset = hdrlen + 6
 
-        """
-        # 如果不是UDPLITE那么checksum设为0,否则重新计算checksum
         if not is_udplite:
             mbuf.replace(b"\0\0")
         else:
             csum = utils.bytes2number(mbuf.get_part(2))
             csum = fn_utils.calc_incre_csum(csum, sport, new_sport)
             mbuf.replace(utils.number2bytes(csum, 2))
-        """
-
-        csum = utils.bytes2number(mbuf.get_part(2))
-        csum = fn_utils.calc_incre_csum(csum, sport, new_sport)
-        mbuf.replace(utils.number2bytes(csum, 2))
 
         if session_id not in self.__dgram_proxy:
             self.__dgram_proxy[session_id] = {}
