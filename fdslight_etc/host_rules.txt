@@ -158,6 +158,7 @@ register.mesh.com:1
 *.ubisoft.com:1
 *.n.srv.nintendo.net:1
 *.dg.srv.nintendo.net:1
+*.ndas.srv.nintendo.net:1
 
 
 #*.srv.nintendo.net:1
