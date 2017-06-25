@@ -27,6 +27,7 @@ class reader(object):
                 except queue.Empty:
                     byte_data = self.__data_list.pop(0)
 
+                # 可能在一些情况下,lifo_queue获取的byte_data的值为b"",因此要加入该行避免
                 if not byte_data: byte_data = self.__data_list.pop(0)
 
                 size = len(byte_data)
@@ -134,8 +135,7 @@ class reader(object):
         return ret
 
     def push(self, byte_data):
-        if byte_data == b"":
-            return
+        if byte_data == b"": return
 
         size = len(byte_data)
 
