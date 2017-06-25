@@ -96,7 +96,7 @@ class reader(object):
                 remain = byte_data[begin:]
 
                 self.__lifo_queue.put(remain)
-
+                self.__size += len(remain)
             self.__size -= len(ret)
             return ret
 
@@ -131,7 +131,7 @@ class reader(object):
 
         ret = byte_io.getvalue()
         byte_io.close()
-        self.__size-=len(ret)
+        self.__size -= len(ret)
 
         return ret
 

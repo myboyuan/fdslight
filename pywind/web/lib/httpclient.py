@@ -75,6 +75,8 @@ class _parser(object):
     __data = None
     __cookies = None
 
+    __fd = None
+
     def __init__(self):
         self.__reader = reader.reader()
         self.header_ok = False
@@ -375,6 +377,8 @@ class client(object):
 
     __write_ok = None
 
+    __fd = None
+
     def __init__(self, is_ipv6=False, timeout=10):
         self.__sent_ok = False
         self.headers = []
@@ -459,7 +463,8 @@ class client(object):
                 rdata = self.__socket.recv(4096)
             except BlockingIOError:
                 break
-            self.__reader._putvalue(rdata)
+            if rdata:
+                self.__reader._putvalue(rdata)
         return
 
     def __send_header(self):
@@ -477,8 +482,8 @@ class client(object):
 
     def __handle_resp_header(self):
         if not self.__ssl_on or not self.__is_http2:
-            self.__parser = http1x_parser()
-        if self.__is_http2:
+            if not self.__parser: self.__parser = http1x_parser()
+        if self.__is_http2 and not self.__parser:
             self.__parser = http2x_parser()
 
         self.__read()
