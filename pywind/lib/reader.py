@@ -42,7 +42,6 @@ class reader(object):
                     read = byte_data
                     byte_io.write(read)
                     continue
-
                 read = byte_data[0:remainN]
                 remain = byte_data[remainN:]
 
@@ -97,7 +96,6 @@ class reader(object):
 
                 self.__lifo_queue.put(remain)
                 self.__size += len(remain)
-            self.__size -= len(ret)
             return ret
 
         byte_io = io.BytesIO()
@@ -121,6 +119,7 @@ class reader(object):
                     begin = end
                     remain = byte_data[begin:]
                     self.__lifo_queue.put(remain)
+                    self.__size += len(remain)
                     byte_io.write(read)
                     break
 

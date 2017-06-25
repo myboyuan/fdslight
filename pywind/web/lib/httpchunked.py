@@ -22,6 +22,8 @@ class parser(object):
         self.__reader._putvalue(byte_data)
 
     def parse(self):
+        if self.__reader.size() == 0: return
+
         if not self.__is_start:
             sts = self.__reader.readline(10)
             pos = sts.find(b"\r\n")
@@ -29,7 +31,6 @@ class parser(object):
             if pos < 1:
                 self.__reader._putvalue(sts)
                 return
-
             sts = sts.decode("iso-8859-1")
             sts = "0x%s" % sts
             try:
@@ -37,12 +38,15 @@ class parser(object):
             except ValueError:
                 raise ChunkedErr("wrong chunked length:%s" % sts.decode())
             self.__is_start = True
+
         if self.__reader.size() < self.__chunk_size + 2:
             if self.__reader.size() > self.MAX_MEM_SIZE:
                 raise ChunkedErr("the size of chunked more than MAX_MEM_SIZE")
             return
+
         byte_data = self.__reader.read(self.__chunk_size + 2)
         self.__results.append(byte_data[0:-2])
+
         if self.__chunk_size == 0: self.__is_ok = True
         self.__reset()
         self.parse()

@@ -75,8 +75,6 @@ class _parser(object):
     __data = None
     __cookies = None
 
-    __fd = None
-
     def __init__(self):
         self.__reader = reader.reader()
         self.header_ok = False
@@ -119,6 +117,10 @@ class _parser(object):
 
     def __parse_body(self):
         rdata = self.reader.read()
+
+        if self.__is_chunked and self.__chunked.is_ok():
+            return
+
         body_data = self.unwrap_body(rdata)
 
         if self.__is_chunked:
@@ -129,6 +131,7 @@ class _parser(object):
             except httpchunked.ChunkedErr:
                 raise HttpErr("wrong chunked body")
 
+            self.__chunked.parse()
             data = self.__chunked.get_chunk()
 
             if not data: return
@@ -179,12 +182,6 @@ class _parser(object):
             ret[name] = val
 
         return ret
-
-    def response_ok(self):
-        if self.__is_chunked:
-            return self.__chunked.is_ok()
-
-        return self.__responsed_length == self.__content_length and self.__is_start
 
     def unwrap_header(self):
         """重写这个方法
@@ -260,6 +257,10 @@ class _parser(object):
     @property
     def status(self):
         return self.__status
+
+    def response_ok(self):
+        if self.__is_chunked: return self.__chunked.is_ok()
+        return self.__responsed_length == self.__content_length and self.__is_start
 
 
 class http1x_builder(_builder):
@@ -363,7 +364,6 @@ class client(object):
     __request_ok = None
 
     __response_header_ok = None
-    __response_ok = None
 
     # 需要发送的内容长度
     __send_length = 0
@@ -377,8 +377,6 @@ class client(object):
 
     __write_ok = None
 
-    __fd = None
-
     def __init__(self, is_ipv6=False, timeout=10):
         self.__sent_ok = False
         self.headers = []
@@ -388,7 +386,6 @@ class client(object):
         self.__connect_ok = False
         self.__timeout = timeout
         self.__request_ok = False
-        self.__response_ok = False
         self.__is_http2 = False
         self.__alpn_on = False
         self.__write_ok = False
@@ -496,7 +493,6 @@ class client(object):
     def __handle_resp_body(self):
         self.__read()
         self.__parser.parse(self.__reader.read())
-        rdata = self.__parser.get_data()
 
     @property
     def cookies(self):
@@ -529,10 +525,11 @@ class client(object):
         pass
 
     def response_ok(self):
-        pass
+        if not self.__parser: return False
+        return self.__parser.response_ok()
 
     def get_data(self):
-        pass
+        return self.__parser.get_data()
 
     @property
     def err_code(self):
@@ -549,8 +546,7 @@ class client(object):
         if not self.__response_header_ok:
             self.__handle_resp_header()
             return
-        if not self.__response_ok:
-            self.__handle_resp_body()
+        self.__handle_resp_body()
         return
 
 
@@ -582,3 +578,7 @@ hc.request("GET", "www.baidu.com")
 
 while 1:
     hc.handle()
+    if hc.response_ok():
+        break
+
+print(hc.get_data())
