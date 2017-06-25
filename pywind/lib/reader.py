@@ -27,14 +27,15 @@ class reader(object):
                 except queue.Empty:
                     byte_data = self.__data_list.pop(0)
 
+                if not byte_data: byte_data = self.__data_list.pop(0)
+
                 size = len(byte_data)
 
                 if n < 0:
                     byte_io.write(byte_data)
                     continue
 
-                if size < 1:
-                    break
+                if size < 1: break
 
                 read = b""
                 if remainN >= size:
@@ -49,8 +50,6 @@ class reader(object):
 
                 self.__lifo_queue.put(remain)
                 break
-
-
             except IndexError:
                 break
 

@@ -132,10 +132,11 @@ class _parser(object):
                 raise HttpErr("wrong chunked body")
 
             self.__chunked.parse()
-            data = self.__chunked.get_chunk()
 
-            if not data: return
-            self.__data.append(data)
+            while 1:
+                data = self.__chunked.get_chunk()
+                if not data: break
+                self.__data.append(data)
 
             return
 
@@ -377,6 +378,8 @@ class client(object):
 
     __write_ok = None
 
+    #__fd = None
+
     def __init__(self, is_ipv6=False, timeout=10):
         self.__sent_ok = False
         self.headers = []
@@ -415,7 +418,7 @@ class client(object):
         return
 
     def __connect(self):
-        err = self.__socket.connect_ex((self.__host, self.__port))
+        err = self.__socket.connect((self.__host, self.__port))
         if not err:
             self.__connect_ok = True
             if self.__ssl_on:
@@ -461,6 +464,8 @@ class client(object):
             except BlockingIOError:
                 break
             if rdata:
+                #if not self.__fd: self.__fd = open("test.txt", "wb")
+                #self.__fd.write(rdata)
                 self.__reader._putvalue(rdata)
         return
 
@@ -574,11 +579,12 @@ s.close()
 """
 
 hc = client()
-hc.request("GET", "www.baidu.com")
+hc.request("GET", "www.qq.com")
 
 while 1:
     hc.handle()
     if hc.response_ok():
         break
-
-print(hc.get_data())
+fd = open("test.txt", "wb")
+fd.write(hc.get_data())
+fd.close()
