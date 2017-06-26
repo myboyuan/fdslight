@@ -358,10 +358,6 @@ class client(object):
     __connect_ok = None
     __port = None
 
-    __timeout = 0
-
-    __update_time = 0
-
     __request_ok = None
 
     __response_header_ok = None
@@ -378,16 +374,13 @@ class client(object):
 
     __write_ok = None
 
-    #__fd = None
-
-    def __init__(self, is_ipv6=False, timeout=10):
+    def __init__(self, is_ipv6=False):
         self.__sent_ok = False
         self.headers = []
         self.__is_ipv6 = is_ipv6
         self.__reader = reader.reader()
         self.__writer = writer.writer()
         self.__connect_ok = False
-        self.__timeout = timeout
         self.__request_ok = False
         self.__is_http2 = False
         self.__alpn_on = False
@@ -464,8 +457,8 @@ class client(object):
             except BlockingIOError:
                 break
             if rdata:
-                #if not self.__fd: self.__fd = open("test.txt", "wb")
-                #self.__fd.write(rdata)
+                # if not self.__fd: self.__fd = open("test.txt", "wb")
+                # self.__fd.write(rdata)
                 self.__reader._putvalue(rdata)
         return
 
