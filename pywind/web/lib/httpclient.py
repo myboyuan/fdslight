@@ -376,7 +376,7 @@ class client(object):
 
     __ssl_ok = None
 
-    def __init__(self, is_ipv6=False):
+    def __init__(self, ssl_on=False, is_ipv6=False):
         self.__sent_ok = False
         self.headers = []
         self.__is_ipv6 = is_ipv6
@@ -388,12 +388,13 @@ class client(object):
         self.__alpn_on = False
         self.__write_ok = False
         self.__ssl_ok = False
+        self.__ssl_on = ssl_on
 
-    def request(self, method, host, path="/", qs_seq=None, ssl_on=False, port=None):
+    def request(self, method, host, path="/", qs_seq=None, port=None):
 
-        if ssl_on and not port:
+        if self.__ssl_on and not port:
             port = 443
-        if not ssl_on and not port:
+        if not self.__ssl_on and not port:
             port = 80
 
         self.__port = port
@@ -401,7 +402,6 @@ class client(object):
         self.__host = host
         self.__path = path
         self.__qs_seq = qs_seq
-        self.__ssl_on = ssl_on
         self.__is_sent_header = False
         self.__sent_body_ok = False
 
@@ -583,7 +583,7 @@ s.close()
 """
 """
 hc = client()
-hc.request("GET", "tieba.baidu.com", ssl_on=True)
+hc.request("GET", "tieba.baidu.com")
 
 while 1:
     hc.handle()
