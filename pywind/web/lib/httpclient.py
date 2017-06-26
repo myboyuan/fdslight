@@ -271,7 +271,7 @@ class http1x_builder(_builder):
         if not qs_seq:
             uri = path
         else:
-            uri = "%s?%s" % (path, "&".join(qs_seq))
+            uri = "%s?%s" % (path, httputils.build_qs(qs_seq))
 
         headers.append(("Host", host))
         headers.append(("User-Agent", user_agent))
@@ -581,7 +581,6 @@ print(parser.get_data())
 
 s.close()
 """
-
 """
 hc = client()
 hc.request("GET", "tieba.baidu.com", ssl_on=True)

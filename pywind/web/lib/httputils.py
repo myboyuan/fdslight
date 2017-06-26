@@ -95,3 +95,14 @@ def parse_http1x_response_header(sts):
     p += 2
 
     return ((version, status,), get_http1x_map(sts[p:]))
+
+
+def build_qs(seq):
+    """构建执行字符串
+    :param seq:
+    :return:
+    """
+    return "&".join([
+        "%s=%s" % (k, v) for k, v in seq
+    ])
+
