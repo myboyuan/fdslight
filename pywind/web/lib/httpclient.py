@@ -374,6 +374,8 @@ class client(object):
 
     __write_ok = None
 
+    __ssl_ok = None
+
     def __init__(self, is_ipv6=False):
         self.__sent_ok = False
         self.headers = []
@@ -385,6 +387,7 @@ class client(object):
         self.__is_http2 = False
         self.__alpn_on = False
         self.__write_ok = False
+        self.__ssl_ok = False
 
     def request(self, method, host, path="/", qs_seq=None, ssl_on=False, port=None):
 
@@ -411,7 +414,7 @@ class client(object):
         return
 
     def __connect(self):
-        err = self.__socket.connect((self.__host, self.__port))
+        err = self.__socket.connect_ex((self.__host, self.__port))
         if not err:
             self.__connect_ok = True
             if self.__ssl_on:
@@ -419,7 +422,7 @@ class client(object):
 
                 ssl_verinfo = ssl.OPENSSL_VERSION_INFO
                 # 只有openssl 1.0.2版本及其以上才支持ALPN
-                if ssl_verinfo[0] >= 1 and ssl_verinfo[1] >= 0 and ssl_verinfo[1] >= 2:
+                if ssl_verinfo[0] >= 1 and ssl_verinfo[1] >= 0 and ssl_verinfo[2] >= 2:
                     self.__alpn_on = True
 
                 if self.__alpn_on:
@@ -439,7 +442,7 @@ class client(object):
             self.__write_ok = False
             self.__writer.write(data)
         except ssl.SSLWantWriteError:
-            pass
+            return
 
         if size == sent_size:
             self.__write_ok = True
@@ -456,6 +459,14 @@ class client(object):
                 rdata = self.__socket.recv(4096)
             except BlockingIOError:
                 break
+            except ssl.SSLWantReadError:
+                break
+            if self.__ssl_on and not self.__ssl_ok:
+                if self.__alpn_on:
+                    protocol = self.__socket.selected_alpn_protocol()
+                    if protocol == "h2": self.__is_http2 = True
+                self.__ssl_ok = True
+
             if rdata:
                 # if not self.__fd: self.__fd = open("test.txt", "wb")
                 # self.__fd.write(rdata)
@@ -519,8 +530,8 @@ class client(object):
     def is_error(self):
         return self.__is_error
 
-    def request_ok(self):
-        pass
+    def writable(self):
+        return self.__writer.is_empty()
 
     def response_ok(self):
         if not self.__parser: return False
@@ -571,13 +582,16 @@ print(parser.get_data())
 s.close()
 """
 
+"""
 hc = client()
-hc.request("GET", "www.qq.com")
+hc.request("GET", "tieba.baidu.com", ssl_on=True)
 
 while 1:
     hc.handle()
     if hc.response_ok():
         break
+hc.close()
 fd = open("test.txt", "wb")
 fd.write(hc.get_data())
 fd.close()
+"""
