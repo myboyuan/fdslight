@@ -375,8 +375,11 @@ class client(object):
     __write_ok = None
 
     __ssl_ok = None
+    __is_closed = None
+    __request_headers = None
+    __sent = None
 
-    def __init__(self, ssl_on=False, is_ipv6=False):
+    def __init__(self, host, ssl_on=False, is_ipv6=False):
         self.__sent_ok = False
         self.headers = []
         self.__is_ipv6 = is_ipv6
@@ -389,8 +392,15 @@ class client(object):
         self.__write_ok = False
         self.__ssl_ok = False
         self.__ssl_on = ssl_on
+        self.__host = host
+        self.__is_closed = False
 
-    def request(self, method, host, path="/", qs_seq=None, port=None):
+    def request(self, method, path="/", qs_seq=None, port=None, headers=None):
+        if self.__is_closed: raise HttpErr("request has been closed")
+        self.__sent = []
+
+        if self.__parser: self.__parser.reset()
+        if self.__builder: self.__builder.reset()
 
         if self.__ssl_on and not port:
             port = 443
@@ -399,11 +409,15 @@ class client(object):
 
         self.__port = port
         self.__method = method
-        self.__host = host
         self.__path = path
         self.__qs_seq = qs_seq
         self.__is_sent_header = False
         self.__sent_body_ok = False
+
+        if not headers:
+            self.__request_headers = []
+        else:
+            self.__request_headers = headers
 
         if not self.__socket:
             if self.__is_ipv6:
@@ -479,6 +493,7 @@ class client(object):
         if self.__is_http2:
             self.__builder = http2x_builder()
 
+        self.__builder.set_headers(self.__request_headers)
         hdr_data = self.__builder.get_header_data(
             self.__method, self.__host, self.__path, self.__qs_seq
         )
@@ -511,27 +526,14 @@ class client(object):
     def status(self):
         return self.__parser.status
 
-    def send_data(self, byte_data):
-        self.__writer.write(byte_data)
-
-    def reset(self):
-        if self.__parser:
-            self.__parser.reset()
-        if self.__builder:
-            self.__builder.reset()
-        return
-
     def close(self):
         if self.__socket:
             self.__socket.close()
-            self.__socket = None
+            self.__is_closed = True
         return
 
     def is_error(self):
         return self.__is_error
-
-    def writable(self):
-        return self.__writer.is_empty()
 
     def response_ok(self):
         if not self.__parser: return False
@@ -552,11 +554,25 @@ class client(object):
         if not self.__is_sent_header:
             self.__send_header()
             return
+
+        if not self.__write_ok:
+            while 1:
+                try:
+                    data = self.__sent.pop(0)
+                except IndexError:
+                    break
+                self.__writer.write(data)
+            return
+
         if not self.__response_header_ok:
             self.__handle_resp_header()
             return
         self.__handle_resp_body()
         return
+
+    def send_body(self, body_data):
+        self.__write_ok = False
+        self.__sent.append(body_data)
 
 
 """
