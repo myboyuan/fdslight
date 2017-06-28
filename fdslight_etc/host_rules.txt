@@ -150,7 +150,6 @@ register.mesh.com:1
 *.ntdimg.com:1
 *.jwpltx.com:1
 *.hk01.com:1
-*.read01.com:1
 
 ### 游戏相关
 *.rockstargames.com:1
