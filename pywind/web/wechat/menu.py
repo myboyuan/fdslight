@@ -59,9 +59,11 @@ class wechat_menu(wechat_access.access):
             "POST", path="/cgi-bin/menu/create",
             qs_seq=[("access_token", access_token)],
             headers=[
-                ("Content-Length", len(sent_data))
+                ("Content-Length", len(sent_data)),
+                ("Content-Type", "application/json"),
             ]
         )
+
         self.httpclient.send_body(sent_data)
 
     def create_menu(self, menu=None, access_token=None, async=False):
@@ -108,3 +110,16 @@ class wechat_menu(wechat_access.access):
 
         return json.loads(sts)
 
+
+cls = wechat_menu("wx3e13a1db5fdf0b7d", "c842a09c8328b2d68ee213c8893fdee8", ssl_on=True)
+is_err, result = cls.get_token()
+
+token = result["access_token"]
+
+btn = build_button(
+    "Test", "click", key="hello"
+)
+
+print(cls.create_menu({"button": btn}, token))
+
+print(cls.get_menu(token))

@@ -96,13 +96,3 @@ class access(object):
         :return:
         """
         self.httpclient.close()
-
-
-cls = access("wx3e13a1db5fdf0b7d", "c842a09c8328b2d68ee213c8893fdee8",ssl_on=True)
-is_err, result = cls.get_token()
-
-if is_err: cls.finish()
-
-token = result["access_token"]
-
-print(cls.get_servers(token))

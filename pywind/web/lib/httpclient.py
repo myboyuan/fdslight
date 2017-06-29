@@ -458,6 +458,9 @@ class client(object):
         except ssl.SSLWantWriteError:
             return
 
+        except (ConnectionError, ssl.SSLEOFError):
+            raise HttpErr("the connection has been closed")
+
         if size == sent_size:
             self.__write_ok = True
             return
@@ -485,6 +488,8 @@ class client(object):
                 # if not self.__fd: self.__fd = open("test.txt", "wb")
                 # self.__fd.write(rdata)
                 self.__reader._putvalue(rdata)
+            else:
+                raise HttpErr("the connection has been closed")
         return
 
     def __send_header(self):
@@ -556,12 +561,7 @@ class client(object):
             return
 
         if not self.__write_ok:
-            while 1:
-                try:
-                    data = self.__sent.pop(0)
-                except IndexError:
-                    break
-                self.__writer.write(data)
+            self.__write()
             return
 
         if not self.__response_header_ok:
@@ -571,6 +571,8 @@ class client(object):
         return
 
     def send_body(self, body_data):
+        if not self.__is_sent_header:
+            self.__send_header()
         self.__write_ok = False
         self.__sent.append(body_data)
 
