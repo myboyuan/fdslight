@@ -110,6 +110,17 @@ class wechat_menu(wechat_access.access):
 
         return json.loads(sts)
 
+    def __create_evt_push(self, ToUserName, FromUserName, CreateTime, MsgType, Event, EventKey):
+        sts="""<xml>
+        <ToUserName><![CDATA[%s]]></ToUserName>
+        <FromUserName><![CDATA[%s]]></FromUserName>
+        <CreateTime>%s</CreateTime>
+        <MsgType><![CDATA[%s]]></MsgType>
+        <Event><![CDATA[
+        </xml>
+        """
+        return
+
 
 cls = wechat_menu("wx3e13a1db5fdf0b7d", "c842a09c8328b2d68ee213c8893fdee8", ssl_on=True)
 is_err, result = cls.get_token()
@@ -120,6 +131,6 @@ btn = build_button(
     "Test", "click", key="hello"
 )
 
-print(cls.create_menu({"button": btn}, token))
+# print(cls.create_menu({"button": btn}, token))
 
 print(cls.get_menu(token))
