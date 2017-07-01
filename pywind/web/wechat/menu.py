@@ -110,16 +110,57 @@ class wechat_menu(wechat_access.access):
 
         return json.loads(sts)
 
-    def __create_evt_push(self, ToUserName, FromUserName, CreateTime, MsgType, Event, EventKey):
-        sts="""<xml>
+    def __create_evt_push(self, ToUserName, FromUserName, CreateTime, Event, EventKey, **kwargs):
+        sts = """<xml>
         <ToUserName><![CDATA[%s]]></ToUserName>
         <FromUserName><![CDATA[%s]]></FromUserName>
         <CreateTime>%s</CreateTime>
-        <MsgType><![CDATA[%s]]></MsgType>
-        <Event><![CDATA[
-        </xml>
-        """
-        return
+        <MsgType><![CDATA[event]]></MsgType>
+        <Event><![CDATA[%s]]></Event>
+        <EventKey><![CDATA[%s]]></EventKey>
+        """ % (ToUserName, FromUserName, CreateTime, Event, EventKey)
+
+        evt = Event.lower()
+
+        if evt == "view":
+            sts += "<MenuId>%s</MenuId>" % kwargs["MenuID"]
+
+        if evt in ("scancode_push", "scancode_waitmsg",):
+            t = """<ScanCodeInfo><ScanType><![CDATA[qrcode]]></ScanType>
+            <ScanResult><![CDATA[%s]]></ScanResult>
+            </ScanCodeInfo>
+            """ % kwargs["ScanResult"]
+            sts += t
+
+        if evt in ("pic_sysphoto", "pic_photo_or_album", "pic_weixin"):
+            t = """
+            <SendPicsInfo><Count>1</Count>
+            <PicList><item><PicMd5Sum><![CDATA[%s]]></PicMd5Sum>
+            </item>
+            </PicList>
+            </SendPicsInfo>
+            """ % kwargs["PicMd5Sum"]
+            sts += t
+
+        if evt == "location_select":
+            t = """
+            <SendLocationInfo><Location_X><![CDATA[%s]]></Location_X>
+            <Location_Y><![CDATA[%s]]></Location_Y>
+            <Scale><![CDATA[%s]]></Scale>
+            <Label><![CDATA[%s]]></Label>
+            <Poiname><![CDATA[%s]]></Poiname>
+            </SendLocationInfo>
+            """ % (kwargs["Location_X"],
+                   kwargs["Location_Y"],
+                   kwargs["Scale"],
+                   kwargs["Label"],
+                   kwargs["Poiname"]
+                   )
+            sts += t
+
+        sts += "</xml>"
+        byte_data = sts.encode("iso-8859-1")
+
 
 
 cls = wechat_menu("wx3e13a1db5fdf0b7d", "c842a09c8328b2d68ee213c8893fdee8", ssl_on=True)
