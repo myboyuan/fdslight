@@ -172,6 +172,6 @@ btn = build_button(
     "Test", "click", key="hello"
 )
 
-# print(cls.create_menu({"button": btn}, token))
+print(cls.create_menu({"button": btn}, token))
 
 print(cls.get_menu(token))
