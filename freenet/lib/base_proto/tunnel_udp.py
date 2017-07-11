@@ -10,8 +10,11 @@ reverse:4 bit 保留
 action:4bit 动作
 """
 import freenet.lib.base_proto.utils as proto_utils
+import struct
 
 MIN_FIXED_HEADER_SIZE = 38
+
+_FMT = "!16s16sHHbb"
 
 
 class builder(object):
@@ -63,6 +66,7 @@ class builder(object):
 
     def __build_proto_header(self, session_id, pkt_md5, pkt_len, real_size, tot_seg, seq, action):
         if action not in proto_utils.ACTS: raise ValueError("not support action type")
+        """
         L = [
             session_id, pkt_md5,
         ]
@@ -76,6 +80,11 @@ class builder(object):
         L.append(bytes(T))
 
         return b"".join(L)
+        """
+        return struct.pack(
+            _FMT, session_id, pkt_md5,
+            pkt_len, real_size, (tot_seg << 4) | seq, action
+        )
 
     def __get_sent_raw_data(self, data_len, byte_data, redundancy=False):
         """获取要发送的原始数据"""
@@ -191,6 +200,7 @@ class parser(object):
         return bytes(tmp_list)
 
     def __parse_header(self, header):
+        """
         session_id = header[0:16]
         pkt_md5 = header[16:32]
 
@@ -204,6 +214,15 @@ class parser(object):
         action = header[37] & 0x0f
 
         return (session_id, pkt_md5, pkt_len, payload_len, tot_seg, seq, action,)
+        """
+        res = struct.unpack(_FMT, header)
+
+        return (
+            res[0], res[1],
+            res[2], res[3],
+            (res[4] & 0xf0) >> 4,
+            res[4] & 0x0f, res[5],
+        )
 
     def __get_pkt(self, pkt):
         if len(pkt) < self.__pkt_len: raise proto_utils.ProtoError("wrong packet length")

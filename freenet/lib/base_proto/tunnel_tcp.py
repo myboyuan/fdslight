@@ -107,6 +107,7 @@ class parser(object):
             "min fixed header size is %s" % MIN_FIXED_HEADER_SIZE)
 
     def __parse_header(self, hdr):
+        """
         session_id = hdr[0:16]
         paylod_md5 = hdr[16:32]
 
@@ -116,6 +117,8 @@ class parser(object):
         real_size = (hdr[35] << 8) | hdr[36]
 
         return (session_id, paylod_md5, action, tot_len, real_size,)
+        """
+        return struct.unpack(_FMT, hdr)
 
     def input(self, byte_data):
         self.__reader._putvalue(byte_data)
