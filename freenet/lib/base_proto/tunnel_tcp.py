@@ -12,6 +12,9 @@ MIN_FIXED_HEADER_SIZE = 37
 
 import pywind.lib.reader as reader
 import freenet.lib.base_proto.utils as proto_utils
+import struct
+
+_FMT = "!16s16sbHH"
 
 
 class builder(object):
@@ -23,6 +26,7 @@ class builder(object):
             "min fixed header size is %s" % MIN_FIXED_HEADER_SIZE)
 
     def __build_proto_headr(self, session_id, payload_m5, tot_len, real_size, action):
+        """
         seq = [
             session_id, payload_m5,
         ]
@@ -38,6 +42,12 @@ class builder(object):
         seq.append(bytes(T))
 
         return b"".join(seq)
+        """
+        res = struct.pack(
+            _FMT, session_id, payload_m5, action, tot_len, real_size
+        )
+
+        return res
 
     def build_packet(self, session_id, action, byte_data):
         if len(session_id) != 16: raise proto_utils.ProtoError("the size of session_id must be 16")
