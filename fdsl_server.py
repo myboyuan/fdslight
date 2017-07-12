@@ -374,8 +374,17 @@ class _fdslight_server(dispatcher.dispatcher):
 
         # 会话已经存在的处理方式
         if cookie_id in pydict:
-            fileno = pydict[cookie_id]
-            self.get_handler(fileno).handle_data_from_client(message)
+            fileno, is_tcp = pydict[cookie_id]
+
+            try:
+                if is_tcp:
+                    cookie_id, _, byte_data = app_proxy_proto.parse_tcp_data(message)
+                    self.get_handler(fileno).handle_data_from_client(byte_data)
+                else:
+                    is_ipv6, is_domain, cookie_id, host, port, byte_data = app_proxy_proto.parse_udp_data(message)
+                    self.get_handler(fileno).handle_data_from_client(host, port, byte_data)
+            except app_proxy_proto.ProtoErr:
+                return False
             return True
 
         try:
@@ -387,6 +396,7 @@ class _fdslight_server(dispatcher.dispatcher):
             return False
 
         if cmd == 1:
+            is_tcp = True
             fileno = self.create_handler(
                 -1, app_proxy.tcp_proxy, session_id, cookie_id, (host, port,), is_ipv6=is_ipv6
             )
@@ -396,10 +406,11 @@ class _fdslight_server(dispatcher.dispatcher):
                     session_id, proto_utils.ACT_SOCKS, app_proxy_proto.build_respconn(cookie_id, 0)
                 )
                 return False
+            is_tcp = False
             fileno = self.create_handler(
                 -1, app_proxy.udp_proxy, session_id, cookie_id, is_ipv6=is_ipv6
             )
-        pydict[cookie_id] = fileno
+        pydict[cookie_id] = (fileno, is_tcp,)
         return True
 
     def __send_msg_to_tunnel(self, session_id, action, message):
@@ -444,7 +455,7 @@ class _fdslight_server(dispatcher.dispatcher):
         resp_data = app_proxy_proto.build_tcp_send_data(cookie_id, message, is_close=is_close)
         self.__send_msg_to_tunnel(session_id, proto_utils.ACT_SOCKS, resp_data)
 
-    def response_socks_udp_data(self, session_id, cookie_id, address, port, message, is_ipv6=False, is_close=False):
+    def response_socks_udp_data(self, session_id, cookie_id, address, port, message, is_ipv6=False):
         if is_ipv6:
             atyp = 4
         else:
@@ -581,7 +592,11 @@ class _fdslight_server(dispatcher.dispatcher):
         if not pydict: del self.__dgram_proxy[session_id]
 
     def tel_del_app_proxy(self, session_id, cookie_id):
-        pass
+        if session_id not in self.__app_proxy: return
+        pydict = self.__app_proxy[session_id]
+
+        del pydict[cookie_id]
+        if not pydict: del self.__app_proxy[session_id]
 
     def __exit(self, signum, frame):
         if self.handler_exists(self.__dns_fileno):

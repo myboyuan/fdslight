@@ -3,8 +3,6 @@
 
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.evtframework.handlers.udp_handler as udp_handler
-import freenet.lib.base_proto.app_proxy as app_proxy_proto
-import freenet.lib.base_proto.utils as proto_utils
 import time, socket
 
 
@@ -40,6 +38,12 @@ class tcp_proxy(tcp_handler.tcp_handler):
         self.add_evt_read(self.fileno)
 
     def tcp_delete(self):
+        if self.is_conn_ok():
+            self.dispatcher.response_socks_tcp_data(self.__session_id, self.__cookie_id, b"", is_close=True)
+        else:
+            self.dispatcher.response_socks_connstate(self.__session_id, self.__cookie_id, 0)
+
+        self.dispatcher.tell_del_app_proxy(self.__session_id, self.__cookie_id)
         self.unregister(self.fileno)
         self.close()
 
@@ -55,7 +59,6 @@ class tcp_proxy(tcp_handler.tcp_handler):
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
-            self
             self.delete_handler(self.fileno)
             return
         t = time.time() - self.__update_time
@@ -66,7 +69,8 @@ class tcp_proxy(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, 10)
 
     def handle_data_from_client(self, message):
-        pass
+        self.writer.write(message)
+        self.add_evt_write(self.fileno)
 
 
 class udp_proxy(udp_handler.udp_handler):
@@ -74,10 +78,65 @@ class udp_proxy(udp_handler.udp_handler):
     __session_id = None
     __permits = None
 
-    def init_func(self, creator, session_id, cookie_id, is_ipv6=False):
+    __is_ipv6 = None
+    __update_time = 0
+    __TIMEOUT = 180
+
+    def init_func(self, creator, session_id, cookie_id, bind_ip=None, is_ipv6=False):
+        if is_ipv6:
+            fa = socket.AF_INET6
+            if not bind_ip: bind_ip = "::"
+        else:
+            fa = socket.AF_INET
+            if not bind_ip: bind_ip = "0.0.0.0"
+
         self.__cookie_id = cookie_id
         self.__session_id = session_id
         self.__permits = {}
+        self.__is_ipv6 = is_ipv6
 
-    def handle_data_from_client(self, message, address):
-        pass
+        s = socket.socket(fa, socket.SOCK_DGRAM)
+        self.set_socket(self.fileno)
+        self.bind((bind_ip, 0))
+
+        self.__update_time = time.time()
+        self.set_timeout(self.fileno, 10)
+
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
+
+        return self.fileno
+
+    def udp_readable(self, message, address):
+        # 进行端口限制
+        if address[1] not in self.__permits: return
+
+        self.dispatcher.response_socks_udp_data(
+            self.__session_id, self.__cookie_id,
+            address[0], address[1], message, is_ipv6=self.__is_ipv6
+        )
+
+    def handle_data_from_client(self, host, port, message):
+        self.__update_time = time.time()
+        self.__permits[port] = None
+        self.sendto(message, (host, port,))
+        self.add_evt_write(self.fileno)
+
+    def udp_writable(self):
+        self.remove_evt_write(self.fileno)
+
+    def udp_timeout(self):
+        t = time.time() - self.__update_time
+
+        if t > self.__TIMEOUT:
+            self.delete_handler(self.fileno)
+            return
+        self.set_timeout(self.fileno, 10)
+
+    def udp_error(self):
+        self.delete_handler(self.fileno)
+
+    def udp_delete(self):
+        self.dispatcher.tell_del_app_proxy(self.__session_id, self.__cookie_id)
+        self.unregister(self.fileno)
+        self.close()
