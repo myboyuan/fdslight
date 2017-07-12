@@ -69,6 +69,8 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __ip6_udp_cone_nat = False
 
+    __app_proxy = None
+
     def init_func(self, debug, configs):
         self.create_poll()
 
@@ -77,6 +79,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
         self.__ip6_dgram = {}
         self.__dgram_proxy = {}
+        self.__app_proxy = {}
 
         signal.signal(signal.SIGINT, self.__exit)
 
@@ -514,6 +517,9 @@ class _fdslight_server(dispatcher.dispatcher):
         if key not in pydict: return
         del pydict[key]
         if not pydict: del self.__dgram_proxy[session_id]
+
+    def tel_del_app_proxy(self, session_id, cookie_id):
+        pass
 
     def __exit(self, signum, frame):
         if self.handler_exists(self.__dns_fileno):
