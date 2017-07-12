@@ -563,6 +563,8 @@ def __stop_service():
 def main():
     help_doc = """
     -d      debug | start | stop    debug,start or stop application
+    --only_http_socks5              only http socks5 proxy
+    --no_http_socks5                no http socks5 proxy
     """
     try:
         opts, args = getopt.getopt(sys.argv[1:], "u:m:d:")
