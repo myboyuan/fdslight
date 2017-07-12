@@ -356,9 +356,14 @@ class _fdslight_server(dispatcher.dispatcher):
         mbuf.offset = 0
         self.send_message_to_handler(-1, self.__raw_fileno, mbuf.get_data())
 
-    def __send_msg_to_tunnel(self, session_id, action, message):
+    def send_msg_to_tunnel(self, session_id, action, message):
         if not self.__access.session_exists(session_id): return
-        if not self.__access.data_for_send(session_id, self.__mbuf.payload_size): return
+
+        if action == proto_utils.ACT_DATA:
+            size = self.__mbuf.payload_size
+        else:
+            size = len(message)
+        if not self.__access.data_for_send(session_id, size): return
 
         session_info = self.__access.get_session_info(session_id)
         fileno = session_info[0]
@@ -380,20 +385,14 @@ class _fdslight_server(dispatcher.dispatcher):
             ok, session_id = self.__nat6.get_ippkt2cLan_from_sLan(self.__mbuf)
 
         if not ok: return
-
         self.__mbuf.offset = 0
-        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, self.__mbuf.get_data())
+        self.send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, self.__mbuf.get_data())
 
     def send_msg_to_tunnel_from_p2p_proxy(self, session_id, message):
-        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, message)
+        self.send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, message)
 
     def response_dns(self, session_id, message):
-        if not self.__access.session_exists(session_id): return
-
-        fileno, _, address, _ = self.__access.get_session_info(session_id)
-        if not self.handler_exists(fileno): return
-
-        self.get_handler(fileno).send_msg(session_id, address, proto_utils.ACT_DNS, message)
+        self.send_msg_to_tunnel(session_id, proto_utils.ACT_DNS, message)
 
     def __request_dns(self, session_id, message):
         self.get_handler(self.__dns_fileno).request_dns(session_id, message)
