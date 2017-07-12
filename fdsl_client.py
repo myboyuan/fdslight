@@ -14,11 +14,12 @@ import pywind.lib.configfile as configfile
 import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.proc as proc
-import os, getopt, signal, importlib, socket
+import os, getopt, signal, importlib, socket, random
 import freenet.handlers.tunnelc as tunnelc
 import freenet.lib.file_parser as file_parser
 import freenet.lib.logging as logging
 import dns.resolver
+import freenet.lib.base_proto.app_proxy as app_proxy_proto
 
 _MODE_GW = 1
 _MODE_LOCAL = 2
@@ -294,6 +295,11 @@ class _fdslight_client(dispatcher.dispatcher):
         if action == proto_utils.ACT_DNS:
             self.get_handler(self.__dns_fileno).msg_from_tunnel(message)
             return
+
+        if action == proto_utils.ACT_SOCKS:
+            self.get_handler(self.__http_socks5_fileno).msg_from_tunnel(message)
+            return
+
         self.__mbuf.copy2buf(message)
         ip_ver = self.__mbuf.ip_version()
         if ip_ver not in (4, 6,): return
