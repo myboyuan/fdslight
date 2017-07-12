@@ -154,7 +154,11 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.__handle_socks5_step3()
 
     def hander_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd not in ("tell_ok", "tell_close"): return
+        if cmd not in ("tell_ok", "tell_error", "tell_close"): return
+
+        if cmd == "tell_close":
+            self.delete_this_no_sent_data()
+            return
 
         if cmd == "tell_ok":
             rep = 0
@@ -182,7 +186,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.__step = 3
             return
 
-        if cmd == "tell_close":
+        if cmd == "tell_error":
             self.delete_this_no_sent_data()
             return
 
@@ -200,7 +204,10 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         pass
 
     def tcp_delete(self):
-        pass
+        if self.handler_exists(self.__fileno):
+            self.delete_handler(self.__fileno)
+        self.unregister(self.fileno)
+        self.close()
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
@@ -213,9 +220,36 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 class _tcp_client(tcp_handler.tcp_handler):
     __TIMEOUT = 300
     __update_time = 0
+    __creator = None
 
     def init_func(self, creator, address, host_rules, is_ipv6=False):
-        pass
+        if is_ipv6:
+            fa = socket.AF_INET6
+        else:
+            fa = socket.AF_INET
+
+        s = socket.socket(fa, socket.SOCK_STREAM)
+        if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+
+        self.__creator = creator
+        self.set_socket(s)
+        self.connect(address)
+
+        return self.fileno
+
+    def connect_ok(self):
+        self.__update_time = time.time()
+        self.set_timeout(self.fileno, 10)
+
+        address, port = self.socket.getsockname()
+
+        self.ctl_handler(
+            self.fileno, self.__creator,
+            "tell_ok", address, port
+        )
+
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
 
     def tcp_readable(self):
         pass
@@ -224,10 +258,35 @@ class _tcp_client(tcp_handler.tcp_handler):
         self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
-        pass
+        if not self.is_conn_ok():
+            address, port = self.socket.getsockname()
+            self.ctl_handler(
+                self.fileno, self.__creator,
+                "tell_error", address, port
+            )
+            return
+        t = time.time() - self.__update_time
+        if t > self.__TIMEOUT:
+            self.ctl_handler(
+                self.fileno, self.__creator,
+                "tell_close"
+            )
+            return
+        self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
-        pass
+        if self.is_conn_ok():
+            self.ctl_handler(
+                self.fileno, self.__creator,
+                "tell_close"
+            )
+        else:
+            address, port = self.socket.getsockname()
+            self.ctl_handler(
+                self.fileno, self.__creator,
+                "tell_error", address, port
+            )
+        return
 
     def tcp_delete(self):
         self.unregister(self.fileno)
