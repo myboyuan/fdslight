@@ -14,13 +14,9 @@ import pywind.lib.configfile as configfile
 import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.proc as proc
-import freenet.handlers.tundev as tundev
 import os, getopt, signal, importlib, socket
-import freenet.handlers.dns_proxy as dns_proxy
-import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.handlers.tunnelc as tunnelc
 import freenet.lib.file_parser as file_parser
-import freenet.handlers.traffic_pass as traffic_pass
 import freenet.lib.logging as logging
 import dns.resolver
 
@@ -71,7 +67,9 @@ class _fdslight_client(dispatcher.dispatcher):
     # 是否开启IPV6流量
     __enable_ipv6_traffic = False
 
-    def init_func(self, mode, debug, configs):
+    __http_socks5_fileno = -1
+
+    def init_func(self, mode, debug, configs, only_http_socks5=False, no_http_socks5=False):
         self.create_poll()
 
         signal.signal(signal.SIGINT, self.__exit)
@@ -79,6 +77,18 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__router_timer = timer.timer()
         self.__routers = {}
         self.__configs = configs
+
+        import freenet.handlers.dns_proxy as dns_proxy
+
+        if not no_http_socks5:
+            import freenet.handlers.http_socks5 as http_socks5
+            self.__http_socks5_fileno = self.create_handler(
+                -1, http_socks5.http_socks5_listener
+            )
+
+        if only_http_socks5: return
+
+        import freenet.handlers.tundev as tundev
 
         if mode == "local":
             self.__mode = _MODE_LOCAL
@@ -124,6 +134,8 @@ class _fdslight_client(dispatcher.dispatcher):
             self.__load_kernel_mod()
             udp_global = bool(int(gateway["dgram_global_proxy"]))
             if udp_global:
+                import freenet.handlers.traffic_pass as traffic_pass
+
                 self.__dgram_fetch_fileno = self.create_handler(
                     -1, traffic_pass.traffic_read,
                     self.__configs["gateway"], enable_ipv6=self.__enable_ipv6_traffic
@@ -169,6 +181,8 @@ class _fdslight_client(dispatcher.dispatcher):
         signal.signal(signal.SIGUSR1, self.__set_host_rules)
 
     def __load_kernel_mod(self):
+        import freenet.lib.fdsl_ctl as fdsl_ctl
+
         ko_file = "%s/driver/fdslight_dgram.ko" % BASE_DIR
 
         if not os.path.isfile(ko_file):
