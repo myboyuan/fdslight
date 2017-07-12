@@ -227,7 +227,7 @@ class _fdslight_client(dispatcher.dispatcher):
 
         if ip_ver not in (4, 6,): return
 
-        action = proto_utils.ACT_DATA
+        action = proto_utils.ACT_IPDATA
         is_ipv6 = False
 
         if ip_ver == 4:
@@ -285,7 +285,7 @@ class _fdslight_client(dispatcher.dispatcher):
             self.set_router(sts_daddr, timeout=190, is_ipv6=is_ipv6, is_dynamic=True)
         else:
             self.__update_router_access(sts_daddr, timeout=190)
-        self.send_msg_to_tunnel(proto_utils.ACT_DATA, message)
+        self.send_msg_to_tunnel(proto_utils.ACT_IPDATA, message)
 
     def handle_msg_from_tunnel(self, seession_id, action, message):
         if seession_id != self.session_id: return

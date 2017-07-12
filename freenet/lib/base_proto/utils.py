@@ -2,11 +2,15 @@
 
 import hashlib, json
 
-ACT_DATA = 1
+# 表示IP数据
+ACT_IPDATA = 1
+# 表示DNS数据
 ACT_DNS = 2
+# 表示socks数据
+ACT_SOCKS = 3
 
 ACTS = (
-    ACT_DATA, ACT_DNS,
+    ACT_IPDATA, ACT_DNS, ACT_SOCKS
 )
 
 

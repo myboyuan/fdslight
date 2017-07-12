@@ -4,7 +4,7 @@
     客户端请求如下报文:
         cookie_id:2bytes 客户端生成的cookie id
         cmd: 1 byte 同socks5 cmd,不支持BIND
-        atyp:1byte 地址类型,同socks5 atyp
+        atyp:1byte 地址类型,同socks5 atyp,注意请求UDP代理时该值代表的IP地址类型,而且值不能为3
         addr_len: 1 byte地址长度
         port:2 bytes 客户端请求端口,如果为UDP代理那么该项可忽略
         address:请求地址,如果为UDP代理那么该项可忽略
@@ -15,6 +15,7 @@
 2.发送数据(客户端和服务端)
     TCP协议如下:
         cookie_id:2 bytes
+        is_close:1 byte 是否关闭连接,0表示不关闭连接,1表示关闭连接,服务端忽略这个值,当改值为1时不能携带任何数据
         data:
     UDP协议如下
         cookie_id:2 bytes
@@ -28,7 +29,7 @@
 _REQ_FMT = "!HbbbH"
 _REQ_RESP_FMT = "!Hb"
 
-_TCP_DATA_SEND_FMT = "!H"
+_TCP_DATA_SEND_FMT = "!Hb"
 _UDP_DATA_SEND_FMT = "!HbbH"
 
 import struct, socket
@@ -84,11 +85,11 @@ def parse_respconn(byte_data):
 
 def parse_tcp_data(byte_data):
     size = len(byte_data)
-    if size < 3: raise ProtoErr("wrong protocol")
+    if size < 4: raise ProtoErr("wrong protocol")
 
-    cookie_id = struct.unpack(_TCP_DATA_SEND_FMT, byte_data[0:2])
+    cookie_id, is_close, = struct.unpack(_TCP_DATA_SEND_FMT, byte_data[0:2])
 
-    return (cookie_id, byte_data[2:])
+    return (cookie_id, is_close, byte_data[2:])
 
 
 def parse_udp_data(byte_data):
@@ -143,11 +144,18 @@ def build_respconn(cookie_id, resp_code):
     return struct.pack(_REQ_RESP_FMT, cookie_id, resp_code)
 
 
-def build_tcp_send_data(cookie_id, byte_data):
+def build_tcp_send_data(cookie_id, byte_data, is_close=False):
     size = len(byte_data)
-    fmt = "!H%ss" % size
+    fmt = "!Hb%ss" % size
 
-    return struct.pack(fmt, cookie_id, byte_data)
+    if is_close:
+        close = 1
+    else:
+        close = 0
+
+    if is_close and byte_data: raise ValueError("argument byte_data must be null")
+
+    return struct.pack(fmt, cookie_id, close, byte_data)
 
 
 def build_udp_send_data(cookie_id, atyp, address, port, byte_data):

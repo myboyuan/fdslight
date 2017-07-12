@@ -24,6 +24,8 @@ import freenet.lib.ip6dgram as ip6dgram
 import freenet.handlers.traffic_pass as traffic_pass
 import freenet.lib.logging as logging
 import freenet.lib.fn_utils as fn_utils
+import freenet.handlers.app_proxy as app_proxy
+import freenet.lib.base_proto.app_proxy as app_proxy_proto
 
 
 class _fdslight_server(dispatcher.dispatcher):
@@ -213,9 +215,13 @@ class _fdslight_server(dispatcher.dispatcher):
         if size > utils.MBUF_AREA_SIZE: return False
         if action not in proto_utils.ACTS: return False
 
-        if action == proto_utils.ACT_DATA: self.__mbuf.copy2buf(message)
+        if action == proto_utils.ACT_IPDATA: self.__mbuf.copy2buf(message)
         if action == proto_utils.ACT_DNS:
             self.__request_dns(session_id, message)
+            return True
+
+        if action == proto_utils.ACT_SOCKS:
+            self.__handle_socks_data_from_tunnel(session_id, message)
             return True
 
         return self.__handle_ipdata_from_tunnel(session_id)
@@ -356,10 +362,50 @@ class _fdslight_server(dispatcher.dispatcher):
         mbuf.offset = 0
         self.send_message_to_handler(-1, self.__raw_fileno, mbuf.get_data())
 
-    def send_msg_to_tunnel(self, session_id, action, message):
+    def __handle_socks_data_from_tunnel(self, session_id, message):
+        try:
+            cookie_id = (message[0] << 8) | message[1]
+        except IndexError:
+            return False
+
+        if session_id not in self.__app_proxy:
+            self.__app_proxy[session_id] = {}
+        pydict = self.__app_proxy[session_id]
+
+        # 会话已经存在的处理方式
+        if cookie_id in pydict:
+            fileno = pydict[cookie_id]
+            self.get_handler(fileno).handle_data_from_client(message)
+            return True
+
+        try:
+            is_ipv6, is_domain, cookie_id, cmd, host, port = app_proxy_proto.parse_reqconn(message)
+        except app_proxy_proto.ProtoErr:
+            self.__send_msg_to_tunnel(
+                session_id, proto_utils.ACT_SOCKS, app_proxy_proto.build_respconn(cookie_id, 0)
+            )
+            return False
+
+        if cmd == 1:
+            fileno = self.create_handler(
+                -1, app_proxy.tcp_proxy, session_id, cookie_id, (host, port,), is_ipv6=is_ipv6
+            )
+        else:
+            if is_domain:
+                self.__send_msg_to_tunnel(
+                    session_id, proto_utils.ACT_SOCKS, app_proxy_proto.build_respconn(cookie_id, 0)
+                )
+                return False
+            fileno = self.create_handler(
+                -1, app_proxy.udp_proxy, session_id, cookie_id, is_ipv6=is_ipv6
+            )
+        pydict[cookie_id] = fileno
+        return True
+
+    def __send_msg_to_tunnel(self, session_id, action, message):
         if not self.__access.session_exists(session_id): return
 
-        if action == proto_utils.ACT_DATA:
+        if action == proto_utils.ACT_IPDATA:
             size = self.__mbuf.payload_size
         else:
             size = len(message)
@@ -386,13 +432,30 @@ class _fdslight_server(dispatcher.dispatcher):
 
         if not ok: return
         self.__mbuf.offset = 0
-        self.send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, self.__mbuf.get_data())
+        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_IPDATA, self.__mbuf.get_data())
 
     def send_msg_to_tunnel_from_p2p_proxy(self, session_id, message):
-        self.send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, message)
+        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_IPDATA, message)
 
     def response_dns(self, session_id, message):
-        self.send_msg_to_tunnel(session_id, proto_utils.ACT_DNS, message)
+        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_DNS, message)
+
+    def response_socks_tcp_data(self, session_id, cookie_id, message, is_close=False):
+        resp_data = app_proxy_proto.build_tcp_send_data(cookie_id, message, is_close=is_close)
+        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_SOCKS, resp_data)
+
+    def response_socks_udp_data(self, session_id, cookie_id, address, port, message, is_ipv6=False, is_close=False):
+        if is_ipv6:
+            atyp = 4
+        else:
+            atyp = 1
+
+        resp_data = app_proxy_proto.build_udp_send_data(cookie_id, atyp, address, port, message)
+        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_SOCKS, resp_data)
+
+    def response_socks_connstate(self, session_id, cookie_id, resp_code):
+        resp_data = app_proxy_proto.build_respconn(cookie_id, resp_code)
+        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_SOCKS, resp_data)
 
     def __request_dns(self, session_id, message):
         self.get_handler(self.__dns_fileno).request_dns(session_id, message)
@@ -568,8 +631,6 @@ def __stop_service():
 def main():
     help_doc = """
     -d      debug | start | stop    debug,start or stop application
-    --only_http_socks5              only http socks5 proxy
-    --no_http_socks5                no http socks5 proxy
     """
     try:
         opts, args = getopt.getopt(sys.argv[1:], "u:m:d:")

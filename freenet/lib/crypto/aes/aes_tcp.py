@@ -104,7 +104,7 @@ key="name"
 builder = encrypt()
 builder.config({"key":key})
 
-e_rs = builder.build_packet(bytes(16),tunnel.ACT_DATA,b"hello")
+e_rs = builder.build_packet(bytes(16),tunnel.ACT_IPDATA,b"hello")
 builder.reset()
 
 parser = decrypt()
@@ -115,7 +115,7 @@ while parser.can_continue_parse():
     parser.parse()
 print(parser.get_pkt())
 
-e_rs = builder.build_packet(bytes(16),tunnel.ACT_DATA,b"world")
+e_rs = builder.build_packet(bytes(16),tunnel.ACT_IPDATA,b"world")
 builder.reset()
 parser.input(e_rs)
 
