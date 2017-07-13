@@ -360,8 +360,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         is_match, flags = self.__host_match.match(host)
 
         if is_match and flags:
-            self.__use_tunnel = True
-            self.__step = 2
+            atyp = self.__get_atyp(host)
+            self.__tunnel_proxy_reqconn(atyp, host, port)
             return
 
         self.__fileno = self.create_handler(
@@ -510,6 +510,11 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
             if resp_code:
                 self.__req_ok = True
+                if self.__is_http:
+                    self.__step = 2
+                    self.__response_http_tunnel_proxy_handshake()
+                else:
+                    self.__step = 3
             else:
                 self.delete_handler(self.fileno)
             return
