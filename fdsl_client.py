@@ -524,7 +524,7 @@ class _fdslight_client(dispatcher.dispatcher):
         return
 
 
-def __start_service(mode, debug):
+def __start_service(mode, debug, only_http_socks5, no_http_socks5):
     if not debug:
         pid = os.fork()
         if pid != 0: sys.exit(0)
@@ -577,13 +577,16 @@ def main():
     --no_http_socks5                no http socks5 proxy
     """
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "u:m:d:")
+        opts, args = getopt.getopt(sys.argv[1:], "u:m:d:", ["only_http_socks5", "no_http_socks5"])
     except getopt.GetoptError:
         print(help_doc)
         return
     d = ""
     m = ""
     u = ""
+
+    only_http_socks5 = False
+    no_http_socks5 = False
 
     for k, v in opts:
         if k == "-u":
@@ -592,8 +595,14 @@ def main():
 
         if k == "-m": m = v
         if k == "-d": d = v
+        if k == "--only_http_socks5": only_http_socks5 = True
+        if k == "--no_http_socks5": no_http_socks5 = True
 
-    if not d and not m and not u:
+    if only_http_socks5 and no_http_socks5:
+        print("conflict argument about only_http_socks5 and no_http_socks5")
+        return
+
+    if not d and not m and not u and not only_http_socks5:
         print(help_doc)
         return
 
@@ -608,14 +617,14 @@ def main():
         print(help_doc)
         return
 
-    if m not in ("local", "gateway"):
+    if not only_http_socks5 and (m not in ("local", "gateway")):
         print(help_doc)
         return
 
     if d in ("start", "debug",):
         debug = False
         if d == "debug": debug = True
-        __start_service(m, debug)
+        __start_service(m, debug, only_http_socks5, no_http_socks5)
         return
 
     if d == "stop": __stop_service()
