@@ -329,6 +329,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         pass
 
     def tcp_delete(self):
+        self.ctl_handler(self.fileno, self.__creator, "unbind_cookie_id", self.__cookie_id)
+
         if self.handler_exists(self.__fileno):
             self.delete_handler(self.__fileno)
         self.unregister(self.fileno)
@@ -368,6 +370,15 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                     break
                 self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
             ''''''
+
+        if self.__is_udp:
+            try:
+                is_ipv6, is_domain, cookie_id, host, port, byte_data = app_proxy_proto.parse_udp_data(message)
+            except app_proxy_proto.ProtoErr:
+                return
+            self.ctl_handler(self.fileno, self.__fileno, "udp_data", host, port, byte_data)
+            return
+
         try:
             cookie_id, is_close, byte_data = app_proxy_proto.parse_tcp_data(message)
         except app_proxy_proto.ProtoErr:
