@@ -7,6 +7,7 @@ import pywind.evtframework.handlers.udp_handler as udp_handler
 import socket, time, struct, random
 import pywind.web.lib.httputils as httputils
 import freenet.lib.base_proto.app_proxy as app_proxy_proto
+import freenet.lib.base_proto.utils as proto_utils
 
 
 class http_socks5_listener(tcp_handler.tcp_handler):
@@ -24,23 +25,23 @@ class http_socks5_listener(tcp_handler.tcp_handler):
 
         s = socket.socket(fa, socket.SOCK_STREAM)
         if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         self.set_socket(s)
         self.bind(address)
-
-        return self.fileno
-
-    def after(self):
         self.listen(10)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
-    def tcp_readable(self):
+        return self.fileno
+
+    def tcp_accept(self):
         while 1:
             try:
                 cs, caddr = self.accept()
+                self.create_handler(self.fileno, _http_socks5_handler, cs, caddr, self.__host_match)
             except BlockingIOError:
-                self.create_handler(self.fileno, cs, caddr, self.__host_match)
+                break
         return
 
     def __bind_cookie_id(self, fileno):
@@ -103,6 +104,10 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
     __creator = None
 
     __req_ok = None
+    __cookie_id = 0
+
+    # UDP数据发送缓冲区
+    __udpdata_buf = None
 
     def init_func(self, creator, cs, caddr, host_match):
         self.set_socket(cs)
@@ -116,8 +121,10 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.__host_match = host_match
         self.__creator = creator
         self.__req_ok = False
+        self.__udpdata_buf = []
 
         self.set_socket(cs)
+
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
@@ -186,13 +193,22 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         port = (byte_port[0] << 8) | byte_port[1]
 
         if cmd == 1:
+            if atyp == 3:
+                is_match, flags = self.__host_match.match(addr)
+
+                if is_match and flags == 1:
+                    self.__use_tunnel = True
+                    self.__tunnel_proxy_reqconn(atyp, addr, port)
+
+                    return
             self.__fileno = self.create_handler(
                 self.fileno, _tcp_client, (addr, port,), is_ipv6=self.__is_ipv6
             )
             return
 
+        self.__is_udp = True
         self.__fileno = self.create_handler(
-            self.fileno, _udp_handler, self.__creator, (self.__caddr[0], port,),
+            self.fileno, _udp_handler, (self.__caddr[0], port,),
             use_tunnel=self.__use_tunnel, is_ipv6=self.__is_ipv6
         )
 
@@ -244,8 +260,12 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
         self.__handle_socks5_step3()
 
-    def hander_ctl(self, from_fd, cmd, *args, **kwargs):
-        if cmd not in ("tell_ok", "tell_error", "tell_close"): return
+    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
+        if cmd not in (
+                "tell_ok", "tell_error", "tell_close",
+                "udp_tunnel_send",
+        ): return
+
 
         if cmd == "tell_close":
             self.delete_this_no_sent_data()
@@ -325,6 +345,15 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                 self.delete_handler(self.fileno)
             return
 
+        # 发送UDP缓冲区的数据
+        if self.__is_udp and self.__udpdata_buf:
+            while 1:
+                try:
+                    sent_data = self.__udpdata_buf.pop(0)
+                except IndexError:
+                    break
+                self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
+
         try:
             cookie_id, is_close, byte_data = app_proxy_proto.parse_tcp_data(message)
         except app_proxy_proto.ProtoErr:
@@ -336,6 +365,30 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             return
 
         self.__send_data(byte_data)
+
+    def __tunnel_proxy_reqconn(self, atyp, addr, port):
+        self.__cookie_id = self.ctl_handler(self.fileno, self.__creator, "bind_cookie_id")
+
+        if self.__cookie_id < 0:
+            self.delete_handler(self.fileno)
+            return
+
+        sent_data = app_proxy_proto.build_reqconn(self.__cookie_id, 1, atyp, addr, port)
+        self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
+
+    def __tunnel_proxy_send_tcpdata(self, tcpdata):
+        sent_data = app_proxy_proto.build_tcp_send_data(self.__cookie_id, tcpdata)
+        self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
+
+    def __tunnel_proxy_send_udpdata(self, cookie_id, atyp, address, port, udpdata):
+        sent_data = app_proxy_proto.build_udp_send_data(
+            cookie_id, atyp, address, port, udpdata
+        )
+
+        if not self.__req_ok:
+            self.__udpdata_buf.append(sent_data)
+        else:
+            self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
 
 
 class _tcp_client(tcp_handler.tcp_handler):
@@ -363,7 +416,6 @@ class _tcp_client(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, 10)
 
         address, port = self.socket.getsockname()
-
         self.ctl_handler(
             self.fileno, self.__creator,
             "tell_ok", address, port
@@ -373,7 +425,7 @@ class _tcp_client(tcp_handler.tcp_handler):
         self.add_evt_read(self.fileno)
 
     def tcp_readable(self):
-        rdata = self.reader.read(ƒ)
+        rdata = self.reader.read()
         self.send_message_to_handler(self.fileno, self.__creator, rdata)
 
     def tcp_writable(self):
@@ -489,12 +541,9 @@ class _udp_handler(udp_handler.udp_handler):
     __creator = None
     __is_ipv6 = None
 
-    __ctl_fileno = None
-
-    def init_func(self, creator, ctl_fileno, src_addr, host_match=None, use_tunnel=False, bind_ip=None, is_ipv6=False):
+    def init_func(self, creator, src_addr, host_match=None, use_tunnel=False, bind_ip=None, is_ipv6=False):
         """
         :param creator:
-        :param ctl_fileno:
         :param src_addr:
         :param host_match
         :param use_tunnel:是否使用隧道传输,如果为True那么会跳过host match,当主机为域名时
@@ -508,7 +557,6 @@ class _udp_handler(udp_handler.udp_handler):
         self.__permits = {}
         self.__creator = creator
         self.__is_ipv6 = is_ipv6
-        self.__ctl_fileno = ctl_fileno
 
         if is_ipv6:
             fa = socket.AF_INET6
