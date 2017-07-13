@@ -10,6 +10,18 @@ import freenet.lib.base_proto.app_proxy as app_proxy_proto
 import freenet.lib.base_proto.utils as proto_utils
 
 
+def _parse_http_uri(uri):
+    """解析HTTP URL
+    :param uri:
+    :return:
+    """
+    p = uri.find(":")
+    if p < 1: return None
+
+    host = uri[0:p]
+    p += 1
+
+
 class http_socks5_listener(tcp_handler.tcp_handler):
     __cookie_ids = None
     __host_match = None
@@ -111,6 +123,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
     # UDP数据发送缓冲区
     __udpdata_buf = None
+    __update_time = 0
+    __TIMEOUT = 300
 
     def init_func(self, creator, cs, caddr, host_match):
         self.set_socket(cs)
@@ -126,6 +140,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.__req_ok = False
         self.__udpdata_buf = []
         self.__is_sent_proxy_requst = False
+        self.set_timeout(self.fileno, 15)
 
         self.set_socket(cs)
 
@@ -212,7 +227,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.__is_udp = True
         self.__fileno = self.create_handler(
             self.fileno, _udp_handler, (self.__caddr[0], port,), self.__host_match,
-            use_tunnel=self.__use_tunnel, is_ipv6=self.__is_ipv6
+            is_ipv6=self.__is_ipv6
         )
 
     def __handle_socks5_step3(self):
@@ -326,7 +341,13 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
-        pass
+        if self.handler_exists(self.__fileno): return
+
+        t = time.time() - self.__update_time
+        if t > self.__TIMEOUT:
+            self.delete_handler(self.fileno)
+            return
+        self.set_timeout(self.fileno, 10)
 
     def tcp_delete(self):
         self.ctl_handler(self.fileno, self.__creator, "unbind_cookie_id", self.__cookie_id)
@@ -385,6 +406,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
 
+        self.__update_time = time.time()
+
         if is_close:
             self.delete_this_no_sent_data()
             return
@@ -403,7 +426,10 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
 
     def __tunnel_proxy_send_tcpdata(self, tcpdata):
+        self.__update_time = time.time()
+
         sent_data = app_proxy_proto.build_tcp_send_data(self.__cookie_id, tcpdata)
+
         self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
 
     def __tunnel_proxy_send_udpdata(self, cookie_id, atyp, address, port, udpdata):
@@ -568,19 +594,17 @@ class _udp_handler(udp_handler.udp_handler):
     __is_ipv6 = None
     __host_match = None
 
-    def init_func(self, creator, src_addr, host_match, use_tunnel=False, bind_ip=None, is_ipv6=False):
+    def init_func(self, creator, src_addr, host_match, bind_ip=None, is_ipv6=False):
         """
         :param creator:
         :param src_addr:
         :param host_match
-        :param use_tunnel:是否使用隧道传输,如果为True那么当目的主机为域名时会跳过host match
         :param bind_ip:
         :param is_ipv6:
         :return:
         """
         self.__src_addr_id = "%s-%s" % src_addr
         self.__src_address = src_addr
-        self.__use_tunnel = use_tunnel
         self.__permits = {}
         self.__creator = creator
         self.__is_ipv6 = is_ipv6
@@ -625,10 +649,6 @@ class _udp_handler(udp_handler.udp_handler):
 
             self.__update_time = time.time()
             self.__permits[port] = None
-
-            if self.__use_tunnel:
-                self.ctl_handler(self.fileno, self.__creator, "udp_tunnel_send", atyp, host, port, byte_data)
-                return
 
             is_match = False
             flags = 0
