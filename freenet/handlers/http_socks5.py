@@ -77,6 +77,15 @@ class http_socks5_listener(tcp_handler.tcp_handler):
         fileno = self.__cookie_ids[cookie_id]
         self.send_message_to_handler(self.fileno, fileno, message)
 
+    def handler_ctl(self, from_fd, cmd, *args, **kwargs):
+        if cmd == "bind_cookie_id":
+            fileno, = args
+            return self.__bind_cookie_id(fileno)
+        if cmd == "unbind_cookie_id":
+            cookie_id, = args
+            self.__unbind_cookie_id(cookie_id)
+            return
+
 
 class _http_socks5_handler(tcp_handler.tcp_handler):
     __caddr = None
@@ -183,7 +192,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             return
 
         self.__fileno = self.create_handler(
-            self.fileno, _udp_handler, (self.__caddr[0], port,),
+            self.fileno, _udp_handler, self.__creator, (self.__caddr[0], port,),
             use_tunnel=self.__use_tunnel, is_ipv6=self.__is_ipv6
         )
 
@@ -206,8 +215,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         except httputils.Http1xHeaderErr:
             self.delete_handler(self.fileno)
             return
-
-
 
     def __handle_http_step2(self):
         pass
@@ -482,9 +489,12 @@ class _udp_handler(udp_handler.udp_handler):
     __creator = None
     __is_ipv6 = None
 
-    def init_func(self, creator, src_addr, host_match=None, use_tunnel=False, bind_ip=None, is_ipv6=False):
+    __ctl_fileno = None
+
+    def init_func(self, creator, ctl_fileno, src_addr, host_match=None, use_tunnel=False, bind_ip=None, is_ipv6=False):
         """
         :param creator:
+        :param ctl_fileno:
         :param src_addr:
         :param host_match
         :param use_tunnel:是否使用隧道传输,如果为True那么会跳过host match,当主机为域名时
@@ -498,6 +508,7 @@ class _udp_handler(udp_handler.udp_handler):
         self.__permits = {}
         self.__creator = creator
         self.__is_ipv6 = is_ipv6
+        self.__ctl_fileno = ctl_fileno
 
         if is_ipv6:
             fa = socket.AF_INET6
