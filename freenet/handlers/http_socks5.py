@@ -8,18 +8,60 @@ import socket, time, struct, random
 import pywind.web.lib.httputils as httputils
 import freenet.lib.base_proto.app_proxy as app_proxy_proto
 import freenet.lib.base_proto.utils as proto_utils
+import freenet.lib.utils as utils
 
 
-def _parse_http_uri(uri):
-    """解析HTTP URL
+def _parse_http_uri_with_tunnel_mode(uri):
+    """解析隧道模式HTTP URI
+    :param uri:
+    :param tunnel_mode:是否是隧道模式
+    :return:
+    """
+
+    p = uri.find(":")
+    if p < 1: return None
+    host = uri[0:p]
+
+    p += 1
+    try:
+        port = uri[p:]
+    except ValueError:
+        return None
+
+    return (host, port,)
+
+
+def _parse_http_uri_no_tunnel_mode(uri):
+    """解析非隧道模式HTTP URI
     :param uri:
     :return:
     """
-    p = uri.find(":")
-    if p < 1: return None
+    if uri[0:7] != "http://": return None
 
-    host = uri[0:p]
-    p += 1
+    port = 80
+    sts = uri[7:]
+
+    p = sts.find("/")
+    if p < 0: return None
+
+    e = p
+    t = sts[0:p]
+    p = t.find(":")
+
+    if p > 0:
+        host = t[0:p]
+        p += 1
+        try:
+            port = t[p:]
+        except ValueError:
+            return None
+        ''''''
+    else:
+        host = t[0:e]
+
+    return (host,
+            port,
+            sts[e:],)
 
 
 class http_socks5_listener(tcp_handler.tcp_handler):
@@ -32,7 +74,7 @@ class http_socks5_listener(tcp_handler.tcp_handler):
         else:
             fa = socket.AF_INET
 
-        self.__cookie_ids = None
+        self.__cookie_ids = {}
         self.__host_match = host_match
 
         s = socket.socket(fa, socket.SOCK_STREAM)
@@ -108,6 +150,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
     # 是否是HTTP代理
     __is_http = None
+    # 是否是http隧道代理
+    __is_http_tunnel = None
 
     __is_ipv6 = None
 
@@ -117,12 +161,12 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
     __req_ok = None
     # 是否已经发送过代理请求
-    __is_sent_proxy_requst = None
+    __is_sent_proxy_request = None
 
     __cookie_id = 0
 
     # UDP数据发送缓冲区
-    __udpdata_buf = None
+    __sentdata_buf = None
     __update_time = 0
     __TIMEOUT = 300
 
@@ -133,13 +177,14 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.__fileno = -1
         self.__step = 1
         self.__is_http = False
+        self.__is_http_tunnel = False
         self.__is_ipv6 = False
         self.__use_tunnel = False
         self.__host_match = host_match
         self.__creator = creator
         self.__req_ok = False
-        self.__udpdata_buf = []
-        self.__is_sent_proxy_requst = False
+        self.__sentdata_buf = []
+        self.__is_sent_proxy_request = False
         self.set_timeout(self.fileno, 15)
 
         self.set_socket(cs)
@@ -236,7 +281,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
     def __handle_http_step1(self):
         rdata = self.reader.read()
-        p = rdata.find("\r\n\r\n")
+        p = rdata.find(b"\r\n\r\n")
 
         if p < 4:
             self.delete_handler(self.fileno)
@@ -250,22 +295,98 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
 
-    def __handle_http_step2(self):
-        pass
+        body_data = rdata[p:]
 
-    def __handle_http_step3(self):
-        pass
+        # 使用隧道模式
+        if request[0].lower() == "connect":
+            self.__handle_http_tunnel_proxy(request, mapv)
+            return
+
+        self.__handle_http_no_tunnel_proxy(request, mapv, body_data)
+
+    def __get_atyp(self, host):
+        """根据host获取socks5 atyp值
+        :param host:
+        :return:
+        """
+        if utils.is_ipv4_address(host):
+            return 1
+
+        if utils.is_ipv6_address(host):
+            return 4
+
+        return 3
+
+    def __handle_http_tunnel_proxy(self, request, mapv):
+        rs = _parse_http_uri_with_tunnel_mode(request[1])
+
+        if not rs:
+            self.delete_handler(self.fileno)
+            return
+
+        self.__is_http_tunnel = True
+
+        host, port = rs
+        is_match, flags = self.__host_match.match(host)
+
+        if is_match and flags == 1:
+            atyp = self.__get_atyp(host)
+            self.__tunnel_proxy_reqconn(atyp, host, port)
+            return
+
+        self.__fileno = self.create_handler(
+            self.fileno, _tcp_client, (host, port,), is_ipv6=self.__is_ipv6
+        )
+
+    def __handle_http_no_tunnel_proxy(self, request, mapv, body_data):
+        rs = _parse_http_uri_no_tunnel_mode(request[1])
+
+        if not rs:
+            self.delete_handler(self.fileno)
+            return
+
+        host, port, uri = rs
+        seq = []
+
+        # 去除代理信息
+        for k, v in mapv:
+            if k.lower() == "proxy-connection": continue
+            seq.append((k, v,))
+
+        # 重新构建HTTP请求头部
+        header_data = httputils.build_http1x_req_header(request[0], uri, seq)
+        req_data = b"".join([header_data.encode("iso-8859-1"), body_data])
+
+        is_match, flags = self.__host_match.match(host)
+
+        if is_match and flags:
+            self.__use_tunnel = True
+            self.__step = 2
+            return
+
+        self.__fileno = self.create_handler(
+            self.fileno, _tcp_client, (host, port,), is_ipv6=self.__is_ipv6
+        )
+        self.send_message_to_handler(self.fileno, self.__fileno, req_data)
+        self.__step = 2
+
+    def __response_http_tunnel_proxy_handshake(self):
+        """响应HTTP隧道代理结果
+        :return:
+        """
+        resp_data = httputils.build_http1x_resp_header("200 Connection Established")
+        self.__send_data(resp_data.encode("iso-8859-1"))
+
+    def __handle_http_step2(self):
+        rdata = self.reader.read()
+        self.send_message_to_handler(self.fileno, self.__fileno, rdata)
 
     def __handle_http(self):
         if self.__step == 1:
             self.__handle_http_step1()
             return
 
-        if self.__step == 2:
-            self.__handle_http_step2()
-            return
-
-        self.__handle_http_step3()
+        self.__handle_http_step2()
 
     def __handle_socks5(self):
         if self.__step == 1:
@@ -286,6 +407,17 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
         if cmd == "tell_close":
             self.delete_this_no_sent_data()
+            return
+
+        if self.__is_http:
+            if cmd == "tell_ok" and self.__is_http_tunnel:
+                self.__step = 2
+                self.__response_http_tunnel_proxy_handshake()
+                return
+            if cmd == "tell_error":
+                self.delete_handler(self.fileno)
+                return
+            if cmd == "tell_ok": self.__step = 2
             return
 
         if cmd == "udp_tunnel_send":
@@ -383,13 +515,12 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             return
 
         # 发送UDP缓冲区的数据
-        if self.__is_udp and self.__udpdata_buf:
-            while 1:
-                try:
-                    sent_data = self.__udpdata_buf.pop(0)
-                except IndexError:
-                    break
-                self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
+        while 1:
+            try:
+                sent_data = self.__sentdata_buf.pop(0)
+            except IndexError:
+                break
+            self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
             ''''''
 
         if self.__is_udp:
@@ -421,7 +552,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
 
-        self.__is_sent_proxy_requst = True
+        self.__is_sent_proxy_request = True
         sent_data = app_proxy_proto.build_reqconn(self.__cookie_id, 1, atyp, addr, port)
         self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
 
@@ -438,7 +569,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         )
 
         if not self.__req_ok:
-            self.__udpdata_buf.append(sent_data)
+            self.__sentdata_buf.append(sent_data)
         else:
             self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
 
