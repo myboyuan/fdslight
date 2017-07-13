@@ -81,8 +81,12 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__routers = {}
         self.__configs = configs
         self.__host_match = host_match.host_match()
+        conn = configs["connection"]
 
         if not no_http_socks5:
+            if conn["tunnel_type"].lower() != "tcp":
+                print("app proxy must be tcp tunnel")
+                sys.exit(-1)
             import freenet.handlers.http_socks5 as http_socks5
             app_proxy_configs = configs["app_proxy"]
             listen_ip = app_proxy_configs["listen_ip"]
@@ -158,8 +162,6 @@ class _fdslight_client(dispatcher.dispatcher):
 
             self.set_router(vir_dns, is_ipv6=False, is_dynamic=False)
             if self.__enable_ipv6_traffic: self.set_router(vir_dns6, is_ipv6=True, is_dynamic=False)
-
-        conn = configs["connection"]
 
         m = "freenet.lib.crypto.%s" % conn["crypto_module"]
         try:
