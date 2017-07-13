@@ -12,7 +12,6 @@ except ImportError:
 import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.ippkts as ippkts
-import freenet.lib.host_match as host_match
 
 
 class dns_base(udp_handler.udp_handler):
@@ -187,7 +186,7 @@ class dnsc_proxy(dns_base):
     __udp_client = None
     __is_ipv6 = False
 
-    def init_func(self, creator, address, debug=False, server_side=False, is_ipv6=False):
+    def init_func(self, creator, address, host_match, debug=False, server_side=False, is_ipv6=False):
         if is_ipv6:
             fa = socket.AF_INET6
         else:
@@ -209,7 +208,7 @@ class dnsc_proxy(dns_base):
             self.connect((address, 53))
 
         self.__debug = debug
-        self.__host_match = host_match.host_match()
+        self.__host_match = host_match
         self.__timer = timer.timer()
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
         self.register(self.fileno)
@@ -344,10 +343,6 @@ class dnsc_proxy(dns_base):
 
     def msg_from_tunnel(self, message):
         self.__handle_msg_from_response(message)
-
-    def set_host_rules(self, rules):
-        self.__host_match.clear()
-        for rule in rules: self.__host_match.add_rule(rule)
 
     def dnsmsg_from_tun(self, saddr, daddr, sport, message, is_ipv6=False):
         self.__handle_msg_for_request(saddr, daddr, sport, message, is_ipv6=is_ipv6)

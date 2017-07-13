@@ -20,6 +20,7 @@ import freenet.lib.file_parser as file_parser
 import freenet.lib.logging as logging
 import dns.resolver
 import freenet.lib.base_proto.app_proxy as app_proxy_proto
+import freenet.lib.host_match as host_match
 
 _MODE_GW = 1
 _MODE_LOCAL = 2
@@ -70,6 +71,8 @@ class _fdslight_client(dispatcher.dispatcher):
 
     __http_socks5_fileno = -1
 
+    __host_match = None
+
     def init_func(self, mode, debug, configs, only_http_socks5=False, no_http_socks5=False):
         self.create_poll()
 
@@ -78,14 +81,22 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__router_timer = timer.timer()
         self.__routers = {}
         self.__configs = configs
+        self.__host_match = host_match.host_match()
 
         import freenet.handlers.dns_proxy as dns_proxy
 
         if not no_http_socks5:
             import freenet.handlers.http_socks5 as http_socks5
+            app_proxy_configs = configs["app_proxy"]
+            listen_ip = app_proxy_configs["listen_ip"]
+            port = app_proxy_configs["listen_port"]
+
             self.__http_socks5_fileno = self.create_handler(
-                -1, http_socks5.http_socks5_listener
+                -1, http_socks5.http_socks5_listener, (listen_ip, port,),
+                self.__host_match, is_ipv6=False
             )
+
+        signal.signal(signal.SIGUSR1, self.__set_host_rules)
 
         if only_http_socks5: return
 
@@ -113,20 +124,20 @@ class _fdslight_client(dispatcher.dispatcher):
         if self.__mode == _MODE_GW:
             self.__dns_fileno = self.create_handler(
                 -1, dns_proxy.dnsc_proxy,
-                gateway["dnsserver_bind"], debug=debug, server_side=True, is_ipv6=False
+                gateway["dnsserver_bind"], self.__host_match, debug=debug, server_side=True, is_ipv6=False
             )
             self.get_handler(self.__dns_fileno).set_parent_dnsserver(public["remote_dns"], is_ipv6=is_ipv6)
 
             if self.__enable_ipv6_traffic:
                 self.__dns_listen6 = self.create_handler(
                     -1, dns_proxy.dnsc_proxy,
-                    gateway["dnsserver_bind6"], debug=debug, server_side=True, is_ipv6=True
+                    gateway["dnsserver_bind6"], self.__host_match, debug=debug, server_side=True, is_ipv6=True
                 )
                 self.get_handler(self.__dns_listen6).set_parent_dnsserver(public["remote_dns"], is_ipv6=is_ipv6)
         else:
             self.__dns_fileno = self.create_handler(
                 -1, dns_proxy.dnsc_proxy,
-                public["remote_dns"], debug=debug, server_side=False
+                public["remote_dns"], self.__host_match, debug=debug, server_side=False
             )
 
         self.__set_host_rules(None, None)
@@ -177,9 +188,7 @@ class _fdslight_client(dispatcher.dispatcher):
         if not debug:
             sys.stdout = open(LOG_FILE, "a+")
             sys.stderr = open(ERR_FILE, "a+")
-        ''''''
-
-        signal.signal(signal.SIGUSR1, self.__set_host_rules)
+        return
 
     def __load_kernel_mod(self):
         import freenet.lib.fdsl_ctl as fdsl_ctl
@@ -389,7 +398,7 @@ class _fdslight_client(dispatcher.dispatcher):
             self.__exit(signum, frame)
 
         rules = file_parser.parse_host_file(fpath)
-        self.get_handler(self.__dns_fileno).set_host_rules(rules)
+        for rule in rules: self.__host_match.add_rule(rule)
 
     def __open_tunnel(self):
         conn = self.__configs["connection"]
