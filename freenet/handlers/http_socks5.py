@@ -6,6 +6,7 @@ import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.evtframework.handlers.udp_handler as udp_handler
 import socket, time, struct, random
 import pywind.web.lib.httputils as httputils
+import freenet.lib.base_proto.app_proxy as app_proxy_proto
 
 
 class http_socks5_listener(tcp_handler.tcp_handler):
@@ -90,6 +91,9 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
     __use_tunnel = None
     __host_match = None
+    __creator = None
+
+    __req_ok = None
 
     def init_func(self, creator, cs, caddr, host_match):
         self.set_socket(cs)
@@ -101,6 +105,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.__is_ipv6 = False
         self.__use_tunnel = False
         self.__host_match = host_match
+        self.__creator = creator
+        self.__req_ok = False
 
         self.set_socket(cs)
         self.register(self.fileno)
@@ -275,6 +281,36 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.add_evt_write(self.fileno)
         self.writer.write(message)
 
+    def message_from_handler(self, from_fd, message):
+        if from_fd == self.__fileno:
+            self.__send_data(message)
+            return
+
+        if not self.__req_ok:
+            try:
+                cookie_id, resp_code = app_proxy_proto.parse_respconn(message)
+            except app_proxy_proto.ProtoErr:
+                self.delete_handler(self.fileno)
+                return
+
+            if resp_code:
+                self.__req_ok = True
+            else:
+                self.delete_handler(self.fileno)
+            return
+
+        try:
+            cookie_id, is_close, byte_data = app_proxy_proto.parse_tcp_data(message)
+        except app_proxy_proto.ProtoErr:
+            self.delete_handler(self.fileno)
+            return
+
+        if is_close:
+            self.delete_this_no_sent_data()
+            return
+
+        self.__send_data(byte_data)
+
 
 class _tcp_client(tcp_handler.tcp_handler):
     __TIMEOUT = 300
@@ -311,7 +347,8 @@ class _tcp_client(tcp_handler.tcp_handler):
         self.add_evt_read(self.fileno)
 
     def tcp_readable(self):
-        pass
+        rdata = self.reader.read(ƒ)
+        self.send_message_to_handler(self.fileno, self.__creator, rdata)
 
     def tcp_writable(self):
         self.remove_evt_write(self.fileno)
@@ -426,11 +463,12 @@ class _udp_handler(udp_handler.udp_handler):
     __creator = None
     __is_ipv6 = None
 
-    def init_func(self, creator, src_addr, use_tunnel=False, bind_ip=None, is_ipv6=False):
+    def init_func(self, creator, src_addr, host_match=None, use_tunnel=False, bind_ip=None, is_ipv6=False):
         """
         :param creator:
         :param src_addr:
-        :param use_tunnel:是否使用隧道传输
+        :param host_match
+        :param use_tunnel:是否使用隧道传输,如果为True那么会跳过host match,当主机为域名时
         :param bind_ip:
         :param is_ipv6:
         :return:

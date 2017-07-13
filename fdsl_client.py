@@ -14,12 +14,11 @@ import pywind.lib.configfile as configfile
 import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.proc as proc
-import os, getopt, signal, importlib, socket, random
+import os, getopt, signal, importlib, socket
 import freenet.handlers.tunnelc as tunnelc
 import freenet.lib.file_parser as file_parser
 import freenet.lib.logging as logging
 import dns.resolver
-import freenet.lib.base_proto.app_proxy as app_proxy_proto
 import freenet.lib.host_match as host_match
 
 _MODE_GW = 1
