@@ -82,13 +82,11 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__configs = configs
         self.__host_match = host_match.host_match()
 
-        import freenet.handlers.dns_proxy as dns_proxy
-
         if not no_http_socks5:
             import freenet.handlers.http_socks5 as http_socks5
             app_proxy_configs = configs["app_proxy"]
             listen_ip = app_proxy_configs["listen_ip"]
-            port = app_proxy_configs["listen_port"]
+            port = int(app_proxy_configs["listen_port"])
 
             self.__http_socks5_fileno = self.create_handler(
                 -1, http_socks5.http_socks5_listener, (listen_ip, port,),
@@ -99,6 +97,7 @@ class _fdslight_client(dispatcher.dispatcher):
 
         if only_http_socks5: return
 
+        import freenet.handlers.dns_proxy as dns_proxy
         import freenet.handlers.tundev as tundev
 
         if mode == "local":
@@ -543,10 +542,10 @@ def __start_service(mode, debug, only_http_socks5, no_http_socks5):
     cls = _fdslight_client()
 
     if debug:
-        cls.ioloop(mode, debug, configs)
+        cls.ioloop(mode, debug, configs, only_http_socks5, no_http_socks5)
         return
     try:
-        cls.ioloop(mode, debug, configs)
+        cls.ioloop(mode, debug, configs, only_http_socks5, no_http_socks5)
     except:
         logging.print_error()
 

@@ -118,10 +118,14 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         if self.reader.size() < 2:
             self.delete_handler(self.fileno)
             return
-        ver, nmethods = struct.unpack("!bb", self.reader.read(2))
+
+        byte_data = self.reader.read(2)
+        ver, nmethods = struct.unpack("!bb", byte_data)
 
         if ver != 5:
-            self.delete_handler(self.fileno)
+            self.__is_http = True
+            self.reader.push(byte_data)
+            self.__handle_http_step1()
             return
 
         self.reader.read()
@@ -188,7 +192,22 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.send_message_to_handler(self.fileno, self.__fileno, rdata)
 
     def __handle_http_step1(self):
-        pass
+        rdata = self.reader.read()
+        p = rdata.find("\r\n\r\n")
+
+        if p < 4:
+            self.delete_handler(self.fileno)
+            return
+
+        p += 4
+        header_data = rdata[0:p]
+        try:
+            request, mapv = httputils.parse_htt1x_request_header(header_data.decode("iso-8859-1"))
+        except httputils.Http1xHeaderErr:
+            self.delete_handler(self.fileno)
+            return
+
+
 
     def __handle_http_step2(self):
         pass
