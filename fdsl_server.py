@@ -382,7 +382,7 @@ class _fdslight_server(dispatcher.dispatcher):
                     self.get_handler(fileno).handle_data_from_client(byte_data)
                 else:
                     is_ipv6, is_domain, cookie_id, host, port, byte_data = app_proxy_proto.parse_udp_data(message)
-                    self.get_handler(fileno).handle_data_from_client(host, port, byte_data)
+                    self.get_handler(fileno).handle_data_from_client(is_ipv6, host, port, byte_data)
             except app_proxy_proto.ProtoErr:
                 return False
             return True

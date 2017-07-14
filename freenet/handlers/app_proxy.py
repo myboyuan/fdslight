@@ -116,7 +116,9 @@ class udp_proxy(udp_handler.udp_handler):
             address[0], address[1], message, is_ipv6=self.__is_ipv6
         )
 
-    def handle_data_from_client(self, host, port, message):
+    def handle_data_from_client(self, is_ipv6, host, port, message):
+        if is_ipv6 != self.__is_ipv6: return
+
         self.__update_time = time.time()
         self.__permits[port] = None
         self.sendto(message, (host, port,))

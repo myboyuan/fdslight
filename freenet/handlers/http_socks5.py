@@ -401,7 +401,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
         if cmd not in (
-                "tell_ok", "tell_error", "tell_close",
+                "tell_socks_ok", "tell_error", "tell_close",
                 "udp_tunnel_send",
         ): return
 
@@ -410,14 +410,14 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             return
 
         if self.__is_http:
-            if cmd == "tell_ok" and self.__is_http_tunnel:
+            if cmd == "tell_socks_ok" and self.__is_http_tunnel:
                 self.__step = 2
                 self.__response_http_tunnel_proxy_handshake()
                 return
             if cmd == "tell_error":
                 self.delete_handler(self.fileno)
                 return
-            if cmd == "tell_ok": self.__step = 2
+            if cmd == "tell_socks_ok": self.__step = 2
             return
 
         if cmd == "udp_tunnel_send":
@@ -432,7 +432,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.__tunnel_proxy_send_udpdata(self.__cookie_id, atyp, addr, port, byte_data)
             return
 
-        if cmd == "tell_ok":
+        if cmd == "tell_socks_ok":
             rep = 0
         else:
             rep = 5
@@ -454,7 +454,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
         self.__send_data(sent_data)
 
-        if cmd == "tell_ok":
+        if cmd == "tell_socks_ok":
             self.__step = 3
             return
 
@@ -515,6 +515,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                     self.__response_http_tunnel_proxy_handshake()
                 else:
                     self.__step = 3
+                    addrinfo = self.socket.getsockname()
+                    self.ctl_handler(self.fileno, "tell_socks_ok", addrinfo[0], addrinfo[1])
             else:
                 self.delete_handler(self.fileno)
             return
@@ -606,7 +608,7 @@ class _tcp_client(tcp_handler.tcp_handler):
         address, port = self.socket.getsockname()
         self.ctl_handler(
             self.fileno, self.__creator,
-            "tell_ok", address, port
+            "tell_socks_ok", address, port
         )
 
         self.register(self.fileno)
@@ -761,7 +763,7 @@ class _udp_handler(udp_handler.udp_handler):
 
         addr, port = self.getsockname()
 
-        self.ctl_handler(self.fileno, self.__creator, "tell_ok", addr, port)
+        self.ctl_handler(self.fileno, self.__creator, "tell_socks_ok", addr, port)
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
