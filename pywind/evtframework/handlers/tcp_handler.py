@@ -2,6 +2,7 @@
 import pywind.evtframework.handlers.handler as handler
 import pywind.lib.reader as reader
 import pywind.lib.writer as writer
+import socket
 
 
 class tcp_handler(handler.handler):
@@ -184,10 +185,13 @@ class tcp_handler(handler.handler):
         pass
 
     def connect(self, address, timeout=3):
-        self.__connect_addr = address
-        self.__connect_timeout = timeout
         self.__is_async_socket_client = True
-        err = self.socket.connect_ex(address)
+
+        try:
+            err = self.socket.connect_ex(address)
+        except socket.gaierror:
+            self.error()
+            return
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         self.add_evt_write(self.fileno)
