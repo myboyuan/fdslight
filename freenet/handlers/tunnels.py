@@ -101,6 +101,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
                 session_id, action, message = pkt_info
 
                 if self.__session_id and self.__session_id != session_id:
+                    print("----")
                     self.delete_handler(self.fileno)
                     return
 
