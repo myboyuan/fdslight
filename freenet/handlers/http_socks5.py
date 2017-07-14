@@ -347,6 +347,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         if self.__debug: print("%s:%s" % (host, port,))
 
         if is_match and flags == 1:
+            self.__use_tunnel = True
             atyp = self.__get_atyp(host)
             self.__tunnel_proxy_reqconn(atyp, host, port)
             return
@@ -379,6 +380,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         is_match, flags = self.__host_match.match(host)
 
         if is_match and flags:
+            self.__use_tunnel = True
             atyp = self.__get_atyp(host)
             self.__tunnel_proxy_reqconn(atyp, host, port)
             return
@@ -750,7 +752,6 @@ class _udp_handler(udp_handler.udp_handler):
     __src_addr_id = None
     __src_address = None
 
-    __use_tunnel = None
     __permits = None
     __creator = None
     __is_ipv6 = None
@@ -826,8 +827,6 @@ class _udp_handler(udp_handler.udp_handler):
             self.add_evt_write(self.fileno)
             return
 
-        # 如果使用隧道传输,丢弃非隧道的包
-        if self.__use_tunnel: return
         # 进行端口限制
         if address[1] not in self.__permits: return
 
