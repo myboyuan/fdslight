@@ -389,7 +389,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.__use_tunnel = True
             atyp = self.__get_atyp(host)
             self.__tunnel_proxy_reqconn(atyp, host, port)
-            self.__sentdata_buf.append(req_data)
+            self.__tunnel_proxy_send_tcpdata(req_data)
             return
 
         self.__fileno = self.create_handler(
@@ -599,10 +599,14 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
 
     def __tunnel_proxy_send_tcpdata(self, tcpdata):
-        self.__update_time = time.time()
 
         sent_data = app_proxy_proto.build_tcp_send_data(self.__cookie_id, tcpdata)
 
+        if not self.__req_ok:
+            self.__sentdata_buf.append(sent_data)
+            return
+
+        self.__update_time = time.time()
         self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
 
     def __tunnel_proxy_send_udpdata(self, cookie_id, atyp, address, port, udpdata):
