@@ -81,6 +81,8 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__routers = {}
         self.__configs = configs
         self.__host_match = host_match.host_match()
+        self.__debug = debug
+
         conn = configs["connection"]
 
         if not no_http_socks5:
@@ -94,7 +96,7 @@ class _fdslight_client(dispatcher.dispatcher):
 
             self.__http_socks5_fileno = self.create_handler(
                 -1, http_socks5.http_socks5_listener, (listen_ip, port,),
-                self.__host_match, is_ipv6=False
+                self.__host_match, is_ipv6=False, debug=self.__debug
             )
 
         signal.signal(signal.SIGUSR1, self.__set_host_rules)
@@ -110,7 +112,6 @@ class _fdslight_client(dispatcher.dispatcher):
             self.__mode = _MODE_GW
 
         self.__mbuf = utils.mbuf()
-        self.__debug = debug
 
         self.__tundev_fileno = self.create_handler(
             -1, tundev.tundevc, self.__DEVNAME

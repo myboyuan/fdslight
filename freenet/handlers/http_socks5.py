@@ -24,7 +24,7 @@ def _parse_http_uri_with_tunnel_mode(uri):
 
     p += 1
     try:
-        port = uri[p:]
+        port = int(uri[p:])
     except ValueError:
         return None
 
@@ -52,7 +52,7 @@ def _parse_http_uri_no_tunnel_mode(uri):
         host = t[0:p]
         p += 1
         try:
-            port = t[p:]
+            port = int(t[p:])
         except ValueError:
             return None
         ''''''
@@ -67,8 +67,9 @@ def _parse_http_uri_no_tunnel_mode(uri):
 class http_socks5_listener(tcp_handler.tcp_handler):
     __cookie_ids = None
     __host_match = None
+    __debug = None
 
-    def init_func(self, creator, address, host_match, is_ipv6=False):
+    def init_func(self, creator, address, host_match, is_ipv6=False, debug=True):
         if is_ipv6:
             fa = socket.AF_INET6
         else:
@@ -76,6 +77,7 @@ class http_socks5_listener(tcp_handler.tcp_handler):
 
         self.__cookie_ids = {}
         self.__host_match = host_match
+        self.__debug = debug
 
         s = socket.socket(fa, socket.SOCK_STREAM)
         if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
@@ -93,7 +95,11 @@ class http_socks5_listener(tcp_handler.tcp_handler):
         while 1:
             try:
                 cs, caddr = self.accept()
-                self.create_handler(self.fileno, _http_socks5_handler, cs, caddr, self.__host_match)
+                self.create_handler(
+                    self.fileno, _http_socks5_handler,
+                    cs, caddr, self.__host_match,
+                    debug=self.__debug
+                )
             except BlockingIOError:
                 break
         return
@@ -170,7 +176,9 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
     __update_time = 0
     __TIMEOUT = 300
 
-    def init_func(self, creator, cs, caddr, host_match):
+    __debug = None
+
+    def init_func(self, creator, cs, caddr, host_match, debug=True):
         self.set_socket(cs)
         self.__is_udp = False
         self.__caddr = caddr
@@ -185,6 +193,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.__req_ok = False
         self.__sentdata_buf = []
         self.__is_sent_proxy_request = False
+        self.__debug = debug
+
         self.set_timeout(self.fileno, 15)
 
         self.set_socket(cs)
@@ -329,6 +339,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         host, port = rs
         is_match, flags = self.__host_match.match(host)
 
+        if self.__debug: print("%s:%s" % (host, port,))
+
         if is_match and flags == 1:
             atyp = self.__get_atyp(host)
             self.__tunnel_proxy_reqconn(atyp, host, port)
@@ -347,6 +359,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
         host, port, uri = rs
         seq = []
+
+        if self.__debug: print("%s:%s" % (host, port,))
 
         # 去除代理信息
         for k, v in mapv:
@@ -374,7 +388,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         """响应HTTP隧道代理结果
         :return:
         """
-        resp_data = httputils.build_http1x_resp_header("200 Connection Established")
+        resp_data = httputils.build_http1x_resp_header("200 Connection Established", [])
         self.__send_data(resp_data.encode("iso-8859-1"))
 
     def __handle_http_step2(self):
