@@ -535,7 +535,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                 return
 
             if resp_code:
-                print(resp_code)
                 self.__req_ok = True
                 if self.__is_http:
                     self.handler_ctl(self.fileno, "tell_socks_ok")
