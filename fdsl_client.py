@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, os
+import sys, os, platform
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -27,6 +27,62 @@ _MODE_LOCAL = 2
 PID_FILE = "/tmp/fdslight.pid"
 LOG_FILE = "/tmp/fdslight.log"
 ERR_FILE = "/tmp/fdslight_error.log"
+
+
+def _config_osx_app_proxy(host, port):
+    pass
+
+
+def _config_windows_app_proxy(host, port):
+    pass
+
+
+def _config_linux_app_proxy(host, port):
+    pass
+
+
+def _config_freebsd_app_proxy(host, port):
+    pass
+
+
+def _unconfig_osx_app_proxy():
+    pass
+
+
+def _unconfig_windows_app_proxy():
+    pass
+
+
+def _unconfig_linux_app_proxy():
+    pass
+
+
+def _unconfig_freebsd_app_proxy():
+    pass
+
+
+def auto_os_app_proxy_config(host, port):
+    """根据不同的操作系统自动配置应用代理
+    :param host:
+    :param port:
+    :return:
+    """
+    if platform.find("win32") > -1:
+        _config_windows_app_proxy(host, port)
+        return
+
+    if platform.find("darwin") > -1:
+        _config_osx_app_proxy(host, port)
+        return
+
+    if platform.find("linux") > -1:
+        _config_linux_app_proxy(host, port)
+        return
+
+    if platform.find("freebsd") > -1:
+        _config_freebsd_app_proxy(host, port)
+
+    return
 
 
 class _fdslight_client(dispatcher.dispatcher):
