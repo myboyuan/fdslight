@@ -272,6 +272,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         byte_port = self.reader.read(2)
         port = (byte_port[0] << 8) | byte_port[1]
 
+        if self.__debug: print("%s:%s" % (addr, port,))
+
         if cmd == 1:
             if atyp == 3:
                 is_match, flags = self.__host_match.match(addr)
