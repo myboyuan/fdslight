@@ -52,6 +52,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
         self.delete_handler(self.fileno)
 
     def tcp_readable(self):
+        self.__update_time = time.time()
         rdata = self.reader.read()
         self.dispatcher.response_socks_tcp_data(self.__session_id, self.__cookie_id, rdata)
 
@@ -72,6 +73,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
     def handle_data_from_client(self, message):
         if not self.is_conn_ok(): return
 
+        self.__update_time = time.time()
         self.writer.write(message)
         self.add_evt_write(self.fileno)
 
@@ -99,7 +101,7 @@ class udp_proxy(udp_handler.udp_handler):
         self.__is_ipv6 = is_ipv6
 
         s = socket.socket(fa, socket.SOCK_DGRAM)
-        self.set_socket(self.fileno)
+        self.set_socket(s)
         self.bind((bind_ip, 0))
 
         self.__update_time = time.time()
