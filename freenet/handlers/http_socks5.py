@@ -552,7 +552,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                     self.handler_ctl(self.fileno, "tell_socks_ok", addrinfo[0], addrinfo[1])
             else:
                 self.delete_handler(self.fileno)
-            return
+                return
 
         # 发送缓冲区的数据
         while 1:
