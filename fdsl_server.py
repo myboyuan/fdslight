@@ -73,6 +73,8 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __app_proxy = None
 
+    __enable_ipv6_app_proxy = None
+
     def init_func(self, debug, configs):
         self.create_poll()
 
@@ -82,6 +84,9 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__ip6_dgram = {}
         self.__dgram_proxy = {}
         self.__app_proxy = {}
+
+        app_proxy_configs = self.__configs["app_proxy"]
+        self.__enable_ipv6_app_proxy = bool(int(app_proxy_configs["enable_ipv6"]))
 
         signal.signal(signal.SIGINT, self.__exit)
 
@@ -394,6 +399,8 @@ class _fdslight_server(dispatcher.dispatcher):
                 session_id, proto_utils.ACT_SOCKS, app_proxy_proto.build_respconn(cookie_id, 0)
             )
             return False
+
+        if self.__enable_ipv6_app_proxy != is_ipv6: return False
 
         if cmd == 1:
             is_tcp = True
