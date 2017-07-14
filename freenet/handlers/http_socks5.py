@@ -546,7 +546,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                 self.delete_handler(self.fileno)
             return
 
-        # 发送UDP缓冲区的数据
+        # 发送缓冲区的数据
         while 1:
             try:
                 sent_data = self.__sentdata_buf.pop(0)
