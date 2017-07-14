@@ -553,14 +553,14 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             else:
                 self.delete_handler(self.fileno)
                 return
-
-        # 发送缓冲区的数据
-        while 1:
-            try:
-                sent_data = self.__sentdata_buf.pop(0)
-            except IndexError:
-                break
-            self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
+            # 发送缓冲区的数据
+            while 1:
+                try:
+                    sent_data = self.__sentdata_buf.pop(0)
+                except IndexError:
+                    break
+                self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
+            return
             ''''''
 
         if self.__is_udp:
