@@ -649,6 +649,7 @@ class _tcp_client(tcp_handler.tcp_handler):
 
     def tcp_readable(self):
         rdata = self.reader.read()
+        print(rdata)
         self.send_message_to_handler(self.fileno, self.__creator, rdata)
 
     def tcp_writable(self):
@@ -690,7 +691,6 @@ class _tcp_client(tcp_handler.tcp_handler):
         self.close()
 
     def message_from_handler(self, from_fd, message):
-        print(message)
         self.writer.write(message)
         self.add_evt_write(self.fileno)
 
