@@ -55,7 +55,8 @@ def parse_reqconn(byte_data):
 
     is_ipv6 = False
     is_domain = False
-    byte_host = byte_data[7:addr_len]
+    e = 7 + addr_len
+    byte_host = byte_data[7:e]
 
     if atyp == 1:
         host = socket.inet_ntop(socket.AF_INET, byte_host)
@@ -75,7 +76,7 @@ def parse_reqconn(byte_data):
 
 def parse_respconn(byte_data):
     size = len(byte_data)
-    if len(size) < 3: raise ProtoErr("wrong protocol")
+    if size < 3: raise ProtoErr("wrong protocol")
 
     cookie_id, resp_code = struct.unpack(_REQ_RESP_FMT, byte_data[0:3])
 
@@ -86,9 +87,9 @@ def parse_tcp_data(byte_data):
     size = len(byte_data)
     if size < 4: raise ProtoErr("wrong protocol")
 
-    cookie_id, is_close, = struct.unpack(_TCP_DATA_SEND_FMT, byte_data[0:2])
+    cookie_id, is_close, = struct.unpack(_TCP_DATA_SEND_FMT, byte_data[0:3])
 
-    return (cookie_id, is_close, byte_data[2:])
+    return (cookie_id, is_close, byte_data[3:])
 
 
 def parse_udp_data(byte_data):
@@ -97,7 +98,7 @@ def parse_udp_data(byte_data):
 
     cookie_id, atyp, addr_len, port = struct.unpack(_UDP_DATA_SEND_FMT, byte_data[0:6])
 
-    if addr_len + 6 < size: raise ProtoErr("wrong protocol")
+    if addr_len + 6 > size: raise ProtoErr("wrong protocol")
     if atyp not in (1, 3, 4,): raise ProtoErr("wrong atyp value")
 
     if atyp == 1 and addr_len != 4: raise ProtoErr("wrong request protocol")
@@ -108,6 +109,7 @@ def parse_udp_data(byte_data):
     byte_host = byte_data[6:e]
 
     is_ipv6 = False
+    is_domain = False
 
     if atyp == 1:
         host = socket.inet_ntop(socket.AF_INET, byte_host)
@@ -170,6 +172,21 @@ def build_udp_send_data(cookie_id, atyp, address, port, byte_data):
         addr_len = len(address)
         byte_addr = address.encode("iso-8859-1")
 
-    header = struct.pack(_UDP_DATA_SEND_FMT, cookie_id, atyp, addr_len, port, byte_addr)
+    header = struct.pack(_UDP_DATA_SEND_FMT, cookie_id, atyp, addr_len, port)
 
-    return b"".join([header, byte_data])
+    return b"".join([header, byte_addr, byte_data])
+
+
+"""
+t = build_reqconn(0, 1, 1, "192.168.1.2", 8000)
+print(parse_reqconn(t))
+t = build_respconn(0, 1)
+print(parse_respconn(t))
+
+t = build_tcp_send_data(0, b"hello")
+print(parse_tcp_data(t))
+
+t = build_udp_send_data(0, 1, "192.168.1.2", 8800, b"hello")
+print(t)
+print(parse_udp_data(t))
+"""
