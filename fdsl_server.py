@@ -601,7 +601,7 @@ class _fdslight_server(dispatcher.dispatcher):
         del pydict[key]
         if not pydict: del self.__dgram_proxy[session_id]
 
-    def tel_del_app_proxy(self, session_id, cookie_id):
+    def tell_del_app_proxy(self, session_id, cookie_id):
         if session_id not in self.__app_proxy: return
         pydict = self.__app_proxy[session_id]
 
