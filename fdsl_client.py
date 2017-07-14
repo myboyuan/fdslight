@@ -86,6 +86,28 @@ class _fdslight_client(dispatcher.dispatcher):
 
         conn = configs["connection"]
 
+        m = "freenet.lib.crypto.%s" % conn["crypto_module"]
+        try:
+            self.__tcp_crypto = importlib.import_module("%s.%s_tcp" % (m, conn["crypto_module"]))
+            self.__udp_crypto = importlib.import_module("%s.%s_udp" % (m, conn["crypto_module"]))
+        except ImportError:
+            print("cannot found tcp or udp crypto module")
+            sys.exit(-1)
+
+        crypto_fpath = "%s/fdslight_etc/%s" % (BASE_DIR, conn["crypto_configfile"])
+
+        if not os.path.isfile(crypto_fpath):
+            print("crypto configfile not exists")
+            sys.exit(-1)
+
+        try:
+            crypto_configs = proto_utils.load_crypto_configfile(crypto_fpath)
+        except:
+            print("crypto configfile should be json file")
+            sys.exit(-1)
+
+        self.__crypto_configs = crypto_configs
+
         if not no_http_socks5:
             if conn["tunnel_type"].lower() != "tcp":
                 print("app proxy must be tcp tunnel")
@@ -164,28 +186,6 @@ class _fdslight_client(dispatcher.dispatcher):
 
             self.set_router(vir_dns, is_ipv6=False, is_dynamic=False)
             if self.__enable_ipv6_traffic: self.set_router(vir_dns6, is_ipv6=True, is_dynamic=False)
-
-        m = "freenet.lib.crypto.%s" % conn["crypto_module"]
-        try:
-            self.__tcp_crypto = importlib.import_module("%s.%s_tcp" % (m, conn["crypto_module"]))
-            self.__udp_crypto = importlib.import_module("%s.%s_udp" % (m, conn["crypto_module"]))
-        except ImportError:
-            print("cannot found tcp or udp crypto module")
-            sys.exit(-1)
-
-        crypto_fpath = "%s/fdslight_etc/%s" % (BASE_DIR, conn["crypto_configfile"])
-
-        if not os.path.isfile(crypto_fpath):
-            print("crypto configfile not exists")
-            sys.exit(-1)
-
-        try:
-            crypto_configs = proto_utils.load_crypto_configfile(crypto_fpath)
-        except:
-            print("crypto configfile should be json file")
-            sys.exit(-1)
-
-        self.__crypto_configs = crypto_configs
 
         if not debug:
             sys.stdout = open(LOG_FILE, "a+")

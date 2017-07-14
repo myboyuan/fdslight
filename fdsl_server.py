@@ -389,12 +389,14 @@ class _fdslight_server(dispatcher.dispatcher):
                     is_ipv6, is_domain, cookie_id, host, port, byte_data = app_proxy_proto.parse_udp_data(message)
                     self.get_handler(fileno).handle_data_from_client(is_ipv6, host, port, byte_data)
             except app_proxy_proto.ProtoErr:
+                if self.__debug: print("wrong app_proxy protocol data")
                 return False
             return True
 
         try:
             is_ipv6, is_domain, cookie_id, cmd, host, port = app_proxy_proto.parse_reqconn(message)
         except app_proxy_proto.ProtoErr:
+            if self.__debug: print("wrong app_proxy protocol request")
             self.__send_msg_to_tunnel(
                 session_id, proto_utils.ACT_SOCKS, app_proxy_proto.build_respconn(cookie_id, 0)
             )
