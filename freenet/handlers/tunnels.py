@@ -67,9 +67,11 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         self.__address = address
         self.__conn_timeout = conn_timeout
         self.__update_time = time.time()
-        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+        self.__session_id = None
 
         self.set_socket(cs)
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
