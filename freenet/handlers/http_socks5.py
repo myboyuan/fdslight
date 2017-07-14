@@ -287,7 +287,12 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
     def __handle_socks5_step3(self):
         rdata = self.reader.read()
-        self.send_message_to_handler(self.fileno, self.__fileno, rdata)
+
+        if self.__use_tunnel:
+            self.__tunnel_proxy_send_tcpdata(rdata)
+        else:
+            self.send_message_to_handler(self.fileno, self.__fileno, rdata)
+        return
 
     def __handle_http_step1(self):
         rdata = self.reader.read()
@@ -393,7 +398,12 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
     def __handle_http_step2(self):
         rdata = self.reader.read()
-        self.send_message_to_handler(self.fileno, self.__fileno, rdata)
+
+        if self.__use_tunnel:
+            self.__tunnel_proxy_send_tcpdata(rdata)
+        else:
+            self.send_message_to_handler(self.fileno, self.__fileno, rdata)
+        return
 
     def __handle_http(self):
         if self.__step == 1:
