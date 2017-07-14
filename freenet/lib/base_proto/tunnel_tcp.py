@@ -52,15 +52,26 @@ class builder(object):
     def build_packet(self, session_id, action, byte_data):
         if len(session_id) != 16: raise proto_utils.ProtoError("the size of session_id must be 16")
 
-        pkt_len = len(byte_data)
-        tot_len = self.get_payload_length(pkt_len)
-        payload_md5 = proto_utils.calc_content_md5(byte_data)
-        base_hdr = self.__build_proto_headr(session_id, payload_md5, tot_len, pkt_len, action)
+        seq = []
 
-        e_hdr = self.wrap_header(base_hdr)
-        e_body = self.wrap_body(pkt_len, byte_data)
+        a, b = (0, 65535,)
 
-        return b"".join((e_hdr, e_body,))
+        while 1:
+            _byte_data = byte_data[a:b]
+            if not _byte_data: break
+
+            pkt_len = len(_byte_data)
+            tot_len = self.get_payload_length(pkt_len)
+            payload_md5 = proto_utils.calc_content_md5(_byte_data)
+            base_hdr = self.__build_proto_headr(session_id, payload_md5, tot_len, pkt_len, action)
+
+            e_hdr = self.wrap_header(base_hdr)
+            e_body = self.wrap_body(pkt_len, _byte_data)
+
+            seq.append(b"".join((e_hdr, e_body,)))
+            a, b = (b, b + 65535,)
+
+        return b"".join(seq)
 
     def wrap_header(self, base_hdr):
         """重写这个方法"""
