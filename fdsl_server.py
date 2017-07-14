@@ -401,6 +401,7 @@ class _fdslight_server(dispatcher.dispatcher):
             return False
 
         if self.__enable_ipv6_app_proxy != is_ipv6: return False
+        if cmd not in (1, 3,): return False
 
         if cmd == 1:
             is_tcp = True
