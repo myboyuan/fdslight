@@ -147,6 +147,12 @@ class http_socks5_listener(tcp_handler.tcp_handler):
             self.__unbind_cookie_id(cookie_id)
             return
 
+    def del_all_proxy(self):
+        seq = [v for k, v in self.__cookie_ids.items()]
+        for fileno in seq:
+            self.delete_handler(fileno)
+        return
+
 
 class _http_socks5_handler(tcp_handler.tcp_handler):
     __caddr = None

@@ -489,6 +489,8 @@ class _fdslight_client(dispatcher.dispatcher):
         self.get_handler(self.__tunnel_fileno).create_tunnel((host, port,))
 
     def tell_tunnel_close(self):
+        if self.handler_exists(self.__http_socks5_fileno):
+            self.get_handler(self.__http_socks5_fileno).del_all_proxy()
         self.__tunnel_fileno = -1
 
     def get_server_ip(self, host):

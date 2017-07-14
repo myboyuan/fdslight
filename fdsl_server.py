@@ -608,6 +608,18 @@ class _fdslight_server(dispatcher.dispatcher):
         del pydict[cookie_id]
         if not pydict: del self.__app_proxy[session_id]
 
+    def tell_del_all_app_proxy(self, session_id):
+        """删除用户的所有代理
+        :param session_id:
+        :return:
+        """
+        if session_id not in self.__app_proxy: return
+        pydict = self.__app_proxy[session_id]
+        seq = [v for k, v in pydict.items()]
+
+        for fileno, is_tcp in seq: self.delete_handler(fileno)
+        return
+
     def __exit(self, signum, frame):
         if self.handler_exists(self.__dns_fileno):
             self.delete_handler(self.__dns_fileno)
