@@ -643,13 +643,12 @@ class _tcp_client(tcp_handler.tcp_handler):
             self.fileno, self.__creator,
             "tell_socks_ok", address, port
         )
-
+        print("OK")
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
     def tcp_readable(self):
         rdata = self.reader.read()
-        print(rdata)
         self.send_message_to_handler(self.fileno, self.__creator, rdata)
 
     def tcp_writable(self):
