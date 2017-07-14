@@ -402,7 +402,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         rdata = self.reader.read()
 
         if self.__use_tunnel:
-            print(rdata)
             self.__tunnel_proxy_send_tcpdata(rdata)
         else:
             self.send_message_to_handler(self.fileno, self.__fileno, rdata)
@@ -538,12 +537,11 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             if resp_code:
                 self.__req_ok = True
                 if self.__is_http:
-                    self.__step = 2
-                    self.__response_http_tunnel_proxy_handshake()
+                    self.handler_ctl(self.fileno, "tell_socks_ok")
                 else:
                     self.__step = 3
                     addrinfo = self.socket.getsockname()
-                    self.ctl_handler(self.fileno, "tell_socks_ok", addrinfo[0], addrinfo[1])
+                    self.handler_ctl(self.fileno, "tell_socks_ok", addrinfo[0], addrinfo[1])
             else:
                 self.delete_handler(self.fileno)
             return
