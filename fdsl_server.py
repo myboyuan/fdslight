@@ -420,7 +420,6 @@ class _fdslight_server(dispatcher.dispatcher):
             fileno = self.create_handler(
                 -1, app_proxy.udp_proxy, session_id, cookie_id, is_ipv6=is_ipv6
             )
-        print(cookie_id)
         pydict[cookie_id] = (fileno, is_tcp,)
         return True
 
