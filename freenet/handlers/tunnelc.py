@@ -16,7 +16,6 @@ class tcp_tunnel(tcp_handler.tcp_handler):
     __LOOP_TIMEOUT = 10
     __update_time = 0
     __conn_timeout = 0
-    __sent_queue = None
 
     __server_address = None
 
@@ -29,7 +28,6 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
         self.set_socket(s)
         self.__conn_timeout = conn_timeout
-        self.__sent_queue = []
 
         self.__encrypt = crypto.encrypt()
         self.__decrypt = crypto.decrypt()
@@ -103,24 +101,19 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
+        if not self.writer.is_empty(): self.add_evt_write(self.fileno)
+
         logging.print_general("connected", self.__server_address)
 
         # 发送还没有连接的时候堆积的数据包
-        if not self.__sent_queue: self.add_evt_write(self.fileno)
-        while 1:
-            try:
-                sent_pkt = self.__sent_queue.pop(0)
-            except IndexError:
-                break
-            self.writer.write(sent_pkt)
         return
 
     def send_msg_to_tunnel(self, session_id, action, message):
         sent_pkt = self.__encrypt.build_packet(session_id, action, message)
-        if not self.is_conn_ok():
-            self.__sent_queue.append(sent_pkt)
         self.writer.write(sent_pkt)
-        self.add_evt_write(self.fileno)
+
+        if self.is_conn_ok(): self.add_evt_write(self.fileno)
+
         self.__encrypt.reset()
 
 
