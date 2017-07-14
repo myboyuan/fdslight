@@ -82,6 +82,7 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__configs = configs
         self.__host_match = host_match.host_match()
         self.__debug = debug
+        self.__set_host_rules(None, None)
 
         conn = configs["connection"]
 

@@ -88,7 +88,9 @@ class tcp_handler(handler.handler):
             except ConnectionResetError:
                 self.error()
                 break
-
+            except ConnectionError:
+                self.error()
+                break
             ''''''
         return
 

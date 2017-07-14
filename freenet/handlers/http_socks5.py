@@ -567,7 +567,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.__send_data(byte_data)
 
     def __tunnel_proxy_reqconn(self, atyp, addr, port):
-        self.__cookie_id = self.ctl_handler(self.fileno, self.__creator, "bind_cookie_id")
+        self.__cookie_id = self.ctl_handler(self.fileno, self.__creator, "bind_cookie_id", self.fileno)
 
         if self.__cookie_id < 0:
             self.delete_handler(self.fileno)

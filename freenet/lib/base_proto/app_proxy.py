@@ -136,8 +136,8 @@ def build_reqconn(cookie_id, cmd, atyp, address, port):
         addr_len = len(address)
         byte_addr = address.encode("iso-8859-1")
 
-    byte_data = struct.pack(_REQ_FMT, cookie_id, cmd, atyp, addr_len, port, byte_addr, )
-    return byte_data
+    byte_data = struct.pack(_REQ_FMT, cookie_id, cmd, atyp, addr_len, port)
+    return b"".join([byte_data, byte_addr])
 
 
 def build_respconn(cookie_id, resp_code):
