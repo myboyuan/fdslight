@@ -690,6 +690,7 @@ class _tcp_client(tcp_handler.tcp_handler):
         self.close()
 
     def message_from_handler(self, from_fd, message):
+        print(message)
         self.writer.write(message)
         self.add_evt_write(self.fileno)
 
