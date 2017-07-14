@@ -643,9 +643,11 @@ class _tcp_client(tcp_handler.tcp_handler):
             self.fileno, self.__creator,
             "tell_socks_ok", address, port
         )
-        print("OK")
+
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+
+        if self.writer.size() > 0: self.add_evt_write(self.fileno)
 
     def tcp_readable(self):
         rdata = self.reader.read()
@@ -690,9 +692,9 @@ class _tcp_client(tcp_handler.tcp_handler):
         self.close()
 
     def message_from_handler(self, from_fd, message):
-        print(message)
         self.writer.write(message)
-        self.add_evt_write(self.fileno)
+
+        if self.is_conn_ok(): self.add_evt_write(self.fileno)
 
 
 class UdpProtoErr(Exception):

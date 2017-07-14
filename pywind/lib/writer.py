@@ -10,7 +10,6 @@ class writer(object):
     def __init__(self):
         self.__buff_queue = queue.Queue()
         self.__lifo = queue.LifoQueue()
-        self.__closed = False
         self.__size = 0
 
     def is_empty(self):
@@ -20,24 +19,10 @@ class writer(object):
         return False
 
     def write(self, bdata):
-        slice_size = 8192
-        bsize = len(bdata)
-        end = 0
-        begin = 0
+        size = len(bdata)
 
-        while 1:
-            if end >= bsize: break
-            if begin + slice_size > bsize:
-                end = bsize
-            else:
-                end = begin + slice_size
-            data = bdata[begin:end]
-            begin = end
-
-            self.__buff_queue.put(data)
-            self.__size += len(data)
-
-        return
+        self.__buff_queue.put(bdata)
+        self.__size += size
 
     def writeline(self, bdata=b""):
         byteio = io.BytesIO()
@@ -86,10 +71,10 @@ class writer(object):
                 ''''''
 
             byte_io.write(v)
-            self.__size -= len(v)
 
         ret = byte_io.getvalue()
         byte_io.close()
+        self.__size = 0
 
         return ret
 
