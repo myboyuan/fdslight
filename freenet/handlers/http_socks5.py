@@ -628,7 +628,6 @@ class _tcp_client(tcp_handler.tcp_handler):
         s = socket.socket(fa, socket.SOCK_STREAM)
         if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
 
-        print(address)
         self.__creator = creator
         self.set_socket(s)
         self.connect(address)
@@ -691,6 +690,7 @@ class _tcp_client(tcp_handler.tcp_handler):
         self.close()
 
     def message_from_handler(self, from_fd, message):
+        print(message)
         self.writer.write(message)
         self.add_evt_write(self.fileno)
 
