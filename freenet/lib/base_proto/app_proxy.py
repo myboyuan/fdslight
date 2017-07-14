@@ -42,7 +42,7 @@ def parse_reqconn(byte_data):
     size = len(byte_data)
     if size < 7: raise ProtoErr("wrong request protocol")
 
-    cookie_id, cmd, atyp, addr_len, port = struct.unpack(_REQ_FMT, byte_data)
+    cookie_id, cmd, atyp, addr_len, port = struct.unpack(_REQ_FMT, byte_data[0:7])
 
     if cmd not in (1, 3,): raise ProtoErr("wrong cmd value")
     if atyp not in (1, 3, 4,): raise ProtoErr("wrong atyp value")
@@ -55,7 +55,6 @@ def parse_reqconn(byte_data):
 
     is_ipv6 = False
     is_domain = False
-    e = 7 + addr_len
     byte_host = byte_data[7:addr_len]
 
     if atyp == 1:
