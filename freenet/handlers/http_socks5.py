@@ -389,6 +389,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.__use_tunnel = True
             atyp = self.__get_atyp(host)
             self.__tunnel_proxy_reqconn(atyp, host, port)
+            self.__sentdata_buf.append(req_data)
             return
 
         self.__fileno = self.create_handler(
@@ -442,8 +443,9 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             return
 
         if self.__is_http:
-            if cmd == "tell_socks_ok" and self.__is_http_tunnel:
+            if cmd == "tell_socks_ok":
                 self.__step = 2
+                if not self.__is_http_tunnel: return
                 self.__response_http_tunnel_proxy_handshake()
                 return
             if cmd == "tell_error":
