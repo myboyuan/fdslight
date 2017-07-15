@@ -312,6 +312,7 @@ class http_socks5_listener(tcp_handler.tcp_handler):
     def del_all_proxy(self):
         seq = [v for k, v in self.__cookie_ids.items()]
         for fileno in seq:
+            print("SSS")
             self.delete_handler(fileno)
         return
 
@@ -624,7 +625,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                 self.__response_http_tunnel_proxy_handshake()
                 return
             if cmd == "tell_error":
-                print("--------s")
                 self.delete_handler(self.fileno)
             return
 
