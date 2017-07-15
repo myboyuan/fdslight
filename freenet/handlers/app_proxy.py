@@ -40,7 +40,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
 
     def tcp_delete(self):
         if self.is_conn_ok():
-            self.dispatcher.response_socks_tcp_data(self.__session_id, self.__cookie_id, b"", is_close=True)
+            self.dispatcher.response_socks_close(self.__session_id, self.__cookie_id)
         else:
             self.dispatcher.response_socks_connstate(self.__session_id, self.__cookie_id, 0)
 
@@ -145,6 +145,7 @@ class udp_proxy(udp_handler.udp_handler):
         self.delete_handler(self.fileno)
 
     def udp_delete(self):
+        self.dispatcher.response_socks_close(self.__session_id, self.__cookie_id)
         self.dispatcher.tell_del_app_proxy(self.__session_id, self.__cookie_id)
         self.unregister(self.fileno)
         self.close()

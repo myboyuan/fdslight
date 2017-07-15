@@ -379,11 +379,20 @@ class _fdslight_server(dispatcher.dispatcher):
 
         # 会话已经存在的处理方式
         if cookie_id in pydict:
+
             fileno, is_tcp = pydict[cookie_id]
+            try:
+                is_close = bool(int(message[2]))
+            except IndexError:
+                return False
+
+            if is_close:
+                self.delete_handler(fileno)
+                return False
 
             try:
                 if is_tcp:
-                    cookie_id, _, byte_data = app_proxy_proto.parse_tcp_data(message)
+                    cookie_id, is_close, byte_data = app_proxy_proto.parse_tcp_data(message)
                     self.get_handler(fileno).handle_data_from_client(byte_data)
                 else:
                     is_ipv6, is_domain, cookie_id, host, port, byte_data = app_proxy_proto.parse_udp_data(message)
@@ -461,8 +470,8 @@ class _fdslight_server(dispatcher.dispatcher):
     def response_dns(self, session_id, message):
         self.__send_msg_to_tunnel(session_id, proto_utils.ACT_DNS, message)
 
-    def response_socks_tcp_data(self, session_id, cookie_id, message, is_close=False):
-        resp_data = app_proxy_proto.build_tcp_send_data(cookie_id, message, is_close=is_close)
+    def response_socks_tcp_data(self, session_id, cookie_id, message):
+        resp_data = app_proxy_proto.build_tcp_send_data(cookie_id, message)
         self.__send_msg_to_tunnel(session_id, proto_utils.ACT_SOCKS, resp_data)
 
     def response_socks_udp_data(self, session_id, cookie_id, address, port, message, is_ipv6=False):
@@ -476,6 +485,10 @@ class _fdslight_server(dispatcher.dispatcher):
 
     def response_socks_connstate(self, session_id, cookie_id, resp_code):
         resp_data = app_proxy_proto.build_respconn(cookie_id, resp_code)
+        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_SOCKS, resp_data)
+
+    def response_socks_close(self, session_id, cookie_id):
+        resp_data = app_proxy_proto.build_close(cookie_id)
         self.__send_msg_to_tunnel(session_id, proto_utils.ACT_SOCKS, resp_data)
 
     def __request_dns(self, session_id, message):

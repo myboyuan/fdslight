@@ -15,10 +15,11 @@
 2.发送数据(客户端和服务端)
     TCP协议如下:
         cookie_id:2 bytes
-        is_close:1 byte 是否关闭连接,0表示不关闭连接,1表示关闭连接,服务端忽略这个值,当改值为1时不能携带任何数据
+        is_close:1 byte 是否关闭连接,0表示不关闭连接,1表示关闭连接,当改值为1时不能携带任何数据
         data:
     UDP协议如下
         cookie_id:2 bytes
+        is_close:1 byte 是否关闭会话,如果为1那么后面的字节忽略
         atyp:1 byte 地址类型
         addr_len:1 byte地址长度
         port:2 bytes 端口
@@ -30,7 +31,9 @@ _REQ_FMT = "!HbbbH"
 _REQ_RESP_FMT = "!Hb"
 
 _TCP_DATA_SEND_FMT = "!Hb"
-_UDP_DATA_SEND_FMT = "!HbbH"
+_UDP_DATA_SEND_FMT = "!HbbbH"
+
+_CLOSE_FMT = "!Hb"
 
 import struct, socket
 
@@ -89,24 +92,29 @@ def parse_tcp_data(byte_data):
 
     cookie_id, is_close, = struct.unpack(_TCP_DATA_SEND_FMT, byte_data[0:3])
 
-    return (cookie_id, is_close, byte_data[3:])
+    if is_close:
+        close = True
+    else:
+        close = False
+
+    return (cookie_id, close, byte_data[3:])
 
 
 def parse_udp_data(byte_data):
     size = len(byte_data)
-    if size < 8: raise ProtoErr("wrong protocol")
+    if size < 9: raise ProtoErr("wrong protocol")
 
-    cookie_id, atyp, addr_len, port = struct.unpack(_UDP_DATA_SEND_FMT, byte_data[0:6])
+    cookie_id, is_close, atyp, addr_len, port = struct.unpack(_UDP_DATA_SEND_FMT, byte_data[0:7])
 
-    if addr_len + 6 > size: raise ProtoErr("wrong protocol")
+    if addr_len + 7 > size: raise ProtoErr("wrong protocol")
     if atyp not in (1, 3, 4,): raise ProtoErr("wrong atyp value")
 
     if atyp == 1 and addr_len != 4: raise ProtoErr("wrong request protocol")
     if atyp == 4 and addr_len != 16: raise ProtoErr("wrong request protocol")
     if atyp == 3 and addr_len < 1: raise ProtoErr("wrong request protocol")
 
-    e = 6 + addr_len
-    byte_host = byte_data[6:e]
+    e = 7 + addr_len
+    byte_host = byte_data[7:e]
 
     is_ipv6 = False
     is_domain = False
@@ -120,7 +128,12 @@ def parse_udp_data(byte_data):
         is_domain = True
         host = byte_host.decode("iso-8859-1")
 
-    return (is_ipv6, is_domain, cookie_id, host, port, byte_data[e:],)
+    if is_close:
+        close = True
+    else:
+        close = False
+
+    return (is_ipv6, is_domain, cookie_id, close, host, port, byte_data[e:],)
 
 
 def build_reqconn(cookie_id, cmd, atyp, address, port):
@@ -145,21 +158,14 @@ def build_respconn(cookie_id, resp_code):
     return struct.pack(_REQ_RESP_FMT, cookie_id, resp_code)
 
 
-def build_tcp_send_data(cookie_id, byte_data, is_close=False):
+def build_tcp_send_data(cookie_id, byte_data):
     size = len(byte_data)
     fmt = "!Hb%ss" % size
 
-    if is_close:
-        close = 1
-    else:
-        close = 0
-
-    if is_close and byte_data: raise ValueError("argument byte_data must be null")
-
-    return struct.pack(fmt, cookie_id, close, byte_data)
+    return struct.pack(fmt, cookie_id, 0, byte_data)
 
 
-def build_udp_send_data(cookie_id, atyp, address, port, byte_data):
+def build_udp_send_data(cookie_id, atyp, address, port, byte_data, is_close=False):
     if atyp not in (1, 3, 4,): raise ProtoErr("wrong atyp value")
 
     if atyp == 1:
@@ -172,9 +178,13 @@ def build_udp_send_data(cookie_id, atyp, address, port, byte_data):
         addr_len = len(address)
         byte_addr = address.encode("iso-8859-1")
 
-    header = struct.pack(_UDP_DATA_SEND_FMT, cookie_id, atyp, addr_len, port)
+    header = struct.pack(_UDP_DATA_SEND_FMT, cookie_id, 0, atyp, addr_len, port)
 
     return b"".join([header, byte_addr, byte_data])
+
+
+def build_close(cookie_id):
+    return struct.pack(_CLOSE_FMT, cookie_id, 1)
 
 
 """

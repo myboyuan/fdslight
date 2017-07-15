@@ -479,7 +479,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                 else:
                     _addr = "0.0.0.0"
                 self.__tunnel_proxy_reqconn(atyp, 3, _addr, 0)
-            self.__tunnel_proxy_send_udpdata(self.__cookie_id, atyp, addr, port, byte_data)
+            self.__tunnel_proxy_send_udpdata(atyp, addr, port, byte_data)
             return
 
         if cmd == "tell_socks_ok":
@@ -534,6 +534,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
     def tcp_delete(self):
         if self.__use_tunnel:
             self.ctl_handler(self.fileno, self.__creator, "unbind_cookie_id", self.__cookie_id)
+            if self.dispatcher.tunnel_ok() and self.__req_ok:
+                self.__tunnel_proxy_send_close()
 
         if self.handler_exists(self.__fileno):
             self.delete_handler(self.__fileno)
@@ -579,7 +581,15 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                     break
                 self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
             return
-            ''''''
+
+        try:
+            is_close = message[2]
+        except IndexError:
+            return
+
+        if is_close:
+            self.delete_handler(self.fileno)
+            return
 
         if self.__is_udp:
             try:
@@ -617,7 +627,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
 
     def __tunnel_proxy_send_tcpdata(self, tcpdata):
-
         sent_data = app_proxy_proto.build_tcp_send_data(self.__cookie_id, tcpdata)
 
         if not self.__req_ok:
@@ -627,15 +636,21 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.__update_time = time.time()
         self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
 
-    def __tunnel_proxy_send_udpdata(self, cookie_id, atyp, address, port, udpdata):
+    def __tunnel_proxy_send_udpdata(self, atyp, address, port, udpdata):
         sent_data = app_proxy_proto.build_udp_send_data(
-            cookie_id, atyp, address, port, udpdata
+            self.__cookie_id, atyp, address, port, udpdata
         )
 
         if not self.__req_ok:
             self.__sentdata_buf.append(sent_data)
         else:
             self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
+
+    def __tunnel_proxy_send_close(self):
+        if not self.__req_ok: return
+
+        sent_data = app_proxy_proto.build_close(self.__cookie_id)
+        self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
 
 
 class _tcp_client(tcp_handler.tcp_handler):

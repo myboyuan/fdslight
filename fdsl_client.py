@@ -493,6 +493,9 @@ class _fdslight_client(dispatcher.dispatcher):
             self.get_handler(self.__http_socks5_fileno).del_all_proxy()
         self.__tunnel_fileno = -1
 
+    def tunnel_ok(self):
+        return self.handler_exists(self.__tunnel_fileno)
+
     def get_server_ip(self, host):
         """获取服务器IP
         :param host:
