@@ -684,7 +684,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
         t = time.time() - self.__update_time
         if t > self.__TIMEOUT:
-            print("tcp_app_proxy timeout")
             self.delete_handler(self.fileno)
             return
         self.set_timeout(self.fileno, 10)
@@ -747,7 +746,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                 if self.__is_http:
                     self.handler_ctl(self.fileno, "tell_socks_ok")
                 else:
-                    self.__step = 3
                     addrinfo = self.socket.getsockname()
                     self.handler_ctl(self.fileno, "tell_socks_ok", addrinfo[0], addrinfo[1])
             else:
