@@ -61,6 +61,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
+            self.dispatcher.response_socks_connstate(self.__session_id, self.__cookie_id, 0)
             self.delete_handler(self.fileno)
             return
         t = time.time() - self.__update_time
