@@ -741,7 +741,6 @@ class _tcp_client(tcp_handler.tcp_handler):
         self.__creator = creator
         self.set_socket(s)
         self.connect(address)
-        print("---",address)
 
         return self.fileno
 
@@ -755,7 +754,6 @@ class _tcp_client(tcp_handler.tcp_handler):
             "tell_socks_ok", address, port
         )
 
-        print("-------")
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
@@ -766,6 +764,7 @@ class _tcp_client(tcp_handler.tcp_handler):
         self.send_message_to_handler(self.fileno, self.__creator, rdata)
 
     def tcp_writable(self):
+        print("ssssssss")
         self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
