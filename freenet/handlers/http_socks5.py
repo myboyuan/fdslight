@@ -438,7 +438,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.__handle_http_step1()
             return
 
-        self.__handle_http_step2()
+        if self.__step == 2:
+            self.__handle_http_step2()
 
     def __handle_socks5(self):
         if self.__step == 1:
@@ -449,7 +450,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.__handle_socks5_step2()
             return
 
-        self.__handle_socks5_step3()
+        if self.__step == 3:
+            self.__handle_socks5_step3()
 
     def handler_ctl(self, from_fd, cmd, *args, **kwargs):
         if cmd not in (
