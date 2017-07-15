@@ -617,7 +617,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             ]
         )
         self.__send_data(resp_data)
-        self.delete_this_no_sent_data()
 
     def message_from_handler(self, from_fd, message):
         if from_fd == self.__fileno:
