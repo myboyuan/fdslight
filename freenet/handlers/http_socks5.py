@@ -785,13 +785,12 @@ class _tcp_client(tcp_handler.tcp_handler):
 
     def tcp_error(self):
         if self.is_conn_ok():
+            rdata = self.reader.read()
+            self.send_message_to_handler(self.fileno, self.__creator, rdata)
             self.ctl_handler(
                 self.fileno, self.__creator,
                 "tell_close"
             )
-            rdata = self.reader.read()
-            print(rdata)
-            self.send_message_to_handler(self.fileno, self.__creator, rdata)
         else:
             address, port = self.socket.getsockname()
             self.ctl_handler(
