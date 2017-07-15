@@ -787,6 +787,7 @@ class _tcp_client(tcp_handler.tcp_handler):
         if self.is_conn_ok():
             rdata = self.reader.read()
             self.send_message_to_handler(self.fileno, self.__creator, rdata)
+
             self.ctl_handler(
                 self.fileno, self.__creator,
                 "tell_close"
