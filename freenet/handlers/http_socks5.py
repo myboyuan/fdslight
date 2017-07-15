@@ -790,6 +790,7 @@ class _tcp_client(tcp_handler.tcp_handler):
                 "tell_close"
             )
             rdata = self.reader.read()
+            print(rdata)
             self.send_message_to_handler(self.fileno, self.__creator, rdata)
         else:
             address, port = self.socket.getsockname()
