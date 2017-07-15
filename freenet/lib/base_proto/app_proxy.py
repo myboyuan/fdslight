@@ -10,7 +10,7 @@
         address:请求地址,如果为UDP代理那么该项可忽略
     服务端响应如下:
         cookie_id:2 bytes 客户端给定的cookie id
-        resp_code:1 byte 响应状态码,1表示成功,0表示失败
+        resp_code:1 byte 响应状态码,2表示成功,0表示失败
 
 2.发送数据(客户端和服务端)
     TCP协议如下:

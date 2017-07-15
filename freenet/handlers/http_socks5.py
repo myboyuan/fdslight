@@ -561,7 +561,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                 self.delete_handler(self.fileno)
                 return
 
-            if resp_code:
+            if resp_code == 2:
                 self.__req_ok = True
                 if self.__is_http:
                     self.handler_ctl(self.fileno, "tell_socks_ok")
