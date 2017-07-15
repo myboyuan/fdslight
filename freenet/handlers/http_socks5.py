@@ -466,8 +466,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                 return
             if cmd == "tell_error":
                 self.delete_handler(self.fileno)
-                return
-            if cmd == "tell_socks_ok": self.__step = 2
             return
 
         if cmd == "udp_tunnel_send":
