@@ -769,7 +769,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         if is_close:
             self.__responsed_close = True
             if self.__debug: print("server tell close connection")
-            self.delete_handler(self.fileno)
+            self.delete_this_no_sent_data()
             return
 
         if self.__is_udp:
