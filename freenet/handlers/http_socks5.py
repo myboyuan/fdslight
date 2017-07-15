@@ -590,7 +590,25 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             return
 
         seq = []
-        print(mapv)
+        has_close = False
+
+        for k, v in mapv:
+            if k.lower() == "Connection":
+                has_close = True
+                seq.append(("Connection", "close"))
+                continue
+            seq.append((k, v))
+
+        if not has_close: seq.append(("Connection", "close"))
+
+        header_data = httputils.build_http1x_resp_header(response[1], seq)
+
+        resp_data = b"".join(
+            [
+                header_data.encode("iso-8859-1"), message[p:]
+            ]
+        )
+        self.__send_data(resp_data)
 
     def message_from_handler(self, from_fd, message):
         if from_fd == self.__fileno:
