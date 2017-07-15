@@ -402,7 +402,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         rs = _parse_http_uri_no_tunnel_mode(request[1])
 
         if not rs:
-            print("AAAA")
             self.delete_handler(self.fileno)
             return
 
@@ -432,7 +431,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.__tunnel_proxy_reqconn(atyp, host, port)
             self.__tunnel_proxy_send_tcpdata(req_data)
             return
-        print("BBB")
+
+        print(header_data)
         self.__fileno = self.create_handler(
             self.fileno, _tcp_client, (host, port,), is_ipv6=self.__is_ipv6
         )
