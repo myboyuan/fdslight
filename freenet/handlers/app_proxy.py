@@ -7,7 +7,7 @@ import time, socket
 
 
 class tcp_proxy(tcp_handler.tcp_handler):
-    __TIMEOUT = 240
+    __TIMEOUT = 600
     __update_time = 0
     __cookie_id = None
     __session_id = None
