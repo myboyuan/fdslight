@@ -99,6 +99,7 @@ class tcp_handler(handler.handler):
         if self.__is_async_socket_client and not self.is_conn_ok():
             self.unregister(self.fileno)
             if self.__conn_ev_flag:
+                print("-------")
                 self.error()
                 return
             ''''''
@@ -118,10 +119,8 @@ class tcp_handler(handler.handler):
                 return
             self.tcp_writable()
         except ConnectionError:
-            print("AAAA")
             self.error()
         except FileNotFoundError:
-            print("BBB")
             self.error()
 
     def timeout(self):
