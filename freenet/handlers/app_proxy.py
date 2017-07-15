@@ -41,7 +41,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
         self.add_evt_read(self.fileno)
 
     def tcp_delete(self):
-        if self.__debug: print("delete tcp proxy")
+        if self.__debug: print("tcp_app_proxy delete")
 
         if self.is_conn_ok():
             self.dispatcher.response_socks_close(self.__session_id, self.__cookie_id)
@@ -53,6 +53,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
         self.close()
 
     def tcp_error(self):
+        if self.__debug: print("tcp_app_proxy error")
         self.delete_handler(self.fileno)
 
     def tcp_readable(self):
@@ -65,12 +66,14 @@ class tcp_proxy(tcp_handler.tcp_handler):
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
+            if self.__debug: print("tcp_app_proxy cannot connect")
             self.dispatcher.response_socks_connstate(self.__session_id, self.__cookie_id, 0)
             self.delete_handler(self.fileno)
             return
         t = time.time() - self.__update_time
 
         if t > self.__TIMEOUT:
+            if self.__debug: print("tcp_app_proxy timeout")
             self.delete_handler(self.fileno)
             return
         self.set_timeout(self.fileno, 10)
