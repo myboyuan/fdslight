@@ -92,7 +92,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
 
         self.__update_time = time.time()
         self.writer.write(message)
-        self.add_evt_write(self.fileno)
+        #self.add_evt_write(self.fileno)
 
 
 class udp_proxy(udp_handler.udp_handler):
