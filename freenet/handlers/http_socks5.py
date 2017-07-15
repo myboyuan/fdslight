@@ -174,6 +174,7 @@ class http_socks5_listener(tcp_handler.tcp_handler):
         if cmd == "unbind_cookie_id":
             cookie_id, = args
             no_wait = kwargs.get("no_wait", True)
+            print(no_wait,"---")
             self.__unbind_cookie_id(cookie_id, no_wait)
             return
 
