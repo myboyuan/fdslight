@@ -534,7 +534,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
     def tcp_delete(self):
         if self.__use_tunnel:
             self.ctl_handler(self.fileno, self.__creator, "unbind_cookie_id", self.__cookie_id)
-            if self.dispatcher.tunnel_ok() and self.__req_ok:
+
+            if self.dispatcher.tunnel_ok():
                 self.__tunnel_proxy_send_close()
 
         if self.handler_exists(self.__fileno):
