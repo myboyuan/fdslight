@@ -41,6 +41,8 @@ class tcp_proxy(tcp_handler.tcp_handler):
         self.add_evt_read(self.fileno)
 
     def tcp_delete(self):
+        if self.__debug: print("delete tcp proxy")
+
         if self.is_conn_ok():
             self.dispatcher.response_socks_close(self.__session_id, self.__cookie_id)
         else:
