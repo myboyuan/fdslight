@@ -474,7 +474,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         p = rdata.find(b"\r\n\r\n")
 
         if p < 4:
-            print("A")
             self.delete_handler(self.fileno)
             return
 
@@ -483,7 +482,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         try:
             request, mapv = httputils.parse_htt1x_request_header(header_data.decode("iso-8859-1"))
         except httputils.Http1xHeaderErr:
-            print("B")
             self.delete_handler(self.fileno)
             return
 
@@ -537,7 +535,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         rs = _parse_http_uri_no_tunnel_mode(request[1])
 
         if not rs:
-            print("C")
             self.delete_handler(self.fileno)
             return
 
@@ -687,7 +684,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
         t = time.time() - self.__update_time
         if t > self.__TIMEOUT:
-            print("D")
             self.delete_handler(self.fileno)
             return
         self.set_timeout(self.fileno, 10)
@@ -718,7 +714,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         try:
             self.__http_transparent.parse(message)
         except _http_response_error:
-            print("F")
+            print(message)
             self.delete_handler(self.fileno)
             return
 
@@ -743,7 +739,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             try:
                 cookie_id, resp_code = app_proxy_proto.parse_respconn(message)
             except app_proxy_proto.ProtoErr:
-                print("G")
                 self.delete_handler(self.fileno)
                 return
 
@@ -755,7 +750,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                     addrinfo = self.socket.getsockname()
                     self.handler_ctl(self.fileno, "tell_socks_ok", addrinfo[0], addrinfo[1])
             else:
-                print("H")
                 self.delete_handler(self.fileno)
                 return
             # 发送缓冲区的数据
@@ -789,7 +783,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         try:
             cookie_id, is_close, byte_data = app_proxy_proto.parse_tcp_data(message)
         except app_proxy_proto.ProtoErr:
-            print("Z")
             self.delete_handler(self.fileno)
             return
 
