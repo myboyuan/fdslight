@@ -379,7 +379,6 @@ class _fdslight_server(dispatcher.dispatcher):
 
         # 会话已经存在的处理方式
         if cookie_id in pydict:
-
             fileno, is_tcp = pydict[cookie_id]
             try:
                 is_close = bool(int(message[2]))
@@ -387,6 +386,7 @@ class _fdslight_server(dispatcher.dispatcher):
                 return False
 
             if is_close:
+                self.response_socks_close(session_id, cookie_id)
                 self.delete_handler(fileno)
                 return False
 

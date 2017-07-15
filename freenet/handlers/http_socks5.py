@@ -72,6 +72,9 @@ class http_socks5_listener(tcp_handler.tcp_handler):
     __current_max_cookie_id = None
     __empty_cookie_ids = None
 
+    # 等待删除的cookie ids
+    __wait_del_cookie_ids = None
+
     def init_func(self, creator, address, host_match, is_ipv6=False, debug=True):
         if is_ipv6:
             fa = socket.AF_INET6
@@ -83,6 +86,7 @@ class http_socks5_listener(tcp_handler.tcp_handler):
         self.__debug = debug
         self.__current_max_cookie_id = 1
         self.__empty_cookie_ids = []
+        self.__wait_del_cookie_ids = {}
 
         s = socket.socket(fa, socket.SOCK_STREAM)
         if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
@@ -125,8 +129,12 @@ class http_socks5_listener(tcp_handler.tcp_handler):
 
         return cookie_id
 
-    def __unbind_cookie_id(self, cookie_id):
+    def __unbind_cookie_id(self, cookie_id, no_wait=True):
         if cookie_id not in self.__cookie_ids: return
+
+        if not no_wait:
+            self.__wait_del_cookie_ids[cookie_id] = None
+            return
 
         if cookie_id == self.__current_max_cookie_id - 1:
             self.__current_max_cookie_id -= 1
@@ -144,10 +152,17 @@ class http_socks5_listener(tcp_handler.tcp_handler):
 
     def msg_from_tunnel(self, message):
         size = len(message)
-        if size < 2: return
+        if size < 3: return
 
         cookie_id = (message[0] << 8) | message[1]
         if cookie_id not in self.__cookie_ids: return
+
+        code = message[2]
+
+        if code == 1 and cookie_id in self.__wait_del_cookie_ids:
+            del self.__wait_del_cookie_ids[cookie_id]
+            self.__unbind_cookie_id(cookie_id, no_wait=True)
+            return
 
         fileno = self.__cookie_ids[cookie_id]
         self.send_message_to_handler(self.fileno, fileno, message)
@@ -158,7 +173,8 @@ class http_socks5_listener(tcp_handler.tcp_handler):
             return self.__bind_cookie_id(fileno)
         if cmd == "unbind_cookie_id":
             cookie_id, = args
-            self.__unbind_cookie_id(cookie_id)
+            no_wait = kwargs.get("no_wait", True)
+            self.__unbind_cookie_id(cookie_id, no_wait)
             return
 
     def del_all_proxy(self):
@@ -538,10 +554,12 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
     def tcp_delete(self):
         if self.__use_tunnel:
-            self.ctl_handler(self.fileno, self.__creator, "unbind_cookie_id", self.__cookie_id)
+            no_wait = True
 
             if self.dispatcher.tunnel_ok() and not self.__responsed_close:
                 self.__tunnel_proxy_send_close()
+                no_wait = False
+            self.ctl_handler(self.fileno, self.__creator, "unbind_cookie_id", self.__cookie_id, no_wait=no_wait)
 
         if self.handler_exists(self.__fileno):
             self.delete_handler(self.__fileno)
