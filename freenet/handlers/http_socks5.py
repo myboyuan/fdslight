@@ -112,14 +112,14 @@ class http_socks5_listener(tcp_handler.tcp_handler):
     def __bind_cookie_id(self, fileno):
         cookie_id = -1
 
-        if self.__current_max_cookie_id < 65535:
+        try:
+            cookie_id = self.__empty_cookie_ids.pop(0)
+        except IndexError:
+            pass
+
+        if self.__current_max_cookie_id < 65536 and cookie_id < 1:
             cookie_id = self.__current_max_cookie_id
             self.__current_max_cookie_id += 1
-        else:
-            try:
-                cookie_id = self.__empty_cookie_ids.pop(0)
-            except IndexError:
-                pass
 
         if cookie_id > 0: self.__cookie_ids[cookie_id] = fileno
 

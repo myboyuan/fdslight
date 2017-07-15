@@ -18,19 +18,21 @@ class dns_base(udp_handler.udp_handler):
     """DNS基本类"""
     # 新的DNS ID映射到就的DNS ID
     __dns_id_map = {}
+    __empty_ids = []
+    __cur_max_dns_id = 1
 
-    def get_dns_id(self, old_dns_id):
-        if old_dns_id not in self.__dns_id_map: return old_dns_id
-
-        n = 0
+    def get_dns_id(self):
         n_dns_id = -1
 
-        while n < 10:
-            n_dns_id = random.randint(1, 65535)
-            if n_dns_id in self.__dns_id_map:
-                n += 1
-                continue
-            break
+        try:
+            n_dns_id = self.__empty_ids.pop(0)
+            return n_dns_id
+        except IndexError:
+            pass
+
+        if self.__cur_max_dns_id < 65536:
+            n_dns_id = self.__cur_max_dns_id
+            self.__cur_max_dns_id += 1
 
         return n_dns_id
 
@@ -39,6 +41,12 @@ class dns_base(udp_handler.udp_handler):
 
     def del_dns_id_map(self, dns_id):
         if dns_id not in self.__dns_id_map: return
+
+        if dns_id == self.__cur_max_dns_id - 1:
+            self.__cur_max_dns_id -= 1
+        else:
+            self.__empty_ids.append(dns_id)
+
         del self.__dns_id_map[dns_id]
 
     def get_dns_id_map(self, dns_id):
@@ -118,7 +126,7 @@ class dnsd_proxy(dns_base):
     def request_dns(self, session_id, message):
         if len(message) < 16: return
         dns_id = (message[0] << 8) | message[1]
-        n_dns_id = self.get_dns_id(dns_id)
+        n_dns_id = self.get_dns_id()
         if n_dns_id < 0: return
 
         self.set_dns_id_map(n_dns_id, (dns_id, session_id))
@@ -312,7 +320,7 @@ class dnsc_proxy(dns_base):
         if flags == 2: return
 
         dns_id = (message[0] << 8) | message[1]
-        n_dns_id = self.get_dns_id(dns_id)
+        n_dns_id = self.get_dns_id()
         if n_dns_id < 0: return
 
         if not is_match: flags = None
