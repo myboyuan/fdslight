@@ -59,6 +59,9 @@ class tcp_proxy(tcp_handler.tcp_handler):
         self.close()
 
     def tcp_error(self):
+        if self.is_conn_ok():
+            rdata = self.reader.read()
+            self.dispatcher.response_socks_tcp_data(self.__session_id, self.__cookie_id, rdata)
         if self.__debug: print("tcp_app_proxy error")
         self.delete_handler(self.fileno)
 

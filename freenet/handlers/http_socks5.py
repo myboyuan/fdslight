@@ -720,7 +720,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         resp_data = self.__http_transparent.get_data()
 
         if not resp_data: return
-        print(resp_data)
         self.__send_data(resp_data)
 
         if self.__http_transparent.is_finish():
