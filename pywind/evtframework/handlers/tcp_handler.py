@@ -80,7 +80,6 @@ class tcp_handler(handler.handler):
             try:
                 recv_data = self.socket.recv(4096)
                 if not recv_data:
-                    print("-------")
                     self.error()
                     break
                 self.reader._putvalue(self.handle_tcp_received_data(recv_data))
