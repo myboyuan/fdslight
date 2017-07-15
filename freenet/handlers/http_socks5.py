@@ -142,7 +142,7 @@ class http_socks5_listener(tcp_handler.tcp_handler):
         else:
             self.__empty_cookie_ids.append(cookie_id)
 
-        del self.__cookie_ids[cookie_id]
+        if cookie_id in self.__cookie_ids: del self.__cookie_ids[cookie_id]
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
@@ -439,7 +439,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         :return:
         """
         resp_data = httputils.build_http1x_resp_header("200 Connection Established", [
-            ("Server", "Proxy-Server"), ("Connection", "close")
+            ("Server", "Proxy-Server"), ("Connection", "Keep-Alive")
         ])
         self.__send_data(resp_data.encode("iso-8859-1"))
 
