@@ -90,7 +90,8 @@ class tcp_proxy(tcp_handler.tcp_handler):
             self.writer.write(message)
             return
 
-        print(message)
+        if self.__debug: print(message)
+
         self.__update_time = time.time()
         self.writer.write(message)
         self.add_evt_write(self.fileno)
