@@ -791,7 +791,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         if is_close:
             self.delete_this_no_sent_data()
             return
-
         if self.__is_http and not self.__is_http_tunnel:
             self.__handle_http_no_tunnel_response(message)
             return
