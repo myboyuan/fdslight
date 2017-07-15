@@ -764,7 +764,6 @@ class _tcp_client(tcp_handler.tcp_handler):
         self.send_message_to_handler(self.fileno, self.__creator, rdata)
 
     def tcp_writable(self):
-        print("ssssssss")
         self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
@@ -803,15 +802,15 @@ class _tcp_client(tcp_handler.tcp_handler):
         return
 
 
-def tcp_delete(self):
-    self.unregister(self.fileno)
-    self.close()
+    def tcp_delete(self):
+        self.unregister(self.fileno)
+        self.close()
 
 
-def message_from_handler(self, from_fd, message):
-    self.writer.write(message)
+    def message_from_handler(self, from_fd, message):
+        self.writer.write(message)
 
-    if self.is_conn_ok(): self.add_evt_write(self.fileno)
+        if self.is_conn_ok(): self.add_evt_write(self.fileno)
 
 
 class UdpProtoErr(Exception):
