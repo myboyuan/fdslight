@@ -532,7 +532,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, 10)
 
     def tcp_delete(self):
-        self.ctl_handler(self.fileno, self.__creator, "unbind_cookie_id", self.__cookie_id)
+        if self.__use_tunnel:
+            self.ctl_handler(self.fileno, self.__creator, "unbind_cookie_id", self.__cookie_id)
 
         if self.handler_exists(self.__fileno):
             self.delete_handler(self.__fileno)
