@@ -358,6 +358,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.__use_tunnel = True
             atyp = self.__get_atyp(host)
             self.__tunnel_proxy_reqconn(atyp, host, port)
+            self.__response_http_tunnel_proxy_handshake()
             return
 
         self.__fileno = self.create_handler(
@@ -447,6 +448,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         if self.__is_http:
             if cmd == "tell_socks_ok":
                 self.__step = 2
+                if self.__use_tunnel: return
                 if not self.__is_http_tunnel: return
                 self.__response_http_tunnel_proxy_handshake()
                 return
@@ -459,7 +461,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         if cmd == "udp_tunnel_send":
             atyp, addr, port, byte_data = args
 
-            if not self.__is_sent_proxy_requst:
+            if not self.__is_sent_proxy_request:
                 if atyp == 4:
                     _addr = "::"
                 else:
@@ -603,10 +605,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
     def __tunnel_proxy_send_tcpdata(self, tcpdata):
 
         sent_data = app_proxy_proto.build_tcp_send_data(self.__cookie_id, tcpdata)
-
-        if not self.__req_ok:
-            self.__sentdata_buf.append(sent_data)
-            return
 
         self.__update_time = time.time()
         self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
