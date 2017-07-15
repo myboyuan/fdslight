@@ -621,7 +621,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         sent_data = app_proxy_proto.build_tcp_send_data(self.__cookie_id, tcpdata)
 
         if not self.__req_ok:
-            self.__sentdata_buf.append(tcpdata)
+            self.__sentdata_buf.append(sent_data)
             return
 
         self.__update_time = time.time()
