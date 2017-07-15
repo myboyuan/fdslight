@@ -31,7 +31,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
         return self.fileno
 
     def connect_ok(self):
-        self.dispatcher.response_socks_connstate(self.__session_id, self.__cookie_id, 1)
+        self.dispatcher.response_socks_connstate(self.__session_id, self.__cookie_id, 2)
         self.__update_time = time.time()
         self.set_timeout(self.fileno, 10)
 
@@ -106,7 +106,7 @@ class udp_proxy(udp_handler.udp_handler):
 
         self.__update_time = time.time()
         self.set_timeout(self.fileno, 10)
-        self.dispatcher.response_socks_connstate(self.__session_id, self.__cookie_id, 1)
+        self.dispatcher.response_socks_connstate(self.__session_id, self.__cookie_id, 2)
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
