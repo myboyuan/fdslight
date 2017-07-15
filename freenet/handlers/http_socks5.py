@@ -461,6 +461,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         if self.__is_http:
             if cmd == "tell_socks_ok":
                 self.__step = 2
+                if not self.__use_tunnel: return
                 if not self.__is_http_tunnel: return
                 self.__response_http_tunnel_proxy_handshake()
                 return
