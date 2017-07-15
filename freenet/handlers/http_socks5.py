@@ -416,9 +416,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             if k.lower() == "proxy-connection": continue
             seq.append((k, v,))
 
-        #if not has_close:
-        #    seq.append(("Connection", "close",))
-
         # 重新构建HTTP请求头部
         header_data = httputils.build_http1x_req_header(request[0], uri, seq)
         req_data = b"".join([header_data.encode("iso-8859-1"), body_data])
@@ -432,6 +429,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.__tunnel_proxy_send_tcpdata(req_data)
             return
 
+        if self.__debug: print(req_data)
         self.__fileno = self.create_handler(
             self.fileno, _tcp_client, (host, port,), is_ipv6=self.__is_ipv6
         )
