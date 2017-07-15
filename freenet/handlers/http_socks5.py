@@ -624,6 +624,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                 self.__response_http_tunnel_proxy_handshake()
                 return
             if cmd == "tell_error":
+                print("--------s")
                 self.delete_handler(self.fileno)
             return
 
@@ -689,7 +690,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, 10)
 
     def tcp_delete(self):
-        print("-------")
         if self.__use_tunnel:
             no_wait = True
 
