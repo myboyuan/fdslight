@@ -900,7 +900,6 @@ class _tcp_client(tcp_handler.tcp_handler):
 
     def tcp_error(self):
         if self.is_conn_ok():
-            print("error")
             rdata = self.reader.read()
             self.send_message_to_handler(self.fileno, self.__creator, rdata)
 
