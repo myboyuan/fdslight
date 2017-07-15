@@ -577,7 +577,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.writer.write(message)
 
     def __handle_http_no_tunnel_response(self, message):
-        """
         p = message.find(b"\r\n\r\n")
 
         if p < 0:
@@ -609,8 +608,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             [
                 header_data.encode("iso-8859-1"), message[p:]
             ]
-        )"""
-        self.__send_data(message)
+        )
+        self.__send_data(resp_data)
 
     def message_from_handler(self, from_fd, message):
         if from_fd == self.__fileno:
