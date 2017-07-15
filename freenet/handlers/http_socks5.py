@@ -4,7 +4,7 @@
 
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.evtframework.handlers.udp_handler as udp_handler
-import socket, time, struct, random
+import socket, time, struct
 import pywind.web.lib.httputils as httputils
 import freenet.lib.base_proto.app_proxy as app_proxy_proto
 import freenet.lib.base_proto.utils as proto_utils
