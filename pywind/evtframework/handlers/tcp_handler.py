@@ -118,8 +118,10 @@ class tcp_handler(handler.handler):
                 return
             self.tcp_writable()
         except ConnectionError:
+            print("AAAA")
             self.error()
         except FileNotFoundError:
+            print("BBB")
             self.error()
 
     def timeout(self):
