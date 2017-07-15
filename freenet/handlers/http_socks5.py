@@ -176,15 +176,21 @@ class _http_transparent_proxy_resp(object):
             byte_data = b"".join(self.__data_list)
             self.__data_list = []
 
-        else:
-            seq = []
+            return byte_data
 
-            while 1:
-                rs = self.__chunked.get_chunk_with_length()
-                if not rs: break
-                seq.append(rs)
+        seq = []
 
-            byte_data = b"".join(seq)
+        while 1:
+            try:
+                seq.append(self.__data_list.pop(0))
+            except IndexError:
+                break
+        while 1:
+            rs = self.__chunked.get_chunk_with_length()
+            if not rs: break
+            seq.append(rs)
+
+        byte_data = b"".join(seq)
 
         return byte_data
 
