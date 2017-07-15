@@ -648,7 +648,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
 
     def __tunnel_proxy_send_close(self):
-        if not self.__req_ok: return
+        if not self.__is_sent_proxy_request: return
 
         sent_data = app_proxy_proto.build_close(self.__cookie_id)
         self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
