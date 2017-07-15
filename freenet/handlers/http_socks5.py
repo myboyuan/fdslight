@@ -785,6 +785,7 @@ class _tcp_client(tcp_handler.tcp_handler):
 
     def tcp_error(self):
         if self.is_conn_ok():
+            print("error")
             rdata = self.reader.read()
             self.send_message_to_handler(self.fileno, self.__creator, rdata)
 
@@ -801,15 +802,12 @@ class _tcp_client(tcp_handler.tcp_handler):
 
         return
 
-
     def tcp_delete(self):
         self.unregister(self.fileno)
         self.close()
 
-
     def message_from_handler(self, from_fd, message):
         self.writer.write(message)
-
         if self.is_conn_ok(): self.add_evt_write(self.fileno)
 
 
