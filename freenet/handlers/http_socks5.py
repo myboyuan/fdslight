@@ -410,10 +410,18 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
         if self.__debug: print("%s:%s" % (host, port,))
 
+        has_close = False
         # 去除代理信息
         for k, v in mapv:
             if k.lower() == "proxy-connection": continue
+            if k.lower() == "connection":
+                has_close = True
+                seq.append((k, "close",))
+                continue
             seq.append((k, v,))
+
+        if not has_close:
+            seq.append(("Connection", "close",))
 
         # 重新构建HTTP请求头部
         header_data = httputils.build_http1x_req_header(request[0], uri, seq)
