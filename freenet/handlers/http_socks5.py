@@ -134,6 +134,7 @@ class http_socks5_listener(tcp_handler.tcp_handler):
 
         if not no_wait:
             self.__wait_del_cookie_ids[cookie_id] = None
+            del self.__cookie_ids[cookie_id]
             return
 
         if cookie_id == self.__current_max_cookie_id - 1:
