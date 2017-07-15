@@ -388,7 +388,6 @@ class _fdslight_server(dispatcher.dispatcher):
             if is_close:
                 # 告知客户端服务端已经收到close包
                 self.response_socks_close(session_id, cookie_id)
-                print("delete--------")
                 self.delete_handler(fileno)
                 return False
 
