@@ -784,10 +784,10 @@ class _tcp_client(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
+        print("error")
         if self.is_conn_ok():
             rdata = self.reader.read()
             self.send_message_to_handler(self.fileno, self.__creator, rdata)
-
             self.ctl_handler(
                 self.fileno, self.__creator,
                 "tell_close"
