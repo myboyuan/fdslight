@@ -575,8 +575,29 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.add_evt_write(self.fileno)
         self.writer.write(message)
 
+    def __handle_http_no_tunnel_response(self, message):
+        p = message.find(b"\r\n\r\n")
+
+        if p < 0:
+            self.delete_handler(self.fileno)
+            return
+        p += 4
+
+        try:
+            response, mapv = httputils.parse_http1x_response_header(message[0:p].decode("iso-8859-1"))
+        except httputils.Http1xHeaderErr:
+            self.delete_handler(self.fileno)
+            return
+
+        seq = []
+        print(mapv)
+
     def message_from_handler(self, from_fd, message):
         if from_fd == self.__fileno:
+            # 对HTTP的非隧道模式进行特别处理 
+            if self.__is_http and not self.__is_http_tunnel:
+                self.__handle_http_no_tunnel_response(message)
+                return
             self.__send_data(message)
             return
 
@@ -636,6 +657,10 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
         if is_close:
             self.delete_this_no_sent_data()
+            return
+
+        if self.__is_http and not self.__is_http_tunnel:
+            self.__handle_http_no_tunnel_response(message)
             return
 
         self.__send_data(byte_data)
