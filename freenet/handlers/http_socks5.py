@@ -791,22 +791,27 @@ class _tcp_client(tcp_handler.tcp_handler):
                 self.fileno, self.__creator,
                 "tell_close"
             )
+            rdata = self.reader.read()
+            self.send_message_to_handler(self.fileno, self.__creator, rdata)
         else:
             address, port = self.socket.getsockname()
             self.ctl_handler(
                 self.fileno, self.__creator,
                 "tell_error", address, port
             )
+
         return
 
-    def tcp_delete(self):
-        self.unregister(self.fileno)
-        self.close()
 
-    def message_from_handler(self, from_fd, message):
-        self.writer.write(message)
+def tcp_delete(self):
+    self.unregister(self.fileno)
+    self.close()
 
-        if self.is_conn_ok(): self.add_evt_write(self.fileno)
+
+def message_from_handler(self, from_fd, message):
+    self.writer.write(message)
+
+    if self.is_conn_ok(): self.add_evt_write(self.fileno)
 
 
 class UdpProtoErr(Exception):
