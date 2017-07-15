@@ -429,7 +429,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.__tunnel_proxy_send_tcpdata(req_data)
             return
 
-        if self.__debug: print(req_data)
         self.__fileno = self.create_handler(
             self.fileno, _tcp_client, (host, port,), is_ipv6=self.__is_ipv6
         )
