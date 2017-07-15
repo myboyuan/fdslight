@@ -30,6 +30,8 @@ class tcp_proxy(tcp_handler.tcp_handler):
         self.set_socket(s)
         self.connect(address)
 
+        if self.__debug: print(address)
+
         return self.fileno
 
     def connect_ok(self):
