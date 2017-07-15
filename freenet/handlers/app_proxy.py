@@ -11,8 +11,9 @@ class tcp_proxy(tcp_handler.tcp_handler):
     __update_time = 0
     __cookie_id = None
     __session_id = None
+    __debug = None
 
-    def init_func(self, creator, session_id, cookie_id, address, is_ipv6=False):
+    def init_func(self, creator, session_id, cookie_id, address, is_ipv6=False, debug=True):
         if is_ipv6:
             fa = socket.AF_INET6
         else:
@@ -24,6 +25,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
         s = socket.socket(fa, socket.SOCK_STREAM)
         if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
         self.__cookie_id = cookie_id
+        self.__debug = debug
 
         self.set_socket(s)
         self.connect(address)
@@ -67,6 +69,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
         t = time.time() - self.__update_time
 
         if t > self.__TIMEOUT:
+            if self.__debug: print("tcp_app_proxy timeout")
             self.delete_handler(self.fileno)
             return
         self.set_timeout(self.fileno, 10)
@@ -88,7 +91,7 @@ class udp_proxy(udp_handler.udp_handler):
     __update_time = 0
     __TIMEOUT = 180
 
-    def init_func(self, creator, session_id, cookie_id, bind_ip=None, is_ipv6=False):
+    def init_func(self, creator, session_id, cookie_id, bind_ip=None, is_ipv6=False, debug=True):
         if is_ipv6:
             fa = socket.AF_INET6
             if not bind_ip: bind_ip = "::"

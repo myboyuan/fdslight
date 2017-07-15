@@ -420,7 +420,8 @@ class _fdslight_server(dispatcher.dispatcher):
         if cmd == 1:
             is_tcp = True
             fileno = self.create_handler(
-                -1, app_proxy.tcp_proxy, session_id, cookie_id, (host, port,), is_ipv6=is_ipv6
+                -1, app_proxy.tcp_proxy, session_id, cookie_id, (host, port,), is_ipv6=is_ipv6,
+                debug=self.__debug
             )
         else:
             if is_domain:
@@ -430,7 +431,8 @@ class _fdslight_server(dispatcher.dispatcher):
                 return False
             is_tcp = False
             fileno = self.create_handler(
-                -1, app_proxy.udp_proxy, session_id, cookie_id, is_ipv6=is_ipv6
+                -1, app_proxy.udp_proxy, session_id, cookie_id, is_ipv6=is_ipv6,
+                debug=self.__debug
             )
         pydict[cookie_id] = (fileno, is_tcp,)
         return True
