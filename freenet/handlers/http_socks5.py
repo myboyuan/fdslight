@@ -535,6 +535,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         rs = _parse_http_uri_no_tunnel_mode(request[1])
 
         if not rs:
+            print("-----")
             self.delete_handler(self.fileno)
             return
 
