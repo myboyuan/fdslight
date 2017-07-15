@@ -91,6 +91,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
 
     def handle_data_from_client(self, message):
         self.writer.write(message)
+        print(message)
 
         if not self.is_conn_ok(): return
 
