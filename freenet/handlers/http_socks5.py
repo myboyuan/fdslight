@@ -9,6 +9,8 @@ import pywind.web.lib.httputils as httputils
 import freenet.lib.base_proto.app_proxy as app_proxy_proto
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.utils as utils
+import pywind.lib.reader as reader
+import pywind.web.lib.httpchunked as httpchunked
 
 
 def _parse_http_uri_with_tunnel_mode(uri):
@@ -62,6 +64,129 @@ def _parse_http_uri_no_tunnel_mode(uri):
     return (host,
             port,
             sts[e:],)
+
+
+class _http_response_error(Exception): pass
+
+
+class _http_transparent_proxy_resp(object):
+    """处理HTTP透明响应
+    """
+
+    # 头部是否已经响应
+    __is_resp_header = None
+    __reader = None
+
+    # 是否是chunked传输
+    __is_chunked = False
+
+    # 总共响应的长度
+    __resp_length = 0
+    # 已经响应的长度 
+    __responsed_length = 0
+
+    __MAX_HEADER_SIZE = 8192
+
+    __data_list = None
+
+    __chunked = None
+
+    def __init__(self):
+        self.__is_resp_header = False
+        self.__reader = reader.reader()
+        self.__is_chunked = False
+        self.__data_list = []
+
+    def __parse_header(self):
+        size = self.__reader.size()
+        rdata = self.__reader.read()
+
+        p = rdata.find(b"\r\n\r\n")
+
+        if p < 0 and size > self.__MAX_HEADER_SIZE:
+            raise _http_response_error("the response header too long")
+
+        if p < 0: return
+
+        p += 4
+
+        try:
+            response, mapv = httputils.parse_http1x_response_header(rdata[0:p].decode("iso-8859-1"))
+        except httputils.Http1xHeaderErr:
+            raise _http_response_error("wrong response header")
+
+        has_chunked = False
+        has_length = False
+
+        for k, v in mapv:
+            if k.lower() == "content-length":
+                has_length = True
+                try:
+                    self.__resp_length = int(v)
+                except ValueError:
+                    raise _http_response_error("wrong http content length value")
+                continue
+
+            if k.lower() == "transfer-encoding":
+                if v.lower() != "chunked":
+                    raise _http_response_error("wrong http transfer-encoding")
+                has_chunked = True
+
+        if has_chunked and has_length:
+            raise _http_response_error("conflict chunked with content-length")
+
+        self.__is_chunked = has_chunked
+        self.__is_resp_header = True
+
+        if has_chunked:
+            self.__chunked = httpchunked.parser()
+
+        self.__data_list.append(rdata[0:p])
+        self.__reader._putvalue(rdata[p:])
+
+    def parse(self, resp_message):
+        self.__reader._putvalue(resp_message)
+
+        if not self.__is_resp_header:
+            self.__parse_header()
+
+        if not self.__is_resp_header: return
+
+        if not self.__is_chunked:
+            n = self.__resp_length - self.__responsed_length
+            rdata = self.__reader.read()[0:n]
+            size = len(rdata)
+
+            self.__data_list.append(rdata)
+            self.__responsed_length += size
+
+            return
+
+        self.__chunked.input(self.__reader.read())
+        self.__chunked.parse()
+
+    def is_finish(self):
+        if not self.__is_resp_header: return False
+        if not self.__chunked:
+            return self.__resp_length == self.__responsed_length
+        return self.__chunked.is_ok()
+
+    def get_data(self):
+        if not self.__chunked:
+            byte_data = b"".join(self.__data_list)
+            self.__data_list = []
+
+        else:
+            seq = []
+
+            while 1:
+                rs = self.__chunked.get_chunk_with_length()
+                if not rs: break
+                seq.append(rs)
+
+            byte_data = b"".join(seq)
+
+        return byte_data
 
 
 class http_socks5_listener(tcp_handler.tcp_handler):
@@ -216,6 +341,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
     __debug = None
 
     __responsed_close = None
+
+    __http_transparent = None
 
     def init_func(self, creator, cs, caddr, host_match, debug=True):
         self.set_socket(cs)
@@ -421,6 +548,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         req_data = b"".join([header_data.encode("iso-8859-1"), body_data])
 
         is_match, flags = self.__host_match.match(host)
+        self.__http_transparent = _http_transparent_proxy_resp()
 
         if is_match and flags:
             self.__use_tunnel = True
@@ -577,39 +705,19 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.writer.write(message)
 
     def __handle_http_no_tunnel_response(self, message):
-        p = message.find(b"\r\n\r\n")
-
-        if p < 0:
-            self.delete_handler(self.fileno)
-            return
-        p += 4
-
         try:
-            response, mapv = httputils.parse_http1x_response_header(message[0:p].decode("iso-8859-1"))
-        except httputils.Http1xHeaderErr:
+            self.__http_transparent.parse(message)
+        except _http_response_error:
             self.delete_handler(self.fileno)
             return
 
-        seq = []
-        has_close = False
+        resp_data = self.__http_transparent.get_data()
 
-        for k, v in mapv:
-            if k.lower() == "Connection":
-                has_close = True
-                seq.append(("Connection", "close"))
-                continue
-            seq.append((k, v))
-
-        if not has_close: seq.append(("Connection", "close"))
-
-        header_data = httputils.build_http1x_resp_header(response[1], seq)
-
-        resp_data = b"".join(
-            [
-                header_data.encode("iso-8859-1"), message[p:]
-            ]
-        )
+        if not resp_data: return
         self.__send_data(resp_data)
+
+        if self.__http_transparent.is_finish():
+            self.delete_this_no_sent_data()
 
     def message_from_handler(self, from_fd, message):
         if from_fd == self.__fileno:
