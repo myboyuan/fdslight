@@ -403,11 +403,15 @@ class _fdslight_server(dispatcher.dispatcher):
                 return False
             return True
 
+        # 去除因为时间间隔问题而发送的关闭数据包
+        size = len(message)
+        if size == 3: return False
+
         try:
             is_ipv6, is_domain, cookie_id, cmd, host, port = app_proxy_proto.parse_reqconn(message)
         except app_proxy_proto.ProtoErr:
             if self.__debug: print("wrong app_proxy protocol request", message)
-            self.response_socks_close(session_id,cookie_id)
+            self.response_socks_close(session_id, cookie_id)
             return False
 
         if self.__enable_ipv6_app_proxy != is_ipv6: return False
