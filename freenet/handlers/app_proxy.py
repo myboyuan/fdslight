@@ -44,6 +44,8 @@ class tcp_proxy(tcp_handler.tcp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
+        if not self.writer.is_empty(): self.add_evt_write(self.fileno)
+
     def tcp_delete(self):
         if self.__debug: print("tcp_app_proxy delete")
 
@@ -63,6 +65,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
     def tcp_readable(self):
         self.__update_time = time.time()
         rdata = self.reader.read()
+
         self.dispatcher.response_socks_tcp_data(self.__session_id, self.__cookie_id, rdata)
 
     def tcp_writable(self):
@@ -83,7 +86,9 @@ class tcp_proxy(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, 10)
 
     def handle_data_from_client(self, message):
-        if not self.is_conn_ok(): return
+        if not self.is_conn_ok():
+            self.writer.write(message)
+            return
 
         self.__update_time = time.time()
         self.writer.write(message)
