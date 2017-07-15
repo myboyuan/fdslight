@@ -758,11 +758,11 @@ class _tcp_client(tcp_handler.tcp_handler):
         self.add_evt_read(self.fileno)
 
         if self.writer.size() > 0:
-            print("sss")
             self.add_evt_write(self.fileno)
 
     def tcp_readable(self):
         rdata = self.reader.read()
+        print(rdata)
         self.send_message_to_handler(self.fileno, self.__creator, rdata)
 
     def tcp_writable(self):
