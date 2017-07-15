@@ -620,6 +620,10 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
         sent_data = app_proxy_proto.build_tcp_send_data(self.__cookie_id, tcpdata)
 
+        if not self.__req_ok:
+            self.__sentdata_buf.append(tcpdata)
+            return
+
         self.__update_time = time.time()
         self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
 
