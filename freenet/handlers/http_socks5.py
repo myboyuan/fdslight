@@ -421,7 +421,9 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         """响应HTTP隧道代理结果
         :return:
         """
-        resp_data = httputils.build_http1x_resp_header("200 Connection Established", [])
+        resp_data = httputils.build_http1x_resp_header("200 Connection Established", [
+            ("Server", "Proxy-Server"), ("Connection", "Keep-Alive")
+        ])
         self.__send_data(resp_data.encode("iso-8859-1"))
 
     def __handle_http_step2(self):
