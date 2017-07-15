@@ -80,6 +80,7 @@ class tcp_handler(handler.handler):
             try:
                 recv_data = self.socket.recv(4096)
                 if not recv_data:
+                    print("-------")
                     self.error()
                     break
                 self.reader._putvalue(self.handle_tcp_received_data(recv_data))
@@ -99,7 +100,6 @@ class tcp_handler(handler.handler):
         if self.__is_async_socket_client and not self.is_conn_ok():
             self.unregister(self.fileno)
             if self.__conn_ev_flag:
-                print("-------")
                 self.error()
                 return
             ''''''
