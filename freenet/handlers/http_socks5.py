@@ -69,6 +69,9 @@ class http_socks5_listener(tcp_handler.tcp_handler):
     __host_match = None
     __debug = None
 
+    __current_max_cookie_id = None
+    __empty_cookie_ids = None
+
     def init_func(self, creator, address, host_match, is_ipv6=False, debug=True):
         if is_ipv6:
             fa = socket.AF_INET6
@@ -78,6 +81,8 @@ class http_socks5_listener(tcp_handler.tcp_handler):
         self.__cookie_ids = {}
         self.__host_match = host_match
         self.__debug = debug
+        self.__current_max_cookie_id = 1
+        self.__empty_cookie_ids = []
 
         s = socket.socket(fa, socket.SOCK_STREAM)
         if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
@@ -105,20 +110,29 @@ class http_socks5_listener(tcp_handler.tcp_handler):
         return
 
     def __bind_cookie_id(self, fileno):
-        n = 0
         cookie_id = -1
-        while n < 10:
-            v = random.randint(1, 65535)
-            if v not in self.__cookie_ids:
-                cookie_id = v
-                break
-            n += 1
+
+        if self.__current_max_cookie_id < 65535:
+            cookie_id = self.__current_max_cookie_id
+            self.__current_max_cookie_id += 1
+        else:
+            try:
+                cookie_id = self.__empty_cookie_ids.pop(0)
+            except IndexError:
+                pass
+
         if cookie_id > 0: self.__cookie_ids[cookie_id] = fileno
 
         return cookie_id
 
     def __unbind_cookie_id(self, cookie_id):
         if cookie_id not in self.__cookie_ids: return
+
+        if cookie_id == self.__current_max_cookie_id - 1:
+            self.__current_max_cookie_id -= 1
+        else:
+            self.__empty_cookie_ids.append(cookie_id)
+
         del self.__cookie_ids[cookie_id]
 
     def tcp_error(self):
