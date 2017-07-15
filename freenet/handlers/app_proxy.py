@@ -58,6 +58,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
 
     def tcp_error(self):
         if self.is_conn_ok():
+            print("GGG")
             rdata = self.reader.read()
             print(rdata)
             self.dispatcher.response_socks_tcp_data(self.__session_id, self.__cookie_id, rdata)
