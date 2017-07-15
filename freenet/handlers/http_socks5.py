@@ -537,6 +537,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
         if self.handler_exists(self.__fileno):
             self.delete_handler(self.__fileno)
+
         self.unregister(self.fileno)
         self.close()
 
