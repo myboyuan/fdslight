@@ -608,6 +608,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
                 header_data.encode("iso-8859-1"), message[p:]
             ]
         )
+        print(resp_data)
         self.__send_data(resp_data)
 
     def message_from_handler(self, from_fd, message):
