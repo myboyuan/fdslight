@@ -198,6 +198,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
     __debug = None
 
+    __responsed_close = None
+
     def init_func(self, creator, cs, caddr, host_match, debug=True):
         self.set_socket(cs)
         self.__is_udp = False
@@ -214,6 +216,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.__sentdata_buf = []
         self.__is_sent_proxy_request = False
         self.__debug = debug
+        self.__responsed_close = False
 
         self.set_timeout(self.fileno, 15)
 
@@ -533,7 +536,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         if self.__use_tunnel:
             self.ctl_handler(self.fileno, self.__creator, "unbind_cookie_id", self.__cookie_id)
 
-            if self.dispatcher.tunnel_ok():
+            if self.dispatcher.tunnel_ok() and not self.__responsed_close:
                 self.__tunnel_proxy_send_close()
 
         if self.handler_exists(self.__fileno):
@@ -587,6 +590,8 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             return
 
         if is_close:
+            self.__responsed_close = True
+            if self.__debug: print("server tell close connection")
             self.delete_handler(self.fileno)
             return
 
