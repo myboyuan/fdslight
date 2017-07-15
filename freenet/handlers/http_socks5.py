@@ -714,7 +714,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         try:
             self.__http_transparent.parse(message)
         except _http_response_error:
-            print(message)
             self.delete_handler(self.fileno)
             return
 
@@ -792,7 +791,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.delete_this_no_sent_data()
             return
         if self.__is_http and not self.__is_http_tunnel:
-            self.__handle_http_no_tunnel_response(message)
+            self.__handle_http_no_tunnel_response(byte_data)
             return
 
         self.__send_data(byte_data)
