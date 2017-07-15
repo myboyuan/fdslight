@@ -535,7 +535,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         rs = _parse_http_uri_no_tunnel_mode(request[1])
 
         if not rs:
-            print("-----")
             self.delete_handler(self.fileno)
             return
 
@@ -690,6 +689,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, 10)
 
     def tcp_delete(self):
+        print("-------")
         if self.__use_tunnel:
             no_wait = True
 
