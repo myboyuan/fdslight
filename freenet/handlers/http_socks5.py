@@ -91,6 +91,8 @@ class _http_transparent_proxy_resp(object):
 
     __chunked = None
 
+    __resp_code = 0
+
     def __init__(self):
         self.__is_resp_header = False
         self.__reader = reader.reader()
@@ -118,6 +120,8 @@ class _http_transparent_proxy_resp(object):
         has_chunked = False
         has_length = False
 
+        self.__resp_code = int(response[1][0:3])
+
         for k, v in mapv:
             if k.lower() == "content-length":
                 has_length = True
@@ -136,7 +140,9 @@ class _http_transparent_proxy_resp(object):
             raise _http_response_error("conflict chunked with content-length")
 
         self.__is_chunked = has_chunked
-        self.__is_resp_header = True
+
+        if self.__resp_code >= 200:
+            self.__is_resp_header = True
 
         if has_chunked:
             self.__chunked = httpchunked.parser()
