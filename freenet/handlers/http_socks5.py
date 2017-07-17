@@ -516,6 +516,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
     def __handle_http_tunnel_proxy(self, request, mapv):
         rs = _parse_http_uri_with_tunnel_mode(request[1])
+        print(request)
 
         if not rs:
             self.delete_handler(self.fileno)
