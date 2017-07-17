@@ -703,11 +703,13 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             if self.dispatcher.tunnel_ok() and not self.__responsed_close:
                 self.__tunnel_proxy_send_close()
                 no_wait = False
+
             self.ctl_handler(self.fileno, self.__creator, "unbind_cookie_id", self.__cookie_id, no_wait=no_wait)
 
         if self.handler_exists(self.__fileno):
             self.delete_handler(self.__fileno)
 
+        print(self.getpeername())
         self.unregister(self.fileno)
         self.close()
 
@@ -776,6 +778,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         if is_close:
             self.__responsed_close = True
             if self.__debug: print("server tell close connection")
+            print(self.getpeername(),"--")
             self.delete_this_no_sent_data()
             return
 
@@ -802,7 +805,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.__handle_http_no_tunnel_response(byte_data)
             return
 
-        print(byte_data)
         self.__send_data(byte_data)
 
     def __tunnel_proxy_reqconn(self, atyp, addr, port):
