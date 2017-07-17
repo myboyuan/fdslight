@@ -373,6 +373,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         self.__is_sent_proxy_request = False
         self.__debug = debug
         self.__responsed_close = False
+        self.__cookie_id = 0
 
         self.set_timeout(self.fileno, 15)
 
@@ -807,7 +808,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
 
         self.__cookie_id = self.ctl_handler(self.fileno, self.__creator, "bind_cookie_id", self.fileno)
 
-        if self.__cookie_id < 0:
+        if self.__cookie_id < 1:
             self.delete_handler(self.fileno)
             return
 
