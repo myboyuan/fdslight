@@ -709,7 +709,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         if self.handler_exists(self.__fileno):
             self.delete_handler(self.__fileno)
 
-        print(self.getpeername())
         self.unregister(self.fileno)
         self.close()
 
@@ -778,7 +777,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         if is_close:
             self.__responsed_close = True
             if self.__debug: print("server tell close connection")
-            print(self.getpeername(),"--")
             self.delete_this_no_sent_data()
             return
 
