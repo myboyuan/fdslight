@@ -813,7 +813,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
 
-        print(self.__cookie_id,self.socket.getsockname(),"--")
+        print(self.__cookie_id,self.getpeername(),"--")
         self.__is_sent_proxy_request = True
         sent_data = app_proxy_proto.build_reqconn(self.__cookie_id, 1, atyp, addr, port)
         self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
@@ -825,7 +825,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.__sentdata_buf.append(sent_data)
             return
 
-        print(self.__cookie_id, self.socket.getsockname(), "--")
+        print(self.__cookie_id, self.getpeername(), "--")
         self.__update_time = time.time()
         self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_SOCKS, sent_data)
 
