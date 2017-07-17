@@ -94,7 +94,6 @@ class tcp_proxy(tcp_handler.tcp_handler):
 
         if not self.is_conn_ok(): return
 
-        if self.__debug: print(message)
         self.__update_time = time.time()
         self.add_evt_write(self.fileno)
 

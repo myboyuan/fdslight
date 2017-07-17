@@ -588,7 +588,6 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         rdata = self.reader.read()
 
         if self.__use_tunnel:
-            if self.__debug: print(rdata)
             self.__tunnel_proxy_send_tcpdata(rdata)
         else:
             self.send_message_to_handler(self.fileno, self.__fileno, rdata)
