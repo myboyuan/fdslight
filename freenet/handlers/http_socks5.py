@@ -580,7 +580,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
         :return:
         """
         resp_data = httputils.build_http1x_resp_header("200 Connection Established", [
-            ("Server", "Proxy-Server"), ("Connection", "Keep-Alive")
+            ("Server", "Proxy-Server"), ("Connection", "close")
         ])
         self.__send_data(resp_data.encode("iso-8859-1"))
 
