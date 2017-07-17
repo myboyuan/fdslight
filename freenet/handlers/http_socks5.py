@@ -802,6 +802,7 @@ class _http_socks5_handler(tcp_handler.tcp_handler):
             self.__handle_http_no_tunnel_response(byte_data)
             return
 
+        print(byte_data)
         self.__send_data(byte_data)
 
     def __tunnel_proxy_reqconn(self, atyp, addr, port):
