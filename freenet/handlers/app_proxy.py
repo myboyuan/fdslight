@@ -39,7 +39,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
         self.__update_time = time.time()
         self.set_timeout(self.fileno, 10)
 
-        if self.__debug: print("connect ok")
+        if self.__debug: print("connect ok", self.socket.getsockname())
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
