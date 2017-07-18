@@ -319,7 +319,10 @@ class http_socks5_listener(tcp_handler.tcp_handler):
         seq = [v for k, v in self.__cookie_ids.items()]
         for fileno in seq:
             self.delete_handler(fileno)
-        return
+
+        for _id in self.__wait_del_cookie_ids:
+            self.__empty_cookie_ids.append(_id)
+        self.__wait_del_cookie_ids = {}
 
 
 class _http_socks5_handler(tcp_handler.tcp_handler):
