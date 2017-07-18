@@ -27,7 +27,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
         self.__cookie_id = cookie_id
         self.__debug = debug
 
-        if self.__debug: print(address)
+        if self.__debug: print(address, self.__cookie_id)
 
         self.set_socket(s)
         self.connect(address)
