@@ -94,7 +94,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
 
         if not self.is_conn_ok(): return
 
-        if self.__debug: print(self.__cookie_id)
+        if self.__debug: print(self.socket.getsockname(), self.__cookie_id)
         self.__update_time = time.time()
         self.add_evt_write(self.fileno)
 
