@@ -5,7 +5,7 @@
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.evtframework.handlers.udp_handler as udp_handler
 import socket, time
-import freenet.lib.utils as proto_utils
+import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.logging as logging
 
 
