@@ -20,6 +20,7 @@ import freenet.lib.file_parser as file_parser
 import freenet.lib.logging as logging
 import dns.resolver
 import freenet.lib.host_match as host_match
+import freenet.lib.app_qos as app_qos
 
 _MODE_GW = 1
 _MODE_LOCAL = 2
@@ -127,6 +128,7 @@ class _fdslight_client(dispatcher.dispatcher):
     __http_socks5_fileno = -1
 
     __host_match = None
+    __app_qos = None
 
     def init_func(self, mode, debug, configs, only_http_socks5=False, no_http_socks5=False):
         self.create_poll()
@@ -172,6 +174,8 @@ class _fdslight_client(dispatcher.dispatcher):
             app_proxy_configs = configs["app_proxy"]
             listen_ip = app_proxy_configs["listen_ip"]
             port = int(app_proxy_configs["listen_port"])
+
+            self.__app_qos = app_qos.app_qos()
 
             self.__http_socks5_fileno = self.create_handler(
                 -1, http_socks5.http_socks5_listener, (listen_ip, port,),
@@ -394,6 +398,10 @@ class _fdslight_client(dispatcher.dispatcher):
             self.__open_tunnel()
 
         handler = self.get_handler(self.__tunnel_fileno)
+
+        #if action == proto_utils.ACT_SOCKS:
+        #    self.__app_qos.input(message)
+
         handler.send_msg_to_tunnel(self.session_id, action, message)
 
     def send_msg_to_tun(self, message):
