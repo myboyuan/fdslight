@@ -128,6 +128,8 @@ class _fdslight_client(dispatcher.dispatcher):
 
     __host_match = None
 
+    __only_http_socks5 = None
+
     def init_func(self, mode, debug, configs, only_http_socks5=False, no_http_socks5=False):
         self.create_poll()
 
@@ -179,6 +181,8 @@ class _fdslight_client(dispatcher.dispatcher):
             )
 
         signal.signal(signal.SIGUSR1, self.__set_host_rules)
+
+        self.__only_http_socks5 = only_http_socks5
 
         if only_http_socks5: return
 
@@ -366,6 +370,8 @@ class _fdslight_client(dispatcher.dispatcher):
         if action == proto_utils.ACT_SOCKS:
             self.get_handler(self.__http_socks5_fileno).msg_from_tunnel(message)
             return
+
+        if self.__only_http_socks5: return
 
         self.__mbuf.copy2buf(message)
         ip_ver = self.__mbuf.ip_version()
