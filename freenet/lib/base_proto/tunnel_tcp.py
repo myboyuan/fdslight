@@ -54,7 +54,7 @@ class builder(object):
 
         seq = []
 
-        a, b = (0, 65535,)
+        a, b = (0, 60000,)
 
         while 1:
             _byte_data = byte_data[a:b]
@@ -69,7 +69,7 @@ class builder(object):
             e_body = self.wrap_body(pkt_len, _byte_data)
 
             seq.append(b"".join((e_hdr, e_body,)))
-            a, b = (b, b + 65535,)
+            a, b = (b, b + 60000,)
 
         return b"".join(seq)
 
