@@ -22,3 +22,13 @@ def decrypt(key, iv, byte_data):
     decryptor = cipher.decryptor()
 
     return decryptor.update(byte_data) + decryptor.finalize()
+
+
+def get_size(byte_size):
+    n = int(byte_size / 16)
+    r = byte_size % 16
+
+    if r != 0: n += 1
+
+    return n * 16
+

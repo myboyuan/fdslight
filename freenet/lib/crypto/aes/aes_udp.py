@@ -42,7 +42,9 @@ class encrypt(tunnel.builder):
         return iv + e_data
 
     def wrap_body(self, size, body_data):
-        return aes_cfb.encrypt(self.__key, self.__iv, body_data)
+        filled = bytes(aes_cfb.get_size(size) - size)
+
+        return aes_cfb.encrypt(self.__key, self.__iv, body_data + filled)
 
     def __set_aes_key(self, new_key):
         self.__key = hashlib.md5(new_key.encode()).digest()
