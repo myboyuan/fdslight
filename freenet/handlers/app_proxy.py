@@ -13,7 +13,12 @@ class tcp_proxy(tcp_handler.tcp_handler):
     __session_id = None
     __debug = None
 
-    def init_func(self, creator, session_id, cookie_id, address, is_ipv6=False, debug=True):
+    __reconnect = None
+
+    __address = None
+    __is_ipv6 = None
+
+    def init_func(self, creator, session_id, cookie_id, address, is_ipv6=False, debug=True, reconn=False):
         if is_ipv6:
             fa = socket.AF_INET6
         else:
@@ -26,6 +31,9 @@ class tcp_proxy(tcp_handler.tcp_handler):
         if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
         self.__cookie_id = cookie_id
         self.__debug = debug
+        self.__reconnect = reconn
+        self.__is_ipv6 = is_ipv6
+        self.__address = address
 
         if self.__debug: print(address, self.__cookie_id)
 
