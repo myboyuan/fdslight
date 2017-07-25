@@ -35,8 +35,6 @@ class tcp_proxy(tcp_handler.tcp_handler):
         self.__is_ipv6 = is_ipv6
         self.__address = address
 
-        if self.__debug: print(address, self.__cookie_id)
-
         self.set_socket(s)
         self.connect(address)
 
@@ -47,7 +45,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
         self.__update_time = time.time()
         self.set_timeout(self.fileno, 10)
 
-        if self.__debug: print("connect ok", self.socket.getsockname(), self.__cookie_id)
+        if self.__debug: print("connect ok", self.__address, self.__cookie_id)
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
@@ -102,7 +100,7 @@ class tcp_proxy(tcp_handler.tcp_handler):
 
         if not self.is_conn_ok(): return
 
-        if self.__debug: print(self.socket.getsockname(), self.__cookie_id)
+        if self.__debug: print(self.__address, self.__cookie_id)
         self.__update_time = time.time()
         self.add_evt_write(self.fileno)
 
