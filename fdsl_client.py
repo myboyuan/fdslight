@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, os, platform
+import sys, os
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -14,12 +14,15 @@ import pywind.lib.configfile as configfile
 import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.proc as proc
+import freenet.handlers.tundev as tundev
 import os, getopt, signal, importlib, socket
+import freenet.handlers.dns_proxy as dns_proxy
+import freenet.lib.fdsl_ctl as fdsl_ctl
 import freenet.handlers.tunnelc as tunnelc
 import freenet.lib.file_parser as file_parser
+import freenet.handlers.traffic_pass as traffic_pass
 import freenet.lib.logging as logging
 import dns.resolver
-import freenet.lib.host_match as host_match
 
 _MODE_GW = 1
 _MODE_LOCAL = 2
@@ -27,62 +30,6 @@ _MODE_LOCAL = 2
 PID_FILE = "/tmp/fdslight.pid"
 LOG_FILE = "/tmp/fdslight.log"
 ERR_FILE = "/tmp/fdslight_error.log"
-
-
-def _config_osx_app_proxy(host, port):
-    pass
-
-
-def _config_windows_app_proxy(host, port):
-    pass
-
-
-def _config_linux_app_proxy(host, port):
-    pass
-
-
-def _config_freebsd_app_proxy(host, port):
-    pass
-
-
-def _unconfig_osx_app_proxy():
-    pass
-
-
-def _unconfig_windows_app_proxy():
-    pass
-
-
-def _unconfig_linux_app_proxy():
-    pass
-
-
-def _unconfig_freebsd_app_proxy():
-    pass
-
-
-def auto_os_app_proxy_config(host, port):
-    """根据不同的操作系统自动配置应用代理
-    :param host:
-    :param port:
-    :return:
-    """
-    if platform.find("win32") > -1:
-        _config_windows_app_proxy(host, port)
-        return
-
-    if platform.find("darwin") > -1:
-        _config_osx_app_proxy(host, port)
-        return
-
-    if platform.find("linux") > -1:
-        _config_linux_app_proxy(host, port)
-        return
-
-    if platform.find("freebsd") > -1:
-        _config_freebsd_app_proxy(host, port)
-
-    return
 
 
 class _fdslight_client(dispatcher.dispatcher):
@@ -124,13 +71,7 @@ class _fdslight_client(dispatcher.dispatcher):
     # 是否开启IPV6流量
     __enable_ipv6_traffic = False
 
-    __http_socks5_fileno = -1
-
-    __host_match = None
-
-    __only_http_socks5 = None
-
-    def init_func(self, mode, debug, configs, only_http_socks5=False, no_http_socks5=False):
+    def init_func(self, mode, debug, configs):
         self.create_poll()
 
         signal.signal(signal.SIGINT, self.__exit)
@@ -138,9 +79,63 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__router_timer = timer.timer()
         self.__routers = {}
         self.__configs = configs
-        self.__host_match = host_match.host_match()
+
+        if mode == "local":
+            self.__mode = _MODE_LOCAL
+        else:
+            self.__mode = _MODE_GW
+
+        self.__mbuf = utils.mbuf()
         self.__debug = debug
+
+        self.__tundev_fileno = self.create_handler(
+            -1, tundev.tundevc, self.__DEVNAME
+        )
+
+        public = configs["public"]
+        gateway = configs["gateway"]
+
+        self.__enable_ipv6_traffic = bool(int(public["enable_ipv6_traffic"]))
+
+        is_ipv6 = utils.is_ipv6_address(public["remote_dns"])
+
+        if self.__mode == _MODE_GW:
+            self.__dns_fileno = self.create_handler(
+                -1, dns_proxy.dnsc_proxy,
+                gateway["dnsserver_bind"], debug=debug, server_side=True, is_ipv6=False
+            )
+            self.get_handler(self.__dns_fileno).set_parent_dnsserver(public["remote_dns"], is_ipv6=is_ipv6)
+
+            if self.__enable_ipv6_traffic:
+                self.__dns_listen6 = self.create_handler(
+                    -1, dns_proxy.dnsc_proxy,
+                    gateway["dnsserver_bind6"], debug=debug, server_side=True, is_ipv6=True
+                )
+                self.get_handler(self.__dns_listen6).set_parent_dnsserver(public["remote_dns"], is_ipv6=is_ipv6)
+        else:
+            self.__dns_fileno = self.create_handler(
+                -1, dns_proxy.dnsc_proxy,
+                public["remote_dns"], debug=debug, server_side=False
+            )
+
         self.__set_host_rules(None, None)
+
+        if self.__mode == _MODE_GW:
+            self.__load_kernel_mod()
+            udp_global = bool(int(gateway["dgram_global_proxy"]))
+            if udp_global:
+                self.__dgram_fetch_fileno = self.create_handler(
+                    -1, traffic_pass.traffic_read,
+                    self.__configs["gateway"], enable_ipv6=self.__enable_ipv6_traffic
+                )
+            ''''''
+        else:
+            local = configs["local"]
+            vir_dns = local["virtual_dns"]
+            vir_dns6 = local["virtual_dns6"]
+
+            self.set_router(vir_dns, is_ipv6=False, is_dynamic=False)
+            if self.__enable_ipv6_traffic: self.set_router(vir_dns6, is_ipv6=True, is_dynamic=False)
 
         conn = configs["connection"]
 
@@ -166,95 +161,14 @@ class _fdslight_client(dispatcher.dispatcher):
 
         self.__crypto_configs = crypto_configs
 
-        if not no_http_socks5:
-            if conn["tunnel_type"].lower() != "tcp":
-                print("app proxy must be tcp tunnel")
-                sys.exit(-1)
-            import freenet.handlers.http_socks5 as http_socks5
-            app_proxy_configs = configs["app_proxy"]
-            listen_ip = app_proxy_configs["listen_ip"]
-            port = int(app_proxy_configs["listen_port"])
-
-            self.__http_socks5_fileno = self.create_handler(
-                -1, http_socks5.http_socks5_listener, (listen_ip, port,),
-                self.__host_match, is_ipv6=False, debug=self.__debug
-            )
-
-        signal.signal(signal.SIGUSR1, self.__set_host_rules)
-
-        self.__only_http_socks5 = only_http_socks5
-
-        if only_http_socks5: return
-
-        import freenet.handlers.dns_proxy as dns_proxy
-        import freenet.handlers.tundev as tundev
-
-        if mode == "local":
-            self.__mode = _MODE_LOCAL
-        else:
-            self.__mode = _MODE_GW
-
-        self.__mbuf = utils.mbuf()
-
-        self.__tundev_fileno = self.create_handler(
-            -1, tundev.tundevc, self.__DEVNAME
-        )
-
-        public = configs["public"]
-        gateway = configs["gateway"]
-
-        self.__enable_ipv6_traffic = bool(int(public["enable_ipv6_traffic"]))
-
-        is_ipv6 = utils.is_ipv6_address(public["remote_dns"])
-
-        if self.__mode == _MODE_GW:
-            self.__dns_fileno = self.create_handler(
-                -1, dns_proxy.dnsc_proxy,
-                gateway["dnsserver_bind"], self.__host_match, debug=debug, server_side=True, is_ipv6=False
-            )
-            self.get_handler(self.__dns_fileno).set_parent_dnsserver(public["remote_dns"], is_ipv6=is_ipv6)
-
-            if self.__enable_ipv6_traffic:
-                self.__dns_listen6 = self.create_handler(
-                    -1, dns_proxy.dnsc_proxy,
-                    gateway["dnsserver_bind6"], self.__host_match, debug=debug, server_side=True, is_ipv6=True
-                )
-                self.get_handler(self.__dns_listen6).set_parent_dnsserver(public["remote_dns"], is_ipv6=is_ipv6)
-        else:
-            self.__dns_fileno = self.create_handler(
-                -1, dns_proxy.dnsc_proxy,
-                public["remote_dns"], self.__host_match, debug=debug, server_side=False
-            )
-
-        self.__set_host_rules(None, None)
-
-        if self.__mode == _MODE_GW:
-            self.__load_kernel_mod()
-            udp_global = bool(int(gateway["dgram_global_proxy"]))
-            if udp_global:
-                import freenet.handlers.traffic_pass as traffic_pass
-
-                self.__dgram_fetch_fileno = self.create_handler(
-                    -1, traffic_pass.traffic_read,
-                    self.__configs["gateway"], enable_ipv6=self.__enable_ipv6_traffic
-                )
-            ''''''
-        else:
-            local = configs["local"]
-            vir_dns = local["virtual_dns"]
-            vir_dns6 = local["virtual_dns6"]
-
-            self.set_router(vir_dns, is_ipv6=False, is_dynamic=False)
-            if self.__enable_ipv6_traffic: self.set_router(vir_dns6, is_ipv6=True, is_dynamic=False)
-
         if not debug:
             sys.stdout = open(LOG_FILE, "a+")
             sys.stderr = open(ERR_FILE, "a+")
-        return
+        ''''''
+
+        signal.signal(signal.SIGUSR1, self.__set_host_rules)
 
     def __load_kernel_mod(self):
-        import freenet.lib.fdsl_ctl as fdsl_ctl
-
         ko_file = "%s/driver/fdslight_dgram.ko" % BASE_DIR
 
         if not os.path.isfile(ko_file):
@@ -299,7 +213,7 @@ class _fdslight_client(dispatcher.dispatcher):
 
         if ip_ver not in (4, 6,): return
 
-        action = proto_utils.ACT_IPDATA
+        action = proto_utils.ACT_DATA
         is_ipv6 = False
 
         if ip_ver == 4:
@@ -357,7 +271,7 @@ class _fdslight_client(dispatcher.dispatcher):
             self.set_router(sts_daddr, timeout=190, is_ipv6=is_ipv6, is_dynamic=True)
         else:
             self.__update_router_access(sts_daddr, timeout=190)
-        self.send_msg_to_tunnel(proto_utils.ACT_IPDATA, message)
+        self.send_msg_to_tunnel(proto_utils.ACT_DATA, message)
 
     def handle_msg_from_tunnel(self, seession_id, action, message):
         if seession_id != self.session_id: return
@@ -366,13 +280,6 @@ class _fdslight_client(dispatcher.dispatcher):
         if action == proto_utils.ACT_DNS:
             self.get_handler(self.__dns_fileno).msg_from_tunnel(message)
             return
-
-        if action == proto_utils.ACT_SOCKS:
-            self.get_handler(self.__http_socks5_fileno).msg_from_tunnel(message)
-            return
-
-        if self.__only_http_socks5: return
-
         self.__mbuf.copy2buf(message)
         ip_ver = self.__mbuf.ip_version()
         if ip_ver not in (4, 6,): return
@@ -400,7 +307,6 @@ class _fdslight_client(dispatcher.dispatcher):
             self.__open_tunnel()
 
         handler = self.get_handler(self.__tunnel_fileno)
-
         handler.send_msg_to_tunnel(self.session_id, action, message)
 
     def send_msg_to_tun(self, message):
@@ -463,7 +369,7 @@ class _fdslight_client(dispatcher.dispatcher):
             self.__exit(signum, frame)
 
         rules = file_parser.parse_host_file(fpath)
-        for rule in rules: self.__host_match.add_rule(rule)
+        self.get_handler(self.__dns_fileno).set_host_rules(rules)
 
     def __open_tunnel(self):
         conn = self.__configs["connection"]
@@ -496,12 +402,7 @@ class _fdslight_client(dispatcher.dispatcher):
         self.get_handler(self.__tunnel_fileno).create_tunnel((host, port,))
 
     def tell_tunnel_close(self):
-        if self.handler_exists(self.__http_socks5_fileno):
-            self.get_handler(self.__http_socks5_fileno).del_all_proxy()
         self.__tunnel_fileno = -1
-
-    def tunnel_ok(self):
-        return self.handler_exists(self.__tunnel_fileno)
 
     def get_server_ip(self, host):
         """获取服务器IP
@@ -595,7 +496,7 @@ class _fdslight_client(dispatcher.dispatcher):
         return
 
 
-def __start_service(mode, debug, only_http_socks5, no_http_socks5):
+def __start_service(mode, debug):
     if not debug:
         pid = os.fork()
         if pid != 0: sys.exit(0)
@@ -614,10 +515,10 @@ def __start_service(mode, debug, only_http_socks5, no_http_socks5):
     cls = _fdslight_client()
 
     if debug:
-        cls.ioloop(mode, debug, configs, only_http_socks5, no_http_socks5)
+        cls.ioloop(mode, debug, configs)
         return
     try:
-        cls.ioloop(mode, debug, configs, only_http_socks5, no_http_socks5)
+        cls.ioloop(mode, debug, configs)
     except:
         logging.print_error()
 
@@ -644,20 +545,15 @@ def main():
     -d      debug | start | stop    debug,start or stop application
     -m      local | gateway         run as local or gateway
     -u      host_rules              update host rules
-    --only_http_socks5              only http socks5 proxy
-    --no_http_socks5                no http socks5 proxy
     """
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "u:m:d:", ["only_http_socks5", "no_http_socks5"])
+        opts, args = getopt.getopt(sys.argv[1:], "u:m:d:")
     except getopt.GetoptError:
         print(help_doc)
         return
     d = ""
     m = ""
     u = ""
-
-    only_http_socks5 = False
-    no_http_socks5 = False
 
     for k, v in opts:
         if k == "-u":
@@ -666,14 +562,8 @@ def main():
 
         if k == "-m": m = v
         if k == "-d": d = v
-        if k == "--only_http_socks5": only_http_socks5 = True
-        if k == "--no_http_socks5": no_http_socks5 = True
 
-    if only_http_socks5 and no_http_socks5:
-        print("conflict argument about only_http_socks5 and no_http_socks5")
-        return
-
-    if not d and not m and not u and not only_http_socks5:
+    if not d and not m and not u:
         print(help_doc)
         return
 
@@ -688,14 +578,14 @@ def main():
         print(help_doc)
         return
 
-    if not only_http_socks5 and (m not in ("local", "gateway")):
+    if m not in ("local", "gateway"):
         print(help_doc)
         return
 
     if d in ("start", "debug",):
         debug = False
         if d == "debug": debug = True
-        __start_service(m, debug, only_http_socks5, no_http_socks5)
+        __start_service(m, debug)
         return
 
     if d == "stop": __stop_service()
