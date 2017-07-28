@@ -289,9 +289,9 @@ class _fdslight_client(dispatcher.dispatcher):
     def send_msg_to_other_dnsservice_for_dns_response(self, message, is_ipv6=False):
         """当启用IPV4和IPv6双协议栈的时候
         此函数的作用是两个局域网DNS服务相互发送消息
-        :param message: 
-        :param is_ipv6:发送的目标是否是IPv6 DNS服务 
-        :return: 
+        :param message:
+        :param is_ipv6:发送的目标是否是IPv6 DNS服务
+        :return:
         """
         # 没有开启IPv6的时候,禁止向另外的DNS服务发送消息
         if not self.__enable_ipv6_traffic: return
@@ -302,7 +302,7 @@ class _fdslight_client(dispatcher.dispatcher):
 
         self.send_message_to_handler(-1, fileno, message)
 
-    def send_msg_to_tunnel(self, action, message):
+    def send_msg_to_tunnel(self, action, message, src_ip=None):
         if not self.handler_exists(self.__tunnel_fileno):
             self.__open_tunnel()
 
@@ -371,7 +371,7 @@ class _fdslight_client(dispatcher.dispatcher):
         rules = file_parser.parse_host_file(fpath)
         self.get_handler(self.__dns_fileno).set_host_rules(rules)
 
-    def __open_tunnel(self):
+    def __open_tunnel(self, src_ip=None):
         conn = self.__configs["connection"]
         host = conn["host"]
         port = int(conn["port"])
