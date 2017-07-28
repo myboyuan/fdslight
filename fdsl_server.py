@@ -75,6 +75,8 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __enable_ipv6_app_proxy = None
 
+    __app_proxy_enable = False
+
     def init_func(self, debug, configs):
         self.create_poll()
 
@@ -87,6 +89,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
         app_proxy_configs = self.__configs["app_proxy"]
         self.__enable_ipv6_app_proxy = bool(int(app_proxy_configs["enable_ipv6"]))
+        self.__app_proxy_enable = bool(int(app_proxy_configs["proxy_enable"]))
 
         signal.signal(signal.SIGINT, self.__exit)
 
@@ -226,6 +229,8 @@ class _fdslight_server(dispatcher.dispatcher):
             return True
 
         if action == proto_utils.ACT_SOCKS:
+            # 没开启应用代理那么直接返回
+            if not self.__app_proxy_enable: return False
             self.__handle_socks_data_from_tunnel(session_id, message)
             return True
 
