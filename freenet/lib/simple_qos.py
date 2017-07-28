@@ -9,7 +9,6 @@ QTYPE_DST = 2
 
 class qos(object):
     __qos_queue = None
-    __QSIZE = 20
     __qtype = 0
 
     def __init__(self, qtype):
@@ -30,9 +29,7 @@ class qos(object):
             else:
                 address = ipdata[24:40]
 
-        n = (address[-2] << 8) | address[-1]
-
-        slot = n % self.__QSIZE
+        slot = address
 
         if slot not in self.__qos_queue:
             self.__qos_queue[slot] = []
