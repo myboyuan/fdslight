@@ -210,7 +210,7 @@ class _fdslight_server(dispatcher.dispatcher):
         if size > utils.MBUF_AREA_SIZE: return False
         if action not in proto_utils.ACTS: return False
 
-        if action == proto_utils.ACT_DATA: self.__mbuf.copy2buf(message)
+        if action == proto_utils.ACT_IPDATA: self.__mbuf.copy2buf(message)
         if action == proto_utils.ACT_DNS:
             self.__request_dns(session_id, message)
             return True
@@ -379,10 +379,10 @@ class _fdslight_server(dispatcher.dispatcher):
         if not ok: return
 
         self.__mbuf.offset = 0
-        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, self.__mbuf.get_data())
+        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_IPDATA, self.__mbuf.get_data())
 
     def send_msg_to_tunnel_from_p2p_proxy(self, session_id, message):
-        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_DATA, message)
+        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_IPDATA, message)
 
     def response_dns(self, session_id, message):
         if not self.__access.session_exists(session_id): return
