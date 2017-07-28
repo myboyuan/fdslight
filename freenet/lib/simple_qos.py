@@ -44,6 +44,14 @@ class qos(object):
         :return: 
         """
         results = []
-        for slot, seq in self.__qos_queue.items():
-            if seq: results.append(seq.pop(0))
+        dels = []
+
+        for slot in self.__qos_queue:
+            seq = self.__qos_queue[slot]
+            results.append(seq.pop(0))
+            if not seq: dels.append(slot)
+
+        for slot in dels:
+            del self.__qos_queue[slot]
+
         return results

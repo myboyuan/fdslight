@@ -73,11 +73,21 @@ class tun_base(handler.handler):
                 break
             self.__qos.add_to_queue(ip_packet)
 
-        while 1:
-            results = self.__qos.get_queue()
-            for ip_packet in results:
-                self.handle_ip_packet_from_read(ip_packet)
-            if not results: break
+        self.__qos_from_tundev()
+
+    def task_loop(self):
+        self.__qos_from_tundev()
+
+    def __qos_from_tundev(self):
+        results = self.__qos.get_queue()
+
+        for ip_packet in results:
+            self.handle_ip_packet_from_read(ip_packet)
+
+        if not results:
+            self.del_loop_task(self.fileno)
+        else:
+            self.add_to_loop_task(self.fileno)
 
     def evt_write(self):
         try:
