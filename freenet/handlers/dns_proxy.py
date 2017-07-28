@@ -12,6 +12,7 @@ except ImportError:
 import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.ippkts as ippkts
+import freenet.lib.host_match as host_match
 
 
 class dns_base(udp_handler.udp_handler):
@@ -194,7 +195,7 @@ class dnsc_proxy(dns_base):
     __udp_client = None
     __is_ipv6 = False
 
-    def init_func(self, creator, address, host_match, debug=False, server_side=False, is_ipv6=False):
+    def init_func(self, creator, address, debug=False, server_side=False, is_ipv6=False):
         if is_ipv6:
             fa = socket.AF_INET6
         else:
@@ -218,11 +219,17 @@ class dnsc_proxy(dns_base):
         self.__debug = debug
         self.__host_match = host_match
         self.__timer = timer.timer()
+        self.__host_match = host_match.host_match()
+
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
         return self.fileno
+
+    def set_host_rules(self, rules):
+        self.__host_match.clear()
+        for rule in rules: self.__host_match.add_rule(rule)
 
     def set_parent_dnsserver(self, server, is_ipv6=False):
         """当作为网关模式时需要调用此函数来设置上游DNS
