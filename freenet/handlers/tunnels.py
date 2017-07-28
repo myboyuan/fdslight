@@ -123,9 +123,6 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def tcp_delete(self):
-        if self.__session_id:
-            self.dispatcher.tell_del_all_app_proxy(self.__session_id)
-
         self.unregister(self.fileno)
         self.close()
         logging.print_general("tcp_disconnect", self.__address)
