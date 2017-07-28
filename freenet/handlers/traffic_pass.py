@@ -161,6 +161,7 @@ class p2p_proxy(udp_handler.udp_handler):
     __is_udplite = False
 
     __is_ipv6 = False
+    __packets = None
 
     def init_func(self, creator_fd, session_id, internal_address, is_udplite=False, is_ipv6=False):
         if not is_udplite:
@@ -179,6 +180,7 @@ class p2p_proxy(udp_handler.udp_handler):
         self.__internal_ip = internal_address[0]
         self.__byte_internal_ip = socket.inet_pton(fa, self.__internal_ip)
         self.__port = internal_address[1]
+        self.__packets = []
 
         s = socket.socket(fa, socket.SOCK_DGRAM, proto)
         self.__permits = {}
@@ -220,9 +222,20 @@ class p2p_proxy(udp_handler.udp_handler):
             is_ipv6=self.__is_ipv6
         )
 
-        for udp_pkt in udp_packets:
-            self.dispatcher.send_msg_to_tunnel_from_p2p_proxy(self.__session_id, udp_pkt)
-        return
+        self.__packets += udp_packets
+        self.__send_to_tunnel()
+
+    def task_loop(self):
+        self.__send_to_tunnel()
+
+    def __send_to_tunnel(self):
+        try:
+            pkt = self.__packets.pop(0)
+        except IndexError:
+            self.del_loop_task(self.fileno)
+            return
+        self.add_to_loop_task(self.fileno)
+        self.dispatcher.send_msg_to_tunnel_from_p2p_proxy(self.__session_id, pkt)
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
