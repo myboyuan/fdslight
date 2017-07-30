@@ -3,6 +3,7 @@
 ## 对于http socks5请求，只支持后缀名为1的请求
 
 # 美国顶级网站
+goo.gl:1
 *.google.com:1
 *.google.com.hk:1
 *.google.co.jp:1
