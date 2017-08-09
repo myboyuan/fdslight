@@ -161,9 +161,9 @@ register.mesh.com:1
 *.ubisoft.com:1
 
 
-#*.srv.nintendo.net:1
-#*.baas.nintendo.com:1
-#*.nintendowifi.net:1
+*.nintendo.net:1
+*.nintendo.com:1
+*.nintendowifi.net:1
 
 ### 开发相关
 *.spice-space.org:1
