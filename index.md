@@ -6,10 +6,10 @@ Linux机器，客户端服务端都需要Linux，python3。
 
 ### 安装第一步（准备软件运行环境）
 1.Python3说明：ubuntu自带的Python3可能会有点麻烦，最好自己编译python3,而且编译Python3也很简单  
-2.Python3下载:wget https://www.python.org/ftp/python/3.5.2/Python-3.5.2.tgz  
-3.解压Python3: tar zxf Python-3.5.2.tgz  
+2.Python3下载:wget https://www.python.org/ftp/python/3.5.4/Python-3.5.4.tgz  
+3.解压Python3: tar zxf Python-3.5.4.tgz  
 4.假设把Python3安装到/opt目录，你也可以选择其他目录，这里以/opt目录为例  
-5.命令:cd Python-3.5.2  
+5.命令:cd Python-3.5.4  
 6.命令:./configure --prefix=/opt --enable-ipv6  
 7.命令:make -j2  
 8.命令(如果提示要输入密码那么就输入密码):sudo make install  
