@@ -1,0 +1,8 @@
+title: Fdslight
+description: IP层代理软件(VPN),支持分发，主要部署在路由器节点上，可以加速你的海外网络访问
+google_analytics: 
+show_downloads: true
+theme: jekyll-theme-slate
+
+gems:
+  - jekyll-mentions
