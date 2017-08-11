@@ -15,15 +15,14 @@ Linux机器，客户端服务端都需要Linux，python3。
 8.命令(如果提示要输入密码那么就输入密码):sudo make install  
 
 ### 安装第二步(安装软件的Python3依赖库)
-1.首先需要安装python的dnspython和pycrypto库，dnspython无论如何一定要，如果使用默认的加密方式，那么需要pycrypto库  
+1.首先需要安装python的dnspython和cryptography库，dnspython无论如何一定要，如果使用默认的加密方式，那么需要cryptography库  
 2.命令：cd /opt/bin  
 3.命令：sudo ./pip3 install dnspython3  
-4.命令：sudo ./pip3 install pycrypto  
+4.命令：sudo ./pip3 install cryptography  
 
 ### 服务端安装
 1.首先进入下载的fdslight的目录,里面有个install.py文件  
-2.命令：/opt/bin/python3 install.py server /opt/include/python3.5m  
-3.修改/etc/sysctl.conf：net.ipv4.ip_forward=1  
+2.命令：/opt/bin/python3 install.py server /opt/include/python3.5m
 
 ### 客戶端gateway模式安装
 1.在ubuntu desktop版本下已经默认安装了linux headers,你不需要安装，如果不是ubuntu需要安装linux headers,即内核开发包，**如果你的机器更新了内核，你需要重新安装一次**  
@@ -41,15 +40,12 @@ Linux机器，客户端服务端都需要Linux，python3。
 ### 启动命令的说明("|"表示或的意思)  
 sudo /opt/bin/python3 main.py -m server|gateway|local -d start|debug|stop  
 
-### 服务端的特别说明 
-1.你需要运行fdslight根目录下的server_nat_script.sh文件，如果你修改了配置文件fn_server.py的subnet选项，需要修改该脚本文件  
-
 ### 客户端gateway模式的特别说明  
 1.网关模式本地机器无法通过代理，局域网的其他的机器可以走代理
 2.要使局域网的其他机器可以走代理，你需要设置局域网其他机器的网关为运行fdslight客户端的地址，DNS也是fdslight客户端的地址
 
 ###客户端local模式的特别说明(以ubuntu desktop发行版说明）
-1.fn_local.py文件有个virtual_dns选项，需要把主机的DNS改成这个DNS地址（如果是DHCP分配地址的方式，请把他改成只地址的选项，如下图）
+1.fn_client.ini文件有个virtual_dns选项，需要把主机的DNS改成这个DNS地址（如果是DHCP分配地址的方式，请把他改成只地址的选项，如下图）
 ![local配置图](https://github.com/fdslight/fdslight/blob/master/images/fdsl_local_config.png?raw=true)
 
 2.改好之后需要断开网络然后重启网络，但是此时如果运行fdslight，或导致退出，无论如何，你都要重新启动或者启动fdslight，参考图  
