@@ -25,23 +25,25 @@
 #define FDSL_MTU 1501
 
 struct fdsl_queue_data{
-	ssize_t size;
-	char data[FDSL_MTU];
 	struct fdsl_queue_data *next;
 	struct fdsl_queue_data *previous;
+
+	ssize_t size;
+	char data[FDSL_MTU];
 };
 
 struct fdsl_queue{
-    // 总共能够存储的数据大小
-	size_t total_size;
-	// 已经使用的数据大小
-	size_t have;
-	//数据开始位置
 	struct fdsl_queue_data *begin;
 	// 数据结束位置
 	struct fdsl_queue_data *end;
 	// 列表对象
 	struct fdsl_queue_data *list;
+
+	// 总共能够存储的数据大小
+	size_t total_size;
+	// 已经使用的数据大小
+	size_t have;
+	//数据开始位置
 };
 
 struct fdsl_queue *fdsl_queue_init(size_t qsize)
