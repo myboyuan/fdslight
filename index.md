@@ -44,7 +44,7 @@ sudo /opt/bin/python3 main.py -m server|gateway|local -d start|debug|stop
 1.网关模式本地机器无法通过代理，局域网的其他的机器可以走代理
 2.要使局域网的其他机器可以走代理，你需要设置局域网其他机器的网关为运行fdslight客户端的地址，DNS也是fdslight客户端的地址
 
-###客户端local模式的特别说明(以ubuntu desktop发行版说明）
+### 客户端local模式的特别说明(以ubuntu desktop发行版说明）
 1.fn_client.ini文件有个virtual_dns选项，需要把主机的DNS改成这个DNS地址（如果是DHCP分配地址的方式，请把他改成只地址的选项，如下图）
 ![local配置图](https://github.com/fdslight/fdslight/blob/master/images/fdsl_local_config.png?raw=true)
 
