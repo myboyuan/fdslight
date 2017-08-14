@@ -69,8 +69,8 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __ip6_udp_cone_nat = False
 
-    __ip4_mtu = 1500
-    __ip6_mtu = 1280
+    __ip4_mtu = None
+    __ip6_mtu = None
 
     def init_func(self, debug, configs):
         self.create_poll()
@@ -161,8 +161,15 @@ class _fdslight_server(dispatcher.dispatcher):
 
         nat_config = configs["nat"]
 
-        self.__ip4_mtu = int(nat_config["p2p_mtu"])
-        self.__ip6_mtu = int(nat_config["p2p6_mtu"])
+        try:
+            self.__ip4_mtu = int(nat_config["p2p_mtu"])
+        except KeyError:
+            self.__ip4_mtu = 1400
+
+        try:
+            self.__ip6_mtu = int(nat_config["p2p6_mtu"])
+        except KeyError:
+            self.__ip6_mtu = 1280
 
         dns_addr = nat_config["dns"]
         if utils.is_ipv6_address(dns_addr):
