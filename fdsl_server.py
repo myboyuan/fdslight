@@ -69,6 +69,9 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __ip6_udp_cone_nat = False
 
+    __ip4_mtu = 1500
+    __ip6_mtu = 1280
+
     def init_func(self, debug, configs):
         self.create_poll()
 
@@ -157,6 +160,9 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__mbuf = utils.mbuf()
 
         nat_config = configs["nat"]
+
+        self.__ip4_mtu = int(nat_config["p2p_mtu"])
+        self.__ip6_mtu = int(nat_config["p2p6_mtu"])
 
         dns_addr = nat_config["dns"]
         if utils.is_ipv6_address(dns_addr):
@@ -325,7 +331,7 @@ class _fdslight_server(dispatcher.dispatcher):
         if fileno < 0:
             fileno = self.create_handler(
                 -1, traffic_pass.p2p_proxy,
-                session_id, (sts_saddr, sport,), is_udplite=is_udplite, is_ipv6=False
+                session_id, (sts_saddr, sport,), mtu=self.__ip4_mtu, is_udplite=is_udplite, is_ipv6=False
             )
         self.get_handler(fileno).add_permit((sts_daddr, dport,))
         _, new_sport = self.get_handler(fileno).getsockname()
@@ -477,7 +483,7 @@ class _fdslight_server(dispatcher.dispatcher):
         if dgram_id not in pydict:
             fileno = self.create_handler(
                 -1, traffic_pass.p2p_proxy,
-                session_id, (saddr, sport), is_udplite=is_udplite, is_ipv6=True
+                session_id, (saddr, sport), mtu=self.__ip6_mtu, is_udplite=is_udplite, is_ipv6=True
             )
             pydict[dgram_id] = fileno
         fileno = pydict[dgram_id]

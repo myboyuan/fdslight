@@ -162,8 +162,9 @@ class p2p_proxy(udp_handler.udp_handler):
 
     __is_ipv6 = False
     __packets = None
+    __mtu = None
 
-    def init_func(self, creator_fd, session_id, internal_address, is_udplite=False, is_ipv6=False):
+    def init_func(self, creator_fd, session_id, internal_address, mtu=1500, is_udplite=False, is_ipv6=False):
         if not is_udplite:
             proto = 17
         else:
@@ -181,6 +182,7 @@ class p2p_proxy(udp_handler.udp_handler):
         self.__byte_internal_ip = socket.inet_pton(fa, self.__internal_ip)
         self.__port = internal_address[1]
         self.__packets = []
+        self.__mtu = mtu
 
         s = socket.socket(fa, socket.SOCK_DGRAM, proto)
         self.__permits = {}
@@ -209,15 +211,10 @@ class p2p_proxy(udp_handler.udp_handler):
         n_saddr = socket.inet_aton(address[0])
         sport = address[1]
 
-        if self.__is_ipv6:
-            mtu = 1280
-        else:
-            mtu = 1380
-
         udp_packets = ippkts.build_udp_packets(
             n_saddr, self.__byte_internal_ip,
             sport, self.__port, message,
-            mtu=mtu,
+            mtu=self.__mtu,
             is_udplite=self.__is_udplite,
             is_ipv6=self.__is_ipv6
         )
