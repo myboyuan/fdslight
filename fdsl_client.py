@@ -371,7 +371,7 @@ class _fdslight_client(dispatcher.dispatcher):
         rules = file_parser.parse_host_file(fpath)
         self.get_handler(self.__dns_fileno).set_host_rules(rules)
 
-    def __open_tunnel(self, src_ip=None):
+    def __open_tunnel(self):
         conn = self.__configs["connection"]
         host = conn["host"]
         port = int(conn["port"])
