@@ -302,7 +302,7 @@ class _fdslight_client(dispatcher.dispatcher):
 
         self.send_message_to_handler(-1, fileno, message)
 
-    def send_msg_to_tunnel(self, action, message, src_ip=None):
+    def send_msg_to_tunnel(self, action, message):
         if not self.handler_exists(self.__tunnel_fileno):
             self.__open_tunnel()
 
