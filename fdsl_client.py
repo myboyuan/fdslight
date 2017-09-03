@@ -399,7 +399,9 @@ class _fdslight_client(dispatcher.dispatcher):
             crypto, self.__crypto_configs, **kwargs
         )
 
-        self.get_handler(self.__tunnel_fileno).create_tunnel((host, port,))
+        rs = self.get_handler(self.__tunnel_fileno).create_tunnel((host, port,))
+        if not rs:
+            self.delete_handler(self.__tunnel_fileno)
 
     def tell_tunnel_close(self):
         self.__tunnel_fileno = -1
@@ -416,10 +418,13 @@ class _fdslight_client(dispatcher.dispatcher):
         resolver = dns.resolver.Resolver()
         resolver.nameservers = [self.__configs["public"]["remote_dns"]]
 
-        if enable_ipv6:
-            rs = resolver.query(host, "AAAA")
-        else:
-            rs = resolver.query(host, "A")
+        try:
+            if enable_ipv6:
+                rs = resolver.query(host, "AAAA")
+            else:
+                rs = resolver.query(host, "A")
+        except dns.resolver.NoAnswer:
+            return None
 
         for anwser in rs:
             ipaddr = anwser.__str__()
