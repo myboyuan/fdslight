@@ -49,7 +49,7 @@ class ip4frag_merge(object):
             self.__timer.drop(name)
         return
 
-    def get_packet(self):
+    def get_data(self):
         self.__recycle()
         try:
             return self.__ok_packets.pop(0)
