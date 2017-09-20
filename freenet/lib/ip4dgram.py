@@ -22,6 +22,7 @@ class ip4frag_merge(object):
         hdr_len = (v & 0x0f) * 4
         entity = message[hdr_len:]
 
+        print(message)
         # df = (frag_off & 0x4000) >> 14
         mf = (frag_off & 0x2000) >> 13
         offset = frag_off & 0x1fff
@@ -30,7 +31,6 @@ class ip4frag_merge(object):
 
         if offset == 0:
             sport, dport = self.__get_udp_port(entity)
-            print(sport,dport)
             entity = entity[8:]
             if dport == 0: return
 
@@ -44,7 +44,6 @@ class ip4frag_merge(object):
 
         if mf == 0:
             saddr, daddr, proto, sport, dport, seq = rs
-            print(rs)
             sts_saddr = socket.inet_ntop(socket.AF_INET, saddr)
             sts_daddr = socket.inet_ntop(socket.AF_INET, daddr)
             self.__ok_packets.append((sts_saddr, sts_daddr, proto, sport, dport, b"".join(seq),))
