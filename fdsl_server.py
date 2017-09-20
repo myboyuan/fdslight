@@ -343,7 +343,7 @@ class _fdslight_server(dispatcher.dispatcher):
                 -1, traffic_pass.p2p_proxy,
                 session_id, (sts_saddr, sport,), mtu=self.__ip4_mtu, is_udplite=is_udplite, is_ipv6=False
             )
-        self.get_handler(fileno).send_msg(byte_data, (sts_daddr, dport))
+
         self.get_handler(fileno).add_permit((sts_daddr, dport,))
         _, new_sport = self.get_handler(fileno).getsockname()
 
