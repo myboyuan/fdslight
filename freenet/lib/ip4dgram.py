@@ -18,7 +18,7 @@ class ip4frag_merge(object):
         self.__fragdata = {}
 
     def add_frag(self, message):
-        v, tos, tot_len, _id, frag_off, ttl, proto, csum, saddr, daddr = struct.unpack(_IP4HDR, message)
+        v, tos, tot_len, _id, frag_off, ttl, proto, csum, saddr, daddr = struct.unpack(_IP4HDR, message[0:20])
         hdr_len = (v & 0x0f) * 4
         entity = message[hdr_len:]
 
