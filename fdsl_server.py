@@ -24,7 +24,6 @@ import freenet.lib.ip6dgram as ip6dgram
 import freenet.handlers.traffic_pass as traffic_pass
 import freenet.lib.logging as logging
 import freenet.lib.fn_utils as fn_utils
-import freenet.lib.ip4dgram as ip4dgram
 
 
 class _fdslight_server(dispatcher.dispatcher):
