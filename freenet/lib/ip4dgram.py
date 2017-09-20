@@ -22,12 +22,12 @@ class ip4frag_merge(object):
         hdr_len = (v & 0x0f) * 4
         entity = message[hdr_len:]
 
-        print(message)
         # df = (frag_off & 0x4000) >> 14
         mf = (frag_off & 0x2000) >> 13
         offset = frag_off & 0x1fff
 
         name = self.__get_fragid(saddr, _id)
+        print(mf,offset)
 
         if offset == 0:
             sport, dport = self.__get_udp_port(entity)
