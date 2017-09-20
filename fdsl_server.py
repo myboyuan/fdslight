@@ -349,6 +349,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
         ''''''
         _id = "%s-%s" % (sts_saddr, sport,)
+        print(rs)
 
         fileno = -1
         if session_id in self.__dgram_proxy:
