@@ -24,6 +24,7 @@ import freenet.lib.ip6dgram as ip6dgram
 import freenet.handlers.traffic_pass as traffic_pass
 import freenet.lib.logging as logging
 import freenet.lib.fn_utils as fn_utils
+import freenet.lib.ip4dgram as ip4dgram
 
 
 class _fdslight_server(dispatcher.dispatcher):
@@ -64,6 +65,7 @@ class _fdslight_server(dispatcher.dispatcher):
     __ip6_dgram = None
 
     __dgram_proxy = None
+    __ip4_fragment = None
 
     __raw_fileno = None
 
@@ -80,6 +82,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
         self.__ip6_dgram = {}
         self.__dgram_proxy = {}
+        self.__ip4_fragment = {}
 
         signal.signal(signal.SIGINT, self.__exit)
 
@@ -289,8 +292,8 @@ class _fdslight_server(dispatcher.dispatcher):
         # 对UDP和UDPLite进行特殊处理,以支持内网穿透
         if protocol == 17 or protocol == 136:
             is_udplite = False
-            if protocol == 136: is_udplite = True
-            self.__handle_ipv4_dgram_from_tunnel(session_id, is_udplite=is_udplite)
+            # if protocol == 136: is_udplite = True
+            self.__handle_ipv4_dgram_from_tunnel(session_id)
             return True
         self.__mbuf.offset = 0
 
@@ -301,14 +304,15 @@ class _fdslight_server(dispatcher.dispatcher):
         return True
 
     def __handle_ipv4_dgram_from_tunnel(self, session_id, is_udplite=False):
+        """
         mbuf = self.__mbuf
         mbuf.offset = 4
 
         mbuf.offset = 6
         frag_off = utils.bytes2number(mbuf.get_part(2))
 
-        df = 0x4000 >> 14
-        mf = 0x2000 >> 13
+        df = (frag_off & 0x4000) >> 14
+        mf = (frag_off & 0x2000) >> 13
         offset = frag_off & 0x1fff
 
         if offset == 0:
@@ -327,7 +331,23 @@ class _fdslight_server(dispatcher.dispatcher):
             mbuf.offset = 0
             self.send_message_to_handler(-1, self.__raw_fileno, mbuf.get_data())
             return
+        """
 
+        if session_id not in self.__ip4_fragment:
+            self.__ip4_fragment[session_id] = ip4dgram.ip4frag_merge()
+
+        ip4frag = self.__ip4_fragment[session_id]
+        ip4frag.add_frag(self.__mbuf.get_data())
+        rs = ip4frag.get_data()
+        if not rs: return
+
+        sts_saddr, sts_daddr, proto, sport, dport, byte_data = rs
+        if proto == 136:
+            is_udplite = True
+        else:
+            is_udplite = False
+
+        ''''''
         _id = "%s-%s" % (sts_saddr, sport,)
 
         fileno = -1
@@ -340,6 +360,8 @@ class _fdslight_server(dispatcher.dispatcher):
                 -1, traffic_pass.p2p_proxy,
                 session_id, (sts_saddr, sport,), mtu=self.__ip4_mtu, is_udplite=is_udplite, is_ipv6=False
             )
+        self.get_handler(fileno).send_msg(byte_data, (sts_daddr, dport))
+        """
         self.get_handler(fileno).add_permit((sts_daddr, dport,))
         _, new_sport = self.get_handler(fileno).getsockname()
 
@@ -365,6 +387,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
         mbuf.offset = 0
         self.send_message_to_handler(-1, self.__raw_fileno, mbuf.get_data())
+        """
 
     def __send_msg_to_tunnel(self, session_id, action, message):
         if not self.__access.session_exists(session_id): return
