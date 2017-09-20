@@ -27,9 +27,9 @@ class ip4frag_merge(object):
         offset = frag_off & 0x1fff
 
         name = self.__get_fragid(saddr, _id)
-        print(mf,offset)
+        #print(mf,offset)
 
-        if offset == 0:
+        if offset == 1:
             sport, dport = self.__get_udp_port(entity)
             entity = entity[8:]
             if dport == 0: return
