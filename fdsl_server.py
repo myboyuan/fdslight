@@ -550,6 +550,8 @@ class _fdslight_server(dispatcher.dispatcher):
         if key not in pydict: return
         del pydict[key]
         if not pydict: del self.__dgram_proxy[session_id]
+        if session_id in self.__ip4_fragment:
+            del self.__ip4_fragment[session_id]
 
     def __exit(self, signum, frame):
         if self.handler_exists(self.__dns_fileno):
