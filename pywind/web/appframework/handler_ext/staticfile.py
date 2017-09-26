@@ -31,7 +31,8 @@ class staticfile(app_handler.handler):
             "eot": "application/vnd.ms-fontobject",
             "otf": "application/font-otf",
             "json": "application/json;charset=utf-8",
-            "woff2":"application/font-woff2",
+            "woff2": "application/font-woff2",
+            "png": "image/png",
         }
         self.__read_size = 0
         self.__is_finish = False
