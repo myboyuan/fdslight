@@ -70,12 +70,9 @@ class staticfile(app_handler.handler):
 
             stat = os.stat(fpath)
 
-            if self.cmp_file_modify_by_mtime:
-                is_modified = self.__is_modified_by_mtime(stat.st_mtime)
-            else:
-                file_md5 = self.__calc_file_md5(fpath)
-                if_none_match = self.request.environ.get("HTTP_IF_NONE_MATCH", "")
-                is_modified = if_none_match == file_md5
+            file_md5 = self.__calc_file_md5(fpath)
+            if_none_match = self.request.environ.get("HTTP_IF_NONE_MATCH", "")
+            is_modified = if_none_match == file_md5
 
             if is_modified:
                 self.set_status("304 Not Modified")
