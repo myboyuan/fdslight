@@ -442,7 +442,6 @@ def __build_ipv6_fragment_hdr(nexthdr, frag_off, m_flag, frag_id):
 
     return b"".join(byte_seq)
 
-
 """
 import os
 
@@ -460,4 +459,4 @@ seq = [
 data2 = b"".join(seq)
 
 print(__calc_udp_csum(addr, addr, data2))
-"""
+    """
