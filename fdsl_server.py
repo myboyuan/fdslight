@@ -419,7 +419,7 @@ class _fdslight_server(dispatcher.dispatcher):
         :return:
         """
         # 添加一条到tun设备的IPV4路由
-        cmd = "route add -net %s/%s dev %s" % (subnet, prefix, self.__DEVNAME)
+        cmd = "ip route add %s/%s dev %s" % (subnet, prefix, self.__DEVNAME)
         os.system(cmd)
         # 开启ip forward
         os.system("echo 1 > /proc/sys/net/ipv4/ip_forward")
@@ -435,7 +435,7 @@ class _fdslight_server(dispatcher.dispatcher):
         :return:
         """
         # 添加一条到tun设备的IPv6路由
-        cmd = "route add -A inet6 %s/%s dev %s" % (ip6_subnet, prefix, self.__DEVNAME)
+        cmd = "ip -6 route add %s/%s dev %s" % (ip6_subnet, prefix, self.__DEVNAME)
         os.system(cmd)
         # 开启IPV6流量重定向
         os.system("echo 1 >/proc/sys/net/ipv6/conf/all/forwarding")
