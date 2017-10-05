@@ -443,10 +443,13 @@ class _fdslight_client(dispatcher.dispatcher):
         # 如果禁止了IPV6流量,那么不设置IPV6路由
         if not self.__enable_ipv6_traffic and is_ipv6: return
         if is_ipv6:
-            cmd = "route add -A inet6 %s/128 dev %s" % (host, self.__DEVNAME)
+            s = "-6"
+            prefix = 128
         else:
-            cmd = "route add -host %s dev %s" % (host, self.__DEVNAME)
+            s = ""
+            prefix = 32
 
+        cmd = "ip %s route add %s/%s dev %s" % (s, host, prefix, self.__DEVNAME)
         os.system(cmd)
 
         if not is_dynamic: return
@@ -461,10 +464,13 @@ class _fdslight_client(dispatcher.dispatcher):
         is_ipv6 = self.__routers[host]
 
         if is_ipv6:
-            cmd = "route del -A inet6 %s/128 dev %s" % (host, self.__DEVNAME)
+            s = "-6"
+            prefix = 128
         else:
-            cmd = "route del -host %s dev %s" % (host, self.__DEVNAME)
+            s = ""
+            prefix = 32
 
+        cmd = "ip %s route del %s/%s dev %s" % (s, host, prefix, self.__DEVNAME)
         os.system(cmd)
         self.__router_timer.drop(host)
         del self.__routers[host]
