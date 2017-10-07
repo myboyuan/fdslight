@@ -194,7 +194,6 @@ class p2p_proxy(udp_handler.udp_handler):
         else:
             self.bind(("0.0.0.0", 0))
 
-        print("p2p proxy open")
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
@@ -242,7 +241,6 @@ class p2p_proxy(udp_handler.udp_handler):
         self.delete_handler(self.fileno)
 
     def udp_delete(self):
-        print("p2p proxy delete")
         self.dispatcher.tell_del_dgram_proxy(self.__session_id, self.__internal_ip, self.__port)
         self.unregister(self.fileno)
         self.close()
