@@ -342,6 +342,7 @@ class _fdslight_server(dispatcher.dispatcher):
                 -1, traffic_pass.p2p_proxy,
                 session_id, (sts_saddr, sport,), mtu=self.__ip4_mtu, is_udplite=is_udplite, is_ipv6=False
             )
+            if fileno < 0: return
 
         self.get_handler(fileno).add_permit((sts_daddr, dport,))
         _, new_sport = self.get_handler(fileno).getsockname()
@@ -495,6 +496,9 @@ class _fdslight_server(dispatcher.dispatcher):
                 -1, traffic_pass.p2p_proxy,
                 session_id, (saddr, sport), mtu=self.__ip6_mtu, is_udplite=is_udplite, is_ipv6=True
             )
+            if fileno < 0:
+                if not pydict: del self.__dgram_proxy[session_id]
+                return
             pydict[dgram_id] = fileno
         fileno = pydict[dgram_id]
         self.get_handler(fileno).send_msg(msg, (daddr, dport))

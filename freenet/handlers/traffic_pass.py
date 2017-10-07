@@ -184,7 +184,10 @@ class p2p_proxy(udp_handler.udp_handler):
         self.__packets = []
         self.__mtu = mtu
 
-        s = socket.socket(fa, socket.SOCK_DGRAM, proto)
+        try:
+            s = socket.socket(fa, socket.SOCK_DGRAM, proto)
+        except OSError:
+            return -1
         self.__permits = {}
 
         self.set_socket(s)
