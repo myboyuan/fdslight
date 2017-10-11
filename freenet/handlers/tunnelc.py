@@ -105,18 +105,22 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
-        if not self.writer.is_empty(): self.add_evt_write(self.fileno)
+        # 发送还没有连接的时候堆积的数据包
+        if not self.writer.is_empty():
+            self.__update_time = time.time()
+            self.add_evt_write(self.fileno)
 
         logging.print_general("connected", self.__server_address)
 
-        # 发送还没有连接的时候堆积的数据包
         return
 
     def send_msg_to_tunnel(self, session_id, action, message):
         sent_pkt = self.__encrypt.build_packet(session_id, action, message)
         self.writer.write(sent_pkt)
 
-        if self.is_conn_ok(): self.add_evt_write(self.fileno)
+        if self.is_conn_ok():
+            self.__update_time = time.time()
+            self.add_evt_write(self.fileno)
 
         self.__encrypt.reset()
 
