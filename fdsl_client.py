@@ -306,6 +306,8 @@ class _fdslight_client(dispatcher.dispatcher):
         if not self.handler_exists(self.__tunnel_fileno):
             self.__open_tunnel()
 
+        if not self.handler_exists(self.__tunnel_fileno): return
+
         handler = self.get_handler(self.__tunnel_fileno)
         handler.send_msg_to_tunnel(self.session_id, action, message)
 
