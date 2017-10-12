@@ -118,9 +118,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         sent_pkt = self.__encrypt.build_packet(session_id, action, message)
         self.writer.write(sent_pkt)
 
-        if self.is_conn_ok():
-            self.__update_time = time.time()
-            self.add_evt_write(self.fileno)
+        if self.is_conn_ok(): self.add_evt_write(self.fileno)
 
         self.__encrypt.reset()
 
