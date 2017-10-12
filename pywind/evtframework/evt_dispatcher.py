@@ -149,6 +149,7 @@ class dispatcher(object):
             if is_err:
                 handler.error()
                 continue
+            if not self.handler_exists(fd): continue
             if is_read: handler.evt_read()
             if not self.handler_exists(fd): continue
             if is_write: handler.evt_write()
