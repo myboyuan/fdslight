@@ -77,7 +77,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         self.unregister(self.fileno)
         self.close()
 
-        if self.connect_ok():
+        if self.is_conn_ok():
             logging.print_general("disconnect", self.__server_address)
         return
 
