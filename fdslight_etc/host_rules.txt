@@ -159,9 +159,7 @@ register.mesh.com:1
 # PS4
 *.llnwd.net:0
 *.ubisoft.com:1
-*.dl.playstation.net:1
-*.net.playstation.net:1
-*.update.playstation.net:1
+*.playstation.net:1
 
 
 *.nintendo.net:1
