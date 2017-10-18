@@ -23,7 +23,7 @@
 
 #define DEV_NAME FDSL_DEV_NAME
 #define DEV_CLASS FDSL_DEV_NAME
-#define QUEUE_SIZE 100
+#define QUEUE_SIZE 256
 
 struct fdsl_poll{
 	struct fdsl_queue *r_queue;
