@@ -68,7 +68,6 @@ static int nf_register_hook(struct nf_hook_ops *reg)
 		if (ret && ret != -ENOENT)
 			goto rollback;
 	}
-	list_add_tail(&reg->list, &nf_hook_list);		//添加 hook 到链表
 	rtnl_unlock();
 
 	return 0;
@@ -88,7 +87,6 @@ static void nf_unregister_hook(struct nf_hook_ops *reg)
 	struct net *net;
 
 	rtnl_lock();
-	list_del(&reg->list);				//从链表中删除 hook
 	for_each_net(net)
 		nf_unregister_net_hook(net, reg);
 	rtnl_unlock();
