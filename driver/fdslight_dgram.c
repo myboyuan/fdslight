@@ -54,6 +54,48 @@ static char is_set_tunnel_addr6=0;
 static char is_set_subnet=0;
 static char is_set_subnet6=0;
 
+
+#if LINUX_VERSION_CODE>=KERNEL_VERSION(4,1,3)
+
+static int nf_register_hook(struct nf_hook_ops *reg)
+{
+	struct net *net, *last;
+	int ret;
+
+	rtnl_lock();
+	for_each_net(net) {
+		ret = nf_register_net_hook(net, reg);
+		if (ret && ret != -ENOENT)
+			goto rollback;
+	}
+	list_add_tail(&reg->list, &nf_hook_list);		//添加 hook 到链表
+	rtnl_unlock();
+
+	return 0;
+rollback:
+	last = net;
+	for_each_net(net) {
+		if (net == last)
+			break;
+		nf_unregister_net_hook(net, reg);
+	}
+	rtnl_unlock();
+	return ret;
+}
+
+static void nf_unregister_hook(struct nf_hook_ops *reg)
+{
+	struct net *net;
+
+	rtnl_lock();
+	list_del(&reg->list);				//从链表中删除 hook
+	for_each_net(net)
+		nf_unregister_net_hook(net, reg);
+	rtnl_unlock();
+}
+
+#endif
+
 static void calc_subnet(char *buf,char *ipaddress,unsigned char prefix,char is_ipv6)
 // 计算IP地址子网
 {
