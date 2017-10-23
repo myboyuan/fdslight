@@ -43,7 +43,7 @@ static struct fdsl_queue *r_queue;
 struct fdsl_poll *poll;
 
 static char fdsl_tunnel_addr[4];
-static char fdsl_tunnel_addr6[6];
+static char fdsl_tunnel_addr6[16];
 
 static struct fdsl_subnet subnet;
 static struct fdsl_subnet subnet6;
