@@ -55,7 +55,7 @@ static char is_set_subnet=0;
 static char is_set_subnet6=0;
 
 
-#if LINUX_VERSION_CODE>=KERNEL_VERSION(4,1,3)
+#if LINUX_VERSION_CODE>=KERNEL_VERSION(4,13,0)
 
 static int nf_register_hook(struct nf_hook_ops *reg)
 {
