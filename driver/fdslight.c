@@ -54,8 +54,8 @@ static char is_set_tunnel_addr6=0;
 static char is_set_subnet=0;
 static char is_set_subnet6=0;
 
-static char is_open_udp_proxy=0;
-static char is_open_uTCP=0;
+//static char is_open_udp_proxy=0;
+//static char is_open_uTCP=0;
 
 
 #if LINUX_VERSION_CODE>=KERNEL_VERSION(4,13,0)
@@ -360,11 +360,11 @@ static unsigned int nf_handle_in(
 	if(nexthdr!=17 && nexthdr!=136 && nexthdr!=6) return NF_ACCEPT;
 
 	if(4==version){
-	    if (17==nexthdr || 136==nexthdr)) return handle_ipv4_dgram_in(ip_header);
-		if(6==nexthdr) return handle_ipv6_tcp_in(ip_header);
+	    if (17==nexthdr || 136==nexthdr) return handle_ipv4_dgram_in(ip_header);
+		if(6==nexthdr) return handle_ipv4_tcp_in(ip_header);
 	}
 
-	if(17==nexthdr || 136==nexthdr) return handle_ipv6_dgram_in(ip_header);
+	if(17==nexthdr || 136==nexthdr) return handle_ipv6_dgram_in(ip6_header);
 	if(6==nexthdr) return handle_ipv6_tcp_in(ip6_header);
 
 
