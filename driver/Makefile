@@ -1,5 +1,5 @@
 ifneq ($(KERNELRELEASE),)
-obj-m := fdslight.o
+obj-m := fdslight_dgram.o
 ccflags-y := -std=gnu99 -g -D FDSL_LINUX_KERNEL
 else
 		PWD  := $(shell pwd)

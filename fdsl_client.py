@@ -169,7 +169,7 @@ class _fdslight_client(dispatcher.dispatcher):
         signal.signal(signal.SIGUSR1, self.__set_host_rules)
 
     def __load_kernel_mod(self):
-        ko_file = "%s/driver/fdslight.ko" % BASE_DIR
+        ko_file = "%s/driver/fdslight_dgram.ko" % BASE_DIR
 
         if not os.path.isfile(ko_file):
             print("you must install this software")
@@ -191,7 +191,7 @@ class _fdslight_client(dispatcher.dispatcher):
             sys.exit(-1)
 
         path = "/dev/%s" % fdsl_ctl.FDSL_DEV_NAME
-        if os.path.exists(path): os.system("rmmod fdslight")
+        if os.path.exists(path): os.system("rmmod fdslight_dgram")
 
         # 开启ip forward
         os.system("echo 1 > /proc/sys/net/ipv4/ip_forward")

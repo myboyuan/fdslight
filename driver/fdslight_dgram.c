@@ -54,9 +54,6 @@ static char is_set_tunnel_addr6=0;
 static char is_set_subnet=0;
 static char is_set_subnet6=0;
 
-//static char is_open_udp_proxy=0;
-//static char is_open_uTCP=0;
-
 
 #if LINUX_VERSION_CODE>=KERNEL_VERSION(4,13,0)
 
@@ -277,16 +274,6 @@ static unsigned int fdsl_push_ipv6_packet_to_user(struct ipv6hdr *ip6_header)
 	return NF_DROP;
 }
 
-static unsigned int handle_ipv4_tcp_in(struct iphdr *ip_header)
-{
-    return NF_ACCEPT;
-}
-
-static unsigned int handle_ipv6_tcp_in(struct ipv6hdr *ip6_header)
-{
-    return NF_ACCEPT;
-}
-
 static unsigned int handle_ipv4_dgram_in(struct iphdr *ip_header)
 // 处理UDP
 {
@@ -338,7 +325,6 @@ static unsigned int nf_handle_in(
 	struct iphdr *ip_header;
 	struct ipv6hdr *ip6_header;
 	unsigned char nexthdr;
-	unsigned char version;
 
 	if(!flock_flag) return NF_ACCEPT;
 	if(!skb) return NF_ACCEPT;
@@ -348,27 +334,18 @@ static unsigned int nf_handle_in(
 	if(!ip_header) return NF_ACCEPT;
 
 	if(4==ip_header->version){
-	    version=4;
 		nexthdr=ip_header->protocol;
 	}else{
 		ip6_header=(struct ipv6hdr *)ipv6_hdr(skb);
 		if(!ip6_header) return NF_ACCEPT;
-		version=6;
 		nexthdr=ip6_header->nexthdr;
 	}
 
-	if(nexthdr!=17 && nexthdr!=136 && nexthdr!=6) return NF_ACCEPT;
+	if(nexthdr!=17 && nexthdr!=136) return NF_ACCEPT;
 
-	if(4==version){
-	    if (17==nexthdr || 136==nexthdr) return handle_ipv4_dgram_in(ip_header);
-		if(6==nexthdr) return handle_ipv4_tcp_in(ip_header);
-	}
+	if(4==ip_header->version) return handle_ipv4_dgram_in(ip_header);
 
-	if(17==nexthdr || 136==nexthdr) return handle_ipv6_dgram_in(ip6_header);
-	if(6==nexthdr) return handle_ipv6_tcp_in(ip6_header);
-
-
-	return NF_ACCEPT;
+	return handle_ipv6_dgram_in(ip6_header);
 }
 
 static int create_dev(void)
