@@ -1,7 +1,7 @@
 #ifndef FDSL_DEV_CTL_H
 #define FDSL_DEV_CTL_H
 
-#define FDSL_DEV_NAME "fdslight_dgram"
+#define FDSL_DEV_NAME "fdslight"
 #define FDSL_IOC_MAGIC 0xad
 
 
