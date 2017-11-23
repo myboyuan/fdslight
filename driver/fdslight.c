@@ -279,12 +279,12 @@ static unsigned int fdsl_push_ipv6_packet_to_user(struct ipv6hdr *ip6_header)
 
 static unsigned int handle_ipv4_tcp_in(struct iphdr *ip_header)
 {
-    return 0;
+    return NF_ACCEPT;
 }
 
 static unsigned int handle_ipv6_tcp_in(struct ipv6hdr *ip6_header)
 {
-    return 0;
+    return NF_ACCEPT;
 }
 
 static unsigned int handle_ipv4_dgram_in(struct iphdr *ip_header)
@@ -359,12 +359,16 @@ static unsigned int nf_handle_in(
 
 	if(nexthdr!=17 && nexthdr!=136 && nexthdr!=6) return NF_ACCEPT;
 
-	if(4==ip_header->version){
+	if(4==version){
 	    if (17==nexthdr || 136==nexthdr)) return handle_ipv4_dgram_in(ip_header);
+		if(6==nexthdr) return handle_ipv6_tcp_in(ip_header);
 	}
 
+	if(17==nexthdr || 136==nexthdr) return handle_ipv6_dgram_in(ip_header);
+	if(6==nexthdr) return handle_ipv6_tcp_in(ip6_header);
 
-	return handle_ipv6_dgram_in(ip6_header);
+
+	return NF_ACCEPT;
 }
 
 static int create_dev(void)
