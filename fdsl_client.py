@@ -429,6 +429,8 @@ class _fdslight_client(dispatcher.dispatcher):
             return None
         except dns.resolver.Timeout:
             return None
+        except dns.resolver.NoNameservers:
+            return None
 
         for anwser in rs:
             ipaddr = anwser.__str__()
