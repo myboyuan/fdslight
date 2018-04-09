@@ -70,7 +70,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         return
 
     def tcp_writable(self):
-        self.remove_evt_write(self.fileno)
+        if self.writer.size() == 0: self.remove_evt_write(self.fileno)
 
     def tcp_delete(self):
         self.dispatcher.tell_tunnel_close()
@@ -208,9 +208,7 @@ class udp_tunnel(udp_handler.udp_handler):
         logging.print_general("udp_close", self.__server_address)
 
     def send_msg_to_tunnel(self, session_id, action, message):
-        ippkts = self.__encrypt.build_packets(
-            session_id, action, message, redundancy=self.__redundancy
-        )
+        ippkts = self.__encrypt.build_packets(session_id, action, message, redundancy=self.__redundancy)
         self.__encrypt.reset()
 
         for ippkt in ippkts: self.send(ippkt)

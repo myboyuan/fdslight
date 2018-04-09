@@ -37,10 +37,8 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         while 1:
             try:
                 cs, address = self.accept()
-                self.create_handler(
-                    self.fileno, _tcp_tunnel_handler, self.__crypto,
-                    self.__crypto_configs, cs, address, self.__conn_timeout
-                )
+                self.create_handler(self.fileno, _tcp_tunnel_handler, self.__crypto, self.__crypto_configs, cs, address,
+                    self.__conn_timeout)
             except BlockingIOError:
                 break
             ''''''
@@ -110,7 +108,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         return
 
     def tcp_writable(self):
-        self.remove_evt_write(self.fileno)
+        if self.writer.size() == 0: self.remove_evt_write(self.fileno)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)

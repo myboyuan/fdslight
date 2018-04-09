@@ -105,13 +105,15 @@ class tcp_handler(handler.handler):
             self.__conn_ok = True
             self.connect_ok()
             return
+        size = self.writer.size()
         sent_data = self.writer._getvalue()
-        if not sent_data: self.tcp_writable()
+        if self.writer.size() == 0:
+            self.tcp_writable()
         try:
             sent_size = self.socket.send(sent_data)
-            rest = sent_data[sent_size:]
-            if rest:
-                self.writer.write(rest)
+
+            if size > sent_size:
+                self.writer.write(sent_data[sent_size:])
                 return
             if self.__delete_this_no_sent_data and self.writer.size() == 0:
                 self.delete_handler(self.fileno)
