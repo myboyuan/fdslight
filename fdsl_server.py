@@ -416,7 +416,14 @@ class _fdslight_server(dispatcher.dispatcher):
 
     def __config_nat(self):
         os.system("""echo “986400″ > /proc/sys/net/ipv4/ip_conntrack_max""")
-        os.system("""echo “1860″ > /proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established""")
+        os.system("modprobe ip_conntrack")
+
+        p = "/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established"
+
+        if not os.path.isfile(p):
+            os.system("sysctl -w net.netfilter.nf_conntrack_tcp_timeout_established=1860")
+        else:
+            os.system("""echo “1860″ > /proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established""")
 
     def __config_gateway(self, subnet, prefix, eth_name):
         """ 配置IPV4网关
