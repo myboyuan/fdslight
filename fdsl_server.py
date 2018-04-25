@@ -415,13 +415,13 @@ class _fdslight_server(dispatcher.dispatcher):
         self.get_handler(self.__dns_fileno).request_dns(session_id, message)
 
     def __config_nat(self):
-        p1 = "/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established"
-        p2 = "/proc/net/netfilter/nf_conntrack_tcp_timeout_established"
+        p = "/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established"
 
-        if not os.path.isfile(p1):
-            os.system("echo 1860 > %s" % p2)
+
+        if not os.path.isfile(p):
+            os.system("sysctl -w net.netfilter.nf_conntrack_tcp_timeout_established=1860")
         else:
-            os.system("echo 1860 > %s" % p1)
+            os.system("""echo “1860″ > /proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established""")
 
     def __config_gateway(self, subnet, prefix, eth_name):
         """ 配置IPV4网关
