@@ -194,14 +194,15 @@ class tcp_handler(handler.handler):
         except socket.gaierror:
             self.error()
             return
-        self.register(self.fileno)
-        self.add_evt_read(self.fileno)
-        self.add_evt_write(self.fileno)
 
         if err:
+            self.register(self.fileno)
+            self.add_evt_read(self.fileno)
+            self.add_evt_write(self.fileno)
             self.set_timeout(self.fileno, timeout)
             return
 
+        self.connect_ok()
         self.__conn_ok = True
 
     def connect_ok(self):
