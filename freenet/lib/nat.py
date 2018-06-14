@@ -72,7 +72,7 @@ class nat(_nat_base):
     __ip_alloc = None
     __timer = None
     # 映射IP的有效时间
-    __VALID_TIME = 660
+    __VALID_TIME = 1800
     __is_ipv6 = False
 
     def __init__(self, subnet, is_ipv6=False):
@@ -129,7 +129,6 @@ class nat(_nat_base):
             ippkts.modify_ip4address(rs["clan_addr"], mbuf, flags=1)
         else:
             ippkts.modify_ip6address(rs["clan_addr"], mbuf, flags=1)
-        self.__timer.set_timeout(slan_daddr, self.__VALID_TIME)
 
         return (True, rs["session_id"],)
 
