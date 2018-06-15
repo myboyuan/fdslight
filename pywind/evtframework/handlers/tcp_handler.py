@@ -92,6 +92,9 @@ class tcp_handler(handler.handler):
             except ConnectionError:
                 self.error()
                 break
+            except TimeoutError:
+                self.error()
+                break
             ''''''
         return
 
@@ -122,6 +125,8 @@ class tcp_handler(handler.handler):
         except ConnectionError:
             self.error()
         except FileNotFoundError:
+            self.error()
+        except TimeoutError:
             self.error()
 
     def timeout(self):
