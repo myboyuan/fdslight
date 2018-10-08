@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import queue, io
+import io
 
 
 class writer(object):
@@ -8,8 +8,8 @@ class writer(object):
     __lifo = None
 
     def __init__(self):
-        self.__buff_queue = queue.Queue()
-        self.__lifo = queue.LifoQueue()
+        self.__buff_queue = []
+        self.__lifo = []
         self.__size = 0
 
     def is_empty(self):
@@ -21,7 +21,7 @@ class writer(object):
     def write(self, bdata):
         size = len(bdata)
 
-        self.__buff_queue.put(bdata)
+        self.__buff_queue.append(bdata)
         self.__size += size
 
     def writeline(self, bdata=b""):
@@ -55,18 +55,18 @@ class writer(object):
             return
 
         self.__size += len(byte_data)
-        self.__lifo.put(byte_data)
+        self.__lifo.append(byte_data)
 
     def _getvalue(self):
         byte_io = io.BytesIO()
 
         while 1:
             try:
-                v = self.__lifo.get_nowait()
-            except queue.Empty:
+                v = self.__lifo.pop()
+            except IndexError:
                 try:
-                    v = self.__buff_queue.get_nowait()
-                except queue.Empty:
+                    v = self.__buff_queue.pop(0)
+                except IndexError:
                     break
                 ''''''
 

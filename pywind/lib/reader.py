@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import io, queue
+import io
 
 
 class reader(object):
@@ -11,7 +11,7 @@ class reader(object):
     def __init__(self):
         self.__size = 0
         self.__data_list = []
-        self.__lifo_queue = queue.LifoQueue()
+        self.__lifo_queue = []
 
     def read(self, n=-1):
         if n == 0:
@@ -23,8 +23,8 @@ class reader(object):
         while 1:
             try:
                 try:
-                    byte_data = self.__lifo_queue.get_nowait()
-                except queue.Empty:
+                    byte_data = self.__lifo_queue.pop()
+                except IndexError:
                     byte_data = self.__data_list.pop(0)
 
                 # 可能在一些情况下,lifo_queue获取的byte_data的值为b"",因此要加入该行避免
@@ -49,7 +49,7 @@ class reader(object):
 
                 byte_io.write(read)
 
-                self.__lifo_queue.put(remain)
+                self.__lifo_queue.append(remain)
                 break
             except IndexError:
                 break
@@ -102,8 +102,8 @@ class reader(object):
         while 1:
             try:
                 try:
-                    byte_data = self.__lifo_queue.get_nowait()
-                except queue.Empty:
+                    byte_data = self.__lifo_queue.pop()
+                except IndexError:
                     byte_data = self.__data_list.pop(0)
 
                 size = len(byte_data)
@@ -118,7 +118,7 @@ class reader(object):
                     read = byte_data[0:end]
                     begin = end
                     remain = byte_data[begin:]
-                    self.__lifo_queue.put(remain)
+                    self.__lifo_queue.append(remain)
                     self.__size += len(remain)
                     byte_io.write(read)
                     break
@@ -140,7 +140,7 @@ class reader(object):
         size = len(byte_data)
 
         self.__size += size
-        self.__lifo_queue.put(byte_data)
+        self.__lifo_queue.append(byte_data)
 
     def _putvalue(self, byte_data):
         # cut down empty list data
