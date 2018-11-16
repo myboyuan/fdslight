@@ -73,6 +73,9 @@ class _fdslight_server(dispatcher.dispatcher):
     __ip4_mtu = None
     __ip6_mtu = None
 
+    __dns_is_ipv6 = None
+    __dns_addr = None
+
     def init_func(self, debug, configs):
         self.create_poll()
 
@@ -131,31 +134,19 @@ class _fdslight_server(dispatcher.dispatcher):
         listen6 = (listen_ip6, listen_port)
 
         if enable_ipv6:
-            self.__tcp6_fileno = self.create_handler(
-                -1, tunnels.tcp_tunnel,
-                listen6, self.__tcp_crypto, self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=True
-            )
-            self.__udp6_fileno = self.create_handler(
-                -1, tunnels.udp_tunnel,
-                listen6, self.__udp_crypto, self.__crypto_configs, is_ipv6=True
-            )
+            self.__tcp6_fileno = self.create_handler(-1, tunnels.tcp_tunnel, listen6, self.__tcp_crypto,
+                                                     self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=True)
+            self.__udp6_fileno = self.create_handler(-1, tunnels.udp_tunnel, listen6, self.__udp_crypto,
+                                                     self.__crypto_configs, is_ipv6=True)
 
-        self.__tcp_fileno = self.create_handler(
-            -1, tunnels.tcp_tunnel,
-            listen, self.__tcp_crypto, self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=False
-        )
-        self.__udp_fileno = self.create_handler(
-            -1, tunnels.udp_tunnel,
-            listen, self.__udp_crypto, self.__crypto_configs, is_ipv6=False
-        )
+        self.__tcp_fileno = self.create_handler(-1, tunnels.tcp_tunnel, listen, self.__tcp_crypto,
+                                                self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=False)
+        self.__udp_fileno = self.create_handler(-1, tunnels.udp_tunnel, listen, self.__udp_crypto,
+                                                self.__crypto_configs, is_ipv6=False)
 
-        self.__tundev_fileno = self.create_handler(
-            -1, tundev.tundevs, self.__DEVNAME
-        )
+        self.__tundev_fileno = self.create_handler(-1, tundev.tundevs, self.__DEVNAME)
 
-        self.__raw_fileno = self.create_handler(
-            -1, traffic_pass.ip4_raw_send
-        )
+        self.__raw_fileno = self.create_handler(-1, traffic_pass.ip4_raw_send)
 
         self.__access = access.access(self)
 
@@ -179,9 +170,10 @@ class _fdslight_server(dispatcher.dispatcher):
         else:
             is_ipv6 = False
 
-        self.__dns_fileno = self.create_handler(
-            -1, dns_proxy.dnsd_proxy, dns_addr, is_ipv6=is_ipv6
-        )
+        self.__dns_is_ipv6 = is_ipv6
+        self.__dns_addr = dns_addr
+
+        self.__dns_fileno = self.create_handler(-1, dns_proxy.dnsd_proxy, dns_addr, is_ipv6=is_ipv6)
 
         enable_ipv6 = bool(int(nat_config["enable_nat66"]))
         subnet, prefix = utils.extract_subnet_info(nat_config["virtual_ip6_subnet"])
@@ -340,10 +332,8 @@ class _fdslight_server(dispatcher.dispatcher):
             if _id in pydict: fileno = pydict[_id]
 
         if fileno < 0:
-            fileno = self.create_handler(
-                -1, traffic_pass.p2p_proxy,
-                session_id, (sts_saddr, sport,), mtu=self.__ip4_mtu, is_udplite=is_udplite, is_ipv6=False
-            )
+            fileno = self.create_handler(-1, traffic_pass.p2p_proxy, session_id, (sts_saddr, sport,),
+                                         mtu=self.__ip4_mtu, is_udplite=is_udplite, is_ipv6=False)
             if fileno < 0: return
 
         self.get_handler(fileno).add_permit((sts_daddr, dport,))
@@ -412,11 +402,17 @@ class _fdslight_server(dispatcher.dispatcher):
         self.get_handler(fileno).send_msg(session_id, address, proto_utils.ACT_DNS, message)
 
     def __request_dns(self, session_id, message):
+        # 检查DNS是否异常退出,如果退出,那么重启DNS服务
+        if not self.handler_exists(self.__dns_fileno):
+            self.__dns_fileno = self.create_handler(-1, dns_proxy.dnsd_proxy, self.__dns_fileno,
+                                                    is_ipv6=self.__dns_is_ipv6)
+        # 检查DNS服务是否创建成功
+        if not self.handler_exists(self.__dns_fileno): return
+
         self.get_handler(self.__dns_fileno).request_dns(session_id, message)
 
     def __config_nat(self):
         p = "/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established"
-
 
         if not os.path.isfile(p):
             os.system("sysctl -w net.netfilter.nf_conntrack_tcp_timeout_established=1860")
@@ -503,10 +499,8 @@ class _fdslight_server(dispatcher.dispatcher):
 
         dgram_id = "%s-%s" % (saddr, sport,)
         if dgram_id not in pydict:
-            fileno = self.create_handler(
-                -1, traffic_pass.p2p_proxy,
-                session_id, (saddr, sport), mtu=self.__ip6_mtu, is_udplite=is_udplite, is_ipv6=True
-            )
+            fileno = self.create_handler(-1, traffic_pass.p2p_proxy, session_id, (saddr, sport), mtu=self.__ip6_mtu,
+                                         is_udplite=is_udplite, is_ipv6=True)
             if fileno < 0:
                 if not pydict: del self.__dgram_proxy[session_id]
                 return
