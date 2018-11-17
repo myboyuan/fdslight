@@ -107,7 +107,6 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         return self.fileno
 
     def tcp_readable(self):
-        self.__update_time = time.time()
         rdata = self.reader.read()
         self.__decrypt.input(rdata)
 
@@ -139,7 +138,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
 
                 self.dispatcher.handle_msg_from_tunnel(self.fileno, session_id, self.__address, action, message)
             ''''''
-        return
+        self.__update_time = time.time()
 
     def tcp_writable(self):
         if self.writer.size() == 0: self.remove_evt_write(self.fileno)
