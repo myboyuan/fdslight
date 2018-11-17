@@ -69,7 +69,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
                 if action == proto_utils.ACT_PONG: continue
                 if action == proto_utils.ACT_PING:
                     session_id = self.dispatcher.session_id
-                    self.send_msg_to_tunnel(session_id, proto_utils.ACT_PONG, b"")
+                    self.send_msg_to_tunnel(session_id, proto_utils.ACT_PONG, proto_utils.rand_bytes())
                     continue
 
                 self.dispatcher.handle_msg_from_tunnel(session_id, action, message)
@@ -239,7 +239,7 @@ class udp_tunnel(udp_handler.udp_handler):
             return
 
         if t - self.__update_time >= self.__heartbeat_timeout:
-            self.send_msg_to_tunnel(self.dispatcher.session_id, proto_utils.ACT_PING, b"")
+            self.send_msg_to_tunnel(self.dispatcher.session_id, proto_utils.ACT_PING, proto_utils.rand_bytes())
             self.__ping_req_num += 1
 
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)

@@ -158,7 +158,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
             return
 
         if t - self.__update_time >= self.__heartbeat_timeout:
-            self.send_msg(self.__session_id, self.__address, proto_utils.ACT_PING, b"")
+            self.send_msg(self.__session_id, self.__address, proto_utils.ACT_PING, proto_utils.rand_bytes())
             self.__ping_req_num += 1
 
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
@@ -221,7 +221,7 @@ class udp_tunnel(udp_handler.udp_handler):
 
         # 丢弃PING和PONG的数据包
         if action == proto_utils.ACT_PING:
-            self.send_msg(session_id, address, proto_utils.ACT_PONG, b"")
+            self.send_msg(session_id, address, proto_utils.ACT_PONG, proto_utils.rand_bytes())
             return
 
         if action == proto_utils.ACT_PONG: return

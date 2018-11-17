@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import hashlib, json
+import hashlib, json, random, os
 
 # 表示IP数据
 ACT_IPDATA = 1
@@ -12,9 +12,11 @@ ACT_PING = 3
 # PONG
 ACT_PONG = 4
 
-ACTS = (
-    ACT_IPDATA, ACT_DNS, ACT_PING, ACT_PONG,
-)
+ACTS = (ACT_IPDATA, ACT_DNS, ACT_PING, ACT_PONG,)
+
+
+def rand_bytes(max_size=64):
+    return os.urandom(random.randint(1, max_size))
 
 
 class ProtoError(Exception): pass
