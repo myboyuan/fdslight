@@ -246,7 +246,7 @@ class udp_tunnel(udp_handler.udp_handler):
 
     def udp_timeout(self):
         if self.__enable_heartbeat:
-            self.__handle_conn_timeout()
+            self.__handle_heartbeat_timeout()
         else:
             self.__handle_conn_timeout()
 

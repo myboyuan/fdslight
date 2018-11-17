@@ -173,7 +173,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
 
     def tcp_timeout(self):
         if self.__enable_heartbeat:
-            self.__handle_conn_timeout()
+            self.__handle_heartbeat_timeout()
         else:
             self.__handle_conn_timeout()
 
