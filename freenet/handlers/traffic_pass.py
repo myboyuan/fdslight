@@ -35,10 +35,7 @@ class traffic_read(handler.handler):
         r = fdsl_ctl.set_udp_proxy_subnet(fileno, byte_subnet, prefix, False)
 
         if enable_ipv6:
-            r = fdsl_ctl.set_udp_proxy_subnet(
-                fileno, byte_subnet6,
-                prefix, True
-            )
+            r = fdsl_ctl.set_udp_proxy_subnet(fileno, byte_subnet6, prefix, True)
         self.__tunnel_fd = creator_fd
 
         self.set_fileno(fileno)
@@ -84,8 +81,7 @@ class ip4_raw_send(handler.handler):
 
         family = socket.AF_INET
 
-        s = socket.socket(family, socket.SOCK_RAW,
-                          socket.IPPROTO_UDP | socket.IPPROTO_ICMP | socket.IPPROTO_UDP | 136)
+        s = socket.socket(family, socket.SOCK_RAW, socket.IPPROTO_UDP | socket.IPPROTO_ICMP | socket.IPPROTO_UDP | 136)
         s.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
         s.setblocking(0)
 
@@ -210,17 +206,11 @@ class p2p_proxy(udp_handler.udp_handler):
 
         if addr_id not in self.__permits: return
 
-        self.__update_time = time.time()
         n_saddr = socket.inet_aton(address[0])
         sport = address[1]
 
-        udp_packets = ippkts.build_udp_packets(
-            n_saddr, self.__byte_internal_ip,
-            sport, self.__port, message,
-            mtu=self.__mtu,
-            is_udplite=self.__is_udplite,
-            is_ipv6=self.__is_ipv6
-        )
+        udp_packets = ippkts.build_udp_packets(n_saddr, self.__byte_internal_ip, sport, self.__port, message,
+            mtu=self.__mtu, is_udplite=self.__is_udplite, is_ipv6=self.__is_ipv6)
 
         self.__packets += udp_packets
         self.__send_to_tunnel()
@@ -258,6 +248,8 @@ class p2p_proxy(udp_handler.udp_handler):
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def send_msg(self, message, address):
+        self.__update_time = time.time()
+
         self.add_evt_write(self.fileno)
         self.sendto(message, address)
         self.add_permit(address)

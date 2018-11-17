@@ -19,7 +19,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
     __server_address = None
 
-    def init_func(self, creator, crypto, crypto_configs, conn_timeout=720, is_ipv6=False):
+    def init_func(self, creator, crypto, crypto_configs, conn_timeout=720, is_ipv6=False, **kwargs):
         if is_ipv6:
             fa = socket.AF_INET6
         else:
@@ -64,7 +64,15 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             while 1:
                 pkt_info = self.__decrypt.get_pkt()
                 if not pkt_info: break
-                self.dispatcher.handle_msg_from_tunnel(*pkt_info)
+
+                session_id, action, message = pkt_info
+                if action == proto_utils.ACT_PONG: continue
+                if action == proto_utils.ACT_PING:
+                    session_id = self.dispatcher.session_id
+                    self.send_msg_to_tunnel(session_id, proto_utils.ACT_PONG, b"")
+                    continue
+
+                self.dispatcher.handle_msg_from_tunnel(session_id, action, message)
             ''''''
         self.__update_time = time.time()
         return
@@ -127,7 +135,7 @@ class udp_tunnel(udp_handler.udp_handler):
     __encrypt = None
     __decrypt = None
 
-    __LOOP_TIMEOUT = 10
+    __LOOP_TIMEOUT = 5
     __update_time = 0
     __conn_timeout = 0
     __sent_queue = None
@@ -135,7 +143,13 @@ class udp_tunnel(udp_handler.udp_handler):
     __server_address = None
     __redundancy = None
 
-    def init_func(self, creator, crypto, crypto_configs, redundancy=False, conn_timeout=720, is_ipv6=False):
+    __enable_heartbeat = None
+    __heartbeat_timeout = None
+    __heartbeat_num = None
+    # 已经发送的ping请求次数
+    __ping_req_num = None
+
+    def init_func(self, creator, crypto, crypto_configs, redundancy=False, conn_timeout=720, is_ipv6=False, **kwargs):
         if is_ipv6:
             fa = socket.AF_INET6
         else:
@@ -154,6 +168,11 @@ class udp_tunnel(udp_handler.udp_handler):
 
         self.__encrypt.config(crypto_configs)
         self.__decrypt.config(crypto_configs)
+
+        self.__enable_heartbeat = kwargs.get("enable_heartbeat", False)
+        self.__heartbeat_timeout = kwargs.get("heartbeat_timeout", 15)
+        self.__heartbeat_num = kwargs.get("heartbeat_num", 3)
+        self.__ping_req_num = 0
 
         return self.fileno
 
@@ -183,6 +202,18 @@ class udp_tunnel(udp_handler.udp_handler):
         if not result: return
 
         session_id, action, byte_data = result
+
+        if action not in proto_utils.ACTS: return
+
+        if action == proto_utils.ACT_PONG:
+            self.__ping_req_num = 0
+            self.__update_time = time.time()
+            return
+
+        if action == proto_utils.ACT_PING:
+            self.__update_time = time.time()
+            return
+
         self.dispatcher.handle_msg_from_tunnel(session_id, action, byte_data)
         self.__update_time = time.time()
 
@@ -193,13 +224,31 @@ class udp_tunnel(udp_handler.udp_handler):
         logging.print_general("udp_error", self.__server_address)
         self.delete_handler(self.fileno)
 
-    def udp_timeout(self):
+    def __handle_conn_timeout(self):
         t = time.time()
         if t - self.__update_time > self.__conn_timeout:
             logging.print_general("udp_timeout", self.__server_address)
             self.delete_handler(self.fileno)
             return
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+
+    def __handle_heartbeat_timeout(self):
+        t = time.time()
+        if self.__ping_req_num == self.__heartbeat_num:
+            self.delete_handler(self.fileno)
+            return
+
+        if t - self.__update_time >= self.__heartbeat_timeout:
+            self.send_msg_to_tunnel(self.dispatcher.session_id, proto_utils.ACT_PING, b"")
+            self.__ping_req_num += 1
+
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+
+    def udp_timeout(self):
+        if self.__enable_heartbeat:
+            self.__handle_conn_timeout()
+        else:
+            self.__handle_conn_timeout()
 
     def udp_delete(self):
         self.unregister(self.fileno)

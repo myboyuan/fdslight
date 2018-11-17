@@ -88,9 +88,7 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__mbuf = utils.mbuf()
         self.__debug = debug
 
-        self.__tundev_fileno = self.create_handler(
-            -1, tundev.tundevc, self.__DEVNAME
-        )
+        self.__tundev_fileno = self.create_handler(-1, tundev.tundevc, self.__DEVNAME)
 
         public = configs["public"]
         gateway = configs["gateway"]
@@ -100,23 +98,17 @@ class _fdslight_client(dispatcher.dispatcher):
         is_ipv6 = utils.is_ipv6_address(public["remote_dns"])
 
         if self.__mode == _MODE_GW:
-            self.__dns_fileno = self.create_handler(
-                -1, dns_proxy.dnsc_proxy,
-                gateway["dnsserver_bind"], debug=debug, server_side=True, is_ipv6=False
-            )
+            self.__dns_fileno = self.create_handler(-1, dns_proxy.dnsc_proxy, gateway["dnsserver_bind"], debug=debug,
+                                                    server_side=True, is_ipv6=False)
             self.get_handler(self.__dns_fileno).set_parent_dnsserver(public["remote_dns"], is_ipv6=is_ipv6)
 
             if self.__enable_ipv6_traffic:
-                self.__dns_listen6 = self.create_handler(
-                    -1, dns_proxy.dnsc_proxy,
-                    gateway["dnsserver_bind6"], debug=debug, server_side=True, is_ipv6=True
-                )
+                self.__dns_listen6 = self.create_handler(-1, dns_proxy.dnsc_proxy, gateway["dnsserver_bind6"],
+                                                         debug=debug, server_side=True, is_ipv6=True)
                 self.get_handler(self.__dns_listen6).set_parent_dnsserver(public["remote_dns"], is_ipv6=is_ipv6)
         else:
-            self.__dns_fileno = self.create_handler(
-                -1, dns_proxy.dnsc_proxy,
-                public["remote_dns"], debug=debug, server_side=False
-            )
+            self.__dns_fileno = self.create_handler(-1, dns_proxy.dnsc_proxy, public["remote_dns"], debug=debug,
+                                                    server_side=False)
 
         self.__set_host_rules(None, None)
 
@@ -124,10 +116,9 @@ class _fdslight_client(dispatcher.dispatcher):
             self.__load_kernel_mod()
             udp_global = bool(int(gateway["dgram_global_proxy"]))
             if udp_global:
-                self.__dgram_fetch_fileno = self.create_handler(
-                    -1, traffic_pass.traffic_read,
-                    self.__configs["gateway"], enable_ipv6=self.__enable_ipv6_traffic
-                )
+                self.__dgram_fetch_fileno = self.create_handler(-1, traffic_pass.traffic_read,
+                                                                self.__configs["gateway"],
+                                                                enable_ipv6=self.__enable_ipv6_traffic)
             ''''''
         else:
             local = configs["local"]
@@ -382,6 +373,14 @@ class _fdslight_client(dispatcher.dispatcher):
         tunnel_type = conn["tunnel_type"]
         redundancy = bool(int(conn.get("udp_tunnel_redundancy", 1)))
 
+        enable_heartbeat = bool(int(conn.get("enable_heartbeat", 0)))
+        heartbeat_timeout = int(conn.get("heartbeat_timeout", 15))
+        if heartbeat_timeout < 10:
+            raise ValueError("wrong heartbeat_timeout value from config")
+        heartbeat_num = int(conn.get("heartbeat_num", 3))
+        if heartbeat_num < 1:
+            raise ValueError("wrong heartbeat_num value from config")
+
         if tunnel_type.lower() == "udp":
             handler = tunnelc.udp_tunnel
             crypto = self.__udp_crypto
@@ -389,17 +388,12 @@ class _fdslight_client(dispatcher.dispatcher):
             handler = tunnelc.tcp_tunnel
             crypto = self.__tcp_crypto
 
-        kwargs = {
-            "conn_timeout": conn_timeout,
-            "is_ipv6": enable_ipv6,
-        }
+        kwargs = {"conn_timeout": conn_timeout, "is_ipv6": enable_ipv6, "enable_heartbeat": enable_heartbeat,
+                  "heartbeat_timeout": heartbeat_timeout, "heartbeat_num": heartbeat_num}
 
         if tunnel_type.lower() == "udp": kwargs["redundancy"] = redundancy
 
-        self.__tunnel_fileno = self.create_handler(
-            -1, handler,
-            crypto, self.__crypto_configs, **kwargs
-        )
+        self.__tunnel_fileno = self.create_handler(-1, handler, crypto, self.__crypto_configs, **kwargs)
 
         rs = self.get_handler(self.__tunnel_fileno).create_tunnel((host, port,))
         if not rs:
