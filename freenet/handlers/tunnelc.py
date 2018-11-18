@@ -76,10 +76,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
                 if action not in proto_utils.ACTS: continue
 
                 if action == proto_utils.ACT_PONG: continue
-                if action == proto_utils.ACT_PING:
-                    session_id = self.dispatcher.session_id
-                    self.send_msg_to_tunnel(session_id, proto_utils.ACT_PONG, proto_utils.rand_bytes())
-                    continue
+                if action == proto_utils.ACT_PING: continue
 
                 self.dispatcher.handle_msg_from_tunnel(session_id, action, message)
             ''''''
