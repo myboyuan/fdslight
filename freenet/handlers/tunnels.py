@@ -120,6 +120,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
                 pkt_info = self.__decrypt.get_pkt()
                 if not pkt_info: break
                 session_id, action, message = pkt_info
+                print(action)
 
                 if action not in proto_utils.ACTS: continue
 
