@@ -11,18 +11,10 @@ class tcp_tunnel(tcp_handler.tcp_handler):
     __crypto_configs = None
     __conn_timeout = None
 
-    __enable_heartbeat = None
-    __heartbeat_timeout = None
-    __heartbeat_num = None
-
-    def init_func(self, creator, address, crypto, crypto_configs, conn_timeout=800, is_ipv6=False, **kwargs):
+    def init_func(self, creator, address, crypto, crypto_configs, conn_timeout=800, is_ipv6=False):
         self.__crypto_configs = crypto_configs
         self.__crypto = crypto
         self.__conn_timeout = conn_timeout
-
-        self.__enable_heartbeat = kwargs.get("enable_heartbeat", False)
-        self.__heartbeat_timeout = kwargs.get("heartbeat_timeout", 15)
-        self.__heartbeat_num = kwargs.get("heartbeat_num", 3)
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -42,14 +34,11 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         return self.fileno
 
     def tcp_accept(self):
-        kwargs = {"enable_heartbeat": self.__enable_heartbeat, "heartbeat_timeout": self.__heartbeat_timeout,
-                  "heartbeat_num": self.__heartbeat_num}
-
         while 1:
             try:
                 cs, address = self.accept()
                 self.create_handler(self.fileno, _tcp_tunnel_handler, self.__crypto, self.__crypto_configs, cs, address,
-                                    self.__conn_timeout, **kwargs)
+                                    self.__conn_timeout)
             except BlockingIOError:
                 break
             ''''''
@@ -72,23 +61,11 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
 
     __session_id = None
 
-    __enable_heartbeat = None
-    __heartbeat_timeout = None
-    __heartbeat_num = None
-
-    __ping_req_num = None
-
-    def init_func(self, creator, crypto, crypto_configs, cs, address, conn_timeout, **kwargs):
+    def init_func(self, creator, crypto, crypto_configs, cs, address, conn_timeout):
         self.__address = address
         self.__conn_timeout = conn_timeout
         self.__update_time = time.time()
         self.__session_id = None
-
-        self.__enable_heartbeat = kwargs.get("enable_heartbeat", False)
-        self.__heartbeat_timeout = kwargs.get("heartbeat_timeout", 15)
-        self.__heartbeat_num = kwargs.get("heartbeat_num", 3)
-
-        self.__ping_req_num = 0
 
         self.set_socket(cs)
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
@@ -129,10 +106,10 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
                     self.delete_handler(self.fileno)
                     return
 
-                if action == proto_utils.ACT_PONG:
-                    self.__ping_req_num = 0
+                if action == proto_utils.ACT_PONG: continue
+                if action == proto_utils.ACT_PING:
+                    self.send_msg(session_id, self.__address, proto_utils.ACT_PONG, proto_utils.rand_bytes())
                     continue
-                if action == proto_utils.ACT_PING: continue
 
                 self.dispatcher.handle_msg_from_tunnel(self.fileno, session_id, self.__address, action, message)
             ''''''
@@ -144,36 +121,13 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
     def tcp_error(self):
         self.delete_handler(self.fileno)
 
-    def __handle_heartbeat_timeout(self):
-        t = time.time()
-        if self.__ping_req_num == self.__heartbeat_num:
-            self.delete_handler(self.fileno)
-            return
-
-        # 如果客户端没有发送过数据包,直接关闭连接
-        if not self.__session_id:
-            self.delete_handler(self.fileno)
-            return
-
-        if t - self.__update_time >= self.__heartbeat_timeout:
-            self.send_msg(self.__session_id, self.__address, proto_utils.ACT_PING, proto_utils.rand_bytes())
-            self.__ping_req_num += 1
-
-        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
-
-    def __handle_conn_timeout(self):
+    def tcp_timeout(self):
         t = time.time()
 
         if t - self.__update_time > self.__conn_timeout:
             self.delete_handler(self.fileno)
             return
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
-
-    def tcp_timeout(self):
-        if self.__enable_heartbeat:
-            self.__handle_heartbeat_timeout()
-        else:
-            self.__handle_conn_timeout()
 
     def tcp_delete(self):
         self.unregister(self.fileno)

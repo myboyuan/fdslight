@@ -19,6 +19,9 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
     __server_address = None
 
+    __enable_heartbeat = None
+    __heartbeat_timeout = None
+
     def init_func(self, creator, crypto, crypto_configs, conn_timeout=720, is_ipv6=False, **kwargs):
         if is_ipv6:
             fa = socket.AF_INET6
@@ -34,6 +37,9 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
         self.__encrypt.config(crypto_configs)
         self.__decrypt.config(crypto_configs)
+
+        self.__enable_heartbeat = kwargs.get("enable_heartbeat", False)
+        self.__heartbeat_timeout = kwargs.get("heartbeat_timeout", 15)
 
         return self.fileno
 
@@ -96,12 +102,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         logging.print_general("tcp_error", self.__server_address)
         self.delete_handler(self.fileno)
 
-    def tcp_timeout(self):
-        if not self.is_conn_ok():
-            logging.print_general("connecting_timeout", self.__server_address)
-            self.delete_handler(self.fileno)
-            return
-
+    def __handle_conn_timeout(self):
         t = time.time()
 
         if t - self.__update_time > self.__conn_timeout:
@@ -109,6 +110,25 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             logging.print_general("connected_timeout", self.__server_address)
             return
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+
+    def __handle_heartbeat_timeout(self):
+        t = time.time()
+
+        if t - self.__update_time >= self.__heartbeat_timeout:
+            self.send_msg_to_tunnel(self.dispatcher.session_id, proto_utils.ACT_PING, proto_utils.rand_bytes())
+
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+
+    def tcp_timeout(self):
+        if not self.is_conn_ok():
+            logging.print_general("connecting_timeout", self.__server_address)
+            self.delete_handler(self.fileno)
+            return
+
+        if self.__enable_heartbeat:
+            self.__handle_heartbeat_timeout()
+        else:
+            self.__handle_conn_timeout()
 
     def connect_ok(self):
         self.__update_time = time.time()
@@ -138,7 +158,7 @@ class udp_tunnel(udp_handler.udp_handler):
     __encrypt = None
     __decrypt = None
 
-    __LOOP_TIMEOUT = 5
+    __LOOP_TIMEOUT = 10
     __update_time = 0
     __conn_timeout = 0
     __sent_queue = None
@@ -148,9 +168,6 @@ class udp_tunnel(udp_handler.udp_handler):
 
     __enable_heartbeat = None
     __heartbeat_timeout = None
-    __heartbeat_num = None
-    # 已经发送的ping请求次数
-    __ping_req_num = None
 
     def init_func(self, creator, crypto, crypto_configs, redundancy=False, conn_timeout=720, is_ipv6=False, **kwargs):
         if is_ipv6:
@@ -174,8 +191,6 @@ class udp_tunnel(udp_handler.udp_handler):
 
         self.__enable_heartbeat = kwargs.get("enable_heartbeat", False)
         self.__heartbeat_timeout = kwargs.get("heartbeat_timeout", 15)
-        self.__heartbeat_num = kwargs.get("heartbeat_num", 3)
-        self.__ping_req_num = 0
 
         return self.fileno
 
@@ -208,17 +223,12 @@ class udp_tunnel(udp_handler.udp_handler):
 
         if action not in proto_utils.ACTS: return
 
-        if action == proto_utils.ACT_PONG:
-            self.__ping_req_num = 0
-            self.__update_time = time.time()
-            return
+        self.__update_time = time.time()
 
-        if action == proto_utils.ACT_PING:
-            self.__update_time = time.time()
-            return
+        if action == proto_utils.ACT_PONG: return
+        if action == proto_utils.ACT_PING: return
 
         self.dispatcher.handle_msg_from_tunnel(session_id, action, byte_data)
-        self.__update_time = time.time()
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
@@ -237,13 +247,9 @@ class udp_tunnel(udp_handler.udp_handler):
 
     def __handle_heartbeat_timeout(self):
         t = time.time()
-        if self.__ping_req_num == self.__heartbeat_num:
-            self.delete_handler(self.fileno)
-            return
 
         if t - self.__update_time >= self.__heartbeat_timeout:
             self.send_msg_to_tunnel(self.dispatcher.session_id, proto_utils.ACT_PING, proto_utils.rand_bytes())
-            self.__ping_req_num += 1
 
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
@@ -266,4 +272,3 @@ class udp_tunnel(udp_handler.udp_handler):
         for ippkt in ippkts: self.send(ippkt)
 
         self.add_evt_write(self.fileno)
-        self.__update_time = time.time()

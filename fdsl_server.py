@@ -127,17 +127,6 @@ class _fdslight_server(dispatcher.dispatcher):
 
         conn_timeout = int(conn_config["conn_timeout"])
 
-        enable_heartbeat = bool(int(conn_config.get("enable_heartbeat", 0)))
-        heartbeat_timeout = int(conn_config.get("heartbeat_timeout", 15))
-        if heartbeat_timeout < 10:
-            raise ValueError("wrong heartbeat_timeout value from config")
-        heartbeat_num = int(conn_config.get("heartbeat_num", 3))
-        if heartbeat_num < 1:
-            raise ValueError("wrong heartbeat_num value from config")
-
-        kwargs = {"enable_heartbeat": enable_heartbeat, "heartbeat_timeout": heartbeat_timeout,
-                  "heartbeat_num": heartbeat_num}
-
         listen_ip = conn_config["listen_ip"]
         listen_ip6 = conn_config["listen_ip6"]
 
@@ -146,8 +135,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
         if enable_ipv6:
             self.__tcp6_fileno = self.create_handler(-1, tunnels.tcp_tunnel, listen6, self.__tcp_crypto,
-                                                     self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=True,
-                                                     **kwargs)
+                                                     self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=True)
             self.__udp6_fileno = self.create_handler(-1, tunnels.udp_tunnel, listen6, self.__udp_crypto,
                                                      self.__crypto_configs, is_ipv6=True)
 
@@ -422,7 +410,6 @@ class _fdslight_server(dispatcher.dispatcher):
         if not self.handler_exists(self.__dns_fileno): return
 
         self.get_handler(self.__dns_fileno).request_dns(session_id, message)
-
 
     def __config_gateway(self, subnet, prefix, eth_name):
         """ 配置IPV4网关

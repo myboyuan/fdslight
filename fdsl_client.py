@@ -377,9 +377,6 @@ class _fdslight_client(dispatcher.dispatcher):
         heartbeat_timeout = int(conn.get("heartbeat_timeout", 15))
         if heartbeat_timeout < 10:
             raise ValueError("wrong heartbeat_timeout value from config")
-        heartbeat_num = int(conn.get("heartbeat_num", 3))
-        if heartbeat_num < 1:
-            raise ValueError("wrong heartbeat_num value from config")
 
         if tunnel_type.lower() == "udp":
             handler = tunnelc.udp_tunnel
@@ -388,8 +385,14 @@ class _fdslight_client(dispatcher.dispatcher):
             handler = tunnelc.tcp_tunnel
             crypto = self.__tcp_crypto
 
+        if conn_timeout < 120:
+            raise ValueError("the conn timeout must be more than 120s")
+
+        if enable_heartbeat and conn_timeout - heartbeat_timeout < 30:
+            raise ValueError("the headerbeat_timeout value wrong")
+
         kwargs = {"conn_timeout": conn_timeout, "is_ipv6": enable_ipv6, "enable_heartbeat": enable_heartbeat,
-                  "heartbeat_timeout": heartbeat_timeout, "heartbeat_num": heartbeat_num}
+                  "heartbeat_timeout": heartbeat_timeout, }
 
         if tunnel_type.lower() == "udp": kwargs["redundancy"] = redundancy
 
