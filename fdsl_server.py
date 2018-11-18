@@ -414,9 +414,9 @@ class _fdslight_server(dispatcher.dispatcher):
         self.get_handler(fileno).send_msg(session_id, address, proto_utils.ACT_DNS, message)
 
     def __request_dns(self, session_id, message):
+        print(message)
         # 检查DNS是否异常退出,如果退出,那么重启DNS服务
         if not self.handler_exists(self.__dns_fileno):
-            print("XXXXX")
             self.__dns_fileno = self.create_handler(-1, dns_proxy.dnsd_proxy, self.__dns_fileno,
                                                     is_ipv6=self.__dns_is_ipv6)
         # 检查DNS服务是否创建成功
