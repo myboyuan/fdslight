@@ -113,8 +113,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
         if t - self.__update_time >= self.__heartbeat_timeout:
             self.send_msg_to_tunnel(self.dispatcher.session_id, proto_utils.ACT_PING, proto_utils.rand_bytes())
-
-        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+        return
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
@@ -247,8 +246,7 @@ class udp_tunnel(udp_handler.udp_handler):
 
         if t - self.__update_time >= self.__heartbeat_timeout:
             self.send_msg_to_tunnel(self.dispatcher.session_id, proto_utils.ACT_PING, proto_utils.rand_bytes())
-
-        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+        return
 
     def udp_timeout(self):
         if self.__enable_heartbeat:
