@@ -66,6 +66,9 @@ class tcp_tunnel(tcp_handler.tcp_handler):
                 if not pkt_info: break
 
                 session_id, action, message = pkt_info
+
+                if action not in proto_utils.ACTS: continue
+
                 if action == proto_utils.ACT_PONG: continue
                 if action == proto_utils.ACT_PING:
                     session_id = self.dispatcher.session_id

@@ -121,9 +121,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
                 if not pkt_info: break
                 session_id, action, message = pkt_info
 
-                if action not in proto_utils.ACTS:
-                    self.delete_handler(self.fileno)
-                    return
+                if action not in proto_utils.ACTS: continue
 
                 self.__session_id = session_id
 
