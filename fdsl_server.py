@@ -140,8 +140,7 @@ class _fdslight_server(dispatcher.dispatcher):
                                                      self.__crypto_configs, is_ipv6=True)
 
         self.__tcp_fileno = self.create_handler(-1, tunnels.tcp_tunnel, listen, self.__tcp_crypto,
-                                                self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=False,
-                                                **kwargs)
+                                                self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=False)
         self.__udp_fileno = self.create_handler(-1, tunnels.udp_tunnel, listen, self.__udp_crypto,
                                                 self.__crypto_configs, is_ipv6=False)
 
