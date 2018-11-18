@@ -124,8 +124,8 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
         if self.__enable_heartbeat:
             self.__handle_heartbeat_timeout()
-        else:
-            self.__handle_conn_timeout()
+
+        self.__handle_conn_timeout()
 
     def connect_ok(self):
         self.__update_time = time.time()
@@ -253,8 +253,7 @@ class udp_tunnel(udp_handler.udp_handler):
     def udp_timeout(self):
         if self.__enable_heartbeat:
             self.__handle_heartbeat_timeout()
-        else:
-            self.__handle_conn_timeout()
+        self.__handle_conn_timeout()
 
     def udp_delete(self):
         self.unregister(self.fileno)
