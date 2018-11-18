@@ -194,7 +194,6 @@ class _fdslight_server(dispatcher.dispatcher):
         ip6_gw = nat_config["ip6_gw"]
 
         self.__ip6_udp_cone_nat = bool(int(nat_config.get("ip6_udp_cone_nat", 0)))
-        self.__config_nat()
 
         if enable_ipv6:
             self.__nat6 = nat.nat((subnet, prefix,), is_ipv6=True)
@@ -424,13 +423,6 @@ class _fdslight_server(dispatcher.dispatcher):
 
         self.get_handler(self.__dns_fileno).request_dns(session_id, message)
 
-    def __config_nat(self):
-        p = "/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established"
-
-        if not os.path.isfile(p):
-            os.system("sysctl -w net.netfilter.nf_conntrack_tcp_timeout_established=1860")
-        else:
-            os.system("""echo “1860″ > /proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established""")
 
     def __config_gateway(self, subnet, prefix, eth_name):
         """ 配置IPV4网关
