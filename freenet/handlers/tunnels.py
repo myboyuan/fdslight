@@ -125,11 +125,11 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
                     self.delete_handler(self.fileno)
                     return
 
+                self.__session_id = session_id
+
                 if self.__session_id and self.__session_id != session_id:
                     self.delete_handler(self.fileno)
                     return
-
-                self.__session_id = session_id
 
                 if action == proto_utils.ACT_PONG:
                     self.__ping_req_num = 0
