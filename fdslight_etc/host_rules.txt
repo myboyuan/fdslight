@@ -39,6 +39,7 @@ goo.gl:1
 *.g.co:1
 *.live.com:1
 *.live.net:1
+*.youmaker.com:1
 
 #  社交网络
 *.facebook.com:1
