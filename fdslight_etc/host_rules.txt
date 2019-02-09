@@ -158,6 +158,7 @@ register.mesh.com:1
 *.jwpltx.com:1
 *.hk01.com:1
 *.amazonaws.com:1
+*.amazon.co.jp:1
 
 ### 游戏相关
 *.rockstargames.com:1
