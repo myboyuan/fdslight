@@ -42,6 +42,7 @@ goo.gl:1
 
 #  社交网络
 *.facebook.com:1
+*.facebook.net:1
 *.fbcdn.net:1
 *.twitter.com:1
 *.twimg.com:1
