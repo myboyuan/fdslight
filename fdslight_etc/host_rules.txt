@@ -39,7 +39,6 @@ goo.gl:1
 *.g.co:1
 *.live.com:1
 *.live.net:1
-*.youtaker.com:1
 
 #  社交网络
 *.facebook.com:1
@@ -68,6 +67,7 @@ goo.gl:1
 *.soundcloud.com:1
 *.sndcdn.com:1
 *.netflix.com:1
+*.youtaker.com:1
 
 # 博客
 *.wordpress.com:1
