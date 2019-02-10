@@ -58,6 +58,8 @@ goo.gl:1
 *.naver.jp:0
 *.telegram.org:1
 *.ptt.cc:1
+*.reddit.com:1
+*.redditstatic.com:1
 
 # 防止skype重定向到gmw.cn
 *.skype.com:1
