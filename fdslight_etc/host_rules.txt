@@ -191,17 +191,7 @@ register.mesh.com:1
 *.xinsheng.net:1
 *.goodtv.tv:1
 
-### 广告屏蔽列表
-#img1.126.net:2
-#img2.126.net:2
-#als.baidu.com:2
-#ss0.bdstatic.com:2
-
 ### 政府机构
 # 中华民国政府
 *.gov.tw:1
 
-# 色情网站
-*.sex.com:1
-zh.foxtube.com:1
-*.fxtimg.com:1
