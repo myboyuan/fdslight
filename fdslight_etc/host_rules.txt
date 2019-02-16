@@ -74,6 +74,7 @@ goo.gl:1
 *.soundcloud.com:1
 *.sndcdn.com:1
 *.netflix.com:1
+*.nflximg.net:1
 *.youtaker.com:1
 
 # 博客
