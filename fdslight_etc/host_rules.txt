@@ -166,6 +166,7 @@ register.mesh.com:1
 *.amazonaws.com:1
 *.amazon.co.jp:1
 *.mobile01.com:1
+*.doubleclick.net:1
 
 ### 游戏相关
 *.rockstargames.com:1
