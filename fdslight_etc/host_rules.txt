@@ -186,6 +186,10 @@ register.mesh.com:1
 *.python-excel.org:1
 *.freebsd.org:0
 
+### 医学相关
+*.ncbi.nlm.nih.gov:1
+*.pubmed.gov:1
+
 ### 宗教及非政府机构
 # 香港教会
 *.hkchurch.org:1
