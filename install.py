@@ -50,6 +50,7 @@ def main():
 
     if __mode == "gateway":
         os.chdir("driver")
+        os.system("make clean")
         os.system("make")
         os.chdir("../")
         write_kern_ver_to_file("fdslight_etc/kern_version")
