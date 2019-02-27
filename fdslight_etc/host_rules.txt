@@ -173,7 +173,6 @@ register.mesh.com:1
 
 ### 书籍文化
 *.pressstore.com.tw:1
-*.pcstore.com.tw:1
 
 ### 游戏相关
 *.rockstargames.com:1
