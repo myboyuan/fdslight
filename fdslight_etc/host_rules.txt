@@ -182,9 +182,9 @@ register.mesh.com:1
 # PS4
 *.llnwd.net:0
 *.ubisoft.com:1
-*.nintendo.net:1
-*.nintendo.com:1
-*.nintendowifi.net:1
+*.nintendo.net:0
+*.nintendo.com:0
+*.nintendowifi.net:0
 
 ### 开发相关
 *.spice-space.org:1
