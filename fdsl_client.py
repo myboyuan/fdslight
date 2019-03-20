@@ -125,8 +125,8 @@ class _fdslight_client(dispatcher.dispatcher):
             vir_dns = local["virtual_dns"]
             vir_dns6 = local["virtual_dns6"]
 
-            self.set_router(vir_dns, is_ipv6=False, is_dynamic=False)
-            if self.__enable_ipv6_traffic: self.set_router(vir_dns6, is_ipv6=True, is_dynamic=False)
+            self.set_route(vir_dns, is_ipv6=False, is_dynamic=False)
+            if self.__enable_ipv6_traffic: self.set_route(vir_dns6, is_ipv6=True, is_dynamic=False)
 
         conn = configs["connection"]
 
@@ -259,7 +259,7 @@ class _fdslight_client(dispatcher.dispatcher):
         sts_daddr = socket.inet_ntop(fa, byte_daddr)
 
         if sts_daddr not in self.__routers:
-            self.set_router(sts_daddr, timeout=190, is_ipv6=is_ipv6, is_dynamic=True)
+            self.set_route(sts_daddr, timeout=190, is_ipv6=is_ipv6, is_dynamic=True)
         else:
             self.__update_router_access(sts_daddr, timeout=190)
         self.send_msg_to_tunnel(proto_utils.ACT_IPDATA, message)
@@ -440,7 +440,7 @@ class _fdslight_client(dispatcher.dispatcher):
         names = self.__router_timer.get_timeout_names()
         for name in names: self.__del_router(name)
 
-    def set_router(self, host, timeout=None, is_ipv6=False, is_dynamic=True):
+    def set_route(self, host, timeout=None, is_ipv6=False, is_dynamic=True):
         if host in self.__routers: return
 
         # 如果禁止了IPV6流量,那么不设置IPV6路由
