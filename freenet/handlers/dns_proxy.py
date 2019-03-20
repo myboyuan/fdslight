@@ -260,8 +260,8 @@ class dnsc_proxy(dns_base):
             for rrset in msg.answer:
                 for cname in rrset:
                     ip = cname.__str__()
-                    if utils.is_ipv4_address(ip): self.dispatcher.set_router(ip, is_dynamic=True)
-                    if utils.is_ipv6_address(ip): self.dispatcher.set_router(ip, is_ipv6=True, is_dynamic=True)
+                    if utils.is_ipv4_address(ip): self.dispatcher.set_route(ip, is_dynamic=True)
+                    if utils.is_ipv6_address(ip): self.dispatcher.set_route(ip, is_ipv6=True, is_dynamic=True)
                 ''''''
             ''''''
         if not self.__server_side:
