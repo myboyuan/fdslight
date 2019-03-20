@@ -34,11 +34,11 @@ ERR_FILE = "/tmp/fdslight_error.log"
 
 class _fdslight_client(dispatcher.dispatcher):
     # 路由超时时间
-    __ROUTER_TIMEOUT = 1200
+    __ROUTE_TIMEOUT = 1200
 
-    __routers = None
+    __routes = None
 
-    __router_timer = None
+    __route_timer = None
 
     __DEVNAME = "fdslight"
 
@@ -76,8 +76,8 @@ class _fdslight_client(dispatcher.dispatcher):
 
         signal.signal(signal.SIGINT, self.__exit)
 
-        self.__router_timer = timer.timer()
-        self.__routers = {}
+        self.__route_timer = timer.timer()
+        self.__routes = {}
         self.__configs = configs
 
         if mode == "local":
@@ -233,7 +233,7 @@ class _fdslight_client(dispatcher.dispatcher):
                 self.get_handler(self.__dns_fileno).dnsmsg_from_tun(saddr, daddr, sport, rs, is_ipv6=is_ipv6)
                 return
 
-        self.__update_router_access(sts_daddr)
+        self.__update_route_access(sts_daddr)
         self.send_msg_to_tunnel(action, message)
 
     def handle_msg_from_dgramdev(self, message):
@@ -258,10 +258,10 @@ class _fdslight_client(dispatcher.dispatcher):
         byte_daddr = self.__mbuf.get_part(n)
         sts_daddr = socket.inet_ntop(fa, byte_daddr)
 
-        if sts_daddr not in self.__routers:
+        if sts_daddr not in self.__routes:
             self.set_route(sts_daddr, timeout=190, is_ipv6=is_ipv6, is_dynamic=True)
         else:
-            self.__update_router_access(sts_daddr, timeout=190)
+            self.__update_route_access(sts_daddr, timeout=190)
         self.send_msg_to_tunnel(proto_utils.ACT_IPDATA, message)
 
     def handle_msg_from_tunnel(self, seession_id, action, message):
@@ -437,11 +437,11 @@ class _fdslight_client(dispatcher.dispatcher):
         return ipaddr
 
     def myloop(self):
-        names = self.__router_timer.get_timeout_names()
-        for name in names: self.__del_router(name)
+        names = self.__route_timer.get_timeout_names()
+        for name in names: self.__del_route(name)
 
     def set_route(self, host, timeout=None, is_ipv6=False, is_dynamic=True):
-        if host in self.__routers: return
+        if host in self.__routes: return
 
         # 如果禁止了IPV6流量,那么不设置IPV6路由
         if not self.__enable_ipv6_traffic and is_ipv6: return
@@ -458,13 +458,13 @@ class _fdslight_client(dispatcher.dispatcher):
         if not is_dynamic: return
 
         if not timeout:
-            timeout = self.__ROUTER_TIMEOUT
-        self.__router_timer.set_timeout(host, timeout)
-        self.__routers[host] = is_ipv6
+            timeout = self.__ROUTE_TIMEOUT
+        self.__route_timer.set_timeout(host, timeout)
+        self.__routes[host] = is_ipv6
 
-    def __del_router(self, host):
-        if host not in self.__routers: return
-        is_ipv6 = self.__routers[host]
+    def __del_route(self, host):
+        if host not in self.__routes: return
+        is_ipv6 = self.__routes[host]
 
         if is_ipv6:
             s = "-6"
@@ -475,19 +475,19 @@ class _fdslight_client(dispatcher.dispatcher):
 
         cmd = "ip %s route del %s/%s dev %s" % (s, host, prefix, self.__DEVNAME)
         os.system(cmd)
-        self.__router_timer.drop(host)
-        del self.__routers[host]
+        self.__route_timer.drop(host)
+        del self.__routes[host]
 
-    def __update_router_access(self, host, timeout=None):
+    def __update_route_access(self, host, timeout=None):
         """更新路由访问时间
         :param host:
         :param timeout:如果没有指定,那么使用默认超时
         :return:
         """
-        if host not in self.__routers: return
+        if host not in self.__routes: return
         if not timeout:
-            timeout = self.__ROUTER_TIMEOUT
-        self.__router_timer.set_timeout(host, timeout)
+            timeout = self.__ROUTE_TIMEOUT
+        self.__route_timer.set_timeout(host, timeout)
 
     def __exit(self, signum, frame):
         if self.handler_exists(self.__dns_fileno):
