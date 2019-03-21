@@ -173,6 +173,7 @@ register.mesh.com:1
 *.amazon.co.jp:1
 *.mobile01.com:1
 *.doubleclick.net:1
+*.appspot.com:1
 
 ### 书籍文化
 *.pressstore.com.tw:1
