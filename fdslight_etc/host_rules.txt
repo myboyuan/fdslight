@@ -216,5 +216,5 @@ register.mesh.com:1
 
 ### xxx
 *.pornhub.com:1
-
+*.phncdn.com:1
 
