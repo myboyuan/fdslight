@@ -214,5 +214,3 @@ register.mesh.com:1
 # 中华民国政府
 *.gov.tw:1
 
-### XXXX
-*.pornhub.com:1
