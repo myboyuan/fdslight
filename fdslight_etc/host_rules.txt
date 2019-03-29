@@ -58,6 +58,7 @@ goo.gl:1
 *.line-scdn.net:0
 *.viber.com:1
 *.whatsapp.net:1
+*.whatsapp.com:1
 *.naver.jp:1
 *.linecorp.com:1
 *.line-scdn.net:1
