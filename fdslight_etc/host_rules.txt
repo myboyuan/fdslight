@@ -90,7 +90,7 @@ goo.gl:1
 # 论坛及讨论区
 *.bannedbook.org:1
 
-###  国际媒体
+###  新闻媒体
 *.dongtaiwang.com:1
 *.epochtimes.com:1
 *.secretchina.com:1
@@ -127,6 +127,7 @@ goo.gl:1
 *.nextmedia.com:1
 # 华尔街日报
 *.wsj.com:1
+*.boxun.com:1
 
 # 苹果日报
 *.appledaily.com:1
