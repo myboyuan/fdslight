@@ -42,6 +42,7 @@ goo.gl:1
 *.live.net:1
 *.google:1
 *.googletagservices.com:1
+*.ads-twitter.com:1
 
 
 #  社交网络
