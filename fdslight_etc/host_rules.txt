@@ -186,6 +186,7 @@ register.mesh.com:1
 *.quora.com:1
 *.quoracdn.net:1
 *.namecheap.com:1
+*.janetter.net:1
 
 ### 书籍文化
 *.pressstore.com.tw:1
