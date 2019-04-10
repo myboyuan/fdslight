@@ -29,6 +29,20 @@ class dispatcher(object):
 
         return fd
 
+    def repleace_handler(self, creator_fd, fileno, handler, *args, **kwargs):
+        if fileno not in self.__handlers: raise excepts.HandlerNotFoundErr
+
+        h = self.__handlers[fileno]
+        h.release_when_replace()
+
+        fd = self.create_handler(creator_fd, handler, *args, **kwargs)
+
+        new_h = self.__handlers[fd]
+        new_h.reader._putvalue(h.reader.read())
+        new_h.writer.write(h.writer._getvalue())
+
+        return fd
+
     def delete_handler(self, fd):
         """删除处理者
         :param fd: 文件描述符
@@ -110,20 +124,20 @@ class dispatcher(object):
     def get_handler(self, fd):
         return self.__handlers.get(fd, None)
 
-    def send_message_to_handler(self, src_fd, dst_fd, byte_data):
+    def send_message_to_handler(self, src_fd, dst_fd, data):
         if dst_fd not in self.__handlers:
             raise excepts.HandlerNotFoundErr
 
         handler = self.__handlers[dst_fd]
-        handler.message_from_handler(src_fd, byte_data)
+        handler.message_from_handler(src_fd, data)
 
         return True
 
     def handler_exists(self, fd):
         return fd in self.__handlers
 
-    def create_poll(self):
-        self.__poll = evt_notify.event()
+    def create_poll(self, *args, **kwargs):
+        self.__poll = evt_notify.event(*args, **kwargs)
 
     def __handle_timeout(self):
         fd_set = self.__timer.get_timeout_names()

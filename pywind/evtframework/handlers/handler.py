@@ -64,13 +64,16 @@ class handler(object):
     def create_handler(self, creator_fd, h, *args, **kwargs):
         return self.dispatcher.create_handler(creator_fd, h, *args, **kwargs)
 
+    def replace_handler(self,creator_fd,fileno,h,*args,**kwargs):
+        return self.dispatcher.repleace_handler(creator_fd, fileno, h, *args, **kwargs)
+
     def delete_handler(self, fd):
         self.dispatcher.delete_handler(fd)
 
-    def send_message_to_handler(self, src_fd, dst_fd, byte_data):
-        return self.dispatcher.send_message_to_handler(src_fd, dst_fd, byte_data)
+    def send_message_to_handler(self, src_fd, dst_fd, data):
+        return self.dispatcher.send_message_to_handler(src_fd, dst_fd, data)
 
-    def message_from_handler(self, from_fd, byte_data):
+    def message_from_handler(self, from_fd, data):
         """
         重写这个方法, 当其他的处理者发送消息会调用这个函数
         :return:
@@ -143,4 +146,11 @@ class handler(object):
 
     def task_loop(self):
         """任务循环函数,当把handler加入道task loop,就会循环调用此函数"""
+        pass
+
+
+    def release_when_replace(self):
+        """当handler被替换的时候释放资源的函数
+        :return:
+        """
         pass

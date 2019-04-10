@@ -39,8 +39,13 @@ class event(object):
 
     __users_data = {}
 
-    def __init__(self):
+    def __init__(self, force_select=False):
         platform = sys.platform
+
+        if force_select:
+            self.__async_mode="select"
+            self.__iowait_func=self.__select_iowait
+            return
 
         if platform.find("win32") > -1 or platform.find("cygwin") > -1:
             self.__async_mode = "select"
@@ -168,11 +173,7 @@ class event(object):
             if is_hup: std_event |= EV_TYPE_HUP
             if is_err: std_event |= EV_TYPE_ERR
 
-            std_events.append(
-                (
-                    fileno, std_event, self.__users_data.get(fileno, None)
-                )
-            )
+            std_events.append((fileno, std_event, self.__users_data.get(fileno, None)))
 
         return std_events
 
@@ -192,8 +193,8 @@ class event(object):
             udata = kevent.udata
 
             is_read = (filter_ & select.KQ_FILTER_READ) == select.KQ_FILTER_READ
-            is_write = (filter_ & select.KQ_FILTER_WRITE) == select.KQ_FILTER_WRITE and \
-                       ((udata & EV_TYPE_WRITE) == EV_TYPE_WRITE)
+            is_write = (filter_ & select.KQ_FILTER_WRITE) == select.KQ_FILTER_WRITE and (
+                        (udata & EV_TYPE_WRITE) == EV_TYPE_WRITE)
             is_error = (flags & select.KQ_EV_ERROR) == select.KQ_EV_ERROR
 
             if is_read: std_event |= EV_TYPE_READ
@@ -202,13 +203,7 @@ class event(object):
 
             self.__kqueue_event_map[ident] = kevent
 
-            std_events.append(
-                (
-                    ident,
-                    std_event,
-                    self.__users_data.get(ident, None)
-                )
-            )
+            std_events.append((ident, std_event, self.__users_data.get(ident, None)))
 
         return std_events
 
