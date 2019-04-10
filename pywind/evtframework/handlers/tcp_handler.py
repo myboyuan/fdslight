@@ -76,7 +76,8 @@ class tcp_handler(handler.handler):
             self.__conn_ev_flag = 1
             return
 
-        while 1:
+        # 使用for,防止一直读取数据
+        for i in range(10):
             try:
                 recv_data = self.socket.recv(4096)
                 if not recv_data:
