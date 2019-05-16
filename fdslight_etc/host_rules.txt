@@ -161,10 +161,8 @@ goo.gl:1
 *.aolcdn.com:1
 *.apkpure.com:1
 static.adzerk.net:1
-dl.delivery.mp.microsoft.com:1
-*.wns.windows.com:1
-*.data.microsoft.com:1
-*.telemetry.microsoft.com:1
+*.windows.com:0
+*.microsoft.com:0
 register.mesh.com:1
 *.akadns.net:1
 *.mengniang.org:0
