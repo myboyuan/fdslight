@@ -129,7 +129,8 @@ goo.gl:1
 *.nextmedia.com:1
 # 华尔街日报
 *.wsj.com:1
-
+# 德国之声
+*.dw.com:1
 *.boxun.com:1
 *.peacehall.com:1
 
