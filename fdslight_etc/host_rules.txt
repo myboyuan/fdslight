@@ -42,6 +42,7 @@ goo.gl:1
 *.google:1
 *.googletagservices.com:1
 *.ads-twitter.com:1
+*.apple.com:0
 
 
 #  社交网络
@@ -184,6 +185,7 @@ register.mesh.com:1
 *.quoracdn.net:1
 *.namecheap.com:1
 *.openvpn.net:1
+*.footprintdns.com:1
 
 ### 书籍文化
 *.pressstore.com.tw:1
