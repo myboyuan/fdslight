@@ -219,6 +219,10 @@ register.mesh.com:1
 # 中华民国政府
 *.gov.tw:1
 
+### 教育
+# 加快访问速度
+*.mit.edu:1
+
 ### xxx
 *.pornhub.com:1
 *.phncdn.com:1
