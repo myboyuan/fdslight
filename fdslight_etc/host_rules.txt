@@ -187,6 +187,7 @@ register.mesh.com:1
 *.namecheap.com:1
 *.openvpn.net:1
 *.footprintdns.com:1
+*.tiqcdn.com:1
 
 ### 书籍文化
 *.pressstore.com.tw:1
@@ -201,7 +202,8 @@ register.mesh.com:1
 *.golang.org:1
 *.python-excel.org:1
 *.python.org:1
-*.freebsd.org:0
+*.freebsd.org:1
+*.vmware.com:1
 
 ### 医学相关
 *.ncbi.nlm.nih.gov:1
