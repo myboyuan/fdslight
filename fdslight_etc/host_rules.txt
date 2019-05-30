@@ -189,6 +189,7 @@ register.mesh.com:1
 *.footprintdns.com:1
 *.tiqcdn.com:1
 *.typography.com:1
+.jetbrains.com:1
 
 ### 书籍文化
 *.pressstore.com.tw:1
