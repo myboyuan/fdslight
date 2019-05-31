@@ -206,6 +206,7 @@ register.mesh.com:1
 *.python.org:1
 *.freebsd.org:1
 *.vmware.com:1
+login.oracle.com:1
 
 ### 医学相关
 *.ncbi.nlm.nih.gov:1
