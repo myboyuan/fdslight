@@ -3,7 +3,7 @@ import socket, time
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 
 class listener(tcp_handler.tcp_handler):
-    def init_func(self, creator_fd, address, timeout=600, is_ipv6=False):
+    def init_func(self, creator_fd, address, is_ipv6=False):
         if is_ipv6:
             fa = socket.AF_INET6
         else:

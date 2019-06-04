@@ -73,7 +73,10 @@ class logging(object):
 
 
 class any2wsd(dispatcher.dispatcher):
+    __configs = None
+
     def init_func(self):
+        self.__configs = {}
         self.create_poll()
         self.any2ws_init()
 
@@ -97,7 +100,11 @@ class any2wsd(dispatcher.dispatcher):
         return BASE_DIR
 
     def load_configs(self, relative_cfg_path):
-        path = "%s/configs/%s" % relative_cfg_path
+        path = "%s/any2ws_etc/%s" % relative_cfg_path
         pyobj = cfgfile.ini_parse_from_file(path)
 
-        return pyobj
+        self.__configs = pyobj
+
+    @property
+    def configs(self):
+        return self.__configs

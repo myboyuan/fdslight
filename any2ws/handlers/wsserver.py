@@ -8,7 +8,6 @@ class ws_listener(websocket.ws_listener):
     def ws_release(self):
         pass
 
-
 class ws_handler(websocket.ws_handler):
     def ws_init(self):
         pass
