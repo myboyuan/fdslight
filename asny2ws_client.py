@@ -3,6 +3,7 @@
 import any2ws.handlers.any2tcp as any2tcp
 import any2ws.any2wsd as any2wsd
 
+
 class any2wsd_client(any2wsd.any2wsd):
     __any2ws_listen_fileno = None
     __any2ws_listen6_fileno = None
@@ -37,7 +38,9 @@ class any2wsd_client(any2wsd.any2wsd):
 
 
 def main():
-    print(any2wsd.BASE_DIR)
+    rs = any2wsd.parse_syargv()
+    if not rs: return
+
 
 
 if __name__ == '__main__': main()

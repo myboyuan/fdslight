@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import pywind.evtframework.evt_dispatcher as dispatcher
 import pywind.lib.configfile as cfgfile
-import sys, os, signal, getopt, time
+import sys, os, signal, getopt, time, struct
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -33,6 +33,24 @@ def parse_syargv():
 
     return d
 
+
+def read_pid_from_file(path):
+    with open(path, "rb") as f:
+        b = f.read()
+    f.close()
+
+    pid, = struct.unpack("i", b)
+
+    return pid
+
+
+def write_pid_to_file(path):
+    pid = os.getpid()
+    b = struct.pack("i", pid)
+
+    with open(path, "wb") as f:
+        f.write(b)
+    f.close()
 
 class logging(object):
     __fdst = None
