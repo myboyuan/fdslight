@@ -69,8 +69,9 @@ class _Iniparser(object):
 
 
 def ini_parse_from_file(fpath):
-    with open(fpath, "r") as f:
-        data = f.read()
+    with open(fpath, "rb") as f:
+        data = f.read().decode("iso-8859-1")
+    f.close()
 
     p = _Iniparser()
     return p.parse(data)

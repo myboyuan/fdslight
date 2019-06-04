@@ -14,8 +14,11 @@ class dispatcher(object):
 
     __loop_tasks = None
 
+    __default_io_wait_time = None
+
     def __init__(self):
         global_vars["pyw.ioevtfw.dispatcher"] = self
+        self.__default_io_wait_time = 10
 
     def create_handler(self, creator_fd, handler, *args, **kwargs):
         """ 创建一个处理者
@@ -96,7 +99,7 @@ class dispatcher(object):
 
         while 1:
             wait_time = self.__timer.get_min_time()
-            if wait_time < 1: wait_time = 10
+            if wait_time < 1: wait_time = self.__default_io_wait_time
             if self.__loop_tasks: wait_time = 0
 
             event_set = self.__poll.poll(wait_time)
@@ -196,3 +199,10 @@ class dispatcher(object):
         """删除循环任务"""
         if not self.__loop_tasks: return
         if fileno in self.__loop_tasks: del self.__loop_tasks[fileno]
+
+    def set_default_io_wait_time(self, seconds):
+        """设置默认IO等待时间
+        :param seconds:
+        :return:
+        """
+        self.__default_io_wait_time = seconds

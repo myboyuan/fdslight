@@ -25,8 +25,8 @@ class template(object):
         fpath = self.__get_fpath(uri)
         if not fpath: raise TemplateErr("cannot found inherit template '%s'" % uri)
 
-        fdst = open(fpath, "r")
-        text_content = fdst.read()
+        fdst = open(fpath, "rb")
+        text_content = fdst.read().decode("iso-8859-1")
         fdst.close()
 
         exeobj = core_execute.execute(**self.__kwargs)
@@ -71,8 +71,8 @@ class template(object):
         fpath = self.__get_fpath(uri)
         if not fpath: raise TemplateErr("cannot found include file '%s'" % uri)
 
-        with open(fpath, "r") as f:
-            content = f.read()
+        with open(fpath, "rb") as f:
+            content = f.read().decode("iso-8859-1")
         f.close()
 
         return content
@@ -105,8 +105,8 @@ class template(object):
         fpath = self.__get_fpath(uri)
         if not fpath: raise TemplateErr("cannot found template file '%s'" % uri)
 
-        fdst = open(fpath, "r")
-        text_content = fdst.read()
+        fdst = open(fpath, "rb")
+        text_content = fdst.read().decode("iso-8859-1")
 
         fdst.close()
 
@@ -136,6 +136,8 @@ class template(object):
         exeobj_a._exe()
 
         return exeobj_a._get_buff_content()
+
+
 """
 tpl = template()
 tpl.set_find_directories(["./test"])
