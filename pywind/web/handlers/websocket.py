@@ -5,7 +5,6 @@ import pywind.web.lib.websocket as websocket
 import pywind.web.lib.httputils as httputils
 import socket, time
 
-
 class ws_listener(tcp_handler.tcp_handler):
     def init_func(self, creator, listen, is_ipv6=False):
         if is_ipv6:
