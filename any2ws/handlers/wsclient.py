@@ -45,9 +45,6 @@ class wsclient(tcp_handler.tcp_handler):
             fa = socket.AF_INET
 
         s = socket.socket(fa, socket.SOCK_STREAM)
-        context = ssl.SSLContext()
-        context.load_default_certs()
-        s = context.wrap_socket(s, do_handshake_on_connect=False)
 
         self.set_socket(s)
         self.connect(address, timeout=5)
@@ -57,11 +54,15 @@ class wsclient(tcp_handler.tcp_handler):
     def connect_ok(self):
         self.__up_time = time.time()
         self.register(self.fileno)
-        self.add_evt_read(self.fileno)
 
         if self.__ssl_on:
+            context = ssl.SSLContext()
+            context.verify_mode = ssl.CERT_NONE
+            s = context.wrap_socket(self.socket, do_handshake_on_connect=False, server_hostname=self.__address[0])
+            self.set_socket(s)
             self.do_ssl_handshake()
         else:
+            self.add_evt_read(self.fileno)
             self.send_handshake()
 
     def send_handshake(self):
@@ -123,29 +124,32 @@ class wsclient(tcp_handler.tcp_handler):
 
     def do_ssl_handshake(self):
         try:
-            self.__ssl_handshake_ok = self.socket.do_handshake()
+            self.socket.do_handshake()
+            self.__ssl_handshake_ok = True
+            self.add_evt_read(self.fileno)
+            self.send_handshake()
         except ssl.SSLWantReadError:
-            pass
+            self.add_evt_read(self.fileno)
         except ssl.SSLWantWriteError:
             self.add_evt_write(self.fileno)
 
-        print(self.__ssl_handshake_ok)
-
     def evt_read(self):
-        if not self.__ssl_on or not self.is_conn_ok():
-            super(wsclient, self).evt_read()
+        if not self.is_conn_ok():
+            super().evt_read()
             return
 
         if not self.__ssl_handshake_ok:
+            self.remove_evt_read(self.fileno)
             self.do_ssl_handshake()
-            return
+
+        if not self.__ssl_handshake_ok: return
+
         try:
             super(wsclient, self).evt_read()
         except ssl.SSLWantWriteError:
             self.add_evt_write(self.fileno)
-            return
         except ssl.SSLWantReadError:
-            return
+            pass
 
     def tcp_readable(self):
         if not self.__handshake_ok:
@@ -157,14 +161,15 @@ class wsclient(tcp_handler.tcp_handler):
         self.__up_time = time.time()
 
     def evt_write(self):
-        if not self.__ssl_on or self.is_conn_ok():
-            super(wsclient, self).evt_write()
+        if not self.is_conn_ok():
+            super().evt_write()
             return
 
         if not self.__ssl_handshake_ok:
             self.remove_evt_write(self.fileno)
             self.do_ssl_handshake()
-            return
+
+        if not self.__ssl_handshake_ok: return
         try:
             super(wsclient, self).evt_write()
         except ssl.SSLWantReadError:

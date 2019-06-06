@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 import socket, time
+import socket
 
 s = socket.socket()
 
 s.connect(("127.0.0.1", 8080))
+time.sleep(10)
+s.close()
 
-time.sleep(5)
+
+
