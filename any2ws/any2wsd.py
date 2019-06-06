@@ -119,7 +119,7 @@ class any2wsd(dispatcher.dispatcher):
         return self.__sysroot
 
     def load_configs(self, relative_cfg_path):
-        path = "%s/any2ws_etc/%s" % relative_cfg_path
+        path = "%s/any2ws_etc/%s" % (self.__sysroot, relative_cfg_path,)
         pyobj = cfgfile.ini_parse_from_file(path)
 
         self.__configs = pyobj

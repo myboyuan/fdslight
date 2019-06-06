@@ -43,10 +43,14 @@ class listener(tcp_handler.tcp_handler):
 class listener_handler(tcp_handler.tcp_handler):
     __caddr = None
     __wsc_fileno = None
+    __is_delete = None
+    __tell_flags = None
 
     def init_func(self, creator_fd, cs, caddr):
         self.__caddr = caddr
         self.__wsc_fileno = -1
+        self.__is_delete = False
+        self.__tell_flags = False
 
         self.create_wsclient()
 
@@ -61,31 +65,48 @@ class listener_handler(tcp_handler.tcp_handler):
 
         host = remote["host"]
         port = int(remote.get("port", 80))
-        ssl_on = bool(int(remote.get("ssl_in", 0)))
+        ssl_on = bool(int(remote.get("ssl_on", 0)))
         enable_ipv6 = bool(int(remote.get("enable_ipv6", 0)))
+        conn_timeout = int(remote.get("conn_timeout", 480))
+        url = remote["url"]
+        auth_id = remote["auth_id"]
 
-        fileno = self.create_handler(self.fileno, wsclient.wsclient, (host, port,), is_ipv6=enable_ipv6, ssl_on=ssl_on)
+        fileno = self.create_handler(self.fileno, wsclient.wsclient, (host, port,), url, auth_id, is_ipv6=enable_ipv6,
+                                     ssl_on=ssl_on)
         self.__wsc_fileno = fileno
 
     def tcp_readable(self):
-        pass
+        rdata = self.reader.read()
 
     def tcp_writable(self):
         if self.writer.size() == 0: self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
-        pass
+        if not self.is_conn_ok():
+            self.delete_handler(self.fileno)
+            return
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):
+        self.__is_delete = True
+
+        if self.__wsc_fileno > 0 and not self.__tell_flags:
+            self.delete_handler(self.__wsc_fileno)
+            self.__wsc_fileno = -1
+
         self.unregister(self.fileno)
         self.close()
 
     @property
     def configs(self):
         return self.dispatcher.configs["remote"]
+
+    def tell_ws_delete(self):
+        if self.__is_delete: return
+        self.__tell_flags = True
+        self.delete_handler(self.fileno)
 
 
 class client(tcp_handler.tcp_handler):

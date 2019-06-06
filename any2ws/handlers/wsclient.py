@@ -3,7 +3,7 @@
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.web.lib.websocket as websocket
 import pywind.web.lib.httputils as httputils
-import socket, time, random, sys
+import socket, time, random, sys, ssl
 
 
 class wsclient(tcp_handler.tcp_handler):
@@ -18,7 +18,14 @@ class wsclient(tcp_handler.tcp_handler):
     __ws_key = None
     __creator = None
 
-    def init_func(self, creator_fd, address, is_ipv6=False, ssl_on=False):
+    __conn_timout = None
+    __url = None
+    __auth_id = None
+
+    __ssl_on = None
+    __ssl_handshake_ok = None
+
+    def init_func(self, creator_fd, address, url, auth_id, is_ipv6=False, ssl_on=False, conn_timeout=600):
         self.__is_delete = False
         self.__handshake_ok = False
         self.__encoder = websocket.encoder()
@@ -26,6 +33,11 @@ class wsclient(tcp_handler.tcp_handler):
         self.__address = address
         self.__ws_key = self.rand_string()
         self.__creator = creator_fd
+        self.__url = url
+        self.__auth_id = auth_id
+        self.__ssl_on = ssl_on
+        self.__conn_timout = conn_timeout
+        self.__ssl_handshake_ok = False
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -33,8 +45,12 @@ class wsclient(tcp_handler.tcp_handler):
             fa = socket.AF_INET
 
         s = socket.socket(fa, socket.SOCK_STREAM)
+        context = ssl.SSLContext()
+        context.load_default_certs()
+        s = context.wrap_socket(s, do_handshake_on_connect=False)
+
         self.set_socket(s)
-        self.connect(address)
+        self.connect(address, timeout=5)
 
         return self.fileno
 
@@ -43,22 +59,25 @@ class wsclient(tcp_handler.tcp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
-        self.send_handshake()
+        if self.__ssl_on:
+            self.do_ssl_handshake()
+        else:
+            self.send_handshake()
 
     def send_handshake(self):
-        cfgs = self.configs.get("remote", {})
-        url = cfgs.get("url", "/")
-        auth_id = cfgs["auth_id"]
+        url = self.__url
+        auth_id = self.__auth_id
 
-        kv_pairs = [("Host", self.__address[0],), ("Connection", "Upgrade"), ("Upgrade", "websocket",),
-                    ("Sec-WebSocket-Version", 13,), ("User-Agent",
-                                                     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36",),
-                    ("Accept-Language", "zh-CN,zh;q=0.8"), ("Sec-WebSocket-Key", self.__ws_key,),
+        kv_pairs = [("Host", self.__address[0],),  # ("Connection", "Upgrade"), ("Upgrade", "websocket",),
+                    # ("Sec-WebSocket-Version", 13,),
+                    ("User-Agent",
+                     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36",),
+                    ("Accept-Language", "zh-CN,zh;q=0.8"),  # ("Sec-WebSocket-Key", self.__ws_key,),
                     ("X-Auth-Id", auth_id,)]
 
         s = httputils.build_http1x_req_header("GET", url, kv_pairs)
 
-        self.writer.write(s.encode("is-8859-1"))
+        self.writer.write(s.encode("iso-8859-1"))
         self.add_evt_write(self.fileno)
 
     def recv_handshake(self):
@@ -102,6 +121,32 @@ class wsclient(tcp_handler.tcp_handler):
 
         self.__handshake_ok = True
 
+    def do_ssl_handshake(self):
+        try:
+            self.__ssl_handshake_ok = self.socket.do_handshake()
+        except ssl.SSLWantReadError:
+            pass
+        except ssl.SSLWantWriteError:
+            self.add_evt_write(self.fileno)
+
+        print(self.__ssl_handshake_ok)
+
+    def evt_read(self):
+        if not self.__ssl_on or not self.is_conn_ok():
+            super(wsclient, self).evt_read()
+            return
+
+        if not self.__ssl_handshake_ok:
+            self.do_ssl_handshake()
+            return
+        try:
+            super(wsclient, self).evt_read()
+        except ssl.SSLWantWriteError:
+            self.add_evt_write(self.fileno)
+            return
+        except ssl.SSLWantReadError:
+            return
+
     def tcp_readable(self):
         if not self.__handshake_ok:
             self.recv_handshake()
@@ -111,24 +156,51 @@ class wsclient(tcp_handler.tcp_handler):
         self.send_message_to_handler(self.fileno, self.__creator, self.reader.read())
         self.__up_time = time.time()
 
+    def evt_write(self):
+        if not self.__ssl_on or self.is_conn_ok():
+            super(wsclient, self).evt_write()
+            return
+
+        if not self.__ssl_handshake_ok:
+            self.remove_evt_write(self.fileno)
+            self.do_ssl_handshake()
+            return
+        try:
+            super(wsclient, self).evt_write()
+        except ssl.SSLWantReadError:
+            return
+        except ssl.SSLWantWriteError:
+            self.add_evt_write(self.fileno)
+            return
+
     def tcp_writable(self):
-        if self.writer.size() == 0: self.remove_evt_write(self.fileno)
+        if self.writer.size() == 0:
+            self.remove_evt_write(self.fileno)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
 
     def tcp_timeout(self):
-        pass
+        if not self.is_conn_ok():
+            self.delete_handler(self.fileno)
+            return
+
+        t = time.time()
+        if not self.__handshake_ok and t - self.__up_time > 15:
+            self.delete_handler(self.fileno)
+            return
+
+        if t - self.__up_time > self.__conn_timout:
+            self.delete_handler(self.fileno)
+            return
+
+        self.set_timeout(self.fileno, 10)
 
     def tcp_delete(self):
-        if self.__is_delete: return
-        self.__is_delete = True
         self.unregister(self.fileno)
         self.close()
 
-    @property
-    def configs(self):
-        return self.dispatcher.configs.get("remote", {})
+        if self.handler_exists(self.__creator): self.dispatcher.get_handler(self.__creator).tell_ws_delete()
 
     def rand_string(self):
         chs = []

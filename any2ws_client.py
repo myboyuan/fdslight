@@ -11,7 +11,7 @@ sys.path.append(BASE_DIR)
 import any2ws.handlers.any2tcp as any2tcp
 import any2ws.any2wsd as any2wsd
 
-PID_PATH = "%s/any2ws_client.pid" % any2wsd.BASE_DIR
+PID_PATH = "%s/any2ws_client.pid" % BASE_DIR
 
 
 class any2wsd_client(any2wsd.any2wsd):
@@ -41,7 +41,7 @@ class any2wsd_client(any2wsd.any2wsd):
         self.__any2ws_listen_fileno = -1
         self.__any2ws_listen6_fileno = -1
 
-        self.load_configs()
+        self.load_configs("client.ini")
         self.create_listener()
 
     def any2ws_release(self):
