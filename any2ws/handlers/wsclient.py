@@ -71,7 +71,7 @@ class wsclient(tcp_handler.tcp_handler):
         kv_pairs = [("Host", self.__address[0],),  # ("Connection", "Upgrade"), ("Upgrade", "websocket",),
                     # ("Sec-WebSocket-Version", 13,),
                     ("Connection", "Keep-Alive",), ("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64)",),
-                    ("Accept-Language", "zh-CN,zh;q=0.8"), # ("Sec-WebSocket-Key", self.__ws_key,),
+                    ("Accept-Language", "zh-CN,zh;q=0.8"),  # ("Sec-WebSocket-Key", self.__ws_key,),
                     ("X-Auth-Id", auth_id,)]
 
         s = httputils.build_http1x_req_header("GET", url, kv_pairs)
@@ -149,16 +149,14 @@ class wsclient(tcp_handler.tcp_handler):
         except ssl.SSLWantWriteError:
             self.add_evt_write(self.fileno)
         except ssl.SSLWantReadError:
-            print("ivmx")
             pass
 
     def tcp_readable(self):
         if not self.__handshake_ok:
             self.recv_handshake()
+            return
 
-        if not self.__handshake_ok: return
-
-        self.send_message_to_handler(self.fileno, self.__creator, self.reader.read())
+        self.__decoder.input(self.reader.read())
         self.__up_time = time.time()
 
     def evt_write(self):
