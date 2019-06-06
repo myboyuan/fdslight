@@ -56,9 +56,8 @@ class wsclient(tcp_handler.tcp_handler):
         self.register(self.fileno)
 
         if self.__ssl_on:
-            context = ssl.SSLContext()
-            context.verify_mode = ssl.CERT_NONE
-            s = context.wrap_socket(self.socket, do_handshake_on_connect=False, server_hostname=self.__address[0])
+            context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+            s = context.wrap_socket(self.socket, do_handshake_on_connect=False)
             self.set_socket(s)
             self.do_ssl_handshake()
         else:
@@ -71,19 +70,20 @@ class wsclient(tcp_handler.tcp_handler):
 
         kv_pairs = [("Host", self.__address[0],),  # ("Connection", "Upgrade"), ("Upgrade", "websocket",),
                     # ("Sec-WebSocket-Version", 13,),
-                    ("User-Agent",
-                     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36",),
-                    ("Accept-Language", "zh-CN,zh;q=0.8"),  # ("Sec-WebSocket-Key", self.__ws_key,),
+                    ("Connection", "Keep-Alive",), ("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64)",),
+                    ("Accept-Language", "zh-CN,zh;q=0.8"), # ("Sec-WebSocket-Key", self.__ws_key,),
                     ("X-Auth-Id", auth_id,)]
 
         s = httputils.build_http1x_req_header("GET", url, kv_pairs)
 
         self.writer.write(s.encode("iso-8859-1"))
         self.add_evt_write(self.fileno)
+        print("send handshake")
 
     def recv_handshake(self):
         size = self.reader.size()
         data = self.reader.read()
+        print(data)
 
         p = data.find(b"\r\n\r\n")
 
@@ -149,6 +149,7 @@ class wsclient(tcp_handler.tcp_handler):
         except ssl.SSLWantWriteError:
             self.add_evt_write(self.fileno)
         except ssl.SSLWantReadError:
+            print("ivmx")
             pass
 
     def tcp_readable(self):
@@ -173,10 +174,11 @@ class wsclient(tcp_handler.tcp_handler):
         try:
             super(wsclient, self).evt_write()
         except ssl.SSLWantReadError:
-            return
+            pass
         except ssl.SSLWantWriteError:
             self.add_evt_write(self.fileno)
-            return
+        except ssl.SSLEOFError:
+            self.delete_handler(self.fileno)
 
     def tcp_writable(self):
         if self.writer.size() == 0:
@@ -204,6 +206,8 @@ class wsclient(tcp_handler.tcp_handler):
     def tcp_delete(self):
         self.unregister(self.fileno)
         self.close()
+
+        print("connection closed")
 
         if self.handler_exists(self.__creator): self.dispatcher.get_handler(self.__creator).tell_ws_delete()
 
