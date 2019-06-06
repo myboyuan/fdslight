@@ -84,7 +84,6 @@ class wsclient(tcp_handler.tcp_handler):
     def recv_handshake(self):
         size = self.reader.size()
         data = self.reader.read()
-        print(data)
 
         p = data.find(b"\r\n\r\n")
 
