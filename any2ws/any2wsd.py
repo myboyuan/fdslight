@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
-import pywind.evtframework.evt_dispatcher as dispatcher
-import pywind.lib.configfile as cfgfile
+
 import sys, os, signal, getopt, time, struct
 
-BASE_DIR = os.path.dirname(sys.argv[0])
-
-if not BASE_DIR: BASE_DIR = "."
-
-sys.path.append(BASE_DIR)
+import pywind.evtframework.evt_dispatcher as dispatcher
+import pywind.lib.configfile as cfgfile
 
 
 def parse_syargv():
@@ -52,6 +48,7 @@ def write_pid_to_file(path):
         f.write(b)
     f.close()
 
+
 class logging(object):
     __fdst = None
 
@@ -92,6 +89,7 @@ class logging(object):
 
 class any2wsd(dispatcher.dispatcher):
     __configs = None
+    __sysroot = None
 
     def init_func(self):
         self.__configs = {}
@@ -110,12 +108,15 @@ class any2wsd(dispatcher.dispatcher):
         """
         pass
 
+    def set_sysroot(self, sysroot):
+        self.__sysroot = sysroot
+
     @property
     def sysroot(self):
         """获取系统根路径
         :return:
         """
-        return BASE_DIR
+        return self.__sysroot
 
     def load_configs(self, relative_cfg_path):
         path = "%s/any2ws_etc/%s" % relative_cfg_path

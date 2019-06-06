@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import socket, time
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
+import any2ws.handlers.wsclient as wsclient
+
 
 class listener(tcp_handler.tcp_handler):
     def init_func(self, creator_fd, address, is_ipv6=False):
@@ -40,15 +42,30 @@ class listener(tcp_handler.tcp_handler):
 
 class listener_handler(tcp_handler.tcp_handler):
     __caddr = None
+    __wsc_fileno = None
 
     def init_func(self, creator_fd, cs, caddr):
         self.__caddr = caddr
+        self.__wsc_fileno = -1
+
+        self.create_wsclient()
 
         self.set_socket(cs)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
         return self.fileno
+
+    def create_wsclient(self):
+        remote = self.configs
+
+        host = remote["host"]
+        port = int(remote.get("port", 80))
+        ssl_on = bool(int(remote.get("ssl_in", 0)))
+        enable_ipv6 = bool(int(remote.get("enable_ipv6", 0)))
+
+        fileno = self.create_handler(self.fileno, wsclient.wsclient, (host, port,), is_ipv6=enable_ipv6, ssl_on=ssl_on)
+        self.__wsc_fileno = fileno
 
     def tcp_readable(self):
         pass
@@ -65,6 +82,10 @@ class listener_handler(tcp_handler.tcp_handler):
     def tcp_delete(self):
         self.unregister(self.fileno)
         self.close()
+
+    @property
+    def configs(self):
+        return self.dispatcher.configs["remote"]
 
 
 class client(tcp_handler.tcp_handler):

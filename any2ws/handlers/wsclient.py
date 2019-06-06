@@ -18,7 +18,7 @@ class wsclient(tcp_handler.tcp_handler):
     __ws_key = None
     __creator = None
 
-    def init_func(self, creator_fd, address, is_ipv6=False):
+    def init_func(self, creator_fd, address, is_ipv6=False, ssl_on=False):
         self.__is_delete = False
         self.__handshake_ok = False
         self.__encoder = websocket.encoder()
