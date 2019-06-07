@@ -157,17 +157,12 @@ class dispatcher(object):
         for fd, evt, udata in evt_set:
             is_read = (evt & evt_notify.EV_TYPE_READ) == evt_notify.EV_TYPE_READ
             is_write = (evt & evt_notify.EV_TYPE_WRITE) == evt_notify.EV_TYPE_WRITE
-            is_err = (evt & evt_notify.EV_TYPE_ERR) == evt_notify.EV_TYPE_ERR
 
             # 别的handler可能删除这个handler,因此需要检查
             if fd not in self.__handlers: continue
             handler = self.__handlers[fd]
             if not self.handler_exists(fd): continue
-            """
-            if is_err:
-                handler.error()
-                continue
-            """
+
             if not self.handler_exists(fd): continue
             if is_read: handler.evt_read()
             if not self.handler_exists(fd): continue

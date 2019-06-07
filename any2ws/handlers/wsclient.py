@@ -109,7 +109,7 @@ class wsclient(tcp_handler.tcp_handler):
             return
 
         version, status = resp
-        print(version, status)
+
         if status.find("101") != 0:
             self.delete_handler(self.fileno)
             sys.stderr.write("websocket handshake fail")
@@ -166,7 +166,54 @@ class wsclient(tcp_handler.tcp_handler):
             return
 
         self.__decoder.input(self.reader.read())
-        self.__up_time = time.time()
+
+        while 1:
+            self.__decoder.parse()
+            if self.__decoder.can_read_data() and self.__decoder.frame_ok():
+                data = self.__decoder.get_data()
+
+                self.__decoder.reset()
+
+                if self.__decoder.opcode not in (
+                        websocket.OP_PING, websocket.OP_PONG, websocket.OP_BIN, websocket.OP_CLOSE):
+                    self.delete_handler(self.fileno)
+                    break
+
+                if self.__decoder.opcode == websocket.OP_BIN:
+                    self.send_message_to_handler(self.fileno, self.__creator, data)
+                    self.__up_time = time.time()
+                    continue
+
+                if self.__decoder.opcode == websocket.OP_PONG:
+                    self.handle_pong()
+                    continue
+
+                if self.__decoder.opcode == websocket.OP_PING:
+                    self.handle_ping()
+                    continue
+
+                if self.__decoder.opcode == websocket.OP_CLOSE:
+                    self.handle_close()
+                    return
+
+            if not self.__decoder.continue_parse(): break
+        ''''''
+
+    def handle_ping(self):
+        data = self.__encoder.build_pong(b"")
+
+        self.add_evt_write(self.fileno)
+        self.writer.write(data)
+
+    def handle_pong(self):
+        pass
+
+    def handle_close(self):
+        data = self.__encoder.build_close(b"")
+
+        self.add_evt_write(self.fileno)
+        self.writer.write(data)
+        self.delete_this_no_sent_data()
 
     def evt_write(self):
         if not self.is_conn_ok():
@@ -214,7 +261,7 @@ class wsclient(tcp_handler.tcp_handler):
         self.unregister(self.fileno)
         self.close()
 
-        print("websocket connection closed")
+        print("closed %s:%s" % self.__address)
 
         if self.handler_exists(self.__creator): self.dispatcher.get_handler(self.__creator).tell_ws_delete()
 
@@ -231,3 +278,6 @@ class wsclient(tcp_handler.tcp_handler):
                 return v
 
         return None
+
+    def message_from_handler(self, from_fd, byte_data):
+        self.__encoder.build_frame(byte_data, 1, 0, websocket.OP_BIN)

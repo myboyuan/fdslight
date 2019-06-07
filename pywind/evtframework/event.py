@@ -4,8 +4,6 @@ import sys
 
 EV_TYPE_READ = 1
 EV_TYPE_WRITE = 2
-EV_TYPE_ERR = 4
-EV_TYPE_HUP = 8
 EV_TYPE_NO_EV = 0
 
 
@@ -163,15 +161,11 @@ class event(object):
         for fileno, event in events:
             is_read = (event & select.EPOLLIN) == select.EPOLLIN
             is_write = (event & select.EPOLLOUT) == select.EPOLLOUT
-            is_hup = (event & select.EPOLLHUP) == select.EPOLLHUP
-            is_err = (event & select.EPOLLERR) == select.EPOLLERR
 
             std_event = 0
 
             if is_read: std_event |= EV_TYPE_READ
             if is_write: std_event |= EV_TYPE_WRITE
-            if is_hup: std_event |= EV_TYPE_HUP
-            if is_err: std_event |= EV_TYPE_ERR
 
             std_events.append((fileno, std_event, self.__users_data.get(fileno, None)))
 
@@ -195,11 +189,9 @@ class event(object):
             is_read = (filter_ & select.KQ_FILTER_READ) == select.KQ_FILTER_READ
             is_write = (filter_ & select.KQ_FILTER_WRITE) == select.KQ_FILTER_WRITE and (
                         (udata & EV_TYPE_WRITE) == EV_TYPE_WRITE)
-            is_error = (flags & select.KQ_EV_ERROR) == select.KQ_EV_ERROR
 
             if is_read: std_event |= EV_TYPE_READ
             if is_write: std_event |= EV_TYPE_WRITE
-            if is_error: std_event |= EV_TYPE_ERR
 
             self.__kqueue_event_map[ident] = kevent
 
@@ -229,7 +221,6 @@ class event(object):
         for fd in errlist:
             if fd not in events_map:
                 events_map[fd] = 0
-            events_map[fd] |= EV_TYPE_ERR
 
         for key in events_map:
             udata = self.__users_data.get(key, None)
@@ -305,7 +296,7 @@ class event(object):
 
         if self.__async_mode == "kqueue":
             filter_ = select.KQ_FILTER_READ
-            flags = select.KQ_EV_ADD | select.KQ_EV_ERROR | select.KQ_EV_ENABLE
+            flags = select.KQ_EV_ADD |  select.KQ_EV_ENABLE
 
             if fileno not in self.__kqueue_event_map:
                 kevent = select.kevent(fileno, filter_, flags)
@@ -355,7 +346,7 @@ class event(object):
 
         if self.__async_mode == "kqueue":
             filter_ = select.KQ_FILTER_WRITE
-            flags = select.KQ_EV_ADD | select.KQ_EV_ERROR | select.KQ_EV_ENABLE
+            flags = select.KQ_EV_ADD  | select.KQ_EV_ENABLE
 
             if fileno not in self.__kqueue_event_map:
                 kevent = select.kevent(fileno, filter_, flags)

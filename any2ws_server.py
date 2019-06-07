@@ -43,6 +43,7 @@ def main():
         os.umask(0)
         pid = os.fork()
         if pid != 0: sys.exit(0)
+        any2wsd.write_pid_to_file(PID_PATH)
 
     cls_obj = any2wsd_server()
 
@@ -50,7 +51,8 @@ def main():
         cls_obj.ioloop()
     except KeyboardInterrupt:
         cls_obj.any2ws_release()
-        return
+
+    if os.path.isfile(PID_PATH): os.remove(PID_PATH)
 
 
 if __name__ == '__main__': main()

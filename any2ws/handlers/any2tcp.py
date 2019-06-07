@@ -72,7 +72,7 @@ class listener_handler(tcp_handler.tcp_handler):
         auth_id = remote["auth_id"]
 
         fileno = self.create_handler(self.fileno, wsclient.wsclient, (host, port,), url, auth_id, is_ipv6=enable_ipv6,
-                                     ssl_on=ssl_on)
+                                     ssl_on=ssl_on, conn_timeout=conn_timeout)
         self.__wsc_fileno = fileno
 
     def tcp_readable(self):
@@ -109,6 +109,10 @@ class listener_handler(tcp_handler.tcp_handler):
         if self.__is_delete: return
         self.__tell_flags = True
         self.delete_handler(self.fileno)
+
+    def message_from_handler(self, from_fd, byte_data):
+        self.add_evt_write(self.fileno)
+        self.writer.write(byte_data)
 
 
 class client(tcp_handler.tcp_handler):
