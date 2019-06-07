@@ -6,7 +6,7 @@ import any2ws.handlers.any2tcp as any2tcp
 
 class ws_listener(websocket.ws_listener):
     def ws_accept(self, cs, caddr):
-        self.create_handler(ws_handler, cs, caddr)
+        self.create_handler(-1, ws_handler, cs, caddr)
 
     def ws_release(self):
         pass

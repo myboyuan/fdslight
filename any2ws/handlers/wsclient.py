@@ -48,9 +48,11 @@ class wsclient(tcp_handler.tcp_handler):
             fa = socket.AF_INET
 
         s = socket.socket(fa, socket.SOCK_STREAM)
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-        context.set_alpn_protocols(["http/1.1"])
-        s = context.wrap_socket(s, do_handshake_on_connect=False)
+
+        if self.__ssl_on:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+            context.set_alpn_protocols(["http/1.1"])
+            s = context.wrap_socket(s, do_handshake_on_connect=False)
 
         self.set_socket(s)
         self.connect(address, timeout=5)
@@ -227,6 +229,10 @@ class wsclient(tcp_handler.tcp_handler):
 
     def evt_write(self):
         if not self.is_conn_ok():
+            super().evt_write()
+            return
+
+        if not self.__ssl_on:
             super().evt_write()
             return
 
