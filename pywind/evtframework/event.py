@@ -41,8 +41,8 @@ class event(object):
         platform = sys.platform
 
         if force_select:
-            self.__async_mode="select"
-            self.__iowait_func=self.__select_iowait
+            self.__async_mode = "select"
+            self.__iowait_func = self.__select_iowait
             return
 
         if platform.find("win32") > -1 or platform.find("cygwin") > -1:
@@ -188,7 +188,7 @@ class event(object):
 
             is_read = (filter_ & select.KQ_FILTER_READ) == select.KQ_FILTER_READ
             is_write = (filter_ & select.KQ_FILTER_WRITE) == select.KQ_FILTER_WRITE and (
-                        (udata & EV_TYPE_WRITE) == EV_TYPE_WRITE)
+                    (udata & EV_TYPE_WRITE) == EV_TYPE_WRITE)
 
             if is_read: std_event |= EV_TYPE_READ
             if is_write: std_event |= EV_TYPE_WRITE
@@ -262,7 +262,7 @@ class event(object):
         return self.__convert_select_events(rlist, wlist, errlist)
 
     def __select_iowait(self):
-        rlist, wlist, errlist = select.select(self.__rlist, self.__wlist, self.__rlist, self.__poll_timeout)
+        rlist, wlist, errlist = select.select(self.__rlist, self.__wlist, [], self.__poll_timeout)
 
         return self.__handle_select_events(rlist, wlist, errlist)
 
@@ -296,7 +296,7 @@ class event(object):
 
         if self.__async_mode == "kqueue":
             filter_ = select.KQ_FILTER_READ
-            flags = select.KQ_EV_ADD |  select.KQ_EV_ENABLE
+            flags = select.KQ_EV_ADD | select.KQ_EV_ENABLE
 
             if fileno not in self.__kqueue_event_map:
                 kevent = select.kevent(fileno, filter_, flags)
@@ -346,7 +346,7 @@ class event(object):
 
         if self.__async_mode == "kqueue":
             filter_ = select.KQ_FILTER_WRITE
-            flags = select.KQ_EV_ADD  | select.KQ_EV_ENABLE
+            flags = select.KQ_EV_ADD | select.KQ_EV_ENABLE
 
             if fileno not in self.__kqueue_event_map:
                 kevent = select.kevent(fileno, filter_, flags)

@@ -120,12 +120,14 @@ class client(tcp_handler.tcp_handler):
     __is_delete = None
     __creator = None
     __wait_writes = None
+    __conn_timeout = None
 
-    def init_func(self, creator_fd, address, is_ipv6=False):
+    def init_func(self, creator_fd, address, conn_timeout=600, is_ipv6=False):
         self.__is_delete = False
         self.__ws_conn_fileno = -1
         self.__creator = creator_fd
         self.__wait_writes = []
+        self.__conn_timeout = conn_timeout
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -163,23 +165,19 @@ class client(tcp_handler.tcp_handler):
             return
 
         t = time.time()
-        if t - self.__up_time > self.conn_timeout:
+        if t - self.__up_time > self.__conn_timeout:
             self.delete_handler(self.fileno)
             return
 
-        self.set_timeout(10)
+        self.set_timeout(self.fileno, 10)
 
     def tcp_delete(self):
         if self.__is_delete: return
 
-        self.dispatcher.get_handler(self.__creator).tell_delete()
+        self.dispatcher.get_handler(self.__creator).tell_any2tcp_delete()
         self.__is_delete = True
         self.unregister(self.fileno)
         self.close()
-
-    @property
-    def conn_timeout(self):
-        return self.dispatcher.conn_timeout
 
     def message_from_handler(self, from_fd, byte_data):
         if from_fd != self.__creator: return

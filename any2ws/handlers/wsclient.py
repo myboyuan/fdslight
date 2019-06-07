@@ -25,8 +25,6 @@ class wsclient(tcp_handler.tcp_handler):
     __ssl_on = None
     __ssl_handshake_ok = None
 
-    __try_delete = None
-
     def init_func(self, creator_fd, address, url, auth_id, is_ipv6=False, ssl_on=False, conn_timeout=600):
         self.__is_delete = False
         self.__handshake_ok = False
