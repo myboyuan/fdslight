@@ -62,9 +62,14 @@ class ws_handler(websocket.ws_handler):
 
     def on_handshake(self, request, headers):
         value = self.get_header_value("x-auth-id", headers)
-        print(value,request)
 
-        return True
+        if not value:
+            return False
+
+        auth_id = self.configs["local"]["auth_id"]
+        print(auth_id == value)
+
+        return auth_id == value
 
     def get_header_value(self, name, headers):
         for k, v in headers:

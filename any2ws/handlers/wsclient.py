@@ -63,7 +63,7 @@ class wsclient(tcp_handler.tcp_handler):
         self.__up_time = time.time()
         self.register(self.fileno)
 
-        print("connected server %s:%s" % self.__address)
+        print("connected %s:%s" % self.__address)
 
         if self.__ssl_on:
             self.do_ssl_handshake()
