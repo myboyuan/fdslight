@@ -52,9 +52,8 @@ class listener_handler(tcp_handler.tcp_handler):
         self.__is_delete = False
         self.__tell_flags = False
 
-        self.create_wsclient()
-
         self.set_socket(cs)
+        self.create_wsclient()
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 

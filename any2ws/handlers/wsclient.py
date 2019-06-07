@@ -26,6 +26,7 @@ class wsclient(tcp_handler.tcp_handler):
     __ssl_handshake_ok = None
 
     __tmp_sent_buf = None
+    __is_sent_ping = None
 
     def init_func(self, creator_fd, address, url, auth_id, is_ipv6=False, ssl_on=False, conn_timeout=600):
         self.__is_delete = False
@@ -41,6 +42,7 @@ class wsclient(tcp_handler.tcp_handler):
         self.__conn_timout = conn_timeout
         self.__ssl_handshake_ok = False
         self.__tmp_sent_buf = []
+        self.__is_sent_ping = False
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -112,7 +114,7 @@ class wsclient(tcp_handler.tcp_handler):
             return
 
         version, status = resp
-        print(status,kv_pairs)
+        print(status, kv_pairs)
 
         if status.find("101") != 0:
             self.delete_handler(self.fileno)
@@ -192,6 +194,7 @@ class wsclient(tcp_handler.tcp_handler):
                     break
 
                 if self.__decoder.opcode == websocket.OP_BIN:
+                    print(self.__creator)
                     self.send_message_to_handler(self.fileno, self.__creator, data)
                     self.__up_time = time.time()
                     continue
@@ -218,7 +221,7 @@ class wsclient(tcp_handler.tcp_handler):
         self.writer.write(data)
 
     def handle_pong(self):
-        pass
+        self.__is_sent_ping = False
 
     def handle_close(self):
         data = self.__encoder.build_close(b"")
@@ -257,6 +260,13 @@ class wsclient(tcp_handler.tcp_handler):
     def tcp_error(self):
         self.delete_handler(self.fileno)
 
+    def send_ping(self):
+        self.__is_sent_ping = True
+        ping = self.__encoder.build_ping()
+
+        self.writer.write(ping)
+        self.add_evt_write(self.fileno)
+
     def tcp_timeout(self):
         if not self.is_conn_ok():
             self.delete_handler(self.fileno)
@@ -271,7 +281,15 @@ class wsclient(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
 
-        self.set_timeout(self.fileno, 10)
+        if self.__is_sent_ping:
+            self.delete_handler(self.fileno)
+            return
+
+        if t - self.__up_time > 30:
+            self.send_ping()
+            return
+
+        self.set_timeout(self.fileno, 30)
 
     def tcp_delete(self):
         self.unregister(self.fileno)
