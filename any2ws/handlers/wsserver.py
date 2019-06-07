@@ -66,4 +66,4 @@ class ws_handler(websocket.ws_handler):
         self.delete_handler(self.fileno)
 
     def on_handshake(self, request, headers):
-        pass
+        return True
