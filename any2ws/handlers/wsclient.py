@@ -115,7 +115,8 @@ class wsclient(tcp_handler.tcp_handler):
 
         if status.find("101") != 0:
             self.delete_handler(self.fileno)
-            sys.stderr.write("websocket handshake fail")
+            sys.stderr.write("websocket handshake fail:%s" % status)
+            sys.stderr.flush()
             return
 
         accept_ws_key = self.get_kv_pairs_value("Sec-WebSocket-Accept", kv_pairs)
