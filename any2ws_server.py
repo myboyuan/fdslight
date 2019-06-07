@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, os, signal
+import sys, os, signal, traceback
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -63,6 +63,8 @@ def main():
         pid = os.fork()
         if pid != 0: sys.exit(0)
         any2wsd.write_pid_to_file(PID_PATH)
+        sys.stdout = any2wsd.logging(path="%s/any2ws_server_access.log" % BASE_DIR)
+        sys.stderr = any2wsd.logging(path="%s/any2ws_server_error.log" % BASE_DIR)
 
     cls_obj = any2wsd_server()
 
@@ -70,6 +72,9 @@ def main():
         cls_obj.ioloop()
     except KeyboardInterrupt:
         cls_obj.any2ws_release()
+    except:
+        excpt = traceback.format_exc()
+        sys.stderr.write(excpt)
 
     if os.path.isfile(PID_PATH): os.remove(PID_PATH)
 

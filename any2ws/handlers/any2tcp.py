@@ -148,6 +148,7 @@ class client(tcp_handler.tcp_handler):
 
         if not self.__wait_writes:
             self.writer.write(b"".join(self.__wait_writes))
+            self.add_evt_write(self.fileno)
             self.__wait_writes = []
 
     def tcp_readable(self):

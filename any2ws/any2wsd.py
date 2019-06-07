@@ -52,13 +52,15 @@ def write_pid_to_file(path):
 class logging(object):
     __fdst = None
 
-    def __init__(self, path):
-        self.__fdst = open(path, "a")
+    def __init__(self, path=None, fdst=None):
+        if fdst:
+            self.__fdst = fdst
+        else:
+            self.__fdst = open(path, "a")
 
     def write(self, s):
         s1 = time.strftime("%Y-%m-%d %H:%M:%S %Z")
         fmt = "--begin %s\r\n" % s1
-
         self.__fdst.write(fmt)
         self.__fdst.write(s)
         self.__fdst.write("\r\n")

@@ -20,7 +20,7 @@ class ws_handler(websocket.ws_handler):
         self.__is_delete = False
         self.__any2tcp_fileno = -1
 
-        print("connection")
+        print("connected %s:%s" % self.caddr)
 
         remote_cfgs = self.configs["remote"]
         enable_ipv6 = bool(int(remote_cfgs.get("enable_ipv6", 0)))
@@ -39,8 +39,6 @@ class ws_handler(websocket.ws_handler):
             self.delete_handler(self.fileno)
             return
 
-        print(message)
-
         if self.__any2tcp_fileno < 0:
             self.delete_handler(self.fileno)
             return
@@ -48,7 +46,7 @@ class ws_handler(websocket.ws_handler):
         self.send_message_to_handler(self.fileno, self.__any2tcp_fileno, message)
 
     def ws_release(self):
-        pass
+        print("disconnect %s:%s" % self.caddr)
 
     @property
     def configs(self):
@@ -65,3 +63,6 @@ class ws_handler(websocket.ws_handler):
     def tell_any2tcp_delete(self):
         if self.__is_delete: return
         self.delete_handler(self.fileno)
+
+    def on_handshake(self, request, headers):
+        pass

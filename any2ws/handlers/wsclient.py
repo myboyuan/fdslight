@@ -112,7 +112,6 @@ class wsclient(tcp_handler.tcp_handler):
             return
 
         version, status = resp
-        print(status)
 
         if status.find("101") != 0:
             self.delete_handler(self.fileno)
