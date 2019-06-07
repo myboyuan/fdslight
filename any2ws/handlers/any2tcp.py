@@ -104,6 +104,9 @@ class listener_handler(tcp_handler.tcp_handler):
 
     def tell_ws_delete(self):
         self.__wsc_fileno = -1
+        if self.writer.size() == 0:
+            self.delete_handler(self.fileno)
+            return
         self.delete_this_no_sent_data()
 
     def message_from_handler(self, from_fd, byte_data):

@@ -26,10 +26,8 @@ class ws_handler(websocket.ws_handler):
         port = int(remote_cfgs["port"])
         conn_timeout = int(remote_cfgs.get("conn_timeout", 600))
 
-        """
         self.__any2tcp_fileno = self.create_handler(self.fileno, any2tcp.client, (host, port,), is_ipv6=enable_ipv6,
                                                     conn_timeout=conn_timeout)
-                                                    """
         self.set_ws_timeout(conn_timeout + 30)
 
     def ws_readable(self, message, fin, rsv, opcode, frame_finish):
@@ -58,6 +56,9 @@ class ws_handler(websocket.ws_handler):
 
     def tell_any2tcp_delete(self):
         self.__any2tcp_fileno = -1
+        if self.writer.size() == 0:
+            self.delete_handler(self.fileno)
+            return
         self.delete_this_no_sent_data()
 
     def on_handshake(self, request, headers):
@@ -67,7 +68,6 @@ class ws_handler(websocket.ws_handler):
             return False
 
         auth_id = self.configs["local"]["auth_id"]
-        print(auth_id == value)
 
         return auth_id == value
 
