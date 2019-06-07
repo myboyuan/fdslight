@@ -40,8 +40,9 @@ class ws_handler(websocket.ws_handler):
             return
 
         print(message)
+        self.sendmsg(b"do you like me,websocket", 1, 0, wslib.OP_BIN)
         if self.__any2tcp_fileno < 0:
-            self.delete_handler(self.fileno)
+            self.delete_this_no_sent_data()
             return
 
         self.send_message_to_handler(self.fileno, self.__any2tcp_fileno, message)
