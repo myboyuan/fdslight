@@ -81,7 +81,9 @@ class tcp_handler(handler.handler):
             try:
                 recv_data = self.socket.recv(4096)
                 if not recv_data:
-                    self.error()
+                    # 处理未接收完毕的数据
+                    self.tcp_readable()
+                    if self.handler_exists(self.fileno): self.error()
                     break
                 self.reader._putvalue(self.handle_tcp_received_data(recv_data))
             except BlockingIOError:

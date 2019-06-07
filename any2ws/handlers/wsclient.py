@@ -25,6 +25,8 @@ class wsclient(tcp_handler.tcp_handler):
     __ssl_on = None
     __ssl_handshake_ok = None
 
+    __try_delete = None
+
     def init_func(self, creator_fd, address, url, auth_id, is_ipv6=False, ssl_on=False, conn_timeout=600):
         self.__is_delete = False
         self.__handshake_ok = False
@@ -45,6 +47,9 @@ class wsclient(tcp_handler.tcp_handler):
             fa = socket.AF_INET
 
         s = socket.socket(fa, socket.SOCK_STREAM)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+        context.set_alpn_protocols(["http/1.1"])
+        s = context.wrap_socket(s, do_handshake_on_connect=False)
 
         self.set_socket(s)
         self.connect(address, timeout=5)
@@ -55,10 +60,9 @@ class wsclient(tcp_handler.tcp_handler):
         self.__up_time = time.time()
         self.register(self.fileno)
 
+        print("connected server %s:%s" % self.__address)
+
         if self.__ssl_on:
-            context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-            s = context.wrap_socket(self.socket, do_handshake_on_connect=False)
-            self.set_socket(s)
             self.do_ssl_handshake()
         else:
             self.add_evt_read(self.fileno)
@@ -68,22 +72,19 @@ class wsclient(tcp_handler.tcp_handler):
         url = self.__url
         auth_id = self.__auth_id
 
-        kv_pairs = [("Host", self.__address[0],),  # ("Connection", "Upgrade"), ("Upgrade", "websocket",),
-                    # ("Sec-WebSocket-Version", 13,),
-                    ("Connection", "Keep-Alive",), ("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64)",),
-                    ("Accept-Language", "zh-CN,zh;q=0.8"),  # ("Sec-WebSocket-Key", self.__ws_key,),
+        kv_pairs = [("Host", self.__address[0],), ("Connection", "Upgrade"), ("Upgrade", "websocket",),
+                    ("Sec-WebSocket-Version", 13,), ("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64)",),
+                    ("Accept-Language", "zh-CN,zh;q=0.8"), ("Sec-WebSocket-Key", self.__ws_key,),
                     ("X-Auth-Id", auth_id,)]
 
         s = httputils.build_http1x_req_header("GET", url, kv_pairs)
 
         self.writer.write(s.encode("iso-8859-1"))
         self.add_evt_write(self.fileno)
-        print("send handshake")
 
     def recv_handshake(self):
         size = self.reader.size()
         data = self.reader.read()
-        print(data)
 
         p = data.find(b"\r\n\r\n")
 
@@ -108,7 +109,7 @@ class wsclient(tcp_handler.tcp_handler):
             return
 
         version, status = resp
-
+        print(version, status)
         if status.find("101") != 0:
             self.delete_handler(self.fileno)
             sys.stderr.write("websocket handshake fail")
@@ -138,18 +139,26 @@ class wsclient(tcp_handler.tcp_handler):
             super().evt_read()
             return
 
+        if not self.__ssl_on:
+            super().evt_read()
+            return
+
         if not self.__ssl_handshake_ok:
-            self.remove_evt_read(self.fileno)
             self.do_ssl_handshake()
 
         if not self.__ssl_handshake_ok: return
 
         try:
-            super(wsclient, self).evt_read()
+            super().evt_read()
         except ssl.SSLWantWriteError:
             self.add_evt_write(self.fileno)
         except ssl.SSLWantReadError:
-            pass
+            if self.reader.size() > 0:
+                self.tcp_readable()
+        except ssl.SSLZeroReturnError:
+            if self.reader.size() > 0:
+                self.tcp_readable()
+            if self.handler_exists(self.fileno): self.delete_handler(self.fileno)
 
     def tcp_readable(self):
         if not self.__handshake_ok:
@@ -205,7 +214,7 @@ class wsclient(tcp_handler.tcp_handler):
         self.unregister(self.fileno)
         self.close()
 
-        print("connection closed")
+        print("websocket connection closed")
 
         if self.handler_exists(self.__creator): self.dispatcher.get_handler(self.__creator).tell_ws_delete()
 

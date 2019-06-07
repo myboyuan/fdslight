@@ -90,6 +90,8 @@ class listener_handler(tcp_handler.tcp_handler):
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):
+        print("any2tcp connection closed")
+
         self.__is_delete = True
 
         if self.__wsc_fileno > 0 and not self.__tell_flags:
