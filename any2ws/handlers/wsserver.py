@@ -39,6 +39,7 @@ class ws_handler(websocket.ws_handler):
             self.delete_handler(self.fileno)
             return
 
+        print(message)
         if self.__any2tcp_fileno < 0:
             self.delete_handler(self.fileno)
             return
