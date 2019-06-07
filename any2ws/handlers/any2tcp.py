@@ -77,6 +77,8 @@ class listener_handler(tcp_handler.tcp_handler):
 
     def tcp_readable(self):
         rdata = self.reader.read()
+        if not self.handler_exists(self.__wsc_fileno): return
+        self.send_message_to_handler(self.fileno, self.__wsc_fileno, rdata)
 
     def tcp_writable(self):
         if self.writer.size() == 0: self.remove_evt_write(self.fileno)

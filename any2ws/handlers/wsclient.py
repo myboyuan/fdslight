@@ -25,6 +25,8 @@ class wsclient(tcp_handler.tcp_handler):
     __ssl_on = None
     __ssl_handshake_ok = None
 
+    __tmp_sent_buf = None
+
     def init_func(self, creator_fd, address, url, auth_id, is_ipv6=False, ssl_on=False, conn_timeout=600):
         self.__is_delete = False
         self.__handshake_ok = False
@@ -38,6 +40,7 @@ class wsclient(tcp_handler.tcp_handler):
         self.__ssl_on = ssl_on
         self.__conn_timout = conn_timeout
         self.__ssl_handshake_ok = False
+        self.__tmp_sent_buf = []
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -107,6 +110,7 @@ class wsclient(tcp_handler.tcp_handler):
             return
 
         version, status = resp
+        print(status)
 
         if status.find("101") != 0:
             self.delete_handler(self.fileno)
@@ -120,6 +124,14 @@ class wsclient(tcp_handler.tcp_handler):
             return
 
         self.__handshake_ok = True
+        if self.__tmp_sent_buf:
+            self.add_evt_write(self.add_evt_write(self.fileno))
+
+        while 1:
+            try:
+                self.writer.write(self.__tmp_sent_buf.pop(0))
+            except IndexError:
+                break
 
     def do_ssl_handshake(self):
         try:
@@ -259,7 +271,7 @@ class wsclient(tcp_handler.tcp_handler):
         self.unregister(self.fileno)
         self.close()
 
-        print("closed %s:%s" % self.__address)
+        print("disconnect %s:%s" % self.__address)
 
         if self.handler_exists(self.__creator): self.dispatcher.get_handler(self.__creator).tell_ws_delete()
 
@@ -278,4 +290,10 @@ class wsclient(tcp_handler.tcp_handler):
         return None
 
     def message_from_handler(self, from_fd, byte_data):
-        self.__encoder.build_frame(byte_data, 1, 0, websocket.OP_BIN)
+        data = self.__encoder.build_frame(byte_data, 1, 0, websocket.OP_BIN)
+
+        if self.__handshake_ok:
+            self.writer.write(data)
+            self.add_evt_write(self.fileno)
+        else:
+            self.__tmp_sent_buf.append(data)
