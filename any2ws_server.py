@@ -27,6 +27,8 @@ class any2wsd_server(any2wsd.any2wsd):
         listen_ipv6 = local_configs.get("listen_ipv6", "::")
         listen_port = int(local_configs.get("listen_port", 8000))
 
+        print(listen_ip,listen_port)
+
         if enable_ipv6:
             self.__wss6_fileno = self.create_handler(-1, wsserver.ws_listener, (listen_ipv6, listen_port,),
                                                      is_ipv6=True)
