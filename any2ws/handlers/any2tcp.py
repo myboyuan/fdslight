@@ -43,13 +43,11 @@ class listener(tcp_handler.tcp_handler):
 class listener_handler(tcp_handler.tcp_handler):
     __caddr = None
     __wsc_fileno = None
-    __is_delete = None
     __tell_flags = None
 
     def init_func(self, creator_fd, cs, caddr):
         self.__caddr = caddr
         self.__wsc_fileno = -1
-        self.__is_delete = False
         self.__tell_flags = False
 
         self.set_socket(cs)
@@ -93,8 +91,6 @@ class listener_handler(tcp_handler.tcp_handler):
     def tcp_delete(self):
         print("any2tcp connection closed")
 
-        self.__is_delete = True
-
         if self.__wsc_fileno > 0 and not self.__tell_flags:
             self.delete_handler(self.__wsc_fileno)
             self.__wsc_fileno = -1
@@ -107,9 +103,8 @@ class listener_handler(tcp_handler.tcp_handler):
         return self.dispatcher.configs["remote"]
 
     def tell_ws_delete(self):
-        if self.__is_delete: return
-        self.__tell_flags = True
-        self.delete_handler(self.fileno)
+        self.__wsc_fileno = -1
+        self.delete_this_no_sent_data()
 
     def message_from_handler(self, from_fd, byte_data):
         self.add_evt_write(self.fileno)
@@ -118,13 +113,11 @@ class listener_handler(tcp_handler.tcp_handler):
 
 class client(tcp_handler.tcp_handler):
     __address = None
-    __is_delete = None
     __creator = None
     __wait_writes = None
     __conn_timeout = None
 
     def init_func(self, creator_fd, address, conn_timeout=600, is_ipv6=False):
-        self.__is_delete = False
         self.__ws_conn_fileno = -1
         self.__creator = creator_fd
         self.__wait_writes = []
@@ -174,10 +167,7 @@ class client(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, 10)
 
     def tcp_delete(self):
-        if self.__is_delete: return
-
         self.dispatcher.get_handler(self.__creator).tell_any2tcp_delete()
-        self.__is_delete = True
         self.unregister(self.fileno)
         self.close()
 

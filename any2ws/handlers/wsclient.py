@@ -7,7 +7,6 @@ import socket, time, random, sys, ssl
 
 
 class wsclient(tcp_handler.tcp_handler):
-    __is_delete = None
     __up_time = None
 
     __handshake_ok = None
@@ -29,7 +28,6 @@ class wsclient(tcp_handler.tcp_handler):
     __is_sent_ping = None
 
     def init_func(self, creator_fd, address, url, auth_id, is_ipv6=False, ssl_on=False, conn_timeout=600):
-        self.__is_delete = False
         self.__handshake_ok = False
         self.__encoder = websocket.encoder()
         self.__decoder = websocket.decoder()
@@ -114,7 +112,6 @@ class wsclient(tcp_handler.tcp_handler):
             return
 
         version, status = resp
-        print(status, kv_pairs)
 
         if status.find("101") != 0:
             self.delete_handler(self.fileno)
@@ -194,7 +191,6 @@ class wsclient(tcp_handler.tcp_handler):
                     break
 
                 if self.__decoder.opcode == websocket.OP_BIN:
-                    print(self.__creator)
                     self.send_message_to_handler(self.fileno, self.__creator, data)
                     self.__up_time = time.time()
                     continue

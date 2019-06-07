@@ -14,10 +14,8 @@ class ws_listener(websocket.ws_listener):
 
 class ws_handler(websocket.ws_handler):
     __any2tcp_fileno = None
-    __is_delete = None
 
     def ws_init(self):
-        self.__is_delete = False
         self.__any2tcp_fileno = -1
 
         print("connected %s:%s" % self.caddr)
@@ -32,17 +30,15 @@ class ws_handler(websocket.ws_handler):
         self.__any2tcp_fileno = self.create_handler(self.fileno, any2tcp.client, (host, port,), is_ipv6=enable_ipv6,
                                                     conn_timeout=conn_timeout)
                                                     """
-        self.set_ws_timeout(conn_timeout + 60)
+        self.set_ws_timeout(conn_timeout + 30)
 
     def ws_readable(self, message, fin, rsv, opcode, frame_finish):
         if opcode != wslib.OP_BIN:
             self.delete_handler(self.fileno)
             return
 
-        print(message)
-        self.sendmsg(b"do you like me,websocket", 1, 0, wslib.OP_BIN)
         if self.__any2tcp_fileno < 0:
-            self.delete_this_no_sent_data()
+            self.delete_handler(self.fileno)
             return
 
         self.send_message_to_handler(self.fileno, self.__any2tcp_fileno, message)
@@ -55,16 +51,24 @@ class ws_handler(websocket.ws_handler):
         return self.dispatcher.configs
 
     def tcp_delete(self):
-        if self.__is_delete: return
-        self.__is_delete = True
         if self.__any2tcp_fileno > 0:
             self.delete_handler(self.__any2tcp_fileno)
             self.__any2tcp_fileno = -1
         super().tcp_delete()
 
     def tell_any2tcp_delete(self):
-        if self.__is_delete: return
-        self.delete_handler(self.fileno)
+        self.__any2tcp_fileno = -1
+        self.delete_this_no_sent_data()
 
     def on_handshake(self, request, headers):
+        value = self.get_header_value("x-auth-id", headers)
+        print(value,request)
+
         return True
+
+    def get_header_value(self, name, headers):
+        for k, v in headers:
+            if name.lower() == k.lower():
+                return v
+            ''''''
+        return None
