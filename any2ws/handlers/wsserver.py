@@ -26,8 +26,6 @@ class ws_handler(websocket.ws_handler):
         port = int(remote_cfgs["port"])
         conn_timeout = int(remote_cfgs.get("conn_timeout", 600))
 
-        print(self.fileno,"wsserver")
-
         self.__any2tcp_fileno = self.create_handler(self.fileno, any2tcp.client, (host, port,), is_ipv6=enable_ipv6,
                                                     conn_timeout=conn_timeout)
         self.set_ws_timeout(conn_timeout + 30)
