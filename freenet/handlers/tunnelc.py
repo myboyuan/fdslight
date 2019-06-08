@@ -235,6 +235,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         if self.__over_https and not self.__http_handshake_ok:
             self.__tmp_buf.append(sent_pkt)
         else:
+            print(sent_pkt)
             self.writer.write(sent_pkt)
         if self.is_conn_ok(): self.add_evt_write(self.fileno)
 
