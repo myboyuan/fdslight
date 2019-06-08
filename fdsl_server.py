@@ -226,7 +226,6 @@ class _fdslight_server(dispatcher.dispatcher):
                     self.delete_handler(old_fileno)
                 ''''''
             ''''''
-        print(session_id)
         b = self.__access.data_from_recv(fileno, session_id, address, size)
         if not b: return False
         if size > utils.MBUF_AREA_SIZE: return False

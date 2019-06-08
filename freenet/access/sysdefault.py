@@ -21,7 +21,6 @@ class access(_access.access):
             passwd = dic["password"]
 
             session_id = self.gen_session_id(username, passwd)
-            print("--",session_id)
             self.__users[session_id] = username
 
     def handle_recv(self, fileno, session_id, address, data_len):
