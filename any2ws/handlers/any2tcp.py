@@ -134,6 +134,8 @@ class client(tcp_handler.tcp_handler):
         self.set_socket(s)
         self.connect(address)
 
+        print("client ",self.fileno)
+
         return self.fileno
 
     def connect_ok(self):
