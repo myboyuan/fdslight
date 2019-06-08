@@ -110,7 +110,6 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         return
 
     def tcp_writable(self):
-        print("write")
         if self.writer.size() == 0: self.remove_evt_write(self.fileno)
 
     def tcp_delete(self):
@@ -236,8 +235,8 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         if self.__over_https and not self.__http_handshake_ok:
             self.__tmp_buf.append(sent_pkt)
         else:
-            print("sent data")
             self.writer.write(sent_pkt)
+
         if self.is_conn_ok(): self.add_evt_write(self.fileno)
 
         self.__encrypt.reset()
@@ -248,8 +247,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         auth_id = cfgs["auth_id"]
 
         kv_pairs = [("Connection", "Upgrade"), ("Upgrade", "fdslight",),
-                    ("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64)",),
-                    ("Accept-Language", "zh-CN,zh;q=0.8"),
+                    ("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64)",), ("Accept-Language", "zh-CN,zh;q=0.8"),
                     ("X-Auth-Id", auth_id,)]
 
         if int(self.__server_address[1]) == 443:
