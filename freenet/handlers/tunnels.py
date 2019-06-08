@@ -103,7 +103,6 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
             self.do_http_handshake()
             return
 
-        print(self.__over_http,self.__http_handshake_ok)
         rdata = self.reader.read()
         self.__decrypt.input(rdata)
 
