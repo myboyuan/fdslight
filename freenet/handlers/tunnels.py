@@ -194,18 +194,23 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         host = self.get_http_kv_value("host", kv_pairs)
 
         if upgrade != "fdslight" and method != "GET":
+            logging.print_general("http_handshake_method_fail:upgrade:%s,method:%s" % (upgrade, method,),
+                                  self.__address)
             self.response_http_error("400 Bad Request")
             return
 
         if auth_id != self.__http_auth_id:
+            logging.print_general("http_auth_id_fail:%s" % auth_id, self.__address)
             self.response_http_error("400 Bad Request")
             return
 
         if not host:
+            logging.print_general("no_define_http_host", self.__address)
             self.response_http_error("400 Bad Request")
             return
 
         if host.find(self.__http_host) != 0:
+            logging.print_general("http_host_not_match:%s!=%s" % (host, self.__http_host,))
             self.response_http_error("400 Bad Request")
             return
 
