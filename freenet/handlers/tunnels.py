@@ -206,11 +206,8 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         self.response_http_ok()
 
     def response_http(self, status):
-        s = httputils.build_http1x_resp_header(
-            status, [
-                ("Content-Length", 0,)
-            ]
-        )
+        s = httputils.build_http1x_resp_header(status,
+            [("Content-Length", 0,), ("Connection", "Upgrade",), ("Upgrade", "fdslight",)])
         self.add_evt_write(self.fileno)
         self.writer.write(s.encode("iso-8859-1"))
 
