@@ -69,7 +69,6 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
     __over_http = None
     __http_handshake_ok = None
     __http_auth_id = None
-    __http_host = None
 
     def init_func(self, creator, crypto, crypto_configs, cs, address, conn_timeout, over_http=False):
         http_configs = self.dispatcher.http_configs
@@ -82,7 +81,6 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         self.__http_handshake_ok = False
         self.__over_http = over_http
         self.__http_auth_id = http_configs["auth_id"]
-        self.__http_host = http_configs["host"]
 
         self.set_socket(cs)
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
@@ -191,7 +189,6 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         method, url, version = request
         upgrade = self.get_http_kv_value("upgrade", kv_pairs)
         auth_id = self.get_http_kv_value("x-auth-id", kv_pairs)
-        host = self.get_http_kv_value("host", kv_pairs)
 
         if upgrade != "fdslight" and method != "GET":
             logging.print_general("http_handshake_method_fail:upgrade:%s,method:%s" % (upgrade, method,),
@@ -201,16 +198,6 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
 
         if auth_id != self.__http_auth_id:
             logging.print_general("http_auth_id_fail:%s" % auth_id, self.__address)
-            self.response_http_error("400 Bad Request")
-            return
-
-        if not host:
-            logging.print_general("no_define_http_host", self.__address)
-            self.response_http_error("400 Bad Request")
-            return
-
-        if host.find(self.__http_host) != 0:
-            logging.print_general("http_host_not_match:%s!=%s" % (host, self.__http_host,), self.__address)
             self.response_http_error("400 Bad Request")
             return
 

@@ -82,7 +82,6 @@ class _fdslight_server(dispatcher.dispatcher):
         configs = self.__configs.get("tunnel_over_http", {})
 
         pyo = {
-            "host": configs.get("host", "example.com"),
             "auth_id": configs.get("auth_id", "fdslight")
         }
 
