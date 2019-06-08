@@ -216,6 +216,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
 
         self.__http_handshake_ok = True
         logging.print_general("http_handshake_ok", self.__address)
+        self.response_http_ok()
 
     def response_http(self, status):
         s = httputils.build_http1x_resp_header(
