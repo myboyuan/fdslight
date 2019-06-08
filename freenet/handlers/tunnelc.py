@@ -292,7 +292,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         version, status = resp
 
         if status.find("101") != 0:
-            logging.print_general("https_handshake_error", self.__server_address)
+            logging.print_general("https_handshake_error:%s" % status, self.__server_address)
             self.delete_handler(self.fileno)
             return
 
