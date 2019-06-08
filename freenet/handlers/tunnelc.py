@@ -28,10 +28,13 @@ class tcp_tunnel(tcp_handler.tcp_handler):
     __over_https = None
     __http_handshake_ok = None
 
+    __tmp_buf = None
+
     def init_func(self, creator, crypto, crypto_configs, conn_timeout=720, is_ipv6=False, **kwargs):
         self.__ssl_handshake_ok = False
         self.__over_https = False
         self.__http_handshake_ok = False
+        self.__tmp_buf = []
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -226,8 +229,11 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
     def send_msg_to_tunnel(self, session_id, action, message):
         sent_pkt = self.__encrypt.build_packet(session_id, action, message)
-        self.writer.write(sent_pkt)
 
+        if self.__over_https and not self.__http_handshake_ok:
+            self.__tmp_buf.append(sent_pkt)
+        else:
+            self.writer.write(sent_pkt)
         if self.is_conn_ok(): self.add_evt_write(self.fileno)
 
         self.__encrypt.reset()
@@ -290,9 +296,14 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
         self.__http_handshake_ok = True
         # 发送还没有连接的时候堆积的数据包
-        if not self.writer.is_empty():
-            self.__update_time = time.time()
-            self.add_evt_write(self.fileno)
+        if self.__tmp_buf: self.add_evt_write(self.fileno)
+        while 1:
+            try:
+                self.writer.write(self.__tmp_buf.pop(0))
+            except IndexError:
+                break
+            ''''''
+        ''''''
 
 
 class udp_tunnel(udp_handler.udp_handler):

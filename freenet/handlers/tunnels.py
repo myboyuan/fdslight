@@ -222,6 +222,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
 
     def response_http_error(self, status):
         self.response_http(status)
+        logging.print_general("http_handshake_error:%s" % status, self.__address)
         self.delete_this_no_sent_data()
 
     def response_http_ok(self):
