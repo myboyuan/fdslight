@@ -145,14 +145,18 @@ class _fdslight_server(dispatcher.dispatcher):
         listen = (listen_ip, listen_port,)
         listen6 = (listen_ip6, listen_port)
 
+        over_http = bool(int(conn_config["tunnel_over_http"]))
+
         if enable_ipv6:
             self.__tcp6_fileno = self.create_handler(-1, tunnels.tcp_tunnel, listen6, self.__tcp_crypto,
-                                                     self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=True)
+                                                     self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=True,
+                                                     over_http=over_http)
             self.__udp6_fileno = self.create_handler(-1, tunnels.udp_tunnel, listen6, self.__udp_crypto,
                                                      self.__crypto_configs, is_ipv6=True)
 
         self.__tcp_fileno = self.create_handler(-1, tunnels.tcp_tunnel, listen, self.__tcp_crypto,
-                                                self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=False)
+                                                self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=False,
+                                                over_http=over_http)
         self.__udp_fileno = self.create_handler(-1, tunnels.udp_tunnel, listen, self.__udp_crypto,
                                                 self.__crypto_configs, is_ipv6=False)
 

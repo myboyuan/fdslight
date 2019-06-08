@@ -69,13 +69,18 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
     __http_auth_id = None
     __http_host = None
 
-    def init_func(self, creator, crypto, crypto_configs, cs, address, conn_timeout):
+    def init_func(self, creator, crypto, crypto_configs, cs, address, conn_timeout, over_http=False):
+        http_configs = self.dispatcher.http_configs
+
         self.__address = address
         self.__conn_timeout = conn_timeout
         self.__update_time = time.time()
         self.__session_id = None
+
         self.__http_handshake_ok = False
-        self.__over_http = False
+        self.__over_http = over_http
+        self.__http_auth_id = http_configs["auth_id"]
+        self.__http_host = http_configs["host"]
 
         self.set_socket(cs)
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
@@ -184,10 +189,25 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         method, url, version = request
         upgrade = self.get_http_kv_value("upgrade", kv_pairs)
         auth_id = self.get_http_kv_value("x-auth-id", kv_pairs)
+        host = self.get_http_kv_value("host", kv_pairs)
 
         if upgrade != "fdslight" and method != "GET":
             self.response_http_error("400 Bad Request")
             return
+
+        if auth_id != self.__http_auth_id:
+            self.response_http_error("400 Bad Request")
+            return
+
+        if not host:
+            self.response_http_error("400 Bad Request")
+            return
+
+        if host.find(self.__http_host) != 0:
+            self.response_http_error("400 Bad Request")
+            return
+
+        self.__http_handshake_ok = True
 
     def response_http(self, status):
         s = httputils.build_http1x_resp_header(
