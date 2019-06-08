@@ -4,8 +4,10 @@ import freenet.lib.base_proto.tunnel_tcp as tunnel
 
 
 class encrypt(tunnel.builder):
-    pass
+    def __init__(self):
+        super().__init__(tunnel.MIN_FIXED_HEADER_SIZE)
 
 
 class decrypt(tunnel.parser):
-    pass
+    def __init__(self):
+        super().__init__(tunnel.MIN_FIXED_HEADER_SIZE)
