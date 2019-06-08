@@ -55,8 +55,6 @@ class listener_handler(tcp_handler.tcp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
-        print("any2tcp",self.fileno)
-
         return self.fileno
 
     def create_wsclient(self):
@@ -139,7 +137,6 @@ class client(tcp_handler.tcp_handler):
         return self.fileno
 
     def connect_ok(self):
-        self.__up_time = time.time()
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
@@ -147,6 +144,7 @@ class client(tcp_handler.tcp_handler):
             self.writer.write(b"".join(self.__wait_writes))
             self.add_evt_write(self.fileno)
             self.__wait_writes = []
+        self.__up_time = time.time()
 
     def tcp_readable(self):
         rdata = self.reader.read()

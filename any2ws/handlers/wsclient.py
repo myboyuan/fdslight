@@ -48,7 +48,6 @@ class wsclient(tcp_handler.tcp_handler):
             fa = socket.AF_INET
 
         s = socket.socket(fa, socket.SOCK_STREAM)
-        print("websocket",s.fileno())
 
         if self.__ssl_on:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS)
