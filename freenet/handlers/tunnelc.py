@@ -110,6 +110,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         return
 
     def tcp_writable(self):
+        print("write")
         if self.writer.size() == 0: self.remove_evt_write(self.fileno)
 
     def tcp_delete(self):
@@ -235,6 +236,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         if self.__over_https and not self.__http_handshake_ok:
             self.__tmp_buf.append(sent_pkt)
         else:
+            print("sent data")
             self.writer.write(sent_pkt)
         if self.is_conn_ok(): self.add_evt_write(self.fileno)
 
