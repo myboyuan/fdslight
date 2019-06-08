@@ -295,6 +295,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             return
 
         self.__http_handshake_ok = True
+        logging.print_general("http_handshake_ok", self.__server_address)
         # 发送还没有连接的时候堆积的数据包
         if self.__tmp_buf: self.add_evt_write(self.fileno)
         while 1:
