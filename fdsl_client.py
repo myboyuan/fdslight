@@ -73,7 +73,14 @@ class _fdslight_client(dispatcher.dispatcher):
 
     @property
     def https_configs(self):
-        return {}
+        configs = self.__configs.get("tunnel_over_https", {})
+
+        pyo = {
+            "url": configs.get("url", "/"),
+            "auth_id": configs.get("auth_id", "fdslight")
+        }
+
+        return pyo
 
     def init_func(self, mode, debug, configs):
         self.create_poll()
@@ -376,6 +383,8 @@ class _fdslight_client(dispatcher.dispatcher):
         conn_timeout = int(conn["conn_timeout"])
         tunnel_type = conn["tunnel_type"]
         redundancy = bool(int(conn.get("udp_tunnel_redundancy", 1)))
+        over_https = bool(int(conn.get("tunnel_over_https", 0)))
+        is_udp = False
 
         enable_heartbeat = bool(int(conn.get("enable_heartbeat", 0)))
         heartbeat_timeout = int(conn.get("heartbeat_timeout", 15))
@@ -385,6 +394,7 @@ class _fdslight_client(dispatcher.dispatcher):
         if tunnel_type.lower() == "udp":
             handler = tunnelc.udp_tunnel
             crypto = self.__udp_crypto
+            is_udp = True
         else:
             handler = tunnelc.tcp_tunnel
             crypto = self.__tcp_crypto
@@ -397,6 +407,9 @@ class _fdslight_client(dispatcher.dispatcher):
 
         kwargs = {"conn_timeout": conn_timeout, "is_ipv6": enable_ipv6, "enable_heartbeat": enable_heartbeat,
                   "heartbeat_timeout": heartbeat_timeout, }
+
+        if not is_udp:
+            kwargs["tunnel_over_https"] = over_https
 
         if tunnel_type.lower() == "udp": kwargs["redundancy"] = redundancy
 

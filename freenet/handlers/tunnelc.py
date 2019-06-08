@@ -75,6 +75,12 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         return True
 
     def tcp_readable(self):
+        if self.__over_https and not self.__http_handshake_ok:
+            self.recv_handshake()
+
+        # 此处是为了握手成功后接收需要传送的数据包
+        if self.__over_https and not self.__http_handshake_ok: return
+
         rdata = self.reader.read()
         self.__decrypt.input(rdata)
 
@@ -255,8 +261,8 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         p = data.find(b"\r\n\r\n")
 
         if p < 10 and size > 2048:
+            logging.print_general("wrong_http_response_header", self.__server_address)
             self.delete_handler(self.fileno)
-            sys.stderr.write("wrong http response header")
             return
 
         if p < 0:
@@ -271,17 +277,22 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         try:
             resp, kv_pairs = httputils.parse_http1x_response_header(s)
         except httputils.Http1xHeaderErr:
+            logging.print_general("wrong_http_reponse_header", self.__server_address)
             self.delete_handler(self.fileno)
             return
 
         version, status = resp
 
         if status.find("101") != 0:
+            logging.print_general("https_handshake_error", self.__server_address)
             self.delete_handler(self.fileno)
-            logging.print_general("https_handshake_err", self.__server_address)
             return
 
         self.__http_handshake_ok = True
+        # 发送还没有连接的时候堆积的数据包
+        if not self.writer.is_empty():
+            self.__update_time = time.time()
+            self.add_evt_write(self.fileno)
 
 
 class udp_tunnel(udp_handler.udp_handler):

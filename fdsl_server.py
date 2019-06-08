@@ -12,11 +12,12 @@ LOG_FILE = "/tmp/fdslight.log"
 ERR_FILE = "/tmp/fdslight_error.log"
 
 import pywind.evtframework.evt_dispatcher as dispatcher
+import pywind.lib.configfile as configfile
+
 import freenet.lib.proc as proc
 import freenet.handlers.dns_proxy as dns_proxy
 import freenet.handlers.tundev as tundev
 import freenet.lib.utils as utils
-import pywind.lib.configfile as configfile
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.nat as nat
 import freenet.handlers.tunnels as tunnels
@@ -75,6 +76,17 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __dns_is_ipv6 = None
     __dns_addr = None
+
+    @property
+    def http_configs(self):
+        configs = self.__configs.get("tunnel_over_http", {})
+
+        pyo = {
+            "host": configs.get("host", "example.com"),
+            "auth_id": configs.get("auth_id", "fdslight")
+        }
+
+        return pyo
 
     def init_func(self, debug, configs):
         self.create_poll()

@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
+import socket, time
+
 import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
-import socket, time
+import pywind.web.lib.httputils as httputils
+
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.logging as logging
 
@@ -61,11 +64,18 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
 
     __session_id = None
 
+    __over_http = None
+    __http_handshake_ok = None
+    __http_auth_id = None
+    __http_host = None
+
     def init_func(self, creator, crypto, crypto_configs, cs, address, conn_timeout):
         self.__address = address
         self.__conn_timeout = conn_timeout
         self.__update_time = time.time()
         self.__session_id = None
+        self.__http_handshake_ok = False
+        self.__over_http = False
 
         self.set_socket(cs)
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
@@ -84,6 +94,10 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         return self.fileno
 
     def tcp_readable(self):
+        if self.__over_http and not self.__http_handshake_ok:
+            self.do_http_handshake()
+            return
+
         rdata = self.reader.read()
         self.__decrypt.input(rdata)
 
@@ -139,6 +153,64 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         self.writer.write(sent_pkt)
         self.add_evt_write(self.fileno)
         self.__encrypt.reset()
+
+    def do_http_handshake(self):
+        size = self.reader.size()
+        data = self.reader.read()
+
+        p = data.find(b"\r\n\r\n")
+
+        if p < 10 and size > 2048:
+            logging.print_general("wrong_http_header_length_for_request_header", self.__address)
+            self.delete_handler(self.fileno)
+            return
+
+        if p < 0:
+            self.reader._putvalue(data)
+            return
+        p += 4
+
+        self.reader._putvalue(data[p:])
+
+        s = data[0:p].decode("iso-8859-1")
+
+        try:
+            request, kv_pairs = httputils.parse_htt1x_request_header(s)
+        except httputils.Http1xHeaderErr:
+            logging.print_general("wrong_http_request_protocol", self.__address)
+            self.delete_handler(self.fileno)
+            return
+
+        method, url, version = request
+        upgrade = self.get_http_kv_value("upgrade", kv_pairs)
+        auth_id = self.get_http_kv_value("x-auth-id", kv_pairs)
+
+        if upgrade != "fdslight" and method != "GET":
+            self.response_http_error("400 Bad Request")
+            return
+
+    def response_http(self, status):
+        s = httputils.build_http1x_resp_header(
+            status, [
+                ("Content-Length", 0,)
+            ]
+        )
+        self.add_evt_write(self.fileno)
+        self.writer.write(s.encode("iso-8859-1"))
+
+    def response_http_error(self, status):
+        self.response_http(status)
+        self.delete_this_no_sent_data()
+
+    def response_http_ok(self):
+        self.response_http("101 Switching Protocols")
+
+    def get_http_kv_value(self, name, kv_pairs):
+        for k, v in kv_pairs:
+            if name.lower() == k.lower():
+                return v
+            ''''''
+        return None
 
 
 class udp_tunnel(udp_handler.udp_handler):
