@@ -104,9 +104,9 @@ class tcp_tunnel(tcp_handler.tcp_handler):
                 if action == proto_utils.ACT_PONG: continue
                 if action == proto_utils.ACT_PING: continue
 
+                self.__update_time = time.time()
                 self.dispatcher.handle_msg_from_tunnel(session_id, action, message)
             ''''''
-        self.__update_time = time.time()
         return
 
     def tcp_writable(self):
@@ -132,7 +132,11 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             logging.print_general("connected_timeout", self.__server_address)
             return
-        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+
+        if self.__enable_heartbeat:
+            self.set_timeout(self.fileno, self.__heartbeat_timeout)
+        else:
+            self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def __handle_heartbeat_timeout(self):
         t = time.time()
@@ -378,11 +382,10 @@ class udp_tunnel(udp_handler.udp_handler):
 
         if action not in proto_utils.ACTS: return
 
-        self.__update_time = time.time()
-
         if action == proto_utils.ACT_PONG: return
         if action == proto_utils.ACT_PING: return
 
+        self.__update_time = time.time()
         self.dispatcher.handle_msg_from_tunnel(session_id, action, byte_data)
 
     def udp_writable(self):
@@ -398,7 +401,11 @@ class udp_tunnel(udp_handler.udp_handler):
             logging.print_general("udp_timeout", self.__server_address)
             self.delete_handler(self.fileno)
             return
-        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+
+        if self.__enable_heartbeat:
+            self.set_timeout(self.fileno, self.__heartbeat_timeout)
+        else:
+            self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def __handle_heartbeat_timeout(self):
         t = time.time()
