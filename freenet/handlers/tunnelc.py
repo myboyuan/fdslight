@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """客户端隧道实现
 """
+import socket, time, ssl
 
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.evtframework.handlers.udp_handler as udp_handler
-import socket, time
+import pywind.web.lib.httputils as httputils
+
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.logging as logging
 
@@ -22,12 +24,27 @@ class tcp_tunnel(tcp_handler.tcp_handler):
     __enable_heartbeat = None
     __heartbeat_timeout = None
 
+    __ssl_handshake_ok = None
+    __over_https = None
+    __http_handshake_ok = None
+
     def init_func(self, creator, crypto, crypto_configs, conn_timeout=720, is_ipv6=False, **kwargs):
+        self.__ssl_handshake_ok = False
+        self.__over_https = False
+        self.__http_handshake_ok = False
+
         if is_ipv6:
             fa = socket.AF_INET6
         else:
             fa = socket.AF_INET
         s = socket.socket(fa, socket.SOCK_STREAM)
+
+        self.__over_https = kwargs.get("tunnel_over_https", False)
+
+        if self.__over_https:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+            context.set_alpn_protocols(["http/1.1"])
+            s = context.wrap_socket(s, do_handshake_on_connect=False)
 
         self.set_socket(s)
         self.__conn_timeout = conn_timeout
@@ -141,6 +158,66 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
         return
 
+    def evt_read(self):
+        if not self.is_conn_ok():
+            super().evt_read()
+            return
+
+        if not self.__over_https:
+            super().evt_read()
+            return
+
+        if not self.__ssl_handshake_ok:
+            self.do_ssl_handshake()
+
+        if not self.__ssl_handshake_ok: return
+
+        try:
+            super().evt_read()
+        except ssl.SSLWantWriteError:
+            self.add_evt_write(self.fileno)
+        except ssl.SSLWantReadError:
+            if self.reader.size() > 0:
+                self.tcp_readable()
+        except ssl.SSLZeroReturnError:
+            if self.reader.size() > 0:
+                self.tcp_readable()
+            if self.handler_exists(self.fileno): self.delete_handler(self.fileno)
+
+    def evt_write(self):
+        if not self.is_conn_ok():
+            super().evt_write()
+            return
+
+        if not self.__over_https:
+            super().evt_write()
+            return
+
+        if not self.__ssl_handshake_ok:
+            self.remove_evt_write(self.fileno)
+            self.do_ssl_handshake()
+
+        if not self.__ssl_handshake_ok: return
+        try:
+            super().evt_write()
+        except ssl.SSLWantReadError:
+            pass
+        except ssl.SSLWantWriteError:
+            self.add_evt_write(self.fileno)
+        except ssl.SSLEOFError:
+            self.delete_handler(self.fileno)
+
+    def do_ssl_handshake(self):
+        try:
+            self.socket.do_handshake()
+            self.__ssl_handshake_ok = True
+            self.add_evt_read(self.fileno)
+            self.send_handshake()
+        except ssl.SSLWantReadError:
+            self.add_evt_read(self.fileno)
+        except ssl.SSLWantWriteError:
+            self.add_evt_write(self.fileno)
+
     def send_msg_to_tunnel(self, session_id, action, message):
         sent_pkt = self.__encrypt.build_packet(session_id, action, message)
         self.writer.write(sent_pkt)
@@ -148,6 +225,63 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         if self.is_conn_ok(): self.add_evt_write(self.fileno)
 
         self.__encrypt.reset()
+
+    def send_handshake(self):
+        cfgs = self.dispatcher.https_configs
+        url = cfgs["url"]
+        auth_id = cfgs["auth_id"]
+
+        kv_pairs = [("Connection", "Upgrade"), ("Upgrade", "fdslight",),
+                    ("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64)",),
+                    ("Accept-Language", "zh-CN,zh;q=0.8"),
+                    ("X-Auth-Id", auth_id,)]
+
+        if int(self.__server_address[1]) == 443:
+            host = ("Host", self.__server_address[0],)
+        else:
+            host = ("Host", "%s:%s" % self.__server_address,)
+
+        kv_pairs.append(host)
+
+        s = httputils.build_http1x_req_header("GET", url, kv_pairs)
+
+        self.writer.write(s.encode("iso-8859-1"))
+        self.add_evt_write(self.fileno)
+
+    def recv_handshake(self):
+        size = self.reader.size()
+        data = self.reader.read()
+
+        p = data.find(b"\r\n\r\n")
+
+        if p < 10 and size > 2048:
+            self.delete_handler(self.fileno)
+            sys.stderr.write("wrong http response header")
+            return
+
+        if p < 0:
+            self.reader._putvalue(data)
+            return
+        p += 4
+
+        self.reader._putvalue(data[p:])
+
+        s = data[0:p].decode("iso-8859-1")
+
+        try:
+            resp, kv_pairs = httputils.parse_http1x_response_header(s)
+        except httputils.Http1xHeaderErr:
+            self.delete_handler(self.fileno)
+            return
+
+        version, status = resp
+
+        if status.find("101") != 0:
+            self.delete_handler(self.fileno)
+            logging.print_general("https_handshake_err", self.__server_address)
+            return
+
+        self.__http_handshake_ok = True
 
 
 class udp_tunnel(udp_handler.udp_handler):

@@ -71,6 +71,10 @@ class _fdslight_client(dispatcher.dispatcher):
     # 是否开启IPV6流量
     __enable_ipv6_traffic = False
 
+    @property
+    def https_configs(self):
+        return {}
+
     def init_func(self, mode, debug, configs):
         self.create_poll()
 
