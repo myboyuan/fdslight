@@ -13,11 +13,13 @@ class tcp_tunnel(tcp_handler.tcp_handler):
     __crypto = None
     __crypto_configs = None
     __conn_timeout = None
+    __over_http = None
 
-    def init_func(self, creator, address, crypto, crypto_configs, conn_timeout=800, is_ipv6=False):
+    def init_func(self, creator, address, crypto, crypto_configs, conn_timeout=800, is_ipv6=False, over_http=False):
         self.__crypto_configs = crypto_configs
         self.__crypto = crypto
         self.__conn_timeout = conn_timeout
+        self.__over_http = over_http
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -41,7 +43,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             try:
                 cs, address = self.accept()
                 self.create_handler(self.fileno, _tcp_tunnel_handler, self.__crypto, self.__crypto_configs, cs, address,
-                                    self.__conn_timeout)
+                                    self.__conn_timeout, over_http=self.__over_http)
             except BlockingIOError:
                 break
             ''''''
