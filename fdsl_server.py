@@ -81,9 +81,7 @@ class _fdslight_server(dispatcher.dispatcher):
     def http_configs(self):
         configs = self.__configs.get("tunnel_over_http", {})
 
-        pyo = {
-            "auth_id": configs.get("auth_id", "fdslight")
-        }
+        pyo = {"auth_id": configs.get("auth_id", "fdslight")}
 
         return pyo
 
@@ -218,7 +216,6 @@ class _fdslight_server(dispatcher.dispatcher):
         return
 
     def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
-        print(message)
         size = len(message)
         # 删除旧的连接
         if self.__access.session_exists(session_id):
@@ -229,15 +226,14 @@ class _fdslight_server(dispatcher.dispatcher):
                     self.delete_handler(old_fileno)
                 ''''''
             ''''''
+        print(session_id)
         b = self.__access.data_from_recv(fileno, session_id, address, size)
-        print(b)
         if not b: return False
         if size > utils.MBUF_AREA_SIZE: return False
         if action not in proto_utils.ACTS: return False
 
         if action == proto_utils.ACT_IPDATA: self.__mbuf.copy2buf(message)
         if action == proto_utils.ACT_DNS:
-            print(session_id)
             self.__request_dns(session_id, message)
             return True
 
