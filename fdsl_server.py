@@ -218,6 +218,7 @@ class _fdslight_server(dispatcher.dispatcher):
         return
 
     def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
+        print(message)
         size = len(message)
         # 删除旧的连接
         if self.__access.session_exists(session_id):
@@ -229,12 +230,14 @@ class _fdslight_server(dispatcher.dispatcher):
                 ''''''
             ''''''
         b = self.__access.data_from_recv(fileno, session_id, address, size)
+        print(b)
         if not b: return False
         if size > utils.MBUF_AREA_SIZE: return False
         if action not in proto_utils.ACTS: return False
 
         if action == proto_utils.ACT_IPDATA: self.__mbuf.copy2buf(message)
         if action == proto_utils.ACT_DNS:
+            print(session_id)
             self.__request_dns(session_id, message)
             return True
 
@@ -416,7 +419,6 @@ class _fdslight_server(dispatcher.dispatcher):
         self.get_handler(fileno).send_msg(session_id, address, proto_utils.ACT_DNS, message)
 
     def __request_dns(self, session_id, message):
-        print("DNS MESSAGE ",message)
         # 检查DNS是否异常退出,如果退出,那么重启DNS服务
         if not self.handler_exists(self.__dns_fileno):
             self.__dns_fileno = self.create_handler(-1, dns_proxy.dnsd_proxy, self.__dns_fileno,
