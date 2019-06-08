@@ -89,7 +89,6 @@ class dnsd_proxy(dns_base):
         return self.fileno
 
     def udp_readable(self, message, address):
-        print(message)
         size = len(message)
         if size < 16: return
 
