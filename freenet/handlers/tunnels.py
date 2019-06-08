@@ -103,7 +103,6 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
             self.do_http_handshake()
             return
 
-        print(rdata)
         rdata = self.reader.read()
         self.__decrypt.input(rdata)
 
@@ -130,7 +129,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
                 if action == proto_utils.ACT_PING:
                     self.send_msg(session_id, self.__address, proto_utils.ACT_PONG, proto_utils.rand_bytes())
                     continue
-
+                print(message)
                 self.dispatcher.handle_msg_from_tunnel(self.fileno, session_id, self.__address, action, message)
             ''''''
         self.__update_time = time.time()
