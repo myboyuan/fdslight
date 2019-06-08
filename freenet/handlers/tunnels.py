@@ -153,7 +153,6 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         logging.print_general("tcp_disconnect", self.__address)
 
     def send_msg(self, session_id, address, action, message):
-        print(message)
         sent_pkt = self.__encrypt.build_packet(session_id, action, message)
         self.writer.write(sent_pkt)
         self.add_evt_write(self.fileno)
