@@ -47,7 +47,8 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         self.__over_https = kwargs.get("tunnel_over_https", False)
 
         if self.__over_https:
-            context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+            context = ssl.create_default_context()
+            context.options &= ~ssl.OP_NO_SSLv3
             context.set_alpn_protocols(["http/1.1"])
             s = context.wrap_socket(s, do_handshake_on_connect=False)
 
