@@ -264,8 +264,9 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         auth_id = cfgs["auth_id"]
 
         # 伪装成websocket握手
-        kv_pairs = [("Connection", "Upgrade"), ("Upgrade", "websocket",),
-                    ("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64)",), ("Accept-Language", "zh-CN,zh;q=0.8"),
+        kv_pairs = [("Connection", "Upgrade"), ("Upgrade", "websocket",), (
+        "User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:67.0) Gecko/20100101 Firefox/67.0",),
+                    ("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2"),
                     ("X-Auth-Id", auth_id,), ("Sec-WebSocket-Version", 13,), ("Sec-WebSocket-Key", self.rand_string(),),
                     ("Sec-WebSocket-Protocol", "fdslight")]
 
