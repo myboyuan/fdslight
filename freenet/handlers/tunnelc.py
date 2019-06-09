@@ -171,6 +171,9 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
         logging.print_general("connected", self.__server_address)
 
+        if self.__over_https:
+            self.do_ssl_handshake()
+
         return
 
     def evt_read(self):
@@ -281,7 +284,6 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         kv_pairs.append(origin)
 
         s = httputils.build_http1x_req_header("GET", url, kv_pairs)
-        print(s)
 
         self.writer.write(s.encode("iso-8859-1"))
         self.add_evt_write(self.fileno)
