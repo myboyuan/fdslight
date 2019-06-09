@@ -237,6 +237,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         except ssl.SSLWantWriteError:
             self.add_evt_write(self.fileno)
         except:
+            logging.print_error()
             self.delete_handler(self.fileno)
 
     def send_msg_to_tunnel(self, session_id, action, message):
