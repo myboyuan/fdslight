@@ -120,7 +120,6 @@ class _fdslight_server(dispatcher.dispatcher):
             sys.exit(-1)
 
         if not os.path.isfile(crypto_configfile):
-            print(crypto_configfile)
             print("cannot found crypto configfile")
             sys.exit(-1)
 
