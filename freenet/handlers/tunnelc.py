@@ -50,6 +50,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             context = ssl.create_default_context()
             context.options &= ~ssl.OP_NO_SSLv3
             context.set_alpn_protocols(["http/1.1"])
+
             s = context.wrap_socket(s, do_handshake_on_connect=False)
 
         self.set_socket(s)
@@ -202,6 +203,9 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             if self.reader.size() > 0:
                 self.tcp_readable()
             if self.handler_exists(self.fileno): self.delete_handler(self.fileno)
+        except ssl.SSLError:
+            logging.print_error()
+            self.delete_handler(self.fileno)
 
     def evt_write(self):
         if not self.is_conn_ok():
@@ -223,7 +227,8 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             pass
         except ssl.SSLWantWriteError:
             self.add_evt_write(self.fileno)
-        except ssl.SSLEOFError:
+        except ssl.SSLError:
+            logging.print_error()
             self.delete_handler(self.fileno)
 
     def do_ssl_handshake(self):
@@ -237,7 +242,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             self.add_evt_read(self.fileno)
         except ssl.SSLWantWriteError:
             self.add_evt_write(self.fileno)
-        except:
+        except ssl.SSLError:
             logging.print_error()
             self.delete_handler(self.fileno)
 

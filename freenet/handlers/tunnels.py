@@ -190,11 +190,25 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         method, url, version = request
         upgrade = self.get_http_kv_value("upgrade", kv_pairs)
         auth_id = self.get_http_kv_value("x-auth-id", kv_pairs)
+        origin = self.get_http_kv_value("origin", kv_pairs)
 
         if upgrade != "websocket" and method != "GET":
             logging.print_general("http_handshake_method_fail:upgrade:%s,method:%s" % (upgrade, method,),
                                   self.__address)
             self.response_http_error("400 Bad Request")
+            return
+
+        if not origin:
+            logging.print_general("http_origin_none", self.__address)
+            self.response_http_error("403 Forbidden")
+            return
+
+        s = "https://%s" % self.dispatcher.http_configs["origin"]
+        p = origin.find(s)
+
+        if p != 0:
+            logging.print_general("http_origin_not_match", self.__address)
+            self.response_http_error("403 Forbidden")
             return
 
         if auth_id != self.__http_auth_id:
