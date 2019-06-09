@@ -48,6 +48,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
         if self.__over_https:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+            context.set_ciphers('ALL')
             context.set_alpn_protocols(["http/1.1"])
             s = context.wrap_socket(s, do_handshake_on_connect=False)
 
