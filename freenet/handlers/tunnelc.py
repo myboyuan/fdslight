@@ -281,6 +281,8 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
         s = httputils.build_http1x_req_header("GET", url, kv_pairs)
 
+        print(s)
+
         self.writer.write(s.encode("iso-8859-1"))
         self.add_evt_write(self.fileno)
 
