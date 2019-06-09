@@ -4,6 +4,7 @@ import socket, time
 import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.web.lib.httputils as httputils
+import pywind.web.lib.websocket as wslib
 
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.logging as logging
@@ -69,6 +70,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
     __over_http = None
     __http_handshake_ok = None
     __http_auth_id = None
+    __http_ws_key = None
 
     def init_func(self, creator, crypto, crypto_configs, cs, address, conn_timeout, over_http=False):
         http_configs = self.dispatcher.http_configs
@@ -189,7 +191,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         upgrade = self.get_http_kv_value("upgrade", kv_pairs)
         auth_id = self.get_http_kv_value("x-auth-id", kv_pairs)
 
-        if upgrade != "fdslight" and method != "GET":
+        if upgrade != "websocket" and method != "GET":
             logging.print_general("http_handshake_method_fail:upgrade:%s,method:%s" % (upgrade, method,),
                                   self.__address)
             self.response_http_error("400 Bad Request")
@@ -197,6 +199,12 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
 
         if auth_id != self.__http_auth_id:
             logging.print_general("http_auth_id_fail:%s" % auth_id, self.__address)
+            self.response_http_error("400 Bad Request")
+            return
+
+        self.__http_ws_key = self.get_http_kv_value("sec-websocket-key", kv_pairs)
+        if not self.__http_ws_key:
+            logging.print_general("http_websocket_key_not_found", self.__address)
             self.response_http_error("400 Bad Request")
             return
 
@@ -208,7 +216,9 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         headers = [("Content-Length", 0,)]
 
         if status[0:3] == "101":
-            headers += [("Connection", "Upgrade",), ("Upgrade", "fdslight",)]
+            headers += [("Connection", "Upgrade",), ("Upgrade", "websocket",)]
+            headers += [("Sec-WebSocket-Accept", wslib.gen_handshake_key(self.__http_ws_key))]
+            headers += [("Sec-WebSocket-Protocol", "fdslight")]
         s = httputils.build_http1x_resp_header(status, headers)
 
         self.add_evt_write(self.fileno)
