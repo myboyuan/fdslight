@@ -112,7 +112,6 @@ class _fdslight_server(dispatcher.dispatcher):
         udp_crypto = "freenet.lib.crypto.%s.%s_udp" % (crypto_mod_name, crypto_mod_name)
 
         crypto_configfile = "%s/fdslight_etc/%s.json" % (BASE_DIR, conn_config["crypto_configfile"])
-
         try:
             self.__tcp_crypto = importlib.import_module(tcp_crypto)
             self.__udp_crypto = importlib.import_module(udp_crypto)
