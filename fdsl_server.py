@@ -111,7 +111,7 @@ class _fdslight_server(dispatcher.dispatcher):
         tcp_crypto = "freenet.lib.crypto.%s.%s_tcp" % (crypto_mod_name, crypto_mod_name)
         udp_crypto = "freenet.lib.crypto.%s.%s_udp" % (crypto_mod_name, crypto_mod_name)
 
-        crypto_configfile = "%s/fdslight_etc/%s" % (BASE_DIR, conn_config["crypto_configfile"])
+        crypto_configfile = "%s/fdslight_etc/%s.json" % (BASE_DIR, conn_config["crypto_configfile"])
 
         try:
             self.__tcp_crypto = importlib.import_module(tcp_crypto)
@@ -121,7 +121,6 @@ class _fdslight_server(dispatcher.dispatcher):
             sys.exit(-1)
 
         if not os.path.isfile(crypto_configfile):
-            print(crypto_configfile)
             print("cannot found crypto configfile")
             sys.exit(-1)
 
