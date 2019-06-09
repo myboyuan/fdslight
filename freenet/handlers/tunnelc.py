@@ -229,6 +229,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         try:
             self.socket.do_handshake()
             self.__ssl_handshake_ok = True
+            logging.print_general("TLS_handshake_ok", self.__server_address)
             self.add_evt_read(self.fileno)
             self.send_handshake()
         except ssl.SSLWantReadError:
@@ -284,7 +285,6 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         kv_pairs.append(origin)
 
         s = httputils.build_http1x_req_header("GET", url, kv_pairs)
-        print(s)
 
         self.writer.write(s.encode("iso-8859-1"))
         self.add_evt_write(self.fileno)
