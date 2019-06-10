@@ -48,7 +48,6 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
         if self.__over_https:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-            context.options &= (ssl.OP_NO_SSLv3 | ssl.OP_NO_TLSv1 | ssl.OP_NO_SSLv2)
             context.set_alpn_protocols(["http/1.1"])
             s = context.wrap_socket(s, do_handshake_on_connect=False)
 
@@ -238,10 +237,8 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         except ssl.SSLWantWriteError:
             self.add_evt_write(self.fileno)
         except:
-            pass
-            """logging.print_error()
+            logging.print_error()
             self.delete_handler(self.fileno)
-            """
 
     def send_msg_to_tunnel(self, session_id, action, message):
         sent_pkt = self.__encrypt.build_packet(session_id, action, message)
