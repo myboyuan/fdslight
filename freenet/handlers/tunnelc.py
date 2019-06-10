@@ -224,6 +224,8 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             self.add_evt_write(self.fileno)
         except ssl.SSLEOFError:
             self.delete_handler(self.fileno)
+        except ssl.SSLError:
+            self.delete_handler(self.fileno)
 
     def do_ssl_handshake(self):
         try:
