@@ -81,10 +81,7 @@ class _fdslight_server(dispatcher.dispatcher):
     def http_configs(self):
         configs = self.__configs.get("tunnel_over_http", {})
 
-        pyo = {
-            "auth_id": configs.get("auth_id", "fdslight"),
-            "origin": configs.get("origin", "example.com")
-        }
+        pyo = {"auth_id": configs.get("auth_id", "fdslight"), "origin": configs.get("origin", "example.com")}
 
         return pyo
 
@@ -385,7 +382,16 @@ class _fdslight_server(dispatcher.dispatcher):
 
         if not self.handler_exists(fileno): return
 
-        self.get_handler(fileno).send_msg(session_id, session_info[2], action, message)
+        ### 注意这里的问题,fileno会重用,会导致发错数据包,p2p的handler和tunnel连接的handler的fileno会经常创建以及删除
+        ### 由于两个handler的send_msg的参数不一样,因此可以通过此方法判断是哪个handler,避免发错数据
+        try:
+            self.get_handler(fileno).send_msg(session_id, session_info[2], action, message)
+        except TypeError:
+            self.__access.del_session(session_id)
+            return
+
+        ### 此处避免由于tunnel handler重用而发错数据
+        if self.get_handler(fileno).session_id != session_id: return
 
     def send_msg_to_tunnel_from_tun(self, message):
         if len(message) > utils.MBUF_AREA_SIZE: return
@@ -408,12 +414,7 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__send_msg_to_tunnel(session_id, proto_utils.ACT_IPDATA, message)
 
     def response_dns(self, session_id, message):
-        if not self.__access.session_exists(session_id): return
-
-        fileno, _, address, _ = self.__access.get_session_info(session_id)
-        if not self.handler_exists(fileno): return
-
-        self.get_handler(fileno).send_msg(session_id, address, proto_utils.ACT_DNS, message)
+        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_DNS, message)
 
     def __request_dns(self, session_id, message):
         # 检查DNS是否异常退出,如果退出,那么重启DNS服务

@@ -253,6 +253,10 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
             ''''''
         return None
 
+    @property
+    def session_id(self):
+        return self.__session_id
+
 
 class udp_tunnel(udp_handler.udp_handler):
     def init_func(self, creator, address, crypto, crypto_configs, is_ipv6=False):
