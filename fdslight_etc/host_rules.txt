@@ -234,3 +234,6 @@ login.oracle.com:1
 *.phncdn.com:1
 *.sdhdbd1.com:1
 
+### 广告屏蔽
+*.tbb86.top:2
+*.laodriver.top:2
