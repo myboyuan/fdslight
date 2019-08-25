@@ -197,6 +197,7 @@ register.mesh.com:1
 
 ### 游戏相关
 *.steamcommunity.com:1
+*.nintendo.net:1
 
 ### 开发相关
 *.spice-space.org:1
