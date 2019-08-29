@@ -118,7 +118,11 @@ class udp_handler(handler.handler):
                     self.udp_writable()
                     return
                 byte_data = self.__sent.pop(0)
-                sent_size = self.socket.send(byte_data)
+                try:
+                    sent_size = self.socket.send(byte_data)
+                except ConnectionError:
+                    self.error()
+                    return
                 remain = byte_data[sent_size:]
                 if remain:
                     self.__sent.insert(0, byte_data)
