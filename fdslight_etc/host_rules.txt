@@ -148,6 +148,7 @@ goo.gl:1
 # 其它网站
 *.wikipedia.org:1
 *.wikimedia.org:1
+*.wikidata.org:1
 *.akamaihd.net:1
 *.chinadigitaltimes.net:1
 *.vpngate.net:1
@@ -197,8 +198,9 @@ register.mesh.com:1
 
 ### 游戏相关
 *.steamcommunity.com:1
-*.nintendo.net:0
-*.nintendo.com:0
+*.nintendo.net:1
+*.nintendo.com:1
+cdn.treasuredata.com:1
 
 ### 开发相关
 *.spice-space.org:1
