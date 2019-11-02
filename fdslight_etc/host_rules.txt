@@ -230,9 +230,10 @@ login.oracle.com:1
 # 中华民国政府
 *.gov.tw:1
 
-### 教育
-# 加快访问速度
+### 加快访问速度
 *.mit.edu:1
+*.macrumors.com:1
+
 
 ### xxx
 *.pornhub.com:1
