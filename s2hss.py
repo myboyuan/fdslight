@@ -10,6 +10,16 @@ sys.path.append(BASE_DIR)
 
 import pywind.evtframework.evt_dispatcher as dispatcher
 
+import freenet.handlers.socks2https_server as socks2https_server
+
+
+class serverd(dispatcher.dispatcher):
+    def init_func(self, debug=True):
+        self.create_poll()
+
+    def release(self):
+        pass
+
 
 def main():
     help_doc = """
@@ -20,6 +30,27 @@ def main():
     except getopt.GetoptError:
         print(help_doc)
         return
-
+    d = None
     for k, v in opts:
-        pass
+        if k == "-d": d = v
+
+    if d not in ("debug", "start", "stop"):
+        print(help_doc)
+        return
+
+    if d == "stop":
+        return
+
+    debug = True
+
+    if d == "start":
+        debug = False
+
+    cls = serverd()
+    try:
+        cls.ioloop(debug=debug)
+    except KeyboardInterrupt:
+        cls.release()
+
+
+if __name__ == '__main__': main()

@@ -11,10 +11,15 @@ sys.path.append(BASE_DIR)
 import pywind.evtframework.evt_dispatcher as dispatcher
 
 
+class serverd(dispatcher.dispatcher):
+    def init_func(self, *args, **kwargs):
+        pass
+
+
 def main():
     help_doc = """
     -d      debug | start | stop    debug,start or stop application
-    -t      relay | proxy | all
+    -m      relay | proxy | all     relay mode,proxy mode or all mode
     """
     try:
         opts, args = getopt.getopt(sys.argv[1:], "u:m:d:")
@@ -24,3 +29,6 @@ def main():
 
     for k, v in opts:
         pass
+
+
+if __name__ == '__main__': main()
