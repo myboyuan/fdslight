@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, os, getopt
+import sys, os, getopt, signal
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -9,16 +9,62 @@ if not BASE_DIR: BASE_DIR = "."
 sys.path.append(BASE_DIR)
 
 import pywind.evtframework.evt_dispatcher as dispatcher
+import pywind.lib.configfile as cfg
 
 import freenet.handlers.socks2https_server as socks2https_server
+import freenet.lib.proc as proc
+
+PID_PATH = "/tmp/s2hss.pid"
 
 
 class serverd(dispatcher.dispatcher):
+    __cfg_path = None
+    __auth_path = None
+
+    __listen_fd = None
+    __listen_fd6 = None
+
+    __debug = None
+
     def init_func(self, debug=True):
+        self.__cfg_path = "%s/fdslight_etc/s2hss.ini" % BASE_DIR
+        self.__auth_path = "%s/fdslight_etc/access.json" % BASE_DIR
+        self.__debug = debug
+
+        self.__listen_fd = -1
+        self.__listen_fd6 = -1
+
         self.create_poll()
 
+        if not debug: signal.signal(signal.SIGINT, self.__exit)
+
+        self.create_service()
+
     def release(self):
-        pass
+        if self.__listen_fd > 0:
+            self.delete_handler(self.__listen_fd)
+        if self.__listen_fd6 > 0:
+            self.delete_handler(self.__listen_fd6)
+
+    def __exit(self, signum, frame):
+        self.release()
+
+        os.remove(PID_PATH)
+        sys.exit(0)
+
+    def create_service(self):
+        configs = cfg.ini_parse_from_file(self.__cfg_path)
+
+        listen = configs.get("listen", {})
+
+        enable_ipv6 = bool(int(listen.get("enable_ipv6", 0)))
+        listen_ip = listen.get("listen_ip", "0.0.0.0")
+        listen_ipv6 = listen.get("listen_ip", "::")
+        conn_timeout = int(listen.get("conn_timeout", 60))
+        enable_heartbeat = bool(int(listen.get("enable_heartbeat", 0)))
+        heartbeat_timeout = int(listen.get("heartbeat_timeout", 20))
+
+
 
 
 def main():
@@ -39,12 +85,26 @@ def main():
         return
 
     if d == "stop":
+        pid = proc.get_pid(PID_PATH)
+        if pid > 0: os.kill(pid, signal.SIGINT)
         return
 
     debug = True
 
     if d == "start":
+        if os.path.exists(PID_PATH):
+            print("the process s2hss exists,please delete %s or kill it at first" % PID_PATH)
+            return
         debug = False
+        pid = os.fork()
+        if pid != 0: sys.exit(0)
+
+        os.setsid()
+        os.umask(0)
+
+        pid = os.fork()
+        if pid != 0: sys.exit(0)
+        proc.write_pid(PID_PATH)
 
     cls = serverd()
     try:
