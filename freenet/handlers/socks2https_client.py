@@ -79,9 +79,13 @@ class http_socks5_handler(tcp_handler.tcp_handler):
     def init_func(self, creator_fd, cs, caddr):
         self.__is_socks5 = False
 
+    def handle_data(self, byte_data):
+        pass
+
 
 class socks5_udp_handler(udp_handler.udp_handler):
-    pass
+    def handle_data(self, byte_data):
+        pass
 
 
 class convert_client(tcp_handler.tcp_handler):
@@ -245,14 +249,13 @@ class convert_client(tcp_handler.tcp_handler):
     def handle_tcp_conn_state(self, info):
         pass
 
-    def handle_tcp_data(self, info):
+    def handle_recv(self, info):
         packet_id, byte_data = info
         fd = self.dispatcher.get_conn_info(packet_id)
 
         if fd < 0: return
 
-    def handle_udp_udplite_data(self, frame_type, frame_info):
-        pass
+        self.dispatcher.get_handler(fd).handle_data(byte_data)
 
     def tcp_readable(self):
         if not self.__http_handshake_ok:
@@ -282,13 +285,13 @@ class convert_client(tcp_handler.tcp_handler):
                 self.handle_tcp_conn_state(info)
                 continue
             if frame_type == socks2https.FRAME_TYPE_TCP_DATA:
-                self.handle_tcp_data(info)
+                self.handle_recv(info)
                 continue
             if frame_type == socks2https.FRAME_TYPE_UDP_DATA:
-                self.handle_udp_udplite_data(frame_type, info)
+                self.handle_recv(info)
                 continue
             if frame_type == socks2https.FRAME_TYPE_UDPLITE_DATA:
-                self.handle_udp_udplite_data(frame_type, info)
+                self.handle_recv(info)
                 continue
             ''''''
         return
