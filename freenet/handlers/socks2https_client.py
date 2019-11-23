@@ -8,6 +8,7 @@ import pywind.web.lib.websocket as wslib
 import socket, time, ssl, random
 
 import freenet.lib.logging as logging
+import freenet.lib.socks2https as socks2https
 
 
 class listener(tcp_handler.tcp_handler):
@@ -95,6 +96,10 @@ class convert_client(tcp_handler.tcp_handler):
 
     __http_handshake_ok = None
     __http_handshake_key = None
+    __parser = None
+    __builder = None
+
+    __time = None
 
     def init_func(self, creator_fd, address, path, user, passwd, is_ipv6=False, ssl_on=False):
         """
@@ -111,6 +116,9 @@ class convert_client(tcp_handler.tcp_handler):
         self.__user = user
         self.__passwd = passwd
         self.__http_handshake_ok = False
+        self.__parser = socks2https.parser()
+        self.__builder = socks2https.builder()
+        self.__time = time.time()
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -226,10 +234,64 @@ class convert_client(tcp_handler.tcp_handler):
             if name.lower() == k.lower():
                 return v
             ''''''
-        return None
+        return
+
+    def send_pong(self):
+        pass
+
+    def handle_pong(self):
+        pass
+
+    def handle_tcp_conn_state(self, info):
+        pass
+
+    def handle_tcp_data(self, info):
+        packet_id, byte_data = info
+        fd = self.dispatcher.get_conn_info(packet_id)
+
+        if fd < 0: return
+
+    def handle_udp_udplite_data(self, frame_type, frame_info):
+        pass
 
     def tcp_readable(self):
-        pass
+        if not self.__http_handshake_ok:
+            self.handle_handshake_response()
+            return
+
+        self.__parser.input(self.reader.read())
+        try:
+            self.__parser.parse()
+        except socks2https.FrameError:
+            logging.print_error()
+            self.delete_handler(self.fileno)
+            return
+
+        while 1:
+            rs = self.__parser.get_result()
+            if not rs: break
+            frame_type, info = rs
+
+            if frame_type == socks2https.FRAME_TYPE_PING:
+                self.send_pong()
+                continue
+            if frame_type == socks2https.FRAME_TYPE_PONG:
+                self.handle_pong()
+                continue
+            if frame_type == socks2https.FRAME_TYPE_TCP_CONN_STATE:
+                self.handle_tcp_conn_state(info)
+                continue
+            if frame_type == socks2https.FRAME_TYPE_TCP_DATA:
+                self.handle_tcp_data(info)
+                continue
+            if frame_type == socks2https.FRAME_TYPE_UDP_DATA:
+                self.handle_udp_udplite_data(frame_type, info)
+                continue
+            if frame_type == socks2https.FRAME_TYPE_UDPLITE_DATA:
+                self.handle_udp_udplite_data(frame_type, info)
+                continue
+            ''''''
+        return
 
     def tcp_writable(self):
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
@@ -257,11 +319,14 @@ class convert_client(tcp_handler.tcp_handler):
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
 
-    def send_conn_reques(self, packet_id, host, addr_type, data=b""):
-        pass
+    def send_conn_request(self, frame_type, packet_id, host, port, addr_type, data=b""):
+        data = self.__builder.build_conn_frame(frame_type, packet_id, addr_type, host, port, win_size=1200,
+                                               byte_data=data)
+        self.send_data(data)
 
     def send_tcp_data(self, packet_id, byte_data):
-        pass
+        data = self.__builder.build_tcp_frame_data(packet_id, byte_data)
+        self.send_data(data)
 
 
 class raw_tcp_handler(tcp_handler.tcp_handler):

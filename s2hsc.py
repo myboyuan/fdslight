@@ -78,6 +78,12 @@ class serverd(dispatcher.dispatcher):
     def create_convert_client(self):
         pass
 
+    def register_new_conn(self):
+        pass
+
+    def get_conn_info(self, packet_id):
+        pass
+
 
 def main():
     help_doc = """

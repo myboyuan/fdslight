@@ -9,10 +9,9 @@ FRAME_TYPE_PING = 0
 FRAME_TYPE_PONG = 1
 FRAME_TYPE_TCP_CONN = 2
 FRAME_TYPE_TCP_CONN_STATE = 3
-FRAME_TYPE_TCP_CLOSE = 4
-FRAME_TYPE_TCP_DATA = 5
-FRAME_TYPE_UDP_DATA = 6
-FRAME_TYPE_UDPLITE_DATA = 7
+FRAME_TYPE_TCP_DATA = 4
+FRAME_TYPE_UDP_DATA = 5
+FRAME_TYPE_UDPLITE_DATA = 6
 
 ADDR_TYPE_IP = 0
 ADDR_TYPE_IPv6 = 1
@@ -20,7 +19,6 @@ ADDR_TYPE_DOMAIN = 2
 ADDR_TYPE_FORCE_DOMAIN_IPv6 = 3
 
 TCP_CONN_STATE_FMT = "!Ii"
-TCP_CONN_CLOSE_FMT = "!I"
 CONN_FMT = "!IHBBH"
 
 
@@ -100,18 +98,6 @@ class parser(object):
             )
         )
 
-    def handle_tcp_conn_close_frame(self, byte_data):
-        if len(byte_data) != 4:
-            raise FrameError("wrong tcp close frame length")
-
-        _id = struct.unpack(TCP_CONN_CLOSE_FMT, byte_data)
-        self.__results.append(
-            (
-                self.__frame_type,
-                (_id,)
-            )
-        )
-
     def handle_tcp_data_frame(self, byte_data):
         if len(byte_data) < 4:
             raise FrameError("wrong tcp data frame length")
@@ -143,10 +129,6 @@ class parser(object):
 
         if self.__frame_type == FRAME_TYPE_TCP_CONN_STATE:
             self.handle_tcp_conn_state_frame(body_data)
-            return
-
-        if self.__frame_type == FRAME_TYPE_TCP_CLOSE:
-            self.handle_tcp_conn_close_frame(body_data)
             return
 
         if self.__frame_type == FRAME_TYPE_TCP_DATA:
@@ -192,7 +174,7 @@ class builder(object):
     def build_pong(self, byte_data=b""):
         return self.build_frame(FRAME_TYPE_PONG, byte_data)
 
-    def build_conn_frame(self, frame_type, packet_id, addr_type, address, port, win_size=4096, byte_data=b""):
+    def build_conn_frame(self, frame_type, packet_id, addr_type, address, port, win_size=1200, byte_data=b""):
         """ TCP连接和UDP,UDPLite的数据帧
         :param frame_type:
         :param packet_id:
@@ -227,5 +209,8 @@ class builder(object):
 
         return self.build_frame(FRAME_TYPE_TCP_CONN_STATE, a)
 
-    def build_tcp_close(self, packet_id):
-        return self.build_frame(FRAME_TYPE_TCP_CLOSE, struct.pack("!I", packet_id))
+    def build_tcp_frame_data(self, packet_id, data):
+        a = struct.pack("!I", packet_id)
+        b = b"".join([a, data])
+
+        return self.build_frame(FRAME_TYPE_TCP_DATA, b)
