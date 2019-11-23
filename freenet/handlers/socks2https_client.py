@@ -63,6 +63,8 @@ class http_socks5_handler(tcp_handler.tcp_handler):
     ### 是否是socks5请求
     __is_socks5 = None
     ### http请求相关变量
+    # 是否已经解析了http请求头
+    __is_parsed_http_header = None
     # 是否是http隧道模式
     __is_http_tunnel_mode = None
     # 是否是http chunked模式
@@ -73,15 +75,21 @@ class http_socks5_handler(tcp_handler.tcp_handler):
     __http_responsed_length = None
     # 响应是否结束
     __is_http_finished = None
+    __http_request_info = None
+    __http_request_kv_pairs = None
 
     ### socks5相关变量
 
     ### 其他相关变量
     __caddr = None
+    # 是否已经确认了协议
+    __is_sure_protocol = None
 
     def init_func(self, creator_fd, cs, caddr):
         self.__is_socks5 = False
         self.__caddr = caddr
+        self.__is_sure_protocol = False
+        self.__is_parsed_http_header = False
 
         self.set_socket(cs)
         self.register(self.fileno)
@@ -89,9 +97,80 @@ class http_socks5_handler(tcp_handler.tcp_handler):
 
         return self.fileno
 
-    def tcp_readable(self):
+    def handle_http(self):
+        if not self.__is_parsed_http_header:
+            rs = self.parse_http_header()
+            if not rs:
+                self.delete_handler(self.fileno)
+                return
+            ''''''
+        if not self.__is_parsed_http_header: return
+        # 核对http请求头
+        # 获取远程服务器信息
+        server_info = self.get_http_remote_server_info()
+
+    def http_request_check(self):
+        # 是否有host字段
+        is_host = None
+        # 是否有user_agent字段
+        is_user_agent = None
+        return False
+
+    def http_request_filter(self):
+        """过滤http请求,使其发送远端服务器看起来不是代理服务器代理
+        :return:
+        """
+        pass
+
+    def get_http_remote_server_info(self):
+        return None
+
+    def parse_http_header(self):
+        """
+        :return Boolean: True表示未发生错误,False表示发生错误
+        """
+        size = self.reader.size()
         rdata = self.reader.read()
-        print(rdata)
+        p = rdata.find(b"\r\n\r\n")
+
+        if p < 0 and size > 2048: return False
+        if p < 0:
+            self.reader._putvalue(rdata)
+            return True
+        if p < 12: return False
+
+        p += 4
+        self.reader._putvalue(rdata[p:])
+        s = rdata[0:p].decode("iso-8859-1")
+
+        try:
+            req, kv_pairs = httputils.parse_htt1x_request_header(s)
+        except httputils.Http1xHeaderErr:
+            return False
+
+        self.__http_request_info = req
+        self.__http_request_kv_pairs = kv_pairs
+        self.__is_parsed_http_header = True
+
+        return True
+
+    def handle_socks5(self):
+        pass
+
+    def tcp_readable(self):
+        ### 首先确认协议
+        if not self.__is_sure_protocol:
+            rdata = self.reader.read()
+            if rdata[0] == 5:
+                self.__is_socks5 = True
+            else:
+                self.__is_socks5 = False
+            self.reader._putvalue(rdata)
+
+        if self.__is_socks5:
+            self.handle_socks5()
+        else:
+            self.handle_http()
 
     def tcp_writable(self):
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)

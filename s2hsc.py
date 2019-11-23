@@ -18,6 +18,13 @@ import freenet.lib.logging as logging
 PID_PATH = "/tmp/s2hsc.pid"
 
 
+def win_client_autocfg():
+    """windows自动配置,配置windows能够使用代理
+    :return:
+    """
+    pass
+
+
 class serverd(dispatcher.dispatcher):
     __cfg_path = None
     __rules_path = None
@@ -33,6 +40,8 @@ class serverd(dispatcher.dispatcher):
     __debug = None
 
     __configs = None
+
+    __client_conn_timeout = None
 
     def init_func(self, mode, debug=True):
         if mode == "proxy":
@@ -92,6 +101,8 @@ class serverd(dispatcher.dispatcher):
         conn_timeout = int(c.get("conn_timeout", 60))
         if conn_timeout < 1:
             raise ValueError("wrong conn_timeout value from s2hsc.ini")
+
+        self.__client_conn_timeout = conn_timeout
 
         self.__socks5http_listen_fd = self.create_handler(
             -1, socks2https.http_socks5_listener, (listen_ip, port), is_ipv6=False
@@ -153,6 +164,9 @@ class serverd(dispatcher.dispatcher):
         ### 连接已经断开,那么丢弃tcp数据包
         if self.__convert_fd < 0: return
         self.get_handler(self.__convert_fd).send_tcp_data(packet_id, byte_data)
+
+    def get_client_conn_timeout(self):
+        return self.__client_conn_timeout
 
 
 def main():
