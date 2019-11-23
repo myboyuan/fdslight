@@ -2,8 +2,12 @@
 
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.evtframework.handlers.udp_handler as udp_handler
+import pywind.web.lib.httputils as httputils
+import pywind.web.lib.websocket as wslib
 
-import socket, time, ssl
+import socket, time, ssl, random
+
+import freenet.lib.logging as logging
 
 
 class listener(tcp_handler.tcp_handler):
@@ -83,10 +87,16 @@ class convert_client(tcp_handler.tcp_handler):
     """把任意数据包转换成私有协议
     """
     __creator = None
-
     __wait_sent = None
+    __address = None
+    __path = None
+    __user = None
+    __passwd = None
 
-    def init_func(self, creator_fd, address, is_ipv6=False, ssl_on=False):
+    __http_handshake_ok = None
+    __http_handshake_key = None
+
+    def init_func(self, creator_fd, address, path, user, passwd, is_ipv6=False, ssl_on=False):
         """
         :param creator_fd:
         :param address:
@@ -96,6 +106,11 @@ class convert_client(tcp_handler.tcp_handler):
         """
         self.__creator = creator_fd
         self.__wait_sent = []
+        self.__address = address
+        self.__path = path
+        self.__user = user
+        self.__passwd = passwd
+        self.__http_handshake_ok = False
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -111,19 +126,107 @@ class convert_client(tcp_handler.tcp_handler):
 
         return self.fileno
 
-    def send_handshake_request(self, user, passwd):
+    def rand_string(self, length=8):
+        seq = []
+        for i in range(length):
+            n = random.randint(65, 122)
+            seq.append(chr(n))
+
+        s = "".join(seq)
+        self.__http_handshake_key = s
+
+        return s
+
+    def send_handshake_request(self):
         """发送握手请求
         :param user:
         :param passwd:
         :return:
         """
-        pass
+        uri = "%s?user=%s&passwd=%s" % (self.__path, self.__user, self.__passwd)
+
+        kv_pairs = [("Connection", "Upgrade"), ("Upgrade", "websocket",), (
+            "User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:67.0) Gecko/20100101 Firefox/67.0",),
+                    ("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2"),
+                    ("Sec-WebSocket-Version", 13,), ("Sec-WebSocket-Key", self.rand_string(),),
+                    ("Sec-WebSocket-Protocol", "Socks2Https")]
+
+        if int(self.__address[1]) == 443:
+            host = ("Host", self.__address[0],)
+            origin = ("Origin", "https://%s" % self.__address[0])
+        else:
+            host = ("Host", "%s:%s" % self.__address,)
+            origin = ("Origin", "https://%s:%s" % self.__address,)
+
+        kv_pairs.append(host)
+        kv_pairs.append(origin)
+
+        s = httputils.build_http1x_req_header("GET", uri, kv_pairs)
+
+        self.writer.write(s.encode("iso-8859-1"))
+        self.add_evt_write(self.fileno)
 
     def handle_handshake_response(self):
         """处理握手响应
         :return:
         """
-        pass
+        size = self.reader.size()
+        data = self.reader.read()
+
+        p = data.find(b"\r\n\r\n")
+
+        if p < 10 and size > 2048:
+            logging.print_general("wrong_http_response_header", self.__address)
+            self.delete_handler(self.fileno)
+            return
+
+        if p < 0:
+            self.reader._putvalue(data)
+            return
+        p += 4
+
+        self.reader._putvalue(data[p:])
+
+        s = data[0:p].decode("iso-8859-1")
+
+        try:
+            resp, kv_pairs = httputils.parse_http1x_response_header(s)
+        except httputils.Http1xHeaderErr:
+            logging.print_general("wrong_http_reponse_header", self.__address)
+            self.delete_handler(self.fileno)
+            return
+
+        version, status = resp
+
+        if status.find("101") != 0:
+            logging.print_general("https_handshake_error:%s" % status, self.__address)
+            self.delete_handler(self.fileno)
+            return
+
+        accept_key = self.get_http_kv_pairs("sec-websocket-accept", kv_pairs)
+        if wslib.gen_handshake_key(self.__http_handshake_key) != accept_key:
+            logging.print_general("https_handshake_error:wrong websocket response key", self.__address)
+            self.delete_handler(self.fileno)
+            return
+
+        self.__http_handshake_ok = True
+        logging.print_general("http_handshake_ok", self.__address)
+        # 发送还没有连接的时候堆积的数据包
+        if self.__wait_sent: self.add_evt_write(self.fileno)
+        while 1:
+            try:
+                self.writer.write(self.__wait_sent.pop(0))
+            except IndexError:
+                break
+            ''''''
+        ''''''
+
+    def get_http_kv_pairs(self, name, kv_pairs):
+        for k, v in kv_pairs:
+            if name.lower() == k.lower():
+                return v
+            ''''''
+        return None
 
     def tcp_readable(self):
         pass
@@ -148,12 +251,17 @@ class convert_client(tcp_handler.tcp_handler):
         :param byte_data:
         :return:
         """
+        if not self.__http_handshake_ok:
+            self.__wait_sent.append(byte_data)
+            return
+        self.add_evt_write(self.fileno)
+        self.writer.write(byte_data)
+
+    def send_conn_reques(self, packet_id, host, addr_type, data=b""):
         pass
 
-    def message_from_handler(self, from_fd, byte_data):
-        # 核对数据包来源
-        if from_fd != self.__creator: return
-        self.send_data(byte_data)
+    def send_tcp_data(self, packet_id, byte_data):
+        pass
 
 
 class raw_tcp_handler(tcp_handler.tcp_handler):
