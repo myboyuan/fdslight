@@ -12,7 +12,8 @@ import pywind.evtframework.evt_dispatcher as dispatcher
 import pywind.lib.configfile as cfg
 
 import freenet.lib.proc as proc
-import freenet.handlers.socks2https_client as socks2http
+import freenet.handlers.socks2https_client as socks2https
+import freenet.lib.logging as logging
 
 PID_PATH = "/tmp/s2hsc.pid"
 
@@ -27,12 +28,17 @@ class serverd(dispatcher.dispatcher):
     __relay_listen_fd = None
     __relay_listen_fd6 = None
 
+    __convert_fd = None
+
     __debug = None
 
     __configs = None
 
     def init_func(self, mode, debug=True):
-        self.__cfg_path = "%s/fdslight_etc/s2hsc.ini" % BASE_DIR
+        if mode == "proxy":
+            self.__cfg_path = "%s/fdslight_etc/s2hsc.ini" % BASE_DIR
+        else:
+            self.__cfg_path = "%s/fdslight_etc/s2hsr.ini" % BASE_DIR
         self.__rules_path = "%s/fdslight_etc/host_rules.txt" % BASE_DIR
         self.__debug = debug
 
@@ -41,6 +47,8 @@ class serverd(dispatcher.dispatcher):
 
         self.__relay_listen_fd = -1
         self.__relay_listen_fd6 = -1
+
+        self.__convert_fd = -1
 
         self.create_poll()
 
@@ -70,19 +78,81 @@ class serverd(dispatcher.dispatcher):
         sys.exit(0)
 
     def create_socks_http_service(self):
-        pass
+        config = cfg.ini_parse_from_file(self.__cfg_path)
+
+        c = config.get("socks5_http_listen", {})
+        enable_ipv6 = bool(int(c.get("enable_ipv6", 0)))
+        listen_ip = c.get("listen_ip", "0.0.0.0")
+        listen_ipv6 = c.get("listen_ipv6", "::")
+        port = int(c.get("port", 8800))
+
+        if port < 0 or port > 65535:
+            raise ValueError("wrong port number from s2hsc.ini")
+
+        conn_timeout = int(c.get("conn_timeout", 60))
+        if conn_timeout < 1:
+            raise ValueError("wrong conn_timeout value from s2hsc.ini")
+
+        self.__socks5http_listen_fd = self.create_handler(
+            -1, socks2https.http_socks5_listener, (listen_ip, port), is_ipv6=False
+        )
+        if enable_ipv6:
+            self.__socks5http_listen_fd6 = self.create_handler(
+                -1, socks2https.http_socks5_listener, (listen_ipv6, port), is_ipv6=True
+            )
 
     def create_relay_service(self):
-        pass
+        config = cfg.ini_parse_from_file(self.__cfg_path)
 
     def create_convert_client(self):
-        pass
+        configs = cfg.ini_parse_from_file(self.__cfg_path)
+
+        serv_cfg = configs.get("server_connection", {})
+        if not serv_cfg:
+            raise SystemError("s2hsc.ini configure file failed")
+        enable_ipv6 = bool(int(serv_cfg.get("enable_ipv6", 0)))
+
+        host = serv_cfg.get("host", "")
+        port = int(serv_cfg.get("port", 443))
+        if port < 0 or port > 65535:
+            raise ValueError("wrong port number from s2hsc.ini")
+
+        conn_timeout = int(serv_cfg.get("conn_timeout", 100))
+
+        if conn_timeout < 1:
+            raise ValueError("wrong conn_timeout value from s2hsc.ini")
+
+        heartbeat_timeout = int(serv_cfg.get("heartbeat_timeout", 30))
+
+        if heartbeat_timeout < 1:
+            raise ValueError("wrong heartbeat_time value from s2hsc.ini")
+
+        path = serv_cfg.get("http_path", "/")
+        user = serv_cfg.get("user", "")
+        passwd = serv_cfg.get("passwd", "")
+
+        self.__convert_fd = self.create_handler(-1, socks2https.convert_client, (host, port), path, user, passwd,
+                                                is_ipv6=enable_ipv6)
 
     def register_new_conn(self):
         pass
 
     def get_conn_info(self, packet_id):
         pass
+
+    def send_conn_request(self, frame_type, packet_id, host, port, addr_type, data=b""):
+        if self.__convert_fd < 0:
+            self.create_convert_client()
+        if self.__convert_fd < 0: return
+
+        self.get_handler(self.__convert_fd).send_conn_request(
+            frame_type, packet_id, host, port, addr_type, data=data
+        )
+
+    def send_tcp_data(self, packet_id, byte_data):
+        ### 连接已经断开,那么丢弃tcp数据包
+        if self.__convert_fd < 0: return
+        self.get_handler(self.__convert_fd).send_tcp_data(packet_id, byte_data)
 
 
 def main():

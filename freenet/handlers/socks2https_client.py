@@ -5,7 +5,7 @@ import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.web.lib.httputils as httputils
 import pywind.web.lib.websocket as wslib
 
-import socket, time, ssl, random
+import socket, time, ssl, random, os
 
 import freenet.lib.logging as logging
 import freenet.lib.socks2https as socks2https
@@ -76,10 +76,44 @@ class http_socks5_handler(tcp_handler.tcp_handler):
 
     ### socks5相关变量
 
+    ### 其他相关变量
+    __caddr = None
+
     def init_func(self, creator_fd, cs, caddr):
         self.__is_socks5 = False
+        self.__caddr = caddr
 
-    def handle_data(self, byte_data):
+        self.set_socket(cs)
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
+
+        return self.fileno
+
+    def tcp_readable(self):
+        rdata = self.reader.read()
+        print(rdata)
+
+    def tcp_writable(self):
+        if self.writer.is_empty(): self.remove_evt_write(self.fileno)
+
+    def tcp_timeout(self):
+        pass
+
+    def tcp_error(self):
+        self.delete_handler(self.fileno)
+
+    def tcp_delete(self):
+        self.unregister(self.fileno)
+        self.close()
+
+    def handle_data_from_convert_client(self, byte_data):
+        """此函数为convert_client调用
+        :param byte_data:
+        :return:
+        """
+        pass
+
+    def handle_conn_state_from_convert_client(self, err_code):
         pass
 
 
@@ -240,14 +274,25 @@ class convert_client(tcp_handler.tcp_handler):
             ''''''
         return
 
+    def rand_bytes(self):
+        n = random.randint(0, 128)
+        return os.urandom(n)
+
     def send_pong(self):
-        pass
+        data = self.rand_bytes()
+        pong_data = self.__builder.build_pong(data)
+
+        self.send_data(pong_data)
 
     def handle_pong(self):
-        pass
+        self.__time = time.time()
 
-    def handle_tcp_conn_state(self, info):
-        pass
+    def handle_conn_state(self, info):
+        packet_id, err_code = info
+        fd = self.dispatcher.get_conn_info(packet_id)
+
+        if fd < 0: return
+        self.dispatcher.get_handler(err_code).handle_conn_state(err_code)
 
     def handle_recv(self, info):
         packet_id, byte_data = info
@@ -282,7 +327,7 @@ class convert_client(tcp_handler.tcp_handler):
                 self.handle_pong()
                 continue
             if frame_type == socks2https.FRAME_TYPE_TCP_CONN_STATE:
-                self.handle_tcp_conn_state(info)
+                self.handle_conn_state(info)
                 continue
             if frame_type == socks2https.FRAME_TYPE_TCP_DATA:
                 self.handle_recv(info)
@@ -302,6 +347,7 @@ class convert_client(tcp_handler.tcp_handler):
     def tcp_timeout(self):
         # 没有连接成功的处理方式
         if not self.is_conn_ok():
+            self.delete_handler(self.fileno)
             return
 
     def tcp_error(self):
@@ -334,7 +380,6 @@ class convert_client(tcp_handler.tcp_handler):
 
 class raw_tcp_handler(tcp_handler.tcp_handler):
     __caddr = None
-    __convert_fd = None
 
     def init_func(self, creator_fd, cs, caddr):
         self.__caddr = caddr
@@ -345,7 +390,7 @@ class raw_tcp_handler(tcp_handler.tcp_handler):
         return self.fileno
 
     def tcp_readable(self):
-        self.send_message_to_handler(self.fileno, self.__convert_fd, self.reader.read())
+        pass
 
     def tcp_writable(self):
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
