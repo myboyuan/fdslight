@@ -3,10 +3,18 @@
 class host_match(object):
     """对域名进行匹配,以找到是否在符合的规则列表中
     """
-    __rules = None
+    __domain_rules = None
+
+    __ip_rules = None
+    __ipv6_rules = None
 
     def __init__(self):
-        self.__rules = {}
+        self.__domain_rules = {}
+        self.__ip_rules = {}
+        self.__ipv6_rules = {}
+
+    def add_ip_rule(self, rule):
+        pass
 
     def add_rule(self, host_rule):
         host, flags = host_rule
@@ -17,7 +25,7 @@ class host_match(object):
 
         lsize = len(tmplist)
         n = 0
-        tmpdict = self.__rules
+        tmpdict = self.__domain_rules
 
         old_name = ""
         old_dict = tmpdict
@@ -47,7 +55,7 @@ class host_match(object):
         is_match = False
         flags = 0
 
-        tmpdict = self.__rules
+        tmpdict = self.__domain_rules
         for name in tmplist:
             if "*" in tmpdict:
                 is_match = True
@@ -64,4 +72,9 @@ class host_match(object):
         return (is_match, flags,)
 
     def clear(self):
-        self.__rules = {}
+        self.__domain_rules = {}
+        self.__ip_rules = {}
+        self.__ipv6_rules = {}
+
+    def match_ipaddr(self, ipaddr, is_ipv6=False):
+        pass

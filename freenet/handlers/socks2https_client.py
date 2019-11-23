@@ -5,10 +5,17 @@ import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.web.lib.httputils as httputils
 import pywind.web.lib.websocket as wslib
 
-import socket, time, ssl, random, os
+import socket, time, ssl, random, os, struct
 
 import freenet.lib.logging as logging
 import freenet.lib.socks2https as socks2https
+
+# 表示主机地址是IP地址
+HTTP_HOST_IP = 0
+# 表示主机地址是IPv6地址
+HTTP_HOST_IPv6 = 1
+# 表示主机地址是域名
+HTTP_HOST_DOMAIN = 2
 
 
 class listener(tcp_handler.tcp_handler):
@@ -67,33 +74,43 @@ class http_socks5_handler(tcp_handler.tcp_handler):
     __is_parsed_http_header = None
     # 是否是http隧道模式
     __is_http_tunnel_mode = None
-    # 是否是http chunked模式
-    __is_http_chunked = None
-    # 总共需要响应的数据长度
-    __is_http_response_length = None
-    # http已经响应的数据长度
-    __http_responsed_length = None
     # 响应是否结束
-    __is_http_finished = None
     __http_request_info = None
     __http_request_kv_pairs = None
+    __http_uri = None
 
     ### socks5相关变量
-
+    # socks5是否握手成功
+    __socks5_handshake_ok = None
+    # socks5代理连接是否建立
+    __socks5_proxy_is_conn_established = None
+    # 是否是socks5 udp协议
+    __is_socks5_udp = None
+    __socks5_request_establish_packet = None
     ### 其他相关变量
     __caddr = None
     # 是否已经确认了协议
     __is_sure_protocol = None
+
+    __time = None
+    __raw_client_fd = None
 
     def init_func(self, creator_fd, cs, caddr):
         self.__is_socks5 = False
         self.__caddr = caddr
         self.__is_sure_protocol = False
         self.__is_parsed_http_header = False
+        self.__raw_client_fd = -1
+        self.__socks5_handshake_ok = False
+        self.__socks5_proxy_is_conn_established = False
+        self.__is_socks5_udp = False
+        self.__time = time.time()
 
         self.set_socket(cs)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+
+        self.set_timeout(self.fileno, 10)
 
         return self.fileno
 
@@ -105,25 +122,94 @@ class http_socks5_handler(tcp_handler.tcp_handler):
                 return
             ''''''
         if not self.__is_parsed_http_header: return
-        # 核对http请求头
-        # 获取远程服务器信息
-        server_info = self.get_http_remote_server_info()
+        self.send_message_to_handler(self.fileno, self.__raw_client_fd, self.reader.read())
 
     def http_request_check(self):
-        # 是否有host字段
-        is_host = None
-        # 是否有user_agent字段
-        is_user_agent = None
-        return False
+        # 检查uri是否合法
+        if self.__http_request_info[0].lower() != "connect":
+            if len(self.__http_request_info[1]) < 9: return False
+            p = self.__http_request_info[1].find("http://")
+            if p != 0: return False
 
-    def http_request_filter(self):
-        """过滤http请求,使其发送远端服务器看起来不是代理服务器代理
+        return True
+
+    def http_request_set(self):
+        """HTTP请求设置
         :return:
         """
-        pass
+        new_headers = []
+        for k, v in self.__http_request_kv_pairs:
+            name = k.lower()
+            # 过滤到proxy相关信息,防止远程服务器知道是代理连接
+            if name[0:5] == "proxy": continue
+            new_headers.append((k, v,))
+        self.__http_request_kv_pairs = new_headers
+
+    def get_http_host(self, host):
+        """
+        :param host:
+        :return:
+        """
+        if host[0] == "[" and host[-1] == "]":
+            if len(host) < 3: return None
+            host = host[1:-1]
+            try:
+                addr_type = HTTP_HOST_IPv6
+                socket.inet_pton(socket.AF_INET6, host)
+            except:
+                return None
+
+            return (host, addr_type,)
+
+        addr_type = HTTP_HOST_IP
+        try:
+            addr_type = HTTP_HOST_IP
+            socket.inet_pton(socket.AF_INET, host)
+        except:
+            addr_type = HTTP_HOST_DOMAIN
+        return (host, addr_type,)
 
     def get_http_remote_server_info(self):
-        return None
+        uri = self.__http_request_info[1]
+        if self.__is_http_tunnel_mode:
+            p = uri.find(":")
+            host = uri[0:p]
+            new_host = self.get_http_host(host)
+            if not new_host: return None
+            p += 1
+            try:
+                port = int(uri[p:])
+            except ValueError:
+                return None
+            return (new_host, port, None)
+
+        port = 80
+        new_uri = None
+        host = None
+        s = uri[7:]
+        p = s.find("/")
+
+        if p < 1: return None
+
+        a = s[0:p]
+        new_uri = s[p:]
+
+        p = a.find(":")
+        if p > 0:
+            host = a[0:p]
+            p += 1
+            try:
+                port = int(a[p:])
+            except ValueError:
+                return None
+            ''''''
+        else:
+            host = a
+
+        new_host = self.get_http_host(host)
+        if not new_host: return None
+
+        return (new_host, port, new_uri)
 
     def parse_http_header(self):
         """
@@ -142,31 +228,172 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         p += 4
         self.reader._putvalue(rdata[p:])
         s = rdata[0:p].decode("iso-8859-1")
-
         try:
             req, kv_pairs = httputils.parse_htt1x_request_header(s)
         except httputils.Http1xHeaderErr:
             return False
+        # 只支持http/1.1代理
+        if req[2].lower() != "http/1.1": return False
 
         self.__http_request_info = req
         self.__http_request_kv_pairs = kv_pairs
         self.__is_parsed_http_header = True
 
+        if self.__http_request_info[0].lower() == "connect": self.__is_http_tunnel_mode = True
+
+        # 核对http请求头
+        if not self.http_request_check():
+            self.delete_handler(self.fileno)
+            return
+
+        server_info = self.get_http_remote_server_info()
+        if not server_info:
+            self.delete_handler(self.fileno)
+            return
+        if not self.__is_http_tunnel_mode:
+            self.http_request_set()
+        host_info, port, uri = server_info
+
+        host, addr_type = host_info
+        if addr_type == HTTP_HOST_IPv6:
+            is_ipv6 = True
+        else:
+            is_ipv6 = False
+        self.__http_uri = uri
+        self.__raw_client_fd = self.create_handler(self.fileno, raw_tcp_client, (host, port), is_ipv6=is_ipv6)
+
         return True
 
+    def send_http_response(self, status):
+        kv_pairs = [
+            ("Server", "Socks2Https"),
+            ("Content-Length", 0)
+        ]
+        s = httputils.build_http1x_resp_header(status, kv_pairs)
+
+        self.add_evt_write(self.fileno)
+        self.writer.write(s.encode("iso-8859-1"))
+
+    def http_conn_ok(self):
+        if self.__is_http_tunnel_mode:
+            self.send_http_response("200 Connection Established")
+            return
+
+        # 重新构建http请求头部
+        s = httputils.build_http1x_req_header(self.__http_request_info[0], self.__http_uri,
+                                              self.__http_request_kv_pairs)
+        self.send_message_to_handler(self.fileno, self.__raw_client_fd, s.encode("iso-8859-1"))
+
+    def handle_socks5_handshake(self):
+        size = self.reader.size()
+        if size != 3:
+            self.delete_handler(self.fileno)
+            return
+
+        rdata = self.reader.read()
+        v = rdata[0]
+        if v != 5:
+            self.delete_handler(self.fileno)
+            return
+        methods = []
+        for i in rdata[2:]: methods.append(i)
+
+        # 只支持无需认证方式
+        if 0 not in methods:
+            self.delete_handler(self.fileno)
+            return
+
+        pkt = struct.pack("BB", 5, 0)
+
+        self.writer.write(pkt)
+        self.add_evt_write(self.fileno)
+        self.__socks5_handshake_ok = True
+
+    def handle_socks5_establish(self):
+        size = self.reader.size()
+        rdata = self.reader.read()
+        self.__socks5_request_establish_packet = rdata
+
+        if size < 7:
+            self.delete_handler(self.fileno)
+            return
+        ver = rdata[0]
+        cmd = rdata[1]
+        rsv = rdata[2]
+        atyp = rdata[3]
+
+        if ver != 5:
+            self.delete_handler(self.fileno)
+            return
+        # 取消bind命令的支持
+        if cmd not in (1, 3,):
+            self.delete_handler(self.fileno)
+            return
+        # 检查地址类型列表
+        if atyp not in (1, 3, 4,):
+            self.delete_handler(self.fileno)
+            return
+        if atyp == 1 and size != 10:
+            self.delete_handler(self.fileno)
+            return
+        if atyp == 4 and size != 22:
+            self.delete_handler(self.fileno)
+            return
+        if atyp == 1:
+            host = socket.inet_ntop(socket.AF_INET, rdata[4:8])
+        elif atyp == 4:
+            host = socket.inet_ntop(socket.AF_INET6, rdata[4:20])
+        else:
+            length = rdata[4]
+            host = rdata[5:-2].decode("iso-8859-1")
+            if length != len(rdata[5:-2]):
+                self.delete_handler(self.fileno)
+                return
+            ''''''
+        b = rdata[-2:]
+        port = (b[0] << 8) | b[1]
+        if atyp == 4:
+            is_ipv6 = True
+        else:
+            is_ipv6 = False
+        if cmd != 3:
+            self.__raw_client_fd = self.create_handler(self.fileno, raw_tcp_client, (host, port), is_ipv6=is_ipv6)
+            return
+
+    def handle_socks5_data(self):
+        rdata = self.reader.read()
+        self.send_message_to_handler(self.fileno, self.__raw_client_fd, rdata)
+
     def handle_socks5(self):
-        pass
+        if not self.__socks5_handshake_ok:
+            self.handle_socks5_handshake()
+            return
+        if not self.__socks5_proxy_is_conn_established:
+            self.handle_socks5_establish()
+            return
+        self.handle_socks5_data()
+
+    def handle_socks5_conn_ok(self):
+        seq = list(self.__socks5_request_establish_packet)
+        seq[1] = 0
+        byte_data = bytes(seq)
+        self.__socks5_proxy_is_conn_established = True
+        self.add_evt_write(self.fileno)
+        self.writer.write(byte_data)
 
     def tcp_readable(self):
         ### 首先确认协议
         if not self.__is_sure_protocol:
             rdata = self.reader.read()
+            if not rdata: return
             if rdata[0] == 5:
                 self.__is_socks5 = True
             else:
                 self.__is_socks5 = False
+            self.__is_sure_protocol = True
             self.reader._putvalue(rdata)
 
+        self.__time = time.time()
         if self.__is_socks5:
             self.handle_socks5()
         else:
@@ -176,12 +403,18 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
-        pass
+        t = time.time()
+        if t - self.__time < self.dispatcher.get_client_conn_timeout():
+            self.set_timeout(self.fileno, 10)
+            return
+        self.delete_handler(self.fileno)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):
+        if self.__raw_client_fd > 0:
+            self.delete_handler(self.__raw_client_fd)
         self.unregister(self.fileno)
         self.close()
 
@@ -194,6 +427,20 @@ class http_socks5_handler(tcp_handler.tcp_handler):
 
     def handle_conn_state_from_convert_client(self, err_code):
         pass
+
+    def tell_close(self):
+        self.delete_handler(self.fileno)
+
+    def tell_conn_ok(self):
+        if self.__is_socks5:
+            self.handle_socks5_conn_ok()
+        else:
+            self.http_conn_ok()
+
+    def message_from_handler(self, from_fd, byte_data):
+        self.__time = time.time()
+        self.add_evt_write(self.fileno)
+        self.writer.write(byte_data)
 
 
 class socks5_udp_handler(udp_handler.udp_handler):
@@ -363,6 +610,12 @@ class convert_client(tcp_handler.tcp_handler):
 
         self.send_data(pong_data)
 
+    def send_ping(self):
+        data = self.rand_bytes()
+        ping_data = self.__builder.build_ping(data)
+
+        self.send_data(ping_data)
+
     def handle_pong(self):
         self.__time = time.time()
 
@@ -457,29 +710,50 @@ class convert_client(tcp_handler.tcp_handler):
         self.send_data(data)
 
 
-class raw_tcp_handler(tcp_handler.tcp_handler):
+class raw_tcp_client(tcp_handler.tcp_handler):
     __caddr = None
+    __creator = None
 
-    def init_func(self, creator_fd, cs, caddr):
-        self.__caddr = caddr
-        self.set_socket(cs)
-        self.register(self.fileno)
-        self.add_evt_read(self.fileno)
+    def init_func(self, creator_fd, address, is_ipv6=False):
+        self.__creator = creator_fd
+
+        if is_ipv6:
+            fa = socket.AF_INET6
+        else:
+            fa = socket.AF_INET
+        s = socket.socket(fa, socket.SOCK_STREAM)
+        self.set_socket(s)
+
+        self.connect(address)
 
         return self.fileno
 
+    def connect_ok(self):
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
+        self.dispatcher.get_handler(self.__creator).tell_conn_ok()
+
     def tcp_readable(self):
-        pass
+        rdata = self.reader.read()
+        if not self.handler_exists(self.__creator): return
+        self.send_message_to_handler(self.fileno, self.__creator, rdata)
 
     def tcp_writable(self):
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
-        pass
+        if not self.is_conn_ok():
+            self.dispatcher.get_handler(self.__creator).tell_close()
+            return
 
     def tcp_error(self):
-        self.delete_handler(self.fileno)
+        self.dispatcher.get_handler(self.__creator).tell_close()
 
     def tcp_delete(self):
         self.unregister(self.fileno)
         self.close()
+
+    def message_from_handler(self, from_fd, byte_data):
+        if not self.is_conn_ok(): return
+        self.writer.write(byte_data)
+        self.add_evt_write(self.fileno)

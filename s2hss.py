@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, os, getopt, signal
+import sys, os, getopt, signal, json
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -25,6 +25,9 @@ class serverd(dispatcher.dispatcher):
     __listen_fd6 = None
 
     __debug = None
+
+    __conn_timeout = None
+    __heartbeat_timeout = None
 
     def init_func(self, debug=True):
         self.__cfg_path = "%s/fdslight_etc/s2hss.ini" % BASE_DIR
@@ -61,10 +64,29 @@ class serverd(dispatcher.dispatcher):
         listen_ip = listen.get("listen_ip", "0.0.0.0")
         listen_ipv6 = listen.get("listen_ip", "::")
         conn_timeout = int(listen.get("conn_timeout", 60))
-        enable_heartbeat = bool(int(listen.get("enable_heartbeat", 0)))
         heartbeat_timeout = int(listen.get("heartbeat_timeout", 20))
 
+        self.__conn_timeout = conn_timeout
+        self.__heartbeat_timeout = heartbeat_timeout
 
+    def get_users(self):
+        """获取所有用户的信息
+        :return:
+        """
+        with open(self.__auth_path, "r") as f: s = f.read()
+        f.close()
+
+        py_obj = json.loads(s)
+
+        return py_obj
+
+    @property
+    def conn_timeout(self):
+        return self.__conn_timeout
+
+    @property
+    def heartbeat_timeout(self):
+        return self.__heartbeat_timeout
 
 
 def main():
