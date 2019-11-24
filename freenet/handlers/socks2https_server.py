@@ -180,6 +180,9 @@ class handler(tcp_handler.tcp_handler):
         _id, tcp_data = info
         if _id not in self.__packet_id_map: return
 
+        fd = self.__packet_id_map[_id]
+        self.send_message_to_handler(self.fileno, fd, tcp_data)
+
     def handle_udp_udplite_data(self, info, is_udplite=False):
         _id, win_size, address, port, byte_data = info
         # 如果不存在那么创建一个handler
@@ -188,15 +191,20 @@ class handler(tcp_handler.tcp_handler):
                                      is_ipv6=False)
             self.__packet_id_map[_id] = fd
         fd = self.__packet_id_map[_id]
+        self.dispatcher.get_handler(fd).msg_send((address, port,), byte_data)
 
     def handle_tcp_conn_request(self, info):
         _id, win_size, address, port, byte_data = info
         # 如果包ID存在那么发送错误
-        if _id in self.__packet_id_map:
-            return
-
+        if _id in self.__packet_id_map: return
         fd = self.create_handler(self.fileno, handler_for_tcp, (address, port), _id, is_ipv6=False)
         self.__packet_id_map[_id] = fd
+
+    def handle_tcp_conn_state(self, info):
+        _id, err_code = info
+        if err_code != 0:
+            if _id in self.__packet_id_map: del self.__packet_id_map[_id]
+        return
 
     def handle_request_data(self):
         self.__parser.input(self.reader.read())
@@ -206,6 +214,8 @@ class handler(tcp_handler.tcp_handler):
         except socks2https.FrameError:
             self.delete_handler(self.fileno)
             return
+
+        self.__time = time.time()
 
         while 1:
             rs = self.__parser.get_result()
@@ -229,6 +239,9 @@ class handler(tcp_handler.tcp_handler):
                 continue
             if frame_type == socks2https.FRAME_TYPE_TCP_CONN:
                 self.handle_tcp_conn_request(info)
+                continue
+            if frame_type == socks2https.FRAME_TYPE_TCP_CONN_STATE:
+                self.handle_tcp_conn_state(info)
                 continue
             ''''''
         return
@@ -310,15 +323,16 @@ class handler(tcp_handler.tcp_handler):
         rs = False
 
         for user_info in users_info:
-            u = users_info.get("username", None)
-            p = users_info.get("password", None)
+            u = user_info.get("username", None)
+            p = user_info.get("password", None)
             if u != user and p != passwd: continue
             rs = True
 
         return rs
 
     def tell_tcp_close(self, packet_id):
-        pass
+        msg = self.__builder.build_tcp_conn_state(packet_id, 1)
+        self.send_data(msg)
 
     def tell_udp_udplite_close(self, packet_id):
         pass
@@ -371,6 +385,9 @@ class handler_for_tcp(tcp_handler.tcp_handler):
             return
 
     def tcp_delete(self):
+        pass
+
+    def message_from_handler(self, from_fd, byte_data):
         pass
 
 

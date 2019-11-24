@@ -4,6 +4,7 @@ import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.web.lib.httputils as httputils
 import pywind.web.lib.websocket as wslib
+import pywind.lib.timer as timer
 
 import socket, time, ssl, random, os, struct
 
@@ -358,7 +359,7 @@ class http_socks5_handler(tcp_handler.tcp_handler):
             self.__raw_client_fd = self.create_handler(self.fileno, raw_tcp_client, (host, port), is_ipv6=is_ipv6)
             return
 
-        self.__raw_client_fd = self.create_handler(self.fileno, self.__caddr[0], is_ipv6=is_ipv6)
+        self.__raw_client_fd = self.create_handler(self.fileno, self.__caddr[0], port, is_ipv6=is_ipv6)
         bind_address = self.dispatcher.get_handler(self.__raw_client_fd).bind_address
 
         a = struct.pack("!BBBB", 5, 0, 0, atyp)
@@ -786,15 +787,23 @@ class raw_tcp_client(tcp_handler.tcp_handler):
 
 class raw_udp_client(udp_handler.udp_handler):
     __time = None
-    __src_ip = None
+    __client_ip = None
+    __client_port = None
     __listen_ip = None
     __is_ipv6 = None
 
-    def init_func(self, creator_fd, src_ip, is_ipv6=False):
+    # 访问列表,增加UDP安全性
+    __access_list = None
+    __timer = None
+
+    def init_func(self, creator_fd, client_ip, client_port, is_ipv6=False):
         self.__creator = creator_fd
         self.__time = time.time()
-        self.__src_ip = src_ip
+        self.__client_ip = client_ip
+        self.__client_port = client_port
         self.__is_ipv6 = is_ipv6
+        self.__access_list = {}
+        self.__timer = timer.timer()
 
         if is_ipv6:
             listen_ip = self.dispatcher.socks5_listen_ipv6
@@ -820,15 +829,88 @@ class raw_udp_client(udp_handler.udp_handler):
     def bind_address(self):
         return (self.__listen_ip, self.getsockname()[1],)
 
-    def udp_readable(self, message, address):
-        # 限制接收的包数据IP地址
-        if address[0] != self.__src_ip: return
-        if not self.handler_exists(self.__creator): return
+    def handle_udp_packet_from_client(self, message):
+        msg_size = len(message)
+        # 检查数据包合法性
+        if msg_size < 9: return None
+        rsv, frag, atyp, = struct.unpack("!HBB", message[0:4])
+        if rsv != 0: return None
+        # 不支持UDP分包
+        if frag != 0: return None
 
+        if atyp not in (1, 3, 4,): return None
+        if atyp == 1 and msg_size < 11: return None
+        if atyp == 4 and msg_size < 23: return None
+
+        message = message[4:]
+
+        if atyp == 1:
+            host = socket.inet_ntop(socket.AF_INET, message[0:4])
+            message = message[4:]
+        elif atyp == 4:
+            host = socket.inet_ntop(socket.AF_INET6, message[0:16])
+            message = message[16:]
+        else:
+            length = message[0]
+            e = 1 + length
+            size = len(message[1:e])
+            if size != length: return None
+            host = message[1:e].decode("iso-8859-1")
+            message = message[1:]
+
+        port = (message[0] << 8) | message[1]
+        message = message[2:]
+
+        return (host, port, atyp, message,)
+
+    def handle_udp_packet_from_server(self, message, address):
+        if not self.handler_exists(self.__creator): return
+        # 检查客户端是否发送过数据包
+        if address[0] not in self.__access_list: return
         if self.__is_ipv6:
             net_addr = socket.inet_pton(socket.AF_INET6, address[0])
         else:
             net_addr = socket.inet_pton(socket.AF_INET, address[0])
+
+        if self.__is_ipv6:
+            atyp = 4
+        else:
+            atyp = 1
+
+        a = struct.pack("!HBB", 0, 0, atyp)
+        b = struct.pack("!H", address[1])
+
+        msg = b"".join([a, net_addr, b, message])
+        self.sendto(msg, (self.__client_ip, self.__client_port,))
+        self.add_evt_write(self.fileno)
+
+    def udp_readable(self, message, address):
+        if address[0] != self.__client_ip:
+            self.handle_udp_packet_from_server(message, address)
+            return
+        # 检查客户端的端口
+        if self.__client_port != address[1]: return
+        rs = self.handle_udp_packet_from_client(message)
+        if not rs:
+            self.dispatcher.get_handler(self.__creator).tell_close()
+            return
+
+        host, port, addr_type, msg = rs
+        # 检查数据包IP协议是否和协商不一致
+        if not self.__is_ipv6 and addr_type == 4:
+            self.dispatcher.get_handler(self.__creator).tell_close()
+            return
+        if self.__is_ipv6 and addr_type == 1:
+            self.dispatcher.get_handler(self.__creator).tell_close()
+            return
+
+        self.__timer.set_timeout(host, 30)
+        self.__time = time.time()
+        if host not in self.__access_list:
+            self.__access_list[host] = None
+
+        self.sendto(msg, (host, port,))
+        self.add_evt_write(self.fileno)
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
@@ -838,6 +920,14 @@ class raw_udp_client(udp_handler.udp_handler):
         if t - self.__time > self.dispatcher.client_conn_timeout:
             self.dispatcher.get_handler(self.__creator).tell_close()
             return
+
+        names = self.__timer.get_timeout_names()
+        for name in names:
+            if name in self.__timer.exists(name):
+                self.__timer.drop(name)
+            if name in self.__access_list:
+                del self.__access_list[name]
+            ''''''
         self.set_timeout(self.fileno, 10)
 
     def udp_error(self):

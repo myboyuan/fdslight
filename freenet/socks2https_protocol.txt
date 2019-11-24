@@ -2,10 +2,15 @@
 
 头部数据帧格式如下
 version:1 byte 目前为1
-type:1 byte 数据帧类型  0表示ping请求帧,1表示pong请求帧,2表示请求建立TCP连接,3表示TCP建立状态响应,4表示TCP数据帧
-     5和6表示UDP数据包和UDPLite数据包
-content_length:2 bytes 数据长度
+type:1 byte 数据帧类型
+    0表示ping请求帧
+    1表示pong请求帧
+    2表示请求建立TCP连接
+    4表示建立UDP连接
+    5表示建立UDPlite连接
+    6表示连接状态告知
 
+content_length:2 bytes 数据长度
 内容帧如下.
 0,1的数据帧只有头部,帧体数据可以是无或者任意数据
 
@@ -20,7 +25,7 @@ udp_data:udp或者udplite数据,如果请求协议是udp或者udplite
 
 3:连接状态响应
 packet_id:4 bytes
-err_code:4 bytes,0表示连接建立成功,1表示无法建立连接
+err_code:4 bytes,0表示连接建立成功,1表示连接关闭
 
 5:TCP数据帧
 packet_id:4 bytes
