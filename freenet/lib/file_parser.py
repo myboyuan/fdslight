@@ -53,7 +53,7 @@ def parse_host_file(fpath):
 def __get_ip_subnet(line):
     """检查子网格式是否正确"""
     pos = line.find("/")
-    if pos < 7: return None
+    if pos < 2: return None
     ipaddr = line[0:pos]
     pos += 1
 
@@ -75,23 +75,3 @@ def parse_ip_subnet_file(fpath):
         results.append(ret)
 
     return results
-
-
-def get_linux_host_nameservers(resolv_path="/etc/resolv.conf"):
-    """获取LINUX系统的所有nameservers
-    :param resolv_path: nameserver的配置文件
-    """
-    fdst = open(resolv_path, "r")
-    nameservers = []
-
-    for line in fdst:
-        ts = line.lstrip()
-        if ts[0] == "#": continue
-        if ts[0:10] != "nameserver": continue
-        replaces = ("\r", "\n", "nameserver")
-        for s in replaces: ts = ts.replace(s, "")
-        ts = ts.lstrip()
-        ts = ts.rstrip()
-        nameservers.append(ts)
-
-    return nameservers

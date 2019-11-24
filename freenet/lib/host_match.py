@@ -5,19 +5,8 @@ class host_match(object):
     """
     __domain_rules = None
 
-    __ip_rules = None
-    __ipv6_rules = None
-
     def __init__(self):
         self.__domain_rules = {}
-        self.__ip_rules = {}
-        self.__ipv6_rules = {}
-
-    def add_ip_rule(self, rule):
-        pass
-
-    def add_host_rule(self, rule):
-        pass
 
     def add_rule(self, host_rule):
         host, flags = host_rule
@@ -76,8 +65,3 @@ class host_match(object):
 
     def clear(self):
         self.__domain_rules = {}
-        self.__ip_rules = {}
-        self.__ipv6_rules = {}
-
-    def match_ipaddr(self, ipaddr, is_ipv6=False):
-        pass

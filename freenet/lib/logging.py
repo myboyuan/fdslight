@@ -9,11 +9,14 @@ def print_general(text, address):
     sys.stdout.flush()
 
 
-def print_error():
+def print_error(text=""):
     s1 = "<error time='%s'>" % time.strftime("%Y-%m-%d %H:%M:%S %Z")
     s2 = "</error>"
 
-    excpt = traceback.format_exc()
-    error = "%s\r\n%s\r\n%s" % (s1, excpt, s2)
-    sys.stderr.write(error)
+    if text:
+        sys.stderr.write(text)
+    else:
+        excpt = traceback.format_exc()
+        error = "%s\r\n%s\r\n%s" % (s1, excpt, s2)
+        sys.stderr.write(error)
     sys.stderr.flush()

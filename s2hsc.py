@@ -13,6 +13,9 @@ import pywind.lib.configfile as cfg
 
 import freenet.lib.proc as proc
 import freenet.handlers.socks2https_client as socks2https
+import freenet.lib.host_match as host_match
+import freenet.lib.ip_match as ip_match
+import freenet.lib.file_parser as file_parser
 
 PID_PATH = "/tmp/s2hsc.pid"
 
@@ -26,7 +29,9 @@ def win_client_autocfg():
 
 class serverd(dispatcher.dispatcher):
     __cfg_path = None
-    __rules_path = None
+    __host_rules_path = None
+    __ip_rules_path = None
+    __udp_src_proxy_path = None
 
     __socks5http_listen_fd = None
     __socks5http_listen_fd6 = None
@@ -46,15 +51,23 @@ class serverd(dispatcher.dispatcher):
     __socks5_bind_ipv6 = None
 
     __packet_id_map = None
+    __debug = None
+
+    __host_match = None
+    __ip_match = None
+    __udp_src_match = None
 
     def init_func(self, mode, debug=True):
         self.__packet_id_map = {}
 
         if mode == "proxy":
             self.__cfg_path = "%s/fdslight_etc/s2hsc.ini" % BASE_DIR
+            self.__host_rules_path = "%s/fdslight_etc/host_rules.txt" % BASE_DIR
+            self.__ip_rules_path = "%s/fdslight_etc/ip_rules.txt" % BASE_DIR
+            self.__udp_src_proxy_path = "%s/fdslight_etc/udp_src_proxy.txt" % BASE_DIR
         else:
             self.__cfg_path = "%s/fdslight_etc/s2hsr.ini" % BASE_DIR
-        self.__rules_path = "%s/fdslight_etc/host_rules.txt" % BASE_DIR
+
         self.__debug = debug
 
         self.__socks5http_listen_fd = -1
@@ -64,6 +77,8 @@ class serverd(dispatcher.dispatcher):
         self.__relay_listen_fd6 = -1
 
         self.__convert_fd = -1
+
+        self.__debug = debug
 
         self.create_poll()
 
@@ -75,6 +90,12 @@ class serverd(dispatcher.dispatcher):
             self.create_relay_service()
 
         if mode == "proxy":
+            if not debug: signal.signal(signal.SIGUSR1, self.__update_rules)
+            self.__host_match = host_match.host_match()
+            self.__ip_match = ip_match.ip_match()
+            self.__udp_src_match = ip_match.ip_match()
+            # 首先第一次先更新规则
+            self.__update_rules(None, None)
             self.create_socks_http_service()
 
     def release(self):
@@ -91,6 +112,40 @@ class serverd(dispatcher.dispatcher):
         self.release()
         os.remove(PID_PATH)
         sys.exit(0)
+
+    def __update_rules(self, signum, frame):
+        """更新白名单规则
+        :param signum:
+        :param frame:
+        :return:
+        """
+        host_rules = file_parser.parse_host_file(self.__host_rules_path)
+        ip_rules = file_parser.parse_ip_subnet_file(self.__ip_rules_path)
+        udp_src_rules = file_parser.parse_ip_subnet_file(self.__udp_src_proxy_path)
+
+        for rule in host_rules: self.__host_match.add_rule(rule)
+        for subnet, prefix in ip_rules:
+            rs = self.__ip_match.add_rule(subnet, prefix)
+            if not rs:
+                sys.stderr.write("wrong ip format at %s/%s from %s" % (subnet, prefix, self.__ip_rules_path))
+                sys.stderr.flush()
+            ''''''
+        for subnet, prefix in udp_src_rules:
+            rs = self.__udp_src_match.add_rule(subnet, prefix)
+            if not rs:
+                sys.stderr.write("wrong ip format at %s/%s from %s" % (subnet, prefix, self.__udp_src_proxy_path))
+                sys.stderr.flush()
+            ''''''
+        return
+
+    def match_ip(self, ipaddr, is_ipv6=False):
+        return self.__ip_match.match(ipaddr, is_ipv6=is_ipv6)
+
+    def match_domain(self, host):
+        return self.__host_match.match(host)
+
+    def match_udp_src_ip(self, ipaddr, is_ipv6=False):
+        return self.__udp_src_match.match(ipaddr, is_ipv6=is_ipv6)
 
     def create_socks_http_service(self):
         config = cfg.ini_parse_from_file(self.__cfg_path)
@@ -120,6 +175,9 @@ class serverd(dispatcher.dispatcher):
             self.__socks5http_listen_fd6 = self.create_handler(
                 -1, socks2https.http_socks5_listener, (listen_ipv6, port), is_ipv6=True
             )
+
+    def create_dns_service(self):
+        pass
 
     def create_relay_service(self):
         config = cfg.ini_parse_from_file(self.__cfg_path)
@@ -154,18 +212,13 @@ class serverd(dispatcher.dispatcher):
         self.__convert_fd = self.create_handler(-1, socks2https.convert_client, (host, port), path, user, passwd,
                                                 is_ipv6=enable_ipv6)
 
-    def register_new_conn(self, packet_id, fd):
-        if packet_id in self.__packet_id_map:
-            raise SystemError("register new connection failed,it is exists")
-
-        self.__packet_id_map[packet_id] = fd
-
-    def alloc_packet_id(self):
+    def alloc_packet_id(self, fd):
         n = 1
         while 1:
             n = random.randint(1, 0xffffffff - 1)
             if n in self.__packet_id_map: continue
             break
+        self.__packet_id_map[n] = fd
         return n
 
     def free_packet_id(self, packet_id):
@@ -173,21 +226,34 @@ class serverd(dispatcher.dispatcher):
             del self.__packet_id_map[packet_id]
 
     def send_conn_frame(self, frame_type, packet_id, host, port, addr_type, data=b""):
-        if self.__convert_fd < 0:
+        if not self.handler_exists(self.__convert_fd):
             self.create_convert_client()
-        if self.__convert_fd < 0: return
+        if not self.handler_exists(self.__convert_fd): return
+
         if packet_id not in self.__packet_id_map: return
 
         self.get_handler(self.__convert_fd).send_conn_request(
-            frame_type, self.alloc_packet_id(), host, port, addr_type, data=data
+            frame_type, packet_id, host, port, addr_type, data=data
         )
 
     def send_tcp_data(self, packet_id, byte_data):
+        if not byte_data: return
         # 连接已经断开,那么丢弃tcp数据包
-        if self.__convert_fd < 0: return
+        if not self.handler_exists(self.__convert_fd): return
         # 数据包ID不存在,那么就丢弃数据包
         if packet_id not in self.__packet_id_map: return
         self.get_handler(self.__convert_fd).send_tcp_data(packet_id, byte_data)
+
+    def handle_udp_udplite_data(self, packet_id, address, port, byte_data):
+        if not byte_data: return
+        if packet_id not in self.__packet_id_map: return
+        fd = self.__packet_id_map[packet_id]
+        self.get_handler(fd).handle_udp_udplite_data((address, port), byte_data)
+
+    def handle_tcp_data(self, packet_id, byte_data):
+        if packet_id not in self.__packet_id_map: return
+        fd = self.__packet_id_map[packet_id]
+        self.send_message_to_handler(-1, fd, byte_data)
 
     def handle_conn_state(self, packet_id, err_code):
         """处理连接状态
@@ -199,9 +265,17 @@ class serverd(dispatcher.dispatcher):
         fd = self.__packet_id_map[packet_id]
 
         if err_code:
-            self.delete_handler(fd)
+            self.get_handler(fd).tell_close()
         else:
             self.get_handler(fd).tell_conn_ok()
+
+    def tell_close_for_all(self):
+        fds = []
+        #  注意这里一定要先放到集合内再删除,否则可能发现在遍历的时候删除映射对象情况导致抛出异常
+        for k, v in self.__packet_id_map.items():
+            fds.append(v)
+        for fd in fds:
+            self.get_handler(fd).tell_close()
 
     @property
     def client_conn_timeout(self):
@@ -215,24 +289,48 @@ class serverd(dispatcher.dispatcher):
     def socks5_listen_ipv6(self):
         return self.__socks5_bind_ipv6
 
+    @property
+    def debug(self):
+        return self.__debug
+
+
+def update_rules():
+    pid = proc.get_pid(PID_PATH)
+    if pid < 0:
+        sys.stderr.write("not found process\r\n")
+        sys.stderr.flush()
+        return
+    os.kill(pid, signal.SIGUSR1)
+
 
 def main():
     help_doc = """
     -d      debug | start | stop    debug,start or stop application
     -m      relay | proxy           relay mode,proxy mode or all mode
+    -u                              update rule files
     """
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "u:m:d:")
+        opts, args = getopt.getopt(sys.argv[1:], "m:d:u")
     except getopt.GetoptError:
         print(help_doc)
         return
 
     d = None
     m = None
+    u = None
 
     for k, v in opts:
         if k == "-d": d = v
         if k == "-m": m = v
+        if k == "-u": u = True
+
+    if u and (d or m):
+        print(help_doc)
+        return
+
+    if u:
+        update_rules()
+        return
 
     if d not in ("debug", "start", "stop"):
         print(help_doc)

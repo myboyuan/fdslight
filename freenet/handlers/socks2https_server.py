@@ -62,6 +62,7 @@ class handler(tcp_handler.tcp_handler):
     __time = None
     # 客户端传送过来的窗口大小
     __win_size = None
+    __my_win_size = None
     __qos = None
 
     def init_func(self, creator_fd, cs, caddr, is_ipv6=False):
@@ -75,8 +76,10 @@ class handler(tcp_handler.tcp_handler):
 
         if is_ipv6:
             self.__win_size = 1140
+            self.__my_win_size = 1140
         else:
             self.__win_size = 1280
+            self.__my_win_size = 1280
 
         self.__time = time.time()
 
@@ -237,7 +240,6 @@ class handler(tcp_handler.tcp_handler):
         if fd < 0:
             self.send_conn_state(_id, 1)
             return
-
         self.__packet_id_map[_id] = fd
 
     def send_conn_state(self, _id, err_code):
@@ -252,17 +254,14 @@ class handler(tcp_handler.tcp_handler):
 
     def handle_request_data(self):
         self.__parser.input(self.reader.read())
-
-        try:
-            self.__parser.parse()
-        except socks2https.FrameError:
-            self.delete_handler(self.fileno)
-            return
-
         self.__time = time.time()
 
         while 1:
-            self.__parser.parse()
+            try:
+                self.__parser.parse()
+            except socks2https.FrameError:
+                self.delete_handler(self.fileno)
+                return
             rs = self.__parser.get_result()
             if not rs: break
             frame_type, info = rs
@@ -325,11 +324,12 @@ class handler(tcp_handler.tcp_handler):
         self.handle_request_data()
 
     def tcp_writable(self):
+        if self.writer.is_empty() and not self.__qos.have_data():
+            self.remove_evt_write(self.fileno)
         while 1:
             pkts = self.__qos.get_data()
             if not pkts: break
             for pkt in pkts: self.writer.write(pkt)
-        if self.writer.is_empty() and not self.__qos.have_data(): self.remove_evt_write(self.fileno)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
@@ -393,16 +393,13 @@ class handler(tcp_handler.tcp_handler):
     def send_tcp_data(self, packet_id, data):
         if packet_id not in self.__packet_id_map: return
         if not data: return
-        b = 0
-        e = self.__win_size
+
         while 1:
-            frag_data = data[b:e]
-            size = len(frag_data)
-            wrap_data = self.__builder.build_tcp_frame_data(packet_id, frag_data, win_size=1280)
-            self.__qos.input(wrap_data)
-            if size <= self.__win_size: break
-            b = e
-            e += self.__win_size
+            if not data: break
+            frag_data = data[0:self.__win_size]
+            wrap_data = self.__builder.build_tcp_frame_data(packet_id, frag_data, win_size=self.__my_win_size)
+            self.__qos.input(packet_id, wrap_data)
+            data = data[self.__win_size:]
 
         self.add_evt_write(self.fileno)
 
@@ -412,6 +409,10 @@ class handler(tcp_handler.tcp_handler):
 
         # UDP和UDPLite数据包立刻发送
         data = self.__builder.build_conn_frame(packet_id, addr_type, ip_addr, port, byte_data=byte_data)
+        self.send_data(data)
+
+    def tell_conn_ok(self, packet_id):
+        data = self.__builder.build_conn_state(packet_id, 0)
         self.send_data(data)
 
 
@@ -424,7 +425,6 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         self.__creator = creator_fd
         self.__packet_id = packet_id
         self.__time = time.time()
-        self.__win_size = 1200
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -440,9 +440,11 @@ class handler_for_tcp(tcp_handler.tcp_handler):
     def connect_ok(self):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+        self.dispatcher.get_handler(self.__creator).tell_conn_ok(self.__packet_id)
 
     def tcp_readable(self):
         if not self.handler_exists(self.__creator): return
+        self.__time = time.time()
         rdata = self.reader.read()
         self.dispatcher.get_handler(self.__creator).send_tcp_data(self.__packet_id, rdata)
 
@@ -468,7 +470,6 @@ class handler_for_tcp(tcp_handler.tcp_handler):
 
     def message_from_handler(self, from_fd, byte_data):
         if not self.is_conn_ok(): return
-
         self.writer.write(byte_data)
         self.add_evt_write(self.fileno)
         self.__time = time.time()
