@@ -43,6 +43,9 @@ class serverd(dispatcher.dispatcher):
 
     __client_conn_timeout = None
 
+    __socks5_bind_ip = None
+    __socks5_bind_ipv6 = None
+
     def init_func(self, mode, debug=True):
         if mode == "proxy":
             self.__cfg_path = "%s/fdslight_etc/s2hsc.ini" % BASE_DIR
@@ -94,6 +97,9 @@ class serverd(dispatcher.dispatcher):
         listen_ip = c.get("listen_ip", "0.0.0.0")
         listen_ipv6 = c.get("listen_ipv6", "::")
         port = int(c.get("port", 8800))
+
+        self.__socks5_bind_ip = listen_ip
+        self.__socks5_bind_ipv6 = listen_ipv6
 
         if port < 0 or port > 65535:
             raise ValueError("wrong port number from s2hsc.ini")
@@ -165,8 +171,17 @@ class serverd(dispatcher.dispatcher):
         if self.__convert_fd < 0: return
         self.get_handler(self.__convert_fd).send_tcp_data(packet_id, byte_data)
 
-    def get_client_conn_timeout(self):
+    @property
+    def client_conn_timeout(self):
         return self.__client_conn_timeout
+
+    @property
+    def socks5_listen_ip(self):
+        return self.__socks5_bind_ip
+
+    @property
+    def socks5_listen_ipv6(self):
+        return self.__socks5_bind_ipv6
 
 
 def main():

@@ -49,6 +49,7 @@ def parse_host_file(fpath):
         results.append((a, b,))
     return results
 
+
 def __get_ip_subnet(line):
     """检查子网格式是否正确"""
     pos = line.find("/")

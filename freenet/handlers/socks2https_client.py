@@ -85,14 +85,13 @@ class http_socks5_handler(tcp_handler.tcp_handler):
     # socks5代理连接是否建立
     __socks5_proxy_is_conn_established = None
     # 是否是socks5 udp协议
-    __is_socks5_udp = None
+    __is_socks5_udp_udplite = None
     __socks5_request_establish_packet = None
     ### 其他相关变量
     __caddr = None
     # 是否已经确认了协议
     __is_sure_protocol = None
 
-    __time = None
     __raw_client_fd = None
 
     def init_func(self, creator_fd, cs, caddr):
@@ -103,14 +102,11 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         self.__raw_client_fd = -1
         self.__socks5_handshake_ok = False
         self.__socks5_proxy_is_conn_established = False
-        self.__is_socks5_udp = False
-        self.__time = time.time()
+        self.__is_socks5_udp_udplite = False
 
         self.set_socket(cs)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
-
-        self.set_timeout(self.fileno, 10)
 
         return self.fileno
 
@@ -356,9 +352,28 @@ class http_socks5_handler(tcp_handler.tcp_handler):
             is_ipv6 = True
         else:
             is_ipv6 = False
+
+        # 处理TCP协议
         if cmd != 3:
             self.__raw_client_fd = self.create_handler(self.fileno, raw_tcp_client, (host, port), is_ipv6=is_ipv6)
             return
+
+        self.__raw_client_fd = self.create_handler(self.fileno, self.__caddr[0], is_ipv6=is_ipv6)
+        bind_address = self.dispatcher.get_handler(self.__raw_client_fd).bind_address
+
+        a = struct.pack("!BBBB", 5, 0, 0, atyp)
+        if is_ipv6:
+            net_addr = socket.inet_pton(socket.AF_INET6, bind_address[0])
+        else:
+            net_addr = socket.inet_pton(socket.AF_INET, bind_address[0])
+
+        b = struct.pack("!H", bind_address[1])
+        pkt = b"".join([a, net_addr, b])
+
+        self.__is_socks5_udp_udplite = True
+        self.__socks5_handshake_ok = True
+        self.writer.write(pkt)
+        self.add_evt_write(self.fileno)
 
     def handle_socks5_data(self):
         rdata = self.reader.read()
@@ -370,6 +385,10 @@ class http_socks5_handler(tcp_handler.tcp_handler):
             return
         if not self.__socks5_proxy_is_conn_established:
             self.handle_socks5_establish()
+            return
+        # 握手成功后不允许再发送TCP数据包
+        if self.__is_socks5_udp_udplite:
+            self.delete_handler(self.fileno)
             return
         self.handle_socks5_data()
 
@@ -393,7 +412,6 @@ class http_socks5_handler(tcp_handler.tcp_handler):
             self.__is_sure_protocol = True
             self.reader._putvalue(rdata)
 
-        self.__time = time.time()
         if self.__is_socks5:
             self.handle_socks5()
         else:
@@ -403,11 +421,7 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
-        t = time.time()
-        if t - self.__time < self.dispatcher.get_client_conn_timeout():
-            self.set_timeout(self.fileno, 10)
-            return
-        self.delete_handler(self.fileno)
+        pass
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
@@ -438,7 +452,6 @@ class http_socks5_handler(tcp_handler.tcp_handler):
             self.http_conn_ok()
 
     def message_from_handler(self, from_fd, byte_data):
-        self.__time = time.time()
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
 
@@ -713,9 +726,11 @@ class convert_client(tcp_handler.tcp_handler):
 class raw_tcp_client(tcp_handler.tcp_handler):
     __caddr = None
     __creator = None
+    __time = None
 
     def init_func(self, creator_fd, address, is_ipv6=False):
         self.__creator = creator_fd
+        self.__time = time.time()
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -736,6 +751,7 @@ class raw_tcp_client(tcp_handler.tcp_handler):
     def tcp_readable(self):
         rdata = self.reader.read()
         if not self.handler_exists(self.__creator): return
+        self.__time = time.time()
         self.send_message_to_handler(self.fileno, self.__creator, rdata)
 
     def tcp_writable(self):
@@ -746,6 +762,13 @@ class raw_tcp_client(tcp_handler.tcp_handler):
             self.dispatcher.get_handler(self.__creator).tell_close()
             return
 
+        t = time.time()
+        if t - self.__time < self.dispatcher.client_conn_timeout:
+            self.set_timeout(self.fileno, 10)
+            return
+
+        self.dispatcher.get_handler(self.__creator).tell_close()
+
     def tcp_error(self):
         self.dispatcher.get_handler(self.__creator).tell_close()
 
@@ -755,5 +778,71 @@ class raw_tcp_client(tcp_handler.tcp_handler):
 
     def message_from_handler(self, from_fd, byte_data):
         if not self.is_conn_ok(): return
+
+        self.__time = time.time()
         self.writer.write(byte_data)
         self.add_evt_write(self.fileno)
+
+
+class raw_udp_client(udp_handler.udp_handler):
+    __time = None
+    __src_ip = None
+    __listen_ip = None
+    __is_ipv6 = None
+
+    def init_func(self, creator_fd, src_ip, is_ipv6=False):
+        self.__creator = creator_fd
+        self.__time = time.time()
+        self.__src_ip = src_ip
+        self.__is_ipv6 = is_ipv6
+
+        if is_ipv6:
+            listen_ip = self.dispatcher.socks5_listen_ipv6
+        else:
+            listen_ip = self.dispatcher.socks5_listen_ip
+
+        self.__listen_ip = listen_ip
+        if is_ipv6:
+            fa = socket.AF_INET6
+        else:
+            fa = socket.AF_INET
+        s = socket.socket(fa, socket.SOCK_DGRAM)
+
+        self.set_socket(s)
+        self.bind((listen_ip, 0))
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
+        self.set_timeout(self.fileno, 10)
+
+        return self.fileno
+
+    @property
+    def bind_address(self):
+        return (self.__listen_ip, self.getsockname()[1],)
+
+    def udp_readable(self, message, address):
+        # 限制接收的包数据IP地址
+        if address[0] != self.__src_ip: return
+        if not self.handler_exists(self.__creator): return
+
+        if self.__is_ipv6:
+            net_addr = socket.inet_pton(socket.AF_INET6, address[0])
+        else:
+            net_addr = socket.inet_pton(socket.AF_INET, address[0])
+
+    def udp_writable(self):
+        self.remove_evt_write(self.fileno)
+
+    def udp_timeout(self):
+        t = time.time()
+        if t - self.__time > self.dispatcher.client_conn_timeout:
+            self.dispatcher.get_handler(self.__creator).tell_close()
+            return
+        self.set_timeout(self.fileno, 10)
+
+    def udp_error(self):
+        self.dispatcher.get_handler(self.__creator).tell_close()
+
+    def udp_delete(self):
+        self.unregister(self.fileno)
+        self.close()

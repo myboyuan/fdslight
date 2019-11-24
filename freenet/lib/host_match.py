@@ -16,6 +16,9 @@ class host_match(object):
     def add_ip_rule(self, rule):
         pass
 
+    def add_host_rule(self, rule):
+        pass
+
     def add_rule(self, host_rule):
         host, flags = host_rule
         tmplist = host.split(".")
