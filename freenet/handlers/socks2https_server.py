@@ -4,13 +4,18 @@ import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.web.lib.websocket as ws
 import pywind.web.lib.httputils as httputils
+import pywind.lib.timer as timer
+
 import socket, time, urllib.parse, random, os
 
 import freenet.lib.socks2https as socks2https
 
 
 class listener(tcp_handler.tcp_handler):
+    __is_ipv6 = None
+
     def init_func(self, creator_fd, address, is_ipv6=False):
+        self.__is_ipv6 = is_ipv6
         if is_ipv6:
             fa = socket.AF_INET6
         else:
@@ -34,7 +39,7 @@ class listener(tcp_handler.tcp_handler):
                 cs, caddr = self.accept()
             except BlockingIOError:
                 break
-            self.create_handler(self.fileno, handler, cs, caddr)
+            self.create_handler(self.fileno, handler, cs, caddr, is_ipv6=self.__is_ipv6)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
@@ -57,14 +62,21 @@ class handler(tcp_handler.tcp_handler):
     __time = None
     # 客户端传送过来的窗口大小
     __win_size = None
+    __qos = None
 
-    def init_func(self, creator_fd, cs, caddr):
+    def init_func(self, creator_fd, cs, caddr, is_ipv6=False):
         self.__handshake_ok = False
         self.__caddr = caddr
         self.__packet_id_map = {}
 
         self.__parser = socks2https.parser()
         self.__builder = socks2https.builder()
+        self.__qos = socks2https.qos()
+
+        if is_ipv6:
+            self.__win_size = 1140
+        else:
+            self.__win_size = 1280
 
         self.__time = time.time()
 
@@ -177,28 +189,60 @@ class handler(tcp_handler.tcp_handler):
         return None
 
     def handle_tcp_data(self, info):
-        _id, tcp_data = info
+        _id, win_size, tcp_data = info
         if _id not in self.__packet_id_map: return
 
         fd = self.__packet_id_map[_id]
-        self.send_message_to_handler(self.fileno, fd, tcp_data)
 
-    def handle_udp_udplite_data(self, info, is_udplite=False):
-        _id, win_size, address, port, byte_data = info
-        # 如果不存在那么创建一个handler
-        if _id not in self.__packet_id_map:
-            fd = self.create_handler(self.fileno, handler_for_udp, (address, port), _id, is_udplite=is_udplite,
-                                     is_ipv6=False)
-            self.__packet_id_map[_id] = fd
+        if self.handler_exists(fd):
+            self.__win_size = win_size
+            self.send_message_to_handler(self.fileno, fd, tcp_data)
+
+    def handle_udp_udplite_data(self, info):
+        _id, address, port, addr_type, byte_data = info
+        if _id not in self.__packet_id_map: return
         fd = self.__packet_id_map[_id]
-        self.dispatcher.get_handler(fd).msg_send((address, port,), byte_data)
+        if self.handler_exists(fd):
+            self.dispatcher.get_handler(fd).msg_send((address, port,), byte_data)
+
+    def handle_udp_udplite_conn(self, info, is_udplite=False):
+        _id, address, port, addr_type, byte_data = info
+        # ID存在直接返回一个建立失败
+        if _id in self.__packet_id_map:
+            self.send_conn_state(_id, 1)
+            return
+
+        is_ipv6 = False
+        if addr_type in (socks2https.ADDR_TYPE_FORCE_DOMAIN_IPv6, socks2https.ADDR_TYPE_IPv6,): is_ipv6 = True
+
+        fd = self.create_handler(self.fileno, handler_for_udp, (address, port), _id, is_udplite=is_udplite,
+                                 is_ipv6=is_ipv6)
+        if fd < 0:
+            self.send_conn_state(_id, 1)
+            return
+        self.__packet_id_map[_id] = fd
 
     def handle_tcp_conn_request(self, info):
-        _id, win_size, address, port, byte_data = info
+        _id, address, port, addr_type, byte_data = info
         # 如果包ID存在那么发送错误
-        if _id in self.__packet_id_map: return
-        fd = self.create_handler(self.fileno, handler_for_tcp, (address, port), _id, is_ipv6=False)
+        if _id in self.__packet_id_map:
+            self.send_conn_state(_id, 1)
+            return
+
+        is_ipv6 = False
+        if addr_type in (socks2https.ADDR_TYPE_FORCE_DOMAIN_IPv6, socks2https.ADDR_TYPE_IPv6,): is_ipv6 = True
+
+        fd = self.create_handler(self.fileno, handler_for_tcp, (address, port), _id, is_ipv6=is_ipv6)
+
+        if fd < 0:
+            self.send_conn_state(_id, 1)
+            return
+
         self.__packet_id_map[_id] = fd
+
+    def send_conn_state(self, _id, err_code):
+        data = self.__builder.build_conn_state(_id, err_code)
+        self.send_data(data)
 
     def handle_tcp_conn_state(self, info):
         _id, err_code = info
@@ -218,6 +262,7 @@ class handler(tcp_handler.tcp_handler):
         self.__time = time.time()
 
         while 1:
+            self.__parser.parse()
             rs = self.__parser.get_result()
             if not rs: break
             frame_type, info = rs
@@ -228,20 +273,24 @@ class handler(tcp_handler.tcp_handler):
             if frame_type == socks2https.FRAME_TYPE_PONG:
                 self.handle_pong()
                 continue
+            if frame_type == socks2https.FRAME_TYPE_TCP_CONN:
+                self.handle_tcp_conn_request(info)
+                continue
+            if frame_type == socks2https.FRAME_TYPE_UDP_CONN:
+                continue
+            if frame_type == socks2https.FRAME_TYPE_UDPLite_CONN:
+                continue
+            if frame_type == socks2https.FRAME_TYPE_CONN_STATE:
+                self.handle_tcp_conn_state(info)
+                continue
             if frame_type == socks2https.FRAME_TYPE_TCP_DATA:
                 self.handle_tcp_data(info)
                 continue
             if frame_type == socks2https.FRAME_TYPE_UDP_DATA:
-                self.handle_udp_udplite_data(info, is_udplite=False)
+                self.handle_udp_udplite_data(info)
                 continue
             if frame_type == socks2https.FRAME_TYPE_UDPLITE_DATA:
-                self.handle_udp_udplite_data(info, is_udplite=True)
-                continue
-            if frame_type == socks2https.FRAME_TYPE_TCP_CONN:
-                self.handle_tcp_conn_request(info)
-                continue
-            if frame_type == socks2https.FRAME_TYPE_TCP_CONN_STATE:
-                self.handle_tcp_conn_state(info)
+                self.handle_udp_udplite_data(info)
                 continue
             ''''''
         return
@@ -276,7 +325,11 @@ class handler(tcp_handler.tcp_handler):
         self.handle_request_data()
 
     def tcp_writable(self):
-        if self.writer.is_empty(): self.remove_evt_write(self.fileno)
+        while 1:
+            pkts = self.__qos.get_data()
+            if not pkts: break
+            for pkt in pkts: self.writer.write(pkt)
+        if self.writer.is_empty() and not self.__qos.have_data(): self.remove_evt_write(self.fileno)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
@@ -330,15 +383,36 @@ class handler(tcp_handler.tcp_handler):
 
         return rs
 
-    def tell_tcp_close(self, packet_id):
-        msg = self.__builder.build_tcp_conn_state(packet_id, 1)
-        self.send_data(msg)
+    def tell_close(self, packet_id):
+        fd = self.__packet_id_map[packet_id]
+        self.send_conn_state(packet_id, 1)
+        self.delete_handler(fd)
 
-    def tell_udp_udplite_close(self, packet_id):
-        pass
+        del self.__packet_id_map[packet_id]
 
-    def message_from_handler(self, from_fd, byte_data):
-        pass
+    def send_tcp_data(self, packet_id, data):
+        if packet_id not in self.__packet_id_map: return
+        if not data: return
+        b = 0
+        e = self.__win_size
+        while 1:
+            frag_data = data[b:e]
+            size = len(frag_data)
+            wrap_data = self.__builder.build_tcp_frame_data(packet_id, frag_data, win_size=1280)
+            self.__qos.input(wrap_data)
+            if size <= self.__win_size: break
+            b = e
+            e += self.__win_size
+
+        self.add_evt_write(self.fileno)
+
+    def send_udp_udplite_data(self, packet_id, ip_addr, port, addr_type, byte_data):
+        if addr_type not in socks2https.addr_types: return
+        if packet_id not in self.__packet_id_map: return
+
+        # UDP和UDPLite数据包立刻发送
+        data = self.__builder.build_conn_frame(packet_id, addr_type, ip_addr, port, byte_data=byte_data)
+        self.send_data(data)
 
 
 class handler_for_tcp(tcp_handler.tcp_handler):
@@ -350,6 +424,7 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         self.__creator = creator_fd
         self.__packet_id = packet_id
         self.__time = time.time()
+        self.__win_size = 1200
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -367,63 +442,109 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         self.add_evt_read(self.fileno)
 
     def tcp_readable(self):
-        pass
+        if not self.handler_exists(self.__creator): return
+        rdata = self.reader.read()
+        self.dispatcher.get_handler(self.__creator).send_tcp_data(self.__packet_id, rdata)
 
     def tcp_writable(self):
-        pass
+        if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def tcp_error(self):
-        pass
+        self.dispatcher.get_handler(self.__creator).tell_close(self.__packet_id)
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
-            self.dispatcher.get_handler(self.__creator).tell_tcp_close(self.__packet_id)
+            self.dispatcher.get_handler(self.__creator).tell_close(self.__packet_id)
             return
         t = time.time()
         if t - self.__time > self.dispatcher.conn_timeout:
-            self.delete_handler(self.fileno)
+            self.dispatcher.get_handler(self.__creator).tell_close(self.__packet_id)
             return
+        self.set_timeout(self.fileno, 10)
 
     def tcp_delete(self):
-        pass
+        self.unregister(self.fileno)
+        self.close()
 
     def message_from_handler(self, from_fd, byte_data):
-        pass
+        if not self.is_conn_ok(): return
+
+        self.writer.write(byte_data)
+        self.add_evt_write(self.fileno)
+        self.__time = time.time()
 
 
 class handler_for_udp(udp_handler.udp_handler):
     __creator = None
     __packet_id = None
     __time = None
+    __access = None
+    __timer = None
+    __addr_type = None
 
     def init_func(self, creator_fd, address, packet_id, is_udplite=False, is_ipv6=False):
         self.__creator = creator_fd
         self.__packet_id = packet_id
         self.__time = time.time()
+        self.__access = {}
+        self.__timer = timer.timer()
+
+        if not self.dispatcher.enable_ipv6 and is_ipv6: return -1
 
         if is_ipv6:
             fa = socket.AF_INET6
+            listen_ip = self.dispatcher.listen_ipv6
+            self.__addr_type = socks2https.ADDR_TYPE_IPv6
         else:
+            self.__addr_type = socks2https.ADDR_TYPE_IP
             fa = socket.AF_INET
+            listen_ip = self.dispatcher.listen_ip
         s = socket.socket(fa, socket.SOCK_DGRAM)
         self.set_socket(s)
+        self.bind((listen_ip, 0))
+
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
 
         return self.fileno
 
     def udp_readable(self, message, address):
-        pass
+        # 检查UDP数据包是否合法
+        if address[0] not in self.__access: return
+        if not self.handler_exists(self.__creator): return
+
+        self.dispatcher.send_udp_udplite_data(self.__packet_id, address[0], address[1], self.__addr_type, message)
 
     def udp_writable(self):
-        pass
+        self.remove_evt_write(self.fileno)
 
     def udp_delete(self):
-        pass
+        self.unregister(self.fileno)
+        self.close()
 
     def udp_error(self):
-        pass
+        self.dispatcher.tell_close(self.__packet_id)
 
     def udp_timeout(self):
-        pass
+        t = time.time()
+        if t - self.__time > self.dispatcher.conn_timeout:
+            self.dispatcher.tell_close(self.__packet_id)
+            return
+
+        names = self.__timer.get_timeout_names()
+        for name in names:
+            if name in self.__access:
+                self.__timer.drop(name)
+                del self.__access[name]
+            ''''''
+
+        self.set_timeout(self.fileno, 10)
 
     def msg_send(self, address, byte_data):
-        pass
+        self.__time = time.time()
+
+        if address[0] not in self.__access:
+            self.__access[address[0]] = None
+            self.__timer.set_timeout(address[0], 60)
+        self.sendto(byte_data, address)
+        self.add_evt_write(self.fileno)

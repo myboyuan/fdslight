@@ -3,33 +3,44 @@
 头部数据帧格式如下
 version:1 byte 目前为1
 type:1 byte 数据帧类型
-    0表示ping请求帧
-    1表示pong请求帧
-    2表示请求建立TCP连接
-    4表示建立UDP连接
-    5表示建立UDPlite连接
-    6表示连接状态告知
+    0 表示ping请求帧
+    1 表示pong请求帧
+    2 表示请求建立TCP连接
+    4 表示建立UDP连接
+    5 表示建立UDPlite连接
+    6 表示连接状态告知
+    7 TCP数据传输
+    9 UDP数据传输
+    10 UDPLite数据传输
 
 content_length:2 bytes 数据长度
 内容帧如下.
 0,1的数据帧只有头部,帧体数据可以是无或者任意数据
 
-2和5和6:请求建立连接数据帧
+2和4和5:请求建立连接数据帧
 packet_id:4 bytes 数据包ID,由客户端生成
 port:2 bytes 端口
 addr_type:1 byte 地址类型,0表示ipv4地址,1表示ipv6地址,2表示域名,3表示域名并且以IPv6方式访问
 addr_length:1 byte 地址长度
-window_size:2 bytes 窗口大小,该值对UDP和UDPLite不可用
 address:var bytes
-udp_data:udp或者udplite数据,如果请求协议是udp或者udplite
 
-3:连接状态响应
+6:连接状态响应
 packet_id:4 bytes
-err_code:4 bytes,0表示连接建立成功,1表示连接关闭
+err_code:4 bytes,0表示连接建立成功,1表示连接失败
 
-5:TCP数据帧
+7:TCP数据帧
 packet_id:4 bytes
+window_size:2 bytes  发送端窗口大小
+reverse:2 bytes 保留字节
 data...
+
+9和10的数据帧如下
+packet_id:4 bytes
+port:2 bytes
+addr_type:1 byte 0表示ipv4地址,1表示ipv6地址,2表示域名,3表示域名并且以IPv6方式访问
+addr_length:1 byte
+address:var bytes
+udp_data
 
 
 

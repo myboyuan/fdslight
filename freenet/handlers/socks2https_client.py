@@ -6,7 +6,7 @@ import pywind.web.lib.httputils as httputils
 import pywind.web.lib.websocket as wslib
 import pywind.lib.timer as timer
 
-import socket, time, ssl, random, os, struct
+import socket, time, random, os, struct
 
 import freenet.lib.logging as logging
 import freenet.lib.socks2https as socks2https
@@ -92,6 +92,8 @@ class http_socks5_handler(tcp_handler.tcp_handler):
     __caddr = None
     # 是否已经确认了协议
     __is_sure_protocol = None
+    # 流量是否发送到转换客户端
+    __is_sent_to_convert_client = None
 
     __raw_client_fd = None
 
@@ -104,6 +106,7 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         self.__socks5_handshake_ok = False
         self.__socks5_proxy_is_conn_established = False
         self.__is_socks5_udp_udplite = False
+        self.__is_sent_to_convert_client = True
 
         self.set_socket(cs)
         self.register(self.fileno)
@@ -119,7 +122,12 @@ class http_socks5_handler(tcp_handler.tcp_handler):
                 return
             ''''''
         if not self.__is_parsed_http_header: return
-        self.send_message_to_handler(self.fileno, self.__raw_client_fd, self.reader.read())
+
+        if not self.__is_sent_to_convert_client:
+            self.send_message_to_handler(self.fileno, self.__raw_client_fd,
+                                         self.reader.read())
+        else:
+            self.dispatcher.send_tcp_data(1, self.reader.read())
 
     def http_request_check(self):
         # 检查uri是否合法
@@ -257,7 +265,17 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         else:
             is_ipv6 = False
         self.__http_uri = uri
-        self.__raw_client_fd = self.create_handler(self.fileno, raw_tcp_client, (host, port), is_ipv6=is_ipv6)
+
+        if not self.__is_sent_to_convert_client:
+            self.__raw_client_fd = self.create_handler(self.fileno, raw_tcp_client, (host, port), is_ipv6=is_ipv6)
+            return True
+
+        if is_ipv6:
+            _t = socks2https.ADDR_TYPE_IPv6
+        else:
+            _t = socks2https.ADDR_TYPE_IP
+
+        self.dispatcher.send_conn_frame(socks2https.FRAME_TYPE_TCP_CONN, 1, host, port, _t)
 
         return True
 
@@ -275,7 +293,6 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         if self.__is_http_tunnel_mode:
             self.send_http_response("200 Connection Established")
             return
-
         # 重新构建http请求头部
         s = httputils.build_http1x_req_header(self.__http_request_info[0], self.__http_uri,
                                               self.__http_request_kv_pairs)
@@ -457,11 +474,6 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         self.writer.write(byte_data)
 
 
-class socks5_udp_handler(udp_handler.udp_handler):
-    def handle_data(self, byte_data):
-        pass
-
-
 class convert_client(tcp_handler.tcp_handler):
     """把任意数据包转换成私有协议
     """
@@ -476,6 +488,8 @@ class convert_client(tcp_handler.tcp_handler):
     __http_handshake_key = None
     __parser = None
     __builder = None
+    __win_size = None
+    __qos = None
 
     __time = None
 
@@ -497,6 +511,12 @@ class convert_client(tcp_handler.tcp_handler):
         self.__parser = socks2https.parser()
         self.__builder = socks2https.builder()
         self.__time = time.time()
+        self.__qos = socks2https.qos()
+
+        if is_ipv6:
+            self.__win_size = 1140
+        else:
+            self.__win_size = 1280
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -640,13 +660,11 @@ class convert_client(tcp_handler.tcp_handler):
         if fd < 0: return
         self.dispatcher.get_handler(err_code).handle_conn_state(err_code)
 
-    def handle_recv(self, info):
-        packet_id, byte_data = info
-        fd = self.dispatcher.get_conn_info(packet_id)
+    def handle_tcp_data(self, info):
+        pass
 
-        if fd < 0: return
-
-        self.dispatcher.get_handler(fd).handle_data(byte_data)
+    def handle_udp_udplite_data(self, info, is_udplite=False):
+        pass
 
     def tcp_readable(self):
         if not self.__http_handshake_ok:
@@ -662,6 +680,7 @@ class convert_client(tcp_handler.tcp_handler):
             return
 
         while 1:
+            self.__parser.parse()
             rs = self.__parser.get_result()
             if not rs: break
             frame_type, info = rs
@@ -672,17 +691,17 @@ class convert_client(tcp_handler.tcp_handler):
             if frame_type == socks2https.FRAME_TYPE_PONG:
                 self.handle_pong()
                 continue
-            if frame_type == socks2https.FRAME_TYPE_TCP_CONN_STATE:
+            if frame_type == socks2https.FRAME_TYPE_CONN_STATE:
                 self.handle_conn_state(info)
                 continue
             if frame_type == socks2https.FRAME_TYPE_TCP_DATA:
-                self.handle_recv(info)
+                self.handle_tcp_data(info)
                 continue
             if frame_type == socks2https.FRAME_TYPE_UDP_DATA:
-                self.handle_recv(info)
+                self.handle_udp_udplite_data(info, is_udplite=False)
                 continue
             if frame_type == socks2https.FRAME_TYPE_UDPLITE_DATA:
-                self.handle_recv(info)
+                self.handle_udp_udplite_data(info, is_udplite=True)
                 continue
             ''''''
         return
@@ -715,13 +734,16 @@ class convert_client(tcp_handler.tcp_handler):
         self.writer.write(byte_data)
 
     def send_conn_request(self, frame_type, packet_id, host, port, addr_type, data=b""):
-        data = self.__builder.build_conn_frame(frame_type, packet_id, addr_type, host, port, win_size=1200,
+        data = self.__builder.build_conn_frame(frame_type, packet_id, addr_type, host, port,
                                                byte_data=data)
         self.send_data(data)
 
     def send_tcp_data(self, packet_id, byte_data):
         data = self.__builder.build_tcp_frame_data(packet_id, byte_data)
         self.send_data(data)
+
+    def tell_conn_ok(self):
+        pass
 
 
 class raw_tcp_client(tcp_handler.tcp_handler):
@@ -904,7 +926,7 @@ class raw_udp_client(udp_handler.udp_handler):
             self.dispatcher.get_handler(self.__creator).tell_close()
             return
 
-        self.__timer.set_timeout(host, 30)
+        self.__timer.set_timeout(host, 60)
         self.__time = time.time()
         if host not in self.__access_list:
             self.__access_list[host] = None
@@ -936,3 +958,6 @@ class raw_udp_client(udp_handler.udp_handler):
     def udp_delete(self):
         self.unregister(self.fileno)
         self.close()
+
+    def tell_conn_ok(self):
+        pass

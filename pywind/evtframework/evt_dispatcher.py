@@ -28,6 +28,9 @@ class dispatcher(object):
         """
         instance = handler()
         fd = instance.init_func(creator_fd, *args, **kwargs)
+        # 避免多个相同-1实例存在
+        if fd < 0: return fd
+
         self.__handlers[fd] = instance
 
         return fd
@@ -39,6 +42,8 @@ class dispatcher(object):
         h.release_when_replace()
 
         fd = self.create_handler(creator_fd, handler, *args, **kwargs)
+
+        if fd < 0: return -1
 
         new_h = self.__handlers[fd]
         new_h.reader._putvalue(h.reader.read())

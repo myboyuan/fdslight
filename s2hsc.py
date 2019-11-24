@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, os, getopt, signal
+import sys, os, getopt, signal, random
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -13,7 +13,6 @@ import pywind.lib.configfile as cfg
 
 import freenet.lib.proc as proc
 import freenet.handlers.socks2https_client as socks2https
-import freenet.lib.logging as logging
 
 PID_PATH = "/tmp/s2hsc.pid"
 
@@ -46,7 +45,11 @@ class serverd(dispatcher.dispatcher):
     __socks5_bind_ip = None
     __socks5_bind_ipv6 = None
 
+    __packet_id_map = None
+
     def init_func(self, mode, debug=True):
+        self.__packet_id_map = {}
+
         if mode == "proxy":
             self.__cfg_path = "%s/fdslight_etc/s2hsc.ini" % BASE_DIR
         else:
@@ -151,25 +154,54 @@ class serverd(dispatcher.dispatcher):
         self.__convert_fd = self.create_handler(-1, socks2https.convert_client, (host, port), path, user, passwd,
                                                 is_ipv6=enable_ipv6)
 
-    def register_new_conn(self):
-        pass
+    def register_new_conn(self, packet_id, fd):
+        if packet_id in self.__packet_id_map:
+            raise SystemError("register new connection failed,it is exists")
 
-    def get_conn_info(self, packet_id):
-        pass
+        self.__packet_id_map[packet_id] = fd
 
-    def send_conn_request(self, frame_type, packet_id, host, port, addr_type, data=b""):
+    def alloc_packet_id(self):
+        n = 1
+        while 1:
+            n = random.randint(1, 0xffffffff - 1)
+            if n in self.__packet_id_map: continue
+            break
+        return n
+
+    def free_packet_id(self, packet_id):
+        if packet_id in self.__packet_id_map:
+            del self.__packet_id_map[packet_id]
+
+    def send_conn_frame(self, frame_type, packet_id, host, port, addr_type, data=b""):
         if self.__convert_fd < 0:
             self.create_convert_client()
         if self.__convert_fd < 0: return
+        if packet_id not in self.__packet_id_map: return
 
         self.get_handler(self.__convert_fd).send_conn_request(
-            frame_type, packet_id, host, port, addr_type, data=data
+            frame_type, self.alloc_packet_id(), host, port, addr_type, data=data
         )
 
     def send_tcp_data(self, packet_id, byte_data):
-        ### 连接已经断开,那么丢弃tcp数据包
+        # 连接已经断开,那么丢弃tcp数据包
         if self.__convert_fd < 0: return
+        # 数据包ID不存在,那么就丢弃数据包
+        if packet_id not in self.__packet_id_map: return
         self.get_handler(self.__convert_fd).send_tcp_data(packet_id, byte_data)
+
+    def handle_conn_state(self, packet_id, err_code):
+        """处理连接状态
+        :param packet_id:
+        :param err_code:
+        :return:
+        """
+        if packet_id not in self.__packet_id_map: return
+        fd = self.__packet_id_map[packet_id]
+
+        if err_code:
+            self.delete_handler(fd)
+        else:
+            self.get_handler(fd).tell_conn_ok()
 
     @property
     def client_conn_timeout(self):

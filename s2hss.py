@@ -29,6 +29,10 @@ class serverd(dispatcher.dispatcher):
     __conn_timeout = None
     __heartbeat_timeout = None
 
+    __listen_ip = None
+    __listen_ipv6 = None
+    __enable_ipv6 = None
+
     def init_func(self, debug=True):
         self.__cfg_path = "%s/fdslight_etc/s2hss.ini" % BASE_DIR
         self.__auth_path = "%s/fdslight_etc/access.json" % BASE_DIR
@@ -63,11 +67,19 @@ class serverd(dispatcher.dispatcher):
         enable_ipv6 = bool(int(listen.get("enable_ipv6", 0)))
         listen_ip = listen.get("listen_ip", "0.0.0.0")
         listen_ipv6 = listen.get("listen_ip", "::")
+        port = int(listen.get("port", 8900))
         conn_timeout = int(listen.get("conn_timeout", 60))
         heartbeat_timeout = int(listen.get("heartbeat_timeout", 20))
 
         self.__conn_timeout = conn_timeout
         self.__heartbeat_timeout = heartbeat_timeout
+        self.__listen_ip = listen_ip
+        self.__listen_ipv6 = listen_ipv6
+        self.__enable_ipv6 = enable_ipv6
+
+        self.__listen_fd = self.create_handler(-1, socks2https_server.listener, (listen_ip, port))
+        if enable_ipv6:
+            self.__listen_fd6 = self.create_handler(-1, socks2https_server.listener, (listen_ipv6, port), is_ipv6=True)
 
     def get_users(self):
         """获取所有用户的信息
@@ -87,6 +99,18 @@ class serverd(dispatcher.dispatcher):
     @property
     def heartbeat_timeout(self):
         return self.__heartbeat_timeout
+
+    @property
+    def listen_ipv6(self):
+        return self.__listen_ipv6
+
+    @property
+    def listen_ip(self):
+        return self.__listen_ip
+
+    @property
+    def enable_ipv6(self):
+        return self.__enable_ipv6
 
 
 def main():
