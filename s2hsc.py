@@ -41,7 +41,7 @@ class serverd(dispatcher.dispatcher):
     __relay_listen_fd = None
     __relay_listen_fd6 = None
 
-    __relay_fds = None
+    __relay_info = None
 
     __convert_fd = None
 
@@ -94,7 +94,8 @@ class serverd(dispatcher.dispatcher):
         self.__configs = cfg.ini_parse_from_file(self.__cfg_path)
 
         if mode == "relay":
-            self.__relay_fds = {}
+            self.__relay_info = {}
+            if not debug: signal.signal(signal.SIGUSR1, self.__update_relay)
             self.create_relay_service()
 
         if mode == "proxy":
@@ -120,6 +121,9 @@ class serverd(dispatcher.dispatcher):
         self.release()
         os.remove(PID_PATH)
         sys.exit(0)
+
+    def __update_relay(self, signum, frame):
+        pass
 
     def __update_rules(self, signum, frame):
         """更新白名单规则
@@ -192,10 +196,6 @@ class serverd(dispatcher.dispatcher):
         """
         o = py_obj[name]
 
-        protocol = o.get("protocol", "all")
-
-        if protocol not in ("tcp", "udp", "all"): return None
-
         listen_ip = o.get("listen_ip")
 
         if not utils.is_ipv6_address(listen_ip) and not utils.is_ipv4_address(listen_ip): return None
@@ -216,13 +216,6 @@ class serverd(dispatcher.dispatcher):
             return None
 
         if conn_timeout < 1: return None
-        remote_host = o.get("remote_host", "")
-        try:
-            remote_port = int(o.get("remote_port", 0))
-        except ValueError:
-            return None
-
-        if remote_port < 1 or remote_port > 65535: return None
 
         redir_host = o.get("redirect_host", "")
         try:
@@ -233,13 +226,10 @@ class serverd(dispatcher.dispatcher):
         if redir_port < 1 or redir_port > 65535: return None
 
         return {
-            "protocol": protocol,
             "is_ipv6": is_ipv6,
             "listen_ip": listen_ip,
             "port": port,
             "conn_timeout": conn_timeout,
-            "remote_host": remote_host,
-            "remote_port": remote_port,
             "redirect_host": redir_host,
             "redirect_port": redir_port
         }
@@ -254,18 +244,22 @@ class serverd(dispatcher.dispatcher):
             if not o:
                 sys.stderr.write("wrong config name about %s" % name)
                 continue
-            protocol = o["protocol"]
             listen_ip = o["listen_ip"]
             port = o["port"]
             is_ipv6 = o["is_ipv6"]
+            timeout = o["conn_timeout"]
+            redir_host = o["redirect_host"]
+            redir_port = o["redirect_port"]
+            fd = self.create_handler(-1, sock2https_relay.listener, (listen_ip, port), name, conn_timeout=timeout,
+                                     is_ipv6=is_ipv6)
+            self.__relay_info[name] = [fd, (redir_host, redir_port,)]
 
-            if protocol == "all" or protocol == "tcp":
-                fd = self.create_handler(-1, sock2https_relay.listener, (listen_ip, port), name, is_ipv6=is_ipv6)
-                self.__relay_fds[name] = fd
-            if protocol == "all" or protocol == "udp":
-                fd = self.create_handler(-1, sock2https_relay.udp_listener, (listen_ip, port, name))
-                self.__relay_fds[name] = fd
-            ''''''
+    def del_relay_service(self, name):
+        if name not in self.__relay_info: return
+        del self.__relay_info[name]
+
+    def get_relay_service(self, name):
+        return self.__relay_info.get(name, None)
 
     def create_convert_client(self):
         configs = cfg.ini_parse_from_file(self.__cfg_path)
@@ -294,7 +288,7 @@ class serverd(dispatcher.dispatcher):
         user = serv_cfg.get("user", "")
         passwd = serv_cfg.get("passwd", "")
 
-        self.__convert_fd = self.create_handler(-1, socks2https.convert_client, (host, port), path, user, passwd,
+        self.__convert_fd = self.create_handler(-1, socks2https_client.convert_client, (host, port), path, user, passwd,
                                                 is_ipv6=enable_ipv6)
 
     def alloc_packet_id(self, fd):
