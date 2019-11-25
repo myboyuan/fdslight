@@ -57,16 +57,6 @@ class http_socks5_listener(listener):
         ''''''
 
 
-class raw_tcp_listener(listener):
-    def tcp_accept(self):
-        while 1:
-            try:
-                cs, caddr = self.accept()
-            except BlockingIOError:
-                break
-            self.create_handler(self.fileno, raw_tcp_handler, cs, caddr)
-
-
 class http_socks5_handler(tcp_handler.tcp_handler):
     ### 是否是socks5请求
     __is_socks5 = None

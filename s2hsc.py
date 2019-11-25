@@ -50,6 +50,9 @@ class serverd(dispatcher.dispatcher):
     __socks5_bind_ip = None
     __socks5_bind_ipv6 = None
 
+    __dnsserver_fd = None
+    __dnsserver_fd6 = None
+
     __packet_id_map = None
     __debug = None
 
@@ -57,7 +60,7 @@ class serverd(dispatcher.dispatcher):
     __ip_match = None
     __udp_src_match = None
 
-    def init_func(self, mode, debug=True):
+    def init_func(self, mode, with_dnsserver=False, debug=True):
         self.__packet_id_map = {}
 
         if mode == "proxy":
@@ -176,11 +179,73 @@ class serverd(dispatcher.dispatcher):
                 -1, socks2https.http_socks5_listener, (listen_ipv6, port), is_ipv6=True
             )
 
+    def parse_relay_config(self, name, py_obj):
+        """解析中继配置
+        :param name:
+        :param py_obj:
+        :return:
+        """
+        o = py_obj[name]
+
+        protocol = o.get("protocol", "all")
+
+        if protocol not in ("tcp", "udp", "all"): return None
+
+        try:
+            enable_ipv6 = bool(int(o.get("enable_ipv6", 0)))
+        except ValueError:
+            return None
+
+        listen_ip = o.get("listen_ip")
+        listen_ipv6 = o.get("listen_ipv6")
+        try:
+            port = int(o.get("port", 8800))
+        except ValueError:
+            return None
+        if port < 1 or port > 65535:
+            return None
+        try:
+            conn_timeout = o.get("conn_timeout", 120)
+        except ValueError:
+            return None
+
+        if conn_timeout < 1: return None
+        remote_host = o.get("remote_host", "")
+        try:
+            remote_port = int(o.get("remote_port", 0))
+        except ValueError:
+            return None
+
+        if remote_port < 1 or remote_port > 65535: return None
+
+        redir_host = o.get("redirect_host", "")
+        try:
+            redir_port = int(o.get("redirect_port", 0))
+        except ValueError:
+            return None
+
+        if redir_port < 1 or redir_port > 65535: return None
+
+        return {
+            "protocol": protocol,
+            "enable_ipv6": enable_ipv6,
+            "listen_ip": listen_ip,
+            "listen_ipv6": listen_ipv6,
+            "port": port,
+            "conn_timeout": conn_timeout,
+            "remote_host": remote_host,
+            "remote_port": remote_port,
+            "redirect_host": redir_host,
+            "redirect_port": redir_port
+        }
+
     def create_dns_service(self):
         pass
 
     def create_relay_service(self):
-        config = cfg.ini_parse_from_file(self.__cfg_path)
+        configs = cfg.ini_parse_from_file(self.__cfg_path)
+        for name in configs:
+            o = self.parse_relay_config(name, configs)
 
     def create_convert_client(self):
         configs = cfg.ini_parse_from_file(self.__cfg_path)
@@ -308,6 +373,7 @@ def main():
     -d      debug | start | stop    debug,start or stop application
     -m      relay | proxy           relay mode,proxy mode or all mode
     -u                              update rule files
+    --with-dnsserver                run nameserver service for client
     """
     try:
         opts, args = getopt.getopt(sys.argv[1:], "m:d:u")

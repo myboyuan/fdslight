@@ -14,9 +14,12 @@ except ImportError:
 class dns_proxy(udp_handler.udp_handler):
     __query_timer = None
     __dns_map = None
+    __dnsserver = None
 
-    def init_func(self, creator_fd, address, is_ipv6=False):
+    def init_func(self, creator_fd, address, dnsserver, is_ipv6=False):
         self.__query_timer = timer.timer()
+        self.__dnsserver = dnsserver
+
         if is_ipv6:
             fa = socket.AF_INET6
         else:
@@ -31,6 +34,15 @@ class dns_proxy(udp_handler.udp_handler):
 
         return self.fileno
 
+    def send_query_request(self, dns_msg):
+        """发送查询请求
+        :return:
+        """
+        pass
+
+    def handle_from_dnsserver(self, dns_msg):
+        pass
+
     def udp_readable(self, message, address):
         pass
 
@@ -44,4 +56,5 @@ class dns_proxy(udp_handler.udp_handler):
         pass
 
     def udp_delete(self):
-        pass
+        self.unregister(self.fileno)
+        self.close()
