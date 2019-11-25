@@ -44,7 +44,10 @@ class dns_proxy(udp_handler.udp_handler):
         pass
 
     def udp_readable(self, message, address):
-        pass
+        if address[0] == self.__dnsserver:
+            self.handle_from_dnsserver(message)
+            return
+
 
     def udp_writable(self):
         pass

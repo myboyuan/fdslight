@@ -8,7 +8,6 @@ import socket, time
 import freenet.lib.socks2https as socks2https
 import freenet.lib.utils as utils
 
-
 class listener(tcp_handler.tcp_handler):
     __cfg_name = None
     __is_ipv6 = None
