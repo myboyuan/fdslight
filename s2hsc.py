@@ -67,6 +67,7 @@ class serverd(dispatcher.dispatcher):
 
     def init_func(self, mode, with_dnsserver=False, debug=True):
         self.__packet_id_map = {}
+        self.__relay_info = {}
 
         if mode == "proxy":
             self.__cfg_path = "%s/fdslight_etc/s2hsc.ini" % BASE_DIR
@@ -81,6 +82,9 @@ class serverd(dispatcher.dispatcher):
         self.__socks5http_listen_fd = -1
         self.__socks5http_listen_fd6 = -1
 
+        self.__dnsserver_fd = -1
+        self.__dnsserver_fd6 = -1
+
         self.__convert_fd = -1
 
         self.__debug = debug
@@ -92,7 +96,6 @@ class serverd(dispatcher.dispatcher):
         self.__configs = cfg.ini_parse_from_file(self.__cfg_path)
 
         if mode == "relay":
-            self.__relay_info = {}
             if not debug: signal.signal(signal.SIGUSR1, self.__update_relay)
             self.create_relay_service()
 
@@ -250,7 +253,7 @@ class serverd(dispatcher.dispatcher):
         try:
             enable_ipv6 = bool(int(c.get("enable_ipv6", 0)))
         except ValueError:
-            sys.stderr.write("wrong dns config")
+            sys.stderr.write("wrong dns config A")
             sys.stderr.flush()
             return
 
@@ -265,13 +268,14 @@ class serverd(dispatcher.dispatcher):
 
         if not utils.is_ipv4_address(listen_ip) or not utils.is_ipv4_address(
                 ns_no_proxy_v4) or not utils.is_ipv4_address(ns_with_proxy_v4):
-            sys.stderr.write("wrong dns config")
+            sys.stderr.write("wrong dns config B")
             sys.stderr.flush()
             return
 
-        if not utils.is_ipv6_address(listen_ipv6) or not utils.is_ipv6_address(ns_no_proxy_v6) or utils.is_ipv6_address(
+        if not utils.is_ipv6_address(listen_ipv6) or not utils.is_ipv6_address(
+                ns_no_proxy_v6) or not utils.is_ipv6_address(
                 ns_with_proxy_v6):
-            sys.stderr.write("wrong dns config")
+            sys.stderr.write("wrong dns config C")
             sys.stderr.flush()
             return
 

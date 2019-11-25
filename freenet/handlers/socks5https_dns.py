@@ -37,6 +37,7 @@ class dns_proxy(udp_handler.udp_handler):
             fa = socket.AF_INET
 
         s = socket.socket(fa, socket.SOCK_DGRAM)
+        print(address)
         self.set_socket(s)
         self.bind(address)
         self.register(self.fileno)

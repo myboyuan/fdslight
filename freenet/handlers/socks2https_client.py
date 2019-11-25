@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
+import pywind.evtframework.handlers.ssl_handler as ssl_handler
 import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.web.lib.httputils as httputils
 import pywind.web.lib.websocket as wslib
 import pywind.lib.timer as timer
 
-import socket, time, random, os, struct
+import socket, time, random, os, struct, ssl
 
 import freenet.lib.logging as logging
 import freenet.lib.socks2https as socks2https
@@ -543,10 +544,9 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         self.writer.write(byte_data)
 
 
-class convert_client(tcp_handler.tcp_handler):
+class convert_client(ssl_handler.ssl_handelr):
     """把任意数据包转换成私有协议
     """
-    __creator = None
     __wait_sent = None
     __address = None
     __path = None
@@ -560,18 +560,9 @@ class convert_client(tcp_handler.tcp_handler):
     __win_size = None
     __my_win_size = None
     __qos = None
-
     __time = None
 
-    def init_func(self, creator_fd, address, path, user, passwd, is_ipv6=False, ssl_on=False):
-        """
-        :param creator_fd:
-        :param address:
-        :param is_ipv6:
-        :param ssl_on: 是否开启ssl加密,默认不开启,用于调试
-        :return:
-        """
-        self.__creator = creator_fd
+    def ssl_init(self, address, path, user, passwd, is_ipv6=False, ssl_on=False):
         self.__wait_sent = []
         self.__address = address
         self.__path = path
@@ -599,17 +590,23 @@ class convert_client(tcp_handler.tcp_handler):
         if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+        context.set_alpn_protocols(["http/1.1"])
+        s = context.wrap_socket(s, do_handshake_on_connect=False)
+
         self.set_socket(s)
         self.connect(address)
 
         return self.fileno
+
+    def handshake_ok(self):
+        pass
 
     def connect_ok(self):
         logging.print_general("connect_ok", self.__address)
 
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
-
         self.send_handshake_request()
 
     def rand_string(self, length=8):
