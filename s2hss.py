@@ -123,11 +123,20 @@ def main():
         print(help_doc)
         return
     d = None
+    if sys.platform("win32") > -1:
+        is_windows = True
+    else:
+        is_windows = False
+
     for k, v in opts:
         if k == "-d": d = v
 
     if d not in ("debug", "start", "stop"):
         print(help_doc)
+        return
+
+    if is_windows and d in ("start", "stop",):
+        sys.stderr.write("windows only support -d start argument")
         return
 
     if d == "stop":

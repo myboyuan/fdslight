@@ -446,6 +446,11 @@ def main():
     u = None
     enable_dns = False
 
+    if sys.platform.find("win32") > -1:
+        is_windows = True
+    else:
+        is_windows = False
+
     for k, v in opts:
         if k == "-d": d = v
         if k == "-m": m = v
@@ -466,6 +471,10 @@ def main():
 
     if d not in ("debug", "start", "stop"):
         print(help_doc)
+        return
+
+    if is_windows and d in ("start", "stop",):
+        sys.stderr.write("windows only support -d debug")
         return
 
     if m not in ("relay", "proxy"):
