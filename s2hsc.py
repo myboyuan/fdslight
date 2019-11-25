@@ -327,7 +327,10 @@ class serverd(dispatcher.dispatcher):
         if not byte_data: return
         if packet_id not in self.__packet_id_map: return
         fd = self.__packet_id_map[packet_id]
-        self.get_handler(fd).handle_udp_udplite_data((address, port), byte_data)
+        try:
+            self.get_handler(fd).handle_udp_udplite_data((address, port), byte_data)
+        except AttributeError:
+            pass
 
     def handle_tcp_data(self, packet_id, byte_data):
         if packet_id not in self.__packet_id_map: return
