@@ -6,6 +6,7 @@ import socket, sys, struct
 
 import freenet.lib.utils as utils
 import freenet.lib.logging as logging
+import freenet.lib.socks2https as socks2https
 
 try:
     import dns.message
@@ -22,6 +23,9 @@ class dns_proxy(udp_handler.udp_handler):
     __empty_ids = None
     __cur_max_dns_id = 1
     __packet_id = None
+    __is_ipv6 = None
+    __is_sent_handshake = None
+    __conn_ok = None
 
     def init_func(self, creator_fd, address, dnsserver, proxy_dnsserver, is_ipv6=False):
         self.__query_timer = timer.timer()
@@ -30,6 +34,9 @@ class dns_proxy(udp_handler.udp_handler):
         self.__cur_max_dns_id = 1
         self.__empty_ids = []
         self.__packet_id = -1
+        self.__is_ipv6 = is_ipv6
+        self.__is_sent_handshake = False
+        self.__conn_ok = False
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -37,7 +44,6 @@ class dns_proxy(udp_handler.udp_handler):
             fa = socket.AF_INET
 
         s = socket.socket(fa, socket.SOCK_DGRAM)
-        print(address)
         self.set_socket(s)
         self.bind(address)
         self.register(self.fileno)
@@ -48,7 +54,6 @@ class dns_proxy(udp_handler.udp_handler):
 
     def get_dns_id(self):
         n_dns_id = -1
-
         try:
             n_dns_id = self.__empty_ids.pop(0)
             return n_dns_id
@@ -108,6 +113,7 @@ class dns_proxy(udp_handler.udp_handler):
             return
 
         self.__dns_map[new_dns_id][2] = True
+        self.send_conn_frame(dns_msg)
 
     def handle_from_dnsserver(self, dns_msg):
         if len(dns_msg) < 6: return
@@ -141,7 +147,18 @@ class dns_proxy(udp_handler.udp_handler):
         self.sendto(msg, address)
         self.add_evt_write(self.fileno)
 
+    def send_conn_frame(self, byte_data):
+        if self.__is_ipv6:
+            addr_type = socks2https.ADDR_TYPE_IPv6
+        else:
+            addr_type = socks2https.ADDR_TYPE_IP
+        self.dispatcher.send_conn_frame(
+            socks2https.FRAME_TYPE_UDP_DATA, self.__packet_id, self.__proxy_dnsserver, 53, addr_type, data=byte_data
+        )
+
     def udp_readable(self, message, address):
+        if not self.__is_sent_handshake:
+            self.send_conn_frame(b"")
         if address[0] == self.__dnsserver:
             if address[1] != 53: return
             self.handle_from_dnsserver(message)
@@ -173,3 +190,16 @@ class dns_proxy(udp_handler.udp_handler):
             self.dispatcher.free_packet_id(self.__packet_id)
         self.unregister(self.fileno)
         self.close()
+
+    def handle_udp_udplite_data(self, address, message):
+        if address[0] != self.__proxy_dnsserver: return
+        if address[1] != 53: return
+
+        self.handle_from_dnsserver(message)
+
+    def tell_close(self):
+        self.__conn_ok = False
+        self.__is_sent_handshake = False
+
+    def tell_conn_ok(self):
+        self.__conn_ok = True

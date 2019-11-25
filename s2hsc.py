@@ -23,13 +23,6 @@ import freenet.lib.utils as utils
 PID_PATH = "/tmp/s2hsc.pid"
 
 
-def win_client_autocfg():
-    """windows自动配置,配置windows能够使用代理
-    :return:
-    """
-    pass
-
-
 class serverd(dispatcher.dispatcher):
     __cfg_path = None
     __host_rules_path = None
@@ -274,7 +267,7 @@ class serverd(dispatcher.dispatcher):
 
         if not utils.is_ipv6_address(listen_ipv6) or not utils.is_ipv6_address(
                 ns_no_proxy_v6) or not utils.is_ipv6_address(
-                ns_with_proxy_v6):
+            ns_with_proxy_v6):
             sys.stderr.write("wrong dns config C")
             sys.stderr.flush()
             return

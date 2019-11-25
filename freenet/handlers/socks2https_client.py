@@ -937,6 +937,14 @@ class raw_udp_client(udp_handler.udp_handler):
 
         if self.__upper_proxy:
             self.__packet_id = self.dispatcher.alloc_packet_id()
+            if is_ipv6:
+                addr_type = socks2https.ADDR_TYPE_IPv6
+            else:
+                addr_type = socks2https.ADDR_TYPE_IP
+            self.dispatcher.send_conn_frame(
+                socks2https.FRAME_TYPE_UDP_CONN,
+                self.__packet_id, client_ip, client_port,addr_type
+            )
 
         return self.fileno
 
