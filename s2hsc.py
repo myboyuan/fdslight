@@ -13,7 +13,8 @@ import pywind.lib.configfile as cfg
 
 import freenet.lib.proc as proc
 import freenet.handlers.socks2https_client as socks2https_client
-import freenet.handlers.socks5https_relay as sock2https_relay
+import freenet.handlers.socks5https_relay as socks2https_relay
+import freenet.handlers.socks5https_dns as socks2https_dns
 import freenet.lib.host_match as host_match
 import freenet.lib.ip_match as ip_match
 import freenet.lib.file_parser as file_parser
@@ -60,7 +61,7 @@ class serverd(dispatcher.dispatcher):
     __packet_id_map = None
     __debug = None
 
-    __host_match = None
+    __domain_match = None
     __ip_match = None
     __udp_src_match = None
 
@@ -80,9 +81,6 @@ class serverd(dispatcher.dispatcher):
         self.__socks5http_listen_fd = -1
         self.__socks5http_listen_fd6 = -1
 
-        self.__relay_listen_fd = -1
-        self.__relay_listen_fd6 = -1
-
         self.__convert_fd = -1
 
         self.__debug = debug
@@ -100,11 +98,12 @@ class serverd(dispatcher.dispatcher):
 
         if mode == "proxy":
             if not debug: signal.signal(signal.SIGUSR1, self.__update_rules)
-            self.__host_match = host_match.host_match()
+            self.__domain_match = host_match.host_match()
             self.__ip_match = ip_match.ip_match()
             self.__udp_src_match = ip_match.ip_match()
             # 首先第一次先更新规则
             self.__update_rules(None, None)
+            if with_dnsserver: self.create_dns_service()
             self.create_socks_http_service()
 
     def release(self):
@@ -112,10 +111,14 @@ class serverd(dispatcher.dispatcher):
             self.delete_handler(self.__socks5http_listen_fd)
         if self.__socks5http_listen_fd6 > 0:
             self.delete_handler(self.__socks5http_listen_fd6)
-        if self.__relay_listen_fd > 0:
-            self.delete_handler(self.__relay_listen_fd)
-        if self.__relay_listen_fd6 > 0:
-            self.delete_handler(self.__relay_listen_fd6)
+        if self.__dnsserver_fd > 0:
+            self.delete_handler(self.__dnsserver_fd)
+        if self.__dnsserver_fd6 > 0:
+            self.delete_handler(self.__dnsserver_fd6)
+
+        dels = []
+        for fd, v in self.__relay_info: dels.append(fd)
+        for fd in dels: self.delete_handler(fd)
 
     def __exit(self, signum, frame):
         self.release()
@@ -123,7 +126,10 @@ class serverd(dispatcher.dispatcher):
         sys.exit(0)
 
     def __update_relay(self, signum, frame):
-        pass
+        dels = []
+        for fd, v in self.__relay_info: dels.append(fd)
+        for fd in dels: self.delete_handler(fd)
+        self.create_relay_service()
 
     def __update_rules(self, signum, frame):
         """更新白名单规则
@@ -135,7 +141,7 @@ class serverd(dispatcher.dispatcher):
         ip_rules = file_parser.parse_ip_subnet_file(self.__ip_rules_path)
         udp_src_rules = file_parser.parse_ip_subnet_file(self.__udp_src_proxy_path)
 
-        for rule in host_rules: self.__host_match.add_rule(rule)
+        for rule in host_rules: self.__domain_match.add_rule(rule)
         for subnet, prefix in ip_rules:
             rs = self.__ip_match.add_rule(subnet, prefix)
             if not rs:
@@ -150,14 +156,17 @@ class serverd(dispatcher.dispatcher):
             ''''''
         return
 
-    def match_ip(self, ipaddr, is_ipv6=False):
-        return self.__ip_match.match(ipaddr, is_ipv6=is_ipv6)
+    def match_ip(self, ipaddr, is_ipv6=False, is_ip_host=False):
+        return self.__ip_match.match(ipaddr, is_ipv6=is_ipv6, is_host=is_ip_host)
 
     def match_domain(self, host):
-        return self.__host_match.match(host)
+        return self.__domain_match.match(host)
 
     def match_udp_src_ip(self, ipaddr, is_ipv6=False):
         return self.__udp_src_match.match(ipaddr, is_ipv6=is_ipv6)
+
+    def match_host_rule_add(self, host):
+        self.__ip_match.add_ip_host(host)
 
     def create_socks_http_service(self):
         config = cfg.ini_parse_from_file(self.__cfg_path)
@@ -235,7 +244,42 @@ class serverd(dispatcher.dispatcher):
         }
 
     def create_dns_service(self):
-        pass
+        config = cfg.ini_parse_from_file(self.__cfg_path)
+        c = config.get("dns_listen", {})
+
+        try:
+            enable_ipv6 = bool(int(c.get("enable_ipv6", 0)))
+        except ValueError:
+            sys.stderr.write("wrong dns config")
+            sys.stderr.flush()
+            return
+
+        listen_ip = c.get("listen_ip", "0.0.0.0")
+        listen_ipv6 = c.get("listen_ipv6", "::")
+
+        ns_no_proxy_v4 = c.get("nameserver_no_proxy_v4", "223.5.5.5")
+        ns_with_proxy_v4 = c.get("nameserver_with_proxy_v4", "8.8.8.8")
+
+        ns_no_proxy_v6 = c.get("nameserver_no_proxy_v6", "2001:4860:4860::8888")
+        ns_with_proxy_v6 = c.get("nameserver_with_proxy_v6", "2001:4860:4860::8844")
+
+        if not utils.is_ipv4_address(listen_ip) or not utils.is_ipv4_address(
+                ns_no_proxy_v4) or not utils.is_ipv4_address(ns_with_proxy_v4):
+            sys.stderr.write("wrong dns config")
+            sys.stderr.flush()
+            return
+
+        if not utils.is_ipv6_address(listen_ipv6) or not utils.is_ipv6_address(ns_no_proxy_v6) or utils.is_ipv6_address(
+                ns_with_proxy_v6):
+            sys.stderr.write("wrong dns config")
+            sys.stderr.flush()
+            return
+
+        self.__dnsserver_fd = self.create_handler(-1, socks2https_dns.dns_proxy, (listen_ip, 53,), ns_no_proxy_v4,
+                                                  ns_with_proxy_v4)
+        if enable_ipv6:
+            self.__dnsserver_fd6 = self.create_handler(-1, socks2https_dns.dns_proxy, (listen_ipv6, 53,),
+                                                       ns_no_proxy_v6, ns_with_proxy_v6)
 
     def create_relay_service(self):
         configs = cfg.ini_parse_from_file(self.__cfg_path)
@@ -250,7 +294,7 @@ class serverd(dispatcher.dispatcher):
             timeout = o["conn_timeout"]
             redir_host = o["redirect_host"]
             redir_port = o["redirect_port"]
-            fd = self.create_handler(-1, sock2https_relay.listener, (listen_ip, port), name, conn_timeout=timeout,
+            fd = self.create_handler(-1, socks2https_relay.listener, (listen_ip, port), name, conn_timeout=timeout,
                                      is_ipv6=is_ipv6)
             self.__relay_info[name] = [fd, (redir_host, redir_port,)]
 
@@ -375,6 +419,9 @@ class serverd(dispatcher.dispatcher):
     def debug(self):
         return self.__debug
 
+    def myloop(self):
+        self.__ip_match.auto_delete()
+
 
 def update_rules():
     pid = proc.get_pid(PID_PATH)
@@ -390,7 +437,6 @@ def main():
     -d      debug | start | stop    debug,start or stop application
     -m      relay | proxy           relay mode,proxy mode or all mode
     -u                              update rule files
-    --with-dnsserver                run nameserver service for client
     """
     try:
         opts, args = getopt.getopt(sys.argv[1:], "m:d:u", ["with-dnsserver"])

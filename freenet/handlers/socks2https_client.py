@@ -121,11 +121,15 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         if add_type == socks2https.ADDR_TYPE_DOMAIN:
             rs = self.dispatcher.match_domain(host)[0]
         elif add_type == socks2https.ADDR_TYPE_IP:
-            rs = self.dispatcher.match_ip(host, is_ipv6=False)
+            # 优先匹配只有一个IP地址的网络,即DNS查询创建的临时条目
+            rs = self.dispatcher.match_ip(host, is_ipv6=False, is_ip_host=True)
+            if not rs: rs = self.dispatcher.match_ip(host, is_ipv6=False, is_ip_host=False)
         elif add_type == socks2https.ADDR_TYPE_FORCE_DOMAIN_IPv6:
             rs = self.dispatcher.match_domain(host)[0]
         else:
+            # 优先匹配只有一个IP地址的网络,即DNS查询创建的临时条目
             rs = self.dispatcher.match_ip(host, is_ipv6=True)
+            if not rs: rs = self.dispatcher.match_ip(host, is_ipv6=True, is_ip_host=False)
 
         return rs
 
