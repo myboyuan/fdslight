@@ -12,10 +12,12 @@ import pywind.evtframework.evt_dispatcher as dispatcher
 import pywind.lib.configfile as cfg
 
 import freenet.lib.proc as proc
-import freenet.handlers.socks2https_client as socks2https
+import freenet.handlers.socks2https_client as socks2https_client
+import freenet.handlers.socks5https_relay as sock2https_relay
 import freenet.lib.host_match as host_match
 import freenet.lib.ip_match as ip_match
 import freenet.lib.file_parser as file_parser
+import freenet.lib.utils as utils
 
 PID_PATH = "/tmp/s2hsc.pid"
 
@@ -38,6 +40,8 @@ class serverd(dispatcher.dispatcher):
 
     __relay_listen_fd = None
     __relay_listen_fd6 = None
+
+    __relay_fds = None
 
     __convert_fd = None
 
@@ -90,6 +94,7 @@ class serverd(dispatcher.dispatcher):
         self.__configs = cfg.ini_parse_from_file(self.__cfg_path)
 
         if mode == "relay":
+            self.__relay_fds = {}
             self.create_relay_service()
 
         if mode == "proxy":
@@ -172,11 +177,11 @@ class serverd(dispatcher.dispatcher):
         self.__client_conn_timeout = conn_timeout
 
         self.__socks5http_listen_fd = self.create_handler(
-            -1, socks2https.http_socks5_listener, (listen_ip, port), is_ipv6=False
+            -1, socks2https_client.http_socks5_listener, (listen_ip, port), is_ipv6=False
         )
         if enable_ipv6:
             self.__socks5http_listen_fd6 = self.create_handler(
-                -1, socks2https.http_socks5_listener, (listen_ipv6, port), is_ipv6=True
+                -1, socks2https_client.http_socks5_listener, (listen_ipv6, port), is_ipv6=True
             )
 
     def parse_relay_config(self, name, py_obj):
@@ -191,13 +196,14 @@ class serverd(dispatcher.dispatcher):
 
         if protocol not in ("tcp", "udp", "all"): return None
 
-        try:
-            enable_ipv6 = bool(int(o.get("enable_ipv6", 0)))
-        except ValueError:
-            return None
-
         listen_ip = o.get("listen_ip")
-        listen_ipv6 = o.get("listen_ipv6")
+
+        if not utils.is_ipv6_address(listen_ip) and not utils.is_ipv4_address(listen_ip): return None
+        if utils.is_ipv4_address(listen_ip):
+            is_ipv6 = False
+        else:
+            is_ipv6 = True
+
         try:
             port = int(o.get("port", 8800))
         except ValueError:
@@ -228,9 +234,8 @@ class serverd(dispatcher.dispatcher):
 
         return {
             "protocol": protocol,
-            "enable_ipv6": enable_ipv6,
+            "is_ipv6": is_ipv6,
             "listen_ip": listen_ip,
-            "listen_ipv6": listen_ipv6,
             "port": port,
             "conn_timeout": conn_timeout,
             "remote_host": remote_host,
@@ -246,6 +251,21 @@ class serverd(dispatcher.dispatcher):
         configs = cfg.ini_parse_from_file(self.__cfg_path)
         for name in configs:
             o = self.parse_relay_config(name, configs)
+            if not o:
+                sys.stderr.write("wrong config name about %s" % name)
+                continue
+            protocol = o["protocol"]
+            listen_ip = o["listen_ip"]
+            port = o["port"]
+            is_ipv6 = o["is_ipv6"]
+
+            if protocol == "all" or protocol == "tcp":
+                fd = self.create_handler(-1, sock2https_relay.listener, (listen_ip, port), name, is_ipv6=is_ipv6)
+                self.__relay_fds[name] = fd
+            if protocol == "all" or protocol == "udp":
+                fd = self.create_handler(-1, sock2https_relay.udp_listener, (listen_ip, port, name))
+                self.__relay_fds[name] = fd
+            ''''''
 
     def create_convert_client(self):
         configs = cfg.ini_parse_from_file(self.__cfg_path)
@@ -376,7 +396,7 @@ def main():
     --with-dnsserver                run nameserver service for client
     """
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "m:d:u")
+        opts, args = getopt.getopt(sys.argv[1:], "m:d:u", ["with-dnsserver"])
     except getopt.GetoptError:
         print(help_doc)
         return
@@ -384,13 +404,19 @@ def main():
     d = None
     m = None
     u = None
+    enable_dns = False
 
     for k, v in opts:
         if k == "-d": d = v
         if k == "-m": m = v
         if k == "-u": u = True
+        if k == "--with-dnsserver": enable_dns = True
 
     if u and (d or m):
+        print(help_doc)
+        return
+
+    if u and enable_dns:
         print(help_doc)
         return
 
@@ -431,7 +457,7 @@ def main():
 
     cls = serverd()
     try:
-        cls.ioloop(m, debug=debug)
+        cls.ioloop(m, with_dnsserver=enable_dns, debug=debug)
     except KeyboardInterrupt:
         cls.release()
 
