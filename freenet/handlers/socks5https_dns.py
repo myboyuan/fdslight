@@ -15,6 +15,45 @@ except ImportError:
     sys.exit(-1)
 
 
+class dns_client(udp_handler.udp_handler):
+    __creator = None
+
+    def init_func(self, creator_fd, dnsserver, is_ipv6=False):
+        self.__creator = creator_fd
+        if is_ipv6:
+            fa = socket.AF_INET6
+        else:
+            fa = socket.AF_INET
+
+        s = socket.socket(fa, socket.SOCK_DGRAM)
+        self.set_socket(s)
+        self.connect((dnsserver, 53))
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
+
+        return self.fileno
+
+    def udp_readable(self, message, address):
+        self.send_message_to_handler(self.fileno, self.__creator, message)
+
+    def udp_writable(self):
+        self.remove_evt_write(self.fileno)
+
+    def udp_timeout(self):
+        pass
+
+    def udp_error(self):
+        self.dispatcher.tell_dns_client_close()
+
+    def udp_delete(self):
+        self.unregister(self.fileno)
+        self.close()
+
+    def message_from_handler(self, from_fd, data):
+        self.send(data)
+        self.add_evt_write(self.fileno)
+
+
 class dns_proxy(udp_handler.udp_handler):
     __query_timer = None
     __dns_map = None
@@ -26,17 +65,20 @@ class dns_proxy(udp_handler.udp_handler):
     __is_ipv6 = None
     __is_sent_handshake = None
     __conn_ok = None
+    __dns_client = None
 
     def init_func(self, creator_fd, address, dnsserver, proxy_dnsserver, is_ipv6=False):
         self.__query_timer = timer.timer()
         self.__dnsserver = dnsserver
         self.__proxy_dnsserver = proxy_dnsserver
+        self.__dns_client = -1
         self.__cur_max_dns_id = 1
         self.__empty_ids = []
         self.__packet_id = -1
         self.__is_ipv6 = is_ipv6
         self.__is_sent_handshake = False
         self.__conn_ok = False
+        self.__dns_map = {}
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -44,6 +86,10 @@ class dns_proxy(udp_handler.udp_handler):
             fa = socket.AF_INET
 
         s = socket.socket(fa, socket.SOCK_DGRAM)
+
+        if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
         self.set_socket(s)
         self.bind(address)
         self.register(self.fileno)
@@ -71,6 +117,9 @@ class dns_proxy(udp_handler.udp_handler):
         :return:
         """
         if len(dns_msg) < 8: return
+        if self.__dns_client < 0:
+            self.__dns_client = self.create_handler(self.fileno, dns_client, self.__dnsserver, is_ipv6=self.__is_ipv6)
+
         # 检查查询以及匹配查询请求
         dns_id = (dns_msg[0] << 8) | dns_msg[1]
 
@@ -92,7 +141,7 @@ class dns_proxy(udp_handler.udp_handler):
             return
 
         self.__query_timer.set_timeout(new_dns_id, 10)
-        self.__dns_map[new_dns_id] = [dns_id, address, False]
+        self.__dns_map[new_dns_id] = [dns_id, address, -1]
 
         questions = msg.question
         if len(questions) != 1 or msg.opcode() != 0:
@@ -104,15 +153,23 @@ class dns_proxy(udp_handler.udp_handler):
         host = b".".join(q.name[0:-1]).decode("iso-8859-1")
         pos = host.find(".")
 
+        if self.dispatcher.debug: print(host)
+
         if pos > 0 and self.dispatcher.debug: print(host)
         is_match, flags = self.dispatcher.match_domain(host)
 
-        if not is_match:
-            self.sendto(dns_msg, (self.__dnsserver, 53,))
-            self.add_evt_write(self.fileno)
+        # 丢弃DNS请求
+        if is_match and flags == 2:
+            self.__query_timer.drop(new_dns_id)
+            self.__empty_ids.append(new_dns_id)
+            del self.__dns_map[new_dns_id]
             return
 
-        self.__dns_map[new_dns_id][2] = True
+        if not is_match:
+            self.send_message_to_handler(self.fileno, self.__dns_client, dns_msg)
+            return
+
+        self.__dns_map[new_dns_id][2] = flags
         self.send_conn_frame(dns_msg)
 
     def handle_from_dnsserver(self, dns_msg):
@@ -121,7 +178,7 @@ class dns_proxy(udp_handler.udp_handler):
         # 检查是否在映射当中
         if dns_id not in self.__dns_map: return
 
-        my_dns_id, address, need_proxy = self.__dns_map[dns_id]
+        my_dns_id, address, flags = self.__dns_map[dns_id]
         self.__empty_ids.append(dns_id)
 
         if self.__query_timer.exists(dns_id):
@@ -141,10 +198,10 @@ class dns_proxy(udp_handler.udp_handler):
             for cname in rrset:
                 ip = cname.__str__()
                 if utils.is_ipv4_address(ip) or utils.is_ipv6_address(ip):
-                    self.dispatcher.match_host_rule_add(ip)
+                    if 1 == flags: self.dispatcher.match_host_rule_add(ip)
                 ''''''
             ''''''
-        self.sendto(msg, address)
+        self.sendto(dns_msg, address)
         self.add_evt_write(self.fileno)
 
     def send_conn_frame(self, byte_data):
@@ -159,13 +216,14 @@ class dns_proxy(udp_handler.udp_handler):
     def udp_readable(self, message, address):
         if not self.__is_sent_handshake:
             self.send_conn_frame(b"")
+
         if address[0] == self.__dnsserver:
             if address[1] != 53: return
             self.handle_from_dnsserver(message)
             return
 
         if self.__packet_id < 1:
-            self.__packet_id = self.dispatcher.alloc_packet_id()
+            self.__packet_id = self.dispatcher.alloc_packet_id(self.fileno)
 
         self.send_query_request(message, address)
 
@@ -178,6 +236,7 @@ class dns_proxy(udp_handler.udp_handler):
             if self.__query_timer.exists(name):
                 self.__query_timer.drop(name)
             if name in self.__dns_map:
+                self.__empty_ids.append(name)
                 del self.__dns_map[name]
             ''''''
         self.set_timeout(self.fileno, 10)
@@ -203,3 +262,10 @@ class dns_proxy(udp_handler.udp_handler):
 
     def tell_conn_ok(self):
         self.__conn_ok = True
+
+    def message_from_handler(self, from_fd, data):
+        self.handle_from_dnsserver(data)
+
+    def tell_dns_client_close(self):
+        self.delete_handler(self.__dns_client)
+        self.__dns_client = -1
