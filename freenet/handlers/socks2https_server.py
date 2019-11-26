@@ -510,12 +510,12 @@ class handler_for_udp(udp_handler.udp_handler):
 
         if is_ipv6:
             fa = socket.AF_INET6
-            listen_ip = "0.0.0.0"
+            listen_ip = "::"
             self.__addr_type = socks2https.ADDR_TYPE_IPv6
         else:
             self.__addr_type = socks2https.ADDR_TYPE_IP
             fa = socket.AF_INET
-            listen_ip = "::"
+            listen_ip = "0.0.0.0"
         s = socket.socket(fa, socket.SOCK_DGRAM)
         self.set_socket(s)
         self.bind((listen_ip, 0))
