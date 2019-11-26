@@ -259,7 +259,6 @@ class handler(tcp_handler.tcp_handler):
 
     def handle_request_data(self):
         rdata = self.reader.read()
-        print(rdata)
         self.__parser.input(rdata)
         self.__time = time.time()
 
@@ -267,10 +266,12 @@ class handler(tcp_handler.tcp_handler):
             try:
                 self.__parser.parse()
             except socks2https.FrameError:
+                print("AAAA")
                 self.delete_handler(self.fileno)
                 return
             rs = self.__parser.get_result()
             if not rs: break
+            print(rs)
             frame_type, info = rs
 
             if frame_type == socks2https.FRAME_TYPE_PING:
@@ -346,6 +347,7 @@ class handler(tcp_handler.tcp_handler):
             for pkt in pkts: self.writer.write(pkt)
 
     def tcp_error(self):
+        logging.print_general("disconnect", self.__caddr)
         self.delete_handler(self.fileno)
 
     def tcp_timeout(self):
