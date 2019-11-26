@@ -266,12 +266,10 @@ class handler(tcp_handler.tcp_handler):
             try:
                 self.__parser.parse()
             except socks2https.FrameError:
-                print("AAAA")
                 self.delete_handler(self.fileno)
                 return
             rs = self.__parser.get_result()
             if not rs: break
-            print(rs)
             frame_type, info = rs
 
             if frame_type == socks2https.FRAME_TYPE_PING:
@@ -284,8 +282,10 @@ class handler(tcp_handler.tcp_handler):
                 self.handle_tcp_conn_request(info)
                 continue
             if frame_type == socks2https.FRAME_TYPE_UDP_CONN:
+                self.handle_udp_udplite_conn(info, is_udplite=False)
                 continue
             if frame_type == socks2https.FRAME_TYPE_UDPLite_CONN:
+                self.handle_udp_udplite_conn(info, is_udplite=True)
                 continue
             if frame_type == socks2https.FRAME_TYPE_CONN_STATE:
                 self.handle_tcp_conn_state(info)
