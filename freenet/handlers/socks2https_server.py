@@ -266,6 +266,8 @@ class handler(tcp_handler.tcp_handler):
             try:
                 self.__parser.parse()
             except socks2https.FrameError:
+                if self.dispatcher.debug:
+                    logging.print_general("wrong frame", self.__caddr)
                 self.delete_handler(self.fileno)
                 return
             rs = self.__parser.get_result()
