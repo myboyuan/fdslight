@@ -73,12 +73,8 @@ class handler(tcp_handler.tcp_handler):
         self.__parser = socks2https.parser()
         self.__builder = socks2https.builder()
 
-        if is_ipv6:
-            self.__win_size = 1140
-            self.__my_win_size = 1140
-        else:
-            self.__win_size = 1280
-            self.__my_win_size = 1280
+        self.__win_size = 8192
+        self.__my_win_size = 8192
 
         self.__time = time.time()
 

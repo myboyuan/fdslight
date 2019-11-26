@@ -621,12 +621,8 @@ class convert_client(ssl_handler.ssl_handelr):
         self.__builder = socks2https.builder()
         self.__time = time.time()
 
-        if is_ipv6:
-            self.__win_size = 1140
-            self.__my_win_size = 1140
-        else:
-            self.__win_size = 1280
-            self.__my_win_size = 1280
+        self.__win_size = 8192
+        self.__my_win_size = 8192
 
         if is_ipv6:
             fa = socket.AF_INET6
