@@ -209,8 +209,12 @@ class dns_proxy(udp_handler.udp_handler):
             addr_type = socks2https.ADDR_TYPE_IPv6
         else:
             addr_type = socks2https.ADDR_TYPE_IP
+        if not byte_data:
+            _t = socks2https.FRAME_TYPE_UDP_CONN
+        else:
+            _t = socks2https.FRAME_TYPE_UDP_DATA
         self.dispatcher.send_conn_frame(
-            socks2https.FRAME_TYPE_UDP_DATA, self.__packet_id, self.__proxy_dnsserver, 53, addr_type, data=byte_data
+            _t, self.__packet_id, self.__proxy_dnsserver, 53, addr_type, data=byte_data
         )
 
     def udp_readable(self, message, address):
