@@ -64,7 +64,7 @@ class handler(object):
     def create_handler(self, creator_fd, h, *args, **kwargs):
         return self.dispatcher.create_handler(creator_fd, h, *args, **kwargs)
 
-    def replace_handler(self,creator_fd,fileno,h,*args,**kwargs):
+    def replace_handler(self, creator_fd, fileno, h, *args, **kwargs):
         return self.dispatcher.repleace_handler(creator_fd, fileno, h, *args, **kwargs)
 
     def delete_handler(self, fd):
@@ -148,9 +148,11 @@ class handler(object):
         """任务循环函数,当把handler加入道task loop,就会循环调用此函数"""
         pass
 
-
     def release_when_replace(self):
         """当handler被替换的时候释放资源的函数
         :return:
         """
         pass
+
+    def get_handler(self, fd):
+        return self.dispatcher.get_handler(fd)

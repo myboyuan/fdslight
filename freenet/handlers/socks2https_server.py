@@ -456,13 +456,14 @@ class handler_for_tcp(tcp_handler.tcp_handler):
     def connect_ok(self):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
-        self.dispatcher.get_handler(self.__creator).tell_conn_ok(self.__packet_id)
+        self.get_handler(self.__creator).tell_conn_ok(self.__packet_id)
 
     def tcp_readable(self):
         if not self.handler_exists(self.__creator): return
         self.__time = time.time()
         rdata = self.reader.read()
-        self.dispatcher.get_handler(self.__creator).send_tcp_data(self.__packet_id, rdata)
+
+        self.get_handler(self.__creator).send_tcp_data(self.__packet_id, rdata)
 
     def tcp_writable(self):
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
@@ -476,7 +477,7 @@ class handler_for_tcp(tcp_handler.tcp_handler):
             return
         t = time.time()
         if t - self.__time > self.dispatcher.conn_timeout:
-            self.dispatcher.get_handler(self.__creator).tell_close(self.__packet_id)
+            self.get_handler(self.__creator).tell_close(self.__packet_id)
             return
         self.set_timeout(self.fileno, 10)
 
@@ -520,7 +521,7 @@ class handler_for_udp(udp_handler.udp_handler):
         self.set_socket(s)
         self.bind((listen_ip, 0))
 
-        self.dispatcher.get_handler(self.__creator).tell_conn_ok(self.__packet_id)
+        self.get_handler(self.__creator).tell_conn_ok(self.__packet_id)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
@@ -531,7 +532,8 @@ class handler_for_udp(udp_handler.udp_handler):
         if address[0] not in self.__access: return
         if not self.handler_exists(self.__creator): return
 
-        self.dispatcher.send_udp_udplite_data(self.__packet_id, address[0], address[1], self.__addr_type, message)
+        self.get_handler(self.__creator).send_udp_udplite_data(self.__packet_id, address[0], address[1],
+                                                               self.__addr_type, message)
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
