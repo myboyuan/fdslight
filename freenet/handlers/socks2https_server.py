@@ -204,7 +204,6 @@ class handler(tcp_handler.tcp_handler):
 
     def handle_udp_udplite_data(self, info):
         _id, address, port, addr_type, byte_data = info
-        print(info)
         if _id not in self.__packet_id_map: return
         fd = self.__packet_id_map[_id]
         if self.handler_exists(fd):
@@ -511,12 +510,12 @@ class handler_for_udp(udp_handler.udp_handler):
 
         if is_ipv6:
             fa = socket.AF_INET6
-            listen_ip = self.dispatcher.listen_ipv6
+            listen_ip = "0.0.0.0"
             self.__addr_type = socks2https.ADDR_TYPE_IPv6
         else:
             self.__addr_type = socks2https.ADDR_TYPE_IP
             fa = socket.AF_INET
-            listen_ip = self.dispatcher.listen_ip
+            listen_ip = "::"
         s = socket.socket(fa, socket.SOCK_DGRAM)
         self.set_socket(s)
         self.bind((listen_ip, 0))
