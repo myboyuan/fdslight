@@ -70,6 +70,7 @@ class http_socks5_handler(tcp_handler.tcp_handler):
     __http_request_info = None
     __http_request_kv_pairs = None
     __http_uri = None
+    __http_response_header_ok = None
 
     ### socks5相关变量
     # socks5是否握手成功
@@ -96,6 +97,7 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         self.__caddr = caddr
         self.__is_sure_protocol = False
         self.__is_parsed_http_header = False
+        self.__http_response_header_ok = False
         self.__raw_client_fd = -1
         self.__socks5_handshake_ok = False
         self.__socks5_proxy_is_conn_established = False
@@ -273,6 +275,8 @@ class http_socks5_handler(tcp_handler.tcp_handler):
 
         # 核对http请求头
         if not self.http_request_check():
+            if self.dispatcher.debug:
+                logging.print_general("wrong http request header", self.__caddr)
             self.delete_handler(self.fileno)
             return
 
@@ -316,7 +320,8 @@ class http_socks5_handler(tcp_handler.tcp_handler):
     def send_http_response(self, status):
         kv_pairs = [
             ("Server", "Socks2Https"),
-            ("Content-Length", 0)
+            ("Content-Length", 0),
+            ("Connection", "Keep-Alive",)
         ]
         s = httputils.build_http1x_resp_header(status, kv_pairs)
 
@@ -540,8 +545,52 @@ class http_socks5_handler(tcp_handler.tcp_handler):
 
     def message_from_handler(self, from_fd, byte_data):
         self.__time = time.time()
-        self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
+
+        # 防止数据接收过多
+        if self.writer.size() > 0xffffff:
+            self.writer._getvalue()
+            return
+
+        if not self.__is_socks5 and not self.__is_http_tunnel_mode:
+            if not self.__http_response_header_ok:
+                rs = self.handle_http_response_header()
+                if not rs:
+                    self.delete_handler(self.fileno)
+                    return
+                ''''''
+            self.add_evt_write(self.fileno)
+            return
+        self.add_evt_write(self.fileno)
+
+    def handle_http_response_header(self):
+        size = self.writer.size()
+        rdata = self.writer._getvalue()
+
+        p = rdata.find(b"\r\n\r\n")
+        if p < 0 and size > 4096: return False
+        if p < 12: return False
+
+        p += 4
+        try:
+            resp, kv_pairs = httputils.parse_http1x_response_header(rdata[0:p].decode("iso-8859-1"))
+        except httputils.Http1xHeaderErr:
+            return False
+
+        # 重写头部连接字段,数据传输完毕后就关闭连接
+        resp_headers = []
+        for k, v in kv_pairs:
+            if k.lower() == "connection":
+                resp_headers.append(("Connection", "close",))
+                continue
+            resp_headers.append((k, v,))
+        data = httputils.build_http1x_resp_header(resp[1], resp_headers)
+
+        self.writer.write(data.encode("iso-8859-1"))
+        self.writer.write(rdata[p:])
+        self.__http_response_header_ok = True
+
+        return True
 
 
 class convert_client(ssl_handler.ssl_handelr):
@@ -854,10 +903,14 @@ class raw_tcp_client(tcp_handler.tcp_handler):
     __caddr = None
     __creator = None
     __time = None
+    __wait_sent = None
+    __wait_sent_size = None
 
     def init_func(self, creator_fd, address, is_ipv6=False):
         self.__creator = creator_fd
         self.__time = time.time()
+        self.__wait_sent = []
+        self.__wait_sent_size = 0
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -873,6 +926,15 @@ class raw_tcp_client(tcp_handler.tcp_handler):
     def connect_ok(self):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+
+        self.add_evt_write(self.fileno)
+        while 1:
+            try:
+                data = self.__wait_sent.pop(0)
+            except IndexError:
+                break
+            self.writer.write(data)
+
         self.dispatcher.get_handler(self.__creator).tell_conn_ok()
 
     def tcp_readable(self):
@@ -904,7 +966,11 @@ class raw_tcp_client(tcp_handler.tcp_handler):
         self.close()
 
     def message_from_handler(self, from_fd, byte_data):
-        if not self.is_conn_ok(): return
+        if not self.is_conn_ok():
+            # 防止客户端恶意传送大量数据
+            if self.__wait_sent_size > 0xffff: return
+            self.__wait_sent.append(byte_data)
+            return
 
         self.__time = time.time()
         self.writer.write(byte_data)

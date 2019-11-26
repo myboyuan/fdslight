@@ -446,6 +446,7 @@ class handler_for_tcp(tcp_handler.tcp_handler):
 
     __wait_sent = None
     __wait_sent_size = None
+    __address = None
 
     def init_func(self, creator_fd, address, packet_id, is_ipv6=False):
         self.__creator = creator_fd
@@ -453,6 +454,7 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         self.__time = time.time()
         self.__wait_sent = []
         self.__wait_sent_size = 0
+        self.__address = address
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -466,6 +468,8 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         return self.fileno
 
     def connect_ok(self):
+        if self.dispatcher.debug:
+            logging.print_general("connect_ok", self.__address)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         self.get_handler(self.__creator).tell_conn_ok(self.__packet_id)
