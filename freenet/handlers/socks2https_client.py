@@ -756,6 +756,7 @@ class convert_client(ssl_handler.ssl_handelr):
             self.delete_handler(self.fileno)
             return
 
+        self.__time = time.time()
         while 1:
             self.__parser.parse()
             rs = self.__parser.get_result()
@@ -795,6 +796,14 @@ class convert_client(ssl_handler.ssl_handelr):
         if not self.is_conn_ok():
             self.delete_handler(self.fileno)
             return
+
+        t = time.time()
+        if t - self.__time > self.dispatcher.client_conn_timeout:
+            self.delete_handler(self.fileno)
+            return
+        if t - self.__time > self.dispatcher.client_heartbeat_time:
+            self.send_ping()
+        self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
@@ -943,7 +952,7 @@ class raw_udp_client(udp_handler.udp_handler):
                 addr_type = socks2https.ADDR_TYPE_IP
             self.dispatcher.send_conn_frame(
                 socks2https.FRAME_TYPE_UDP_CONN,
-                self.__packet_id, client_ip, client_port,addr_type
+                self.__packet_id, client_ip, client_port, addr_type
             )
 
         return self.fileno

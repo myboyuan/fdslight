@@ -44,6 +44,7 @@ class serverd(dispatcher.dispatcher):
     __configs = None
 
     __client_conn_timeout = None
+    __client_heartbeat_time = None
 
     __socks5_bind_ip = None
     __socks5_bind_ipv6 = None
@@ -325,6 +326,8 @@ class serverd(dispatcher.dispatcher):
         if heartbeat_timeout < 1:
             raise ValueError("wrong heartbeat_time value from s2hsc.ini")
 
+        self.__client_heartbeat_time = heartbeat_timeout
+
         path = serv_cfg.get("http_path", "/")
         user = serv_cfg.get("user", "")
         passwd = serv_cfg.get("passwd", "")
@@ -403,6 +406,10 @@ class serverd(dispatcher.dispatcher):
     @property
     def client_conn_timeout(self):
         return self.__client_conn_timeout
+
+    @property
+    def client_heartbeat_time(self):
+        return self.__client_heartbeat_time
 
     @property
     def socks5_listen_ip(self):
