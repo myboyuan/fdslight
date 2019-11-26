@@ -311,7 +311,6 @@ class http_socks5_handler(tcp_handler.tcp_handler):
             self.__raw_client_fd = self.create_handler(self.fileno, raw_tcp_client, (host, port), is_ipv6=is_ipv6)
             return True
 
-        self.__is_sent_to_convert_client = True
         self.__packet_id = self.dispatcher.alloc_packet_id(self.fileno)
         self.dispatcher.send_conn_frame(socks2https.FRAME_TYPE_TCP_CONN, self.__packet_id, host, port, _t)
 
@@ -359,7 +358,7 @@ class http_socks5_handler(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
 
-        pkt = struct.pack("BB", 5, 0)
+        pkt = struct.pack("!BB", 5, 0)
 
         self.writer.write(pkt)
         self.add_evt_write(self.fileno)
@@ -544,6 +543,7 @@ class http_socks5_handler(tcp_handler.tcp_handler):
             self.http_conn_ok()
 
     def message_from_handler(self, from_fd, byte_data):
+        if not self.__is_sure_protocol: return
         self.__time = time.time()
         self.writer.write(byte_data)
 
@@ -608,7 +608,6 @@ class convert_client(ssl_handler.ssl_handelr):
     __builder = None
     __win_size = None
     __my_win_size = None
-    __qos = None
     __time = None
 
     def ssl_init(self, address, path, user, passwd, is_ipv6=False, ssl_on=False):
@@ -621,7 +620,6 @@ class convert_client(ssl_handler.ssl_handelr):
         self.__parser = socks2https.parser()
         self.__builder = socks2https.builder()
         self.__time = time.time()
-        self.__qos = socks2https.qos()
 
         if is_ipv6:
             self.__win_size = 1140
@@ -803,16 +801,15 @@ class convert_client(ssl_handler.ssl_handelr):
             return
 
         self.__parser.input(self.reader.read())
-        try:
-            self.__parser.parse()
-        except socks2https.FrameError:
-            logging.print_error()
-            self.delete_handler(self.fileno)
-            return
-
         self.__time = time.time()
+
         while 1:
-            self.__parser.parse()
+            try:
+                self.__parser.parse()
+            except socks2https.FrameError:
+                logging.print_error()
+                self.delete_handler(self.fileno)
+                break
             rs = self.__parser.get_result()
             if not rs: break
             frame_type, info = rs
@@ -839,20 +836,18 @@ class convert_client(ssl_handler.ssl_handelr):
         return
 
     def tcp_writable(self):
-        if self.writer.is_empty() and not self.__qos.have_data(): self.remove_evt_write(self.fileno)
-        while 1:
-            pkts = self.__qos.get_data()
-            if not pkts: break
-            for pkt in pkts: self.writer.write(pkt)
+        if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
         # 没有连接成功的处理方式
         if not self.is_conn_ok():
+            logging.print_general("connect_fail", self.__address)
             self.delete_handler(self.fileno)
             return
 
         t = time.time()
         if t - self.__time > self.dispatcher.client_conn_timeout:
+            logging.print_general("timeout", self.__address)
             self.delete_handler(self.fileno)
             return
         if t - self.__time > self.dispatcher.client_heartbeat_time:
@@ -860,6 +855,7 @@ class convert_client(ssl_handler.ssl_handelr):
         self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
+        logging.print_general("server_disconnect", self.__address)
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):
@@ -888,14 +884,9 @@ class convert_client(ssl_handler.ssl_handelr):
 
     def send_tcp_data(self, packet_id, byte_data):
         if not self.is_conn_ok(): return
-        data = byte_data
-        while 1:
-            if not data: break
-            frag_data = data[0:self.__win_size]
-            wrap_data = self.__builder.build_tcp_frame_data(packet_id, frag_data, win_size=self.__my_win_size)
-            self.__qos.input(packet_id, wrap_data)
-            data = data[self.__win_size:]
 
+        wrap_data = self.__builder.build_tcp_frame_data(packet_id, byte_data)
+        self.writer.write(wrap_data)
         self.add_evt_write(self.fileno)
 
 

@@ -64,7 +64,6 @@ class handler(tcp_handler.tcp_handler):
     # 客户端传送过来的窗口大小
     __win_size = None
     __my_win_size = None
-    __qos = None
 
     def init_func(self, creator_fd, cs, caddr, is_ipv6=False):
         self.__handshake_ok = False
@@ -73,7 +72,6 @@ class handler(tcp_handler.tcp_handler):
 
         self.__parser = socks2https.parser()
         self.__builder = socks2https.builder()
-        self.__qos = socks2https.qos()
 
         if is_ipv6:
             self.__win_size = 1140
@@ -341,12 +339,7 @@ class handler(tcp_handler.tcp_handler):
         self.handle_request_data()
 
     def tcp_writable(self):
-        if self.writer.is_empty() and not self.__qos.have_data():
-            self.remove_evt_write(self.fileno)
-        while 1:
-            pkts = self.__qos.get_data()
-            if not pkts: break
-            for pkt in pkts: self.writer.write(pkt)
+        if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def tcp_error(self):
         logging.print_general("client_disconnect", self.__caddr)
@@ -355,6 +348,7 @@ class handler(tcp_handler.tcp_handler):
     def tcp_timeout(self):
         t = time.time()
         if t - self.__time > self.dispatcher.conn_timeout:
+            logging.print_general("conn_timeout", self.__caddr)
             self.delete_handler(self.fileno)
             return
 
@@ -414,13 +408,9 @@ class handler(tcp_handler.tcp_handler):
         if packet_id not in self.__packet_id_map: return
         if not data: return
 
-        while 1:
-            if not data: break
-            frag_data = data[0:self.__win_size]
-            wrap_data = self.__builder.build_tcp_frame_data(packet_id, frag_data, win_size=self.__my_win_size)
-            self.__qos.input(packet_id, wrap_data)
-            data = data[self.__win_size:]
+        wrap_data = self.__builder.build_tcp_frame_data(packet_id, data, win_size=self.__my_win_size)
 
+        self.writer.write(wrap_data)
         self.add_evt_write(self.fileno)
 
     def send_udp_udplite_data(self, packet_id, ip_addr, port, addr_type, byte_data, is_udplite=False):

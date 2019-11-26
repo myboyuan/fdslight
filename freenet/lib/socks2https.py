@@ -238,38 +238,6 @@ class builder(object):
 
         return self.build_frame(FRAME_TYPE_TCP_DATA, b)
 
-
-class qos(object):
-    __qos = None
-
-    def __init__(self):
-        self.__qos = {}
-
-    def input(self, packet_id, byte_data):
-        if packet_id not in self.__qos:
-            self.__qos[packet_id] = []
-        seq = self.__qos[packet_id]
-        seq.append(byte_data)
-
-    def get_data(self):
-        dels = []
-        results = []
-
-        for k, v in self.__qos.items():
-            if not v:
-                dels.append(k)
-                continue
-            results.append(v.pop(0))
-
-        for _id in dels:
-            del self.__qos[_id]
-
-        return results
-
-    def have_data(self):
-        return bool(self.__qos)
-
-
 """
 p = parser()
 b = builder()
