@@ -397,6 +397,7 @@ class handler(tcp_handler.tcp_handler):
         if packet_id not in self.__packet_id_map: return
         if not byte_data: return
 
+        ### 防止数据溢出
         while 1:
             if not byte_data: break
             wrap_data = self.__builder.build_tcp_frame_data(packet_id, byte_data[0:0xfff0])
