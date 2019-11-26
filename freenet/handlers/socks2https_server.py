@@ -204,6 +204,7 @@ class handler(tcp_handler.tcp_handler):
 
     def handle_udp_udplite_data(self, info):
         _id, address, port, addr_type, byte_data = info
+        print(info)
         if _id not in self.__packet_id_map: return
         fd = self.__packet_id_map[_id]
         if self.handler_exists(fd):
