@@ -61,9 +61,6 @@ class handler(tcp_handler.tcp_handler):
     __builder = None
 
     __time = None
-    # 客户端传送过来的窗口大小
-    __win_size = None
-    __my_win_size = None
 
     def init_func(self, creator_fd, cs, caddr, is_ipv6=False):
         self.__handshake_ok = False
@@ -72,9 +69,6 @@ class handler(tcp_handler.tcp_handler):
 
         self.__parser = socks2https.parser()
         self.__builder = socks2https.builder()
-
-        self.__win_size = 8192
-        self.__my_win_size = 8192
 
         self.__time = time.time()
 
@@ -193,7 +187,6 @@ class handler(tcp_handler.tcp_handler):
         fd = self.__packet_id_map[_id]
 
         if self.handler_exists(fd):
-            self.__win_size = win_size
             self.send_message_to_handler(self.fileno, fd, tcp_data)
 
     def handle_udp_udplite_data(self, info):
@@ -400,16 +393,14 @@ class handler(tcp_handler.tcp_handler):
 
         del self.__packet_id_map[packet_id]
 
-    def send_tcp_data(self, packet_id, data):
+    def send_tcp_data(self, packet_id, byte_data):
         if packet_id not in self.__packet_id_map: return
-        if not data: return
+        if not byte_data: return
 
         while 1:
-            if not data: break
-            wrap_data = self.__builder.build_tcp_frame_data(packet_id, data[0:self.__win_size],
-                                                            win_size=self.__my_win_size)
-            data = data[self.__win_size:]
-            self.writer.write(wrap_data)
+            if not byte_data: break
+            wrap_data = self.__builder.build_tcp_frame_data(packet_id, byte_data[0:0xfff0])
+            byte_data = byte_data[0xfff0:]
             self.writer.write(wrap_data)
 
         self.add_evt_write(self.fileno)

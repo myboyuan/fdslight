@@ -606,8 +606,6 @@ class convert_client(ssl_handler.ssl_handelr):
     __http_handshake_key = None
     __parser = None
     __builder = None
-    __win_size = None
-    __my_win_size = None
     __time = None
 
     def ssl_init(self, address, path, user, passwd, is_ipv6=False, ssl_on=False):
@@ -620,9 +618,6 @@ class convert_client(ssl_handler.ssl_handelr):
         self.__parser = socks2https.parser()
         self.__builder = socks2https.builder()
         self.__time = time.time()
-
-        self.__win_size = 8192
-        self.__my_win_size = 8192
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -784,7 +779,6 @@ class convert_client(ssl_handler.ssl_handelr):
 
     def handle_tcp_data(self, info):
         packet_id, win_size, byte_data = info
-        self.__win_size = win_size
         self.dispatcher.handle_tcp_data(packet_id, byte_data)
 
     def handle_udp_udplite_data(self, info):
@@ -883,9 +877,8 @@ class convert_client(ssl_handler.ssl_handelr):
 
         while 1:
             if not byte_data: break
-            wrap_data = self.__builder.build_tcp_frame_data(packet_id, byte_data[0:self.__win_size],
-                                                            win_size=self.__my_win_size)
-            byte_data = byte_data[self.__win_size:]
+            wrap_data = self.__builder.build_tcp_frame_data(packet_id, byte_data[0:0xfff0])
+            byte_data = byte_data[0xfff0:]
             self.writer.write(wrap_data)
 
         self.add_evt_write(self.fileno)

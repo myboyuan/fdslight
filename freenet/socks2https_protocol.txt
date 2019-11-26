@@ -30,7 +30,7 @@ err_code:4 bytes,0表示连接建立成功,1表示连接失败
 
 7:TCP数据帧
 packet_id:4 bytes
-window_size:2 bytes  发送端窗口大小,目前本软件无实现该机制
+window_size:2 bytes  发送端窗口大小,目前该参数作为未来备用,暂时不实现
 reverse:2 bytes 保留字节
 data...
 
