@@ -21,6 +21,8 @@ import freenet.lib.file_parser as file_parser
 import freenet.lib.utils as utils
 
 PID_PATH = "/tmp/s2hsc.pid"
+LOG_FILE = "%s/s2hsc.log" % BASE_DIR
+ERR_FILE = "%s/s2hsc_err.log" % BASE_DIR
 
 
 class serverd(dispatcher.dispatcher):
@@ -85,7 +87,10 @@ class serverd(dispatcher.dispatcher):
 
         self.create_poll()
 
-        if not debug: signal.signal(signal.SIGINT, self.__exit)
+        if not debug:
+            signal.signal(signal.SIGINT, self.__exit)
+            sys.stdout = open(LOG_FILE, "a+")
+            sys.stderr = open(ERR_FILE, "a+")
 
         self.__configs = cfg.ini_parse_from_file(self.__cfg_path)
 

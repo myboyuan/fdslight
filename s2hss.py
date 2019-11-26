@@ -15,7 +15,8 @@ import freenet.handlers.socks2https_server as socks2https_server
 import freenet.lib.proc as proc
 
 PID_PATH = "/tmp/s2hss.pid"
-
+LOG_FILE = "%s/s2hss.log" % BASE_DIR
+ERR_FILE = "%s/s2hss_err.log" % BASE_DIR
 
 class serverd(dispatcher.dispatcher):
     __cfg_path = None
@@ -43,7 +44,10 @@ class serverd(dispatcher.dispatcher):
 
         self.create_poll()
 
-        if not debug: signal.signal(signal.SIGINT, self.__exit)
+        if not debug:
+            signal.signal(signal.SIGINT, self.__exit)
+            sys.stdout = open(LOG_FILE, "a+")
+            sys.stderr = open(ERR_FILE, "a+")
 
         self.create_service()
 
