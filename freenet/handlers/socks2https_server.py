@@ -442,10 +442,15 @@ class handler_for_tcp(tcp_handler.tcp_handler):
     __packet_id = None
     __time = None
 
+    __wait_sent = None
+    __wait_sent_size = None
+
     def init_func(self, creator_fd, address, packet_id, is_ipv6=False):
         self.__creator = creator_fd
         self.__packet_id = packet_id
         self.__time = time.time()
+        self.__wait_sent = []
+        self.__wait_sent_size = 0
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -462,6 +467,14 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         self.get_handler(self.__creator).tell_conn_ok(self.__packet_id)
+
+        self.add_evt_write(self.fileno)
+        while 1:
+            try:
+                data = self.__wait_sent.pop(0)
+            except IndexError:
+                break
+            self.writer.write(data)
 
     def tcp_readable(self):
         if not self.handler_exists(self.__creator): return
@@ -491,7 +504,12 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         self.close()
 
     def message_from_handler(self, from_fd, byte_data):
-        if not self.is_conn_ok(): return
+        if not self.is_conn_ok():
+            # 客户端在建立连接时恶意发送大量数据规避措施
+            if self.__wait_sent_size > 0xffff: return
+            self.__wait_sent_size += len(byte_data)
+            self.__wait_sent.append(byte_data)
+            return
         self.writer.write(byte_data)
         self.add_evt_write(self.fileno)
         self.__time = time.time()
