@@ -335,6 +335,12 @@ class serverd(dispatcher.dispatcher):
         self.__convert_fd = self.create_handler(-1, socks2https_client.convert_client, (host, port), path, user, passwd,
                                                 is_ipv6=enable_ipv6)
 
+    def delete_handler(self, fd):
+        super(serverd, self).delete_handler(fd)
+        # 注意,这里非常重要,因为convert_fd是在变化的,而程序中会fd会频繁释放创建
+        # 如果convert_fd不设置成-1,那么会导致发送给fd的数据发送到其他地方
+        if fd == self.__convert_fd: self.__convert_fd = -1
+
     def alloc_packet_id(self, fd):
         n = 1
         while 1:
