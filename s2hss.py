@@ -47,6 +47,10 @@ class serverd(dispatcher.dispatcher):
 
         self.create_service()
 
+    @property
+    def debug(self):
+        return self.__debug
+
     def release(self):
         if self.__listen_fd > 0:
             self.delete_handler(self.__listen_fd)

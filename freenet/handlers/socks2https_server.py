@@ -9,6 +9,7 @@ import pywind.lib.timer as timer
 import socket, time, urllib.parse, random, os
 
 import freenet.lib.socks2https as socks2https
+import freenet.lib.logging as logging
 
 
 class listener(tcp_handler.tcp_handler):
@@ -215,6 +216,8 @@ class handler(tcp_handler.tcp_handler):
             self.send_conn_state(_id, 1)
             return
 
+        if self.dispatcher.debug:
+            print("create udp udplite connection")
         is_ipv6 = False
         if addr_type in (socks2https.ADDR_TYPE_FORCE_DOMAIN_IPv6, socks2https.ADDR_TYPE_IPv6,): is_ipv6 = True
 
@@ -232,6 +235,8 @@ class handler(tcp_handler.tcp_handler):
             self.send_conn_state(_id, 1)
             return
 
+        if self.dispatcher.debug:
+            print("create tcp connection")
         is_ipv6 = False
         if addr_type in (socks2https.ADDR_TYPE_FORCE_DOMAIN_IPv6, socks2https.ADDR_TYPE_IPv6,): is_ipv6 = True
 
@@ -303,15 +308,22 @@ class handler(tcp_handler.tcp_handler):
         return os.urandom(n)
 
     def send_pong(self):
+        if self.dispatcher.debug:
+            logging.print_general("send_pong", self.__caddr)
+
         data = self.rand_bytes()
         pong_data = self.__builder.build_pong(data)
 
         self.send_data(pong_data)
 
     def handle_pong(self):
+        if self.dispatcher.debug:
+            logging.print_general("received pong", self.__caddr)
         self.__time = time.time()
 
     def send_ping(self):
+        if self.dispatcher.debug:
+            logging.print_general("send_ping", self.__caddr)
         data = self.rand_bytes()
         ping_data = self.__builder.build_ping(data)
 
@@ -504,6 +516,7 @@ class handler_for_udp(udp_handler.udp_handler):
         self.set_socket(s)
         self.bind((listen_ip, 0))
 
+        self.dispatcher.get_handler(self.__creator).tell_conn_ok(self.__packet_id)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 

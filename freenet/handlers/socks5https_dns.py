@@ -258,6 +258,8 @@ class dns_proxy(udp_handler.udp_handler):
         self.handle_from_dnsserver(message)
 
     def tell_close(self):
+        if self.dispatcher.debug:
+            print("remote server error at DNS")
         self.__conn_ok = False
         self.__is_sent_handshake = False
 

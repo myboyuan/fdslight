@@ -716,18 +716,24 @@ class convert_client(ssl_handler.ssl_handelr):
         return os.urandom(n)
 
     def send_pong(self):
+        if self.dispatcher.debug:
+            print("send pong")
         data = self.rand_bytes()
         pong_data = self.__builder.build_pong(data)
 
         self.send_data(pong_data)
 
     def send_ping(self):
+        if self.dispatcher.debug:
+            print("send ping")
         data = self.rand_bytes()
         ping_data = self.__builder.build_ping(data)
 
         self.send_data(ping_data)
 
     def handle_pong(self):
+        if self.dispatcher.debug:
+            print("received pong")
         self.__time = time.time()
 
     def handle_conn_state(self, info):
