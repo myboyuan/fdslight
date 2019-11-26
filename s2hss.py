@@ -123,7 +123,7 @@ def main():
         print(help_doc)
         return
     d = None
-    if sys.platform("win32") > -1:
+    if sys.platform.find("win32") > -1:
         is_windows = True
     else:
         is_windows = False
