@@ -419,12 +419,17 @@ class handler(tcp_handler.tcp_handler):
 
         self.add_evt_write(self.fileno)
 
-    def send_udp_udplite_data(self, packet_id, ip_addr, port, addr_type, byte_data):
+    def send_udp_udplite_data(self, packet_id, ip_addr, port, addr_type, byte_data, is_udplite=False):
         if addr_type not in socks2https.addr_types: return
         if packet_id not in self.__packet_id_map: return
 
+        if is_udplite:
+            _t = socks2https.FRAME_TYPE_UDPLITE_DATA
+        else:
+            _t = socks2https.FRAME_TYPE_UDP_DATA
+
         # UDP和UDPLite数据包立刻发送
-        data = self.__builder.build_conn_frame(packet_id, addr_type, ip_addr, port, byte_data=byte_data)
+        data = self.__builder.build_conn_frame(_t, packet_id, addr_type, ip_addr, port, byte_data=byte_data)
         self.send_data(data)
 
     def tell_conn_ok(self, packet_id):
@@ -499,6 +504,7 @@ class handler_for_udp(udp_handler.udp_handler):
     __access = None
     __timer = None
     __addr_type = None
+    __is_udplite = None
 
     def init_func(self, creator_fd, address, packet_id, is_udplite=False, is_ipv6=False):
         self.__creator = creator_fd
@@ -506,6 +512,7 @@ class handler_for_udp(udp_handler.udp_handler):
         self.__time = time.time()
         self.__access = {}
         self.__timer = timer.timer()
+        self.__is_udplite = is_udplite
 
         if not self.dispatcher.enable_ipv6 and is_ipv6: return -1
 
@@ -533,7 +540,7 @@ class handler_for_udp(udp_handler.udp_handler):
         if not self.handler_exists(self.__creator): return
 
         self.get_handler(self.__creator).send_udp_udplite_data(self.__packet_id, address[0], address[1],
-                                                               self.__addr_type, message)
+                                                               self.__addr_type, message, is_udplite=self.__is_udplite)
 
     def udp_writable(self):
         self.remove_evt_write(self.fileno)
