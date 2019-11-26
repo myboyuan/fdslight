@@ -215,6 +215,7 @@ class dns_proxy(udp_handler.udp_handler):
 
     def udp_readable(self, message, address):
         if not self.__is_sent_handshake:
+            self.__is_sent_handshake = True
             self.send_conn_frame(b"")
 
         if address[0] == self.__dnsserver:
