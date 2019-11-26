@@ -349,6 +349,7 @@ class handler(tcp_handler.tcp_handler):
             for pkt in pkts: self.writer.write(pkt)
 
     def tcp_error(self):
+        logging.print_general("client_disconnect", self.__caddr)
         self.delete_handler(self.fileno)
 
     def tcp_timeout(self):
