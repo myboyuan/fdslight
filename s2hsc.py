@@ -354,9 +354,6 @@ class serverd(dispatcher.dispatcher):
         if packet_id in self.__packet_id_map:
             del self.__packet_id_map[packet_id]
 
-        if self.handler_exists(self.__convert_fd):
-            self.get_handler(self.__convert_fd).qos_del(packet_id)
-
     def send_conn_frame(self, frame_type, packet_id, host, port, addr_type, data=b""):
         if not self.handler_exists(self.__convert_fd):
             self.create_convert_client()

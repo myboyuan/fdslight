@@ -408,9 +408,14 @@ class handler(tcp_handler.tcp_handler):
         if packet_id not in self.__packet_id_map: return
         if not data: return
 
-        wrap_data = self.__builder.build_tcp_frame_data(packet_id, data, win_size=self.__my_win_size)
+        while 1:
+            if not data: break
+            wrap_data = self.__builder.build_tcp_frame_data(packet_id, data[0:self.__win_size],
+                                                            win_size=self.__my_win_size)
+            data = data[self.__win_size:]
+            self.writer.write(wrap_data)
+            self.writer.write(wrap_data)
 
-        self.writer.write(wrap_data)
         self.add_evt_write(self.fileno)
 
     def send_udp_udplite_data(self, packet_id, ip_addr, port, addr_type, byte_data, is_udplite=False):

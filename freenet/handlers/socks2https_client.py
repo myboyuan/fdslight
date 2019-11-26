@@ -885,8 +885,13 @@ class convert_client(ssl_handler.ssl_handelr):
     def send_tcp_data(self, packet_id, byte_data):
         if not self.is_conn_ok(): return
 
-        wrap_data = self.__builder.build_tcp_frame_data(packet_id, byte_data)
-        self.writer.write(wrap_data)
+        while 1:
+            if not byte_data: break
+            wrap_data = self.__builder.build_tcp_frame_data(packet_id, byte_data[0:self.__win_size],
+                                                            win_size=self.__my_win_size)
+            byte_data = byte_data[self.__win_size:]
+            self.writer.write(wrap_data)
+
         self.add_evt_write(self.fileno)
 
 
