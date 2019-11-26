@@ -218,6 +218,9 @@ class dns_proxy(udp_handler.udp_handler):
         )
 
     def udp_readable(self, message, address):
+        if self.__packet_id < 1:
+            self.__packet_id = self.dispatcher.alloc_packet_id(self.fileno)
+
         if not self.__is_sent_handshake:
             self.__is_sent_handshake = True
             self.send_conn_frame(b"")
@@ -226,9 +229,6 @@ class dns_proxy(udp_handler.udp_handler):
             if address[1] != 53: return
             self.handle_from_dnsserver(message)
             return
-
-        if self.__packet_id < 1:
-            self.__packet_id = self.dispatcher.alloc_packet_id(self.fileno)
 
         self.send_query_request(message, address)
 

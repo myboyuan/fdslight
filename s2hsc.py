@@ -352,7 +352,6 @@ class serverd(dispatcher.dispatcher):
         if not self.handler_exists(self.__convert_fd):
             self.create_convert_client()
         if not self.handler_exists(self.__convert_fd): return
-
         if packet_id not in self.__packet_id_map: return
 
         self.get_handler(self.__convert_fd).send_conn_request(

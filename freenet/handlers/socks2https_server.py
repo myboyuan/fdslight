@@ -258,7 +258,9 @@ class handler(tcp_handler.tcp_handler):
         return
 
     def handle_request_data(self):
-        self.__parser.input(self.reader.read())
+        rdata = self.reader.read()
+        print(rdata)
+        self.__parser.input(rdata)
         self.__time = time.time()
 
         while 1:

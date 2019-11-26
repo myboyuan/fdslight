@@ -692,7 +692,7 @@ class convert_client(ssl_handler.ssl_handelr):
             return
 
         self.__http_handshake_ok = True
-        logging.print_general("http_handshake_ok", self.__address)
+        logging.print_general("https_handshake_ok", self.__address)
         # 发送还没有连接的时候堆积的数据包
         if self.__wait_sent: self.add_evt_write(self.fileno)
         while 1:
@@ -700,7 +700,7 @@ class convert_client(ssl_handler.ssl_handelr):
                 self.writer.write(self.__wait_sent.pop(0))
             except IndexError:
                 break
-            self.add_evt_write(self.fileno)
+            ''''''
         ''''''
 
     def get_http_kv_pairs(self, name, kv_pairs):
