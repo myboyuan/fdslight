@@ -69,7 +69,7 @@ class ssl_handelr(tcp_handelr.tcp_handler):
         except ssl.SSLError:
             self.delete_handler(self.fileno)
 
-    def handshake_ok(self):
+    def ssl_handshake_ok(self):
         """握手成功后的处理,重写这个方法
         :return:
         """
@@ -79,7 +79,7 @@ class ssl_handelr(tcp_handelr.tcp_handler):
         try:
             self.socket.do_handshake()
             self.__handshake_ok = True
-            self.handshake_ok()
+            self.ssl_handshake_ok()
         except ssl.SSLWantReadError:
             self.add_evt_read(self.fileno)
         except ssl.SSLWantWriteError:

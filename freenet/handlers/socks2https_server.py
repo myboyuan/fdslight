@@ -211,13 +211,14 @@ class handler(tcp_handler.tcp_handler):
 
     def handle_udp_udplite_conn(self, info, is_udplite=False):
         _id, address, port, addr_type, byte_data = info
+
+        if self.dispatcher.debug:
+            print("create udp udplite connection")
+
         # ID存在直接返回一个建立失败
         if _id in self.__packet_id_map:
             self.send_conn_state(_id, 1)
             return
-
-        if self.dispatcher.debug:
-            print("create udp udplite connection")
         is_ipv6 = False
         if addr_type in (socks2https.ADDR_TYPE_FORCE_DOMAIN_IPv6, socks2https.ADDR_TYPE_IPv6,): is_ipv6 = True
 
@@ -251,12 +252,6 @@ class handler(tcp_handler.tcp_handler):
         data = self.__builder.build_conn_state(_id, err_code)
         self.send_data(data)
 
-    def handle_tcp_conn_state(self, info):
-        _id, err_code = info
-        if err_code != 0:
-            if _id in self.__packet_id_map: del self.__packet_id_map[_id]
-        return
-
     def handle_request_data(self):
         self.__parser.input(self.reader.read())
         self.__time = time.time()
@@ -283,9 +278,6 @@ class handler(tcp_handler.tcp_handler):
             if frame_type == socks2https.FRAME_TYPE_UDP_CONN:
                 continue
             if frame_type == socks2https.FRAME_TYPE_UDPLite_CONN:
-                continue
-            if frame_type == socks2https.FRAME_TYPE_CONN_STATE:
-                self.handle_tcp_conn_state(info)
                 continue
             if frame_type == socks2https.FRAME_TYPE_TCP_DATA:
                 self.handle_tcp_data(info)

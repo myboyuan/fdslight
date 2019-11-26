@@ -599,15 +599,14 @@ class convert_client(ssl_handler.ssl_handelr):
 
         return self.fileno
 
-    def handshake_ok(self):
-        pass
+    def ssl_handshake_ok(self):
+        logging.print_general("TLS handshake OK", self.__address)
+        self.send_handshake_request()
 
     def connect_ok(self):
         logging.print_general("connect_ok", self.__address)
-
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
-        self.send_handshake_request()
 
     def rand_string(self, length=8):
         seq = []
@@ -701,7 +700,7 @@ class convert_client(ssl_handler.ssl_handelr):
                 self.writer.write(self.__wait_sent.pop(0))
             except IndexError:
                 break
-            ''''''
+            self.add_evt_write(self.fileno)
         ''''''
 
     def get_http_kv_pairs(self, name, kv_pairs):
@@ -815,6 +814,7 @@ class convert_client(ssl_handler.ssl_handelr):
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):
+        logging.print_general("disconnect", self.__address)
         self.dispatcher.tell_close_for_all()
         self.unregister(self.fileno)
         self.close()
@@ -833,6 +833,8 @@ class convert_client(ssl_handler.ssl_handelr):
     def send_conn_request(self, frame_type, packet_id, host, port, addr_type, data=b""):
         data = self.__builder.build_conn_frame(frame_type, packet_id, addr_type, host, port,
                                                byte_data=data)
+        if self.dispatcher.debug:
+            logging.print_general("send_conn_request,%s,(%s,%s)" % (frame_type, host, port,), self.__address)
         self.send_data(data)
 
     def send_tcp_data(self, packet_id, byte_data):
