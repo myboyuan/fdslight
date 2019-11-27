@@ -14,6 +14,7 @@ import pywind.lib.configfile as cfg
 import freenet.lib.proc as proc
 import freenet.handlers.socks2https_client as socks2https_client
 import freenet.handlers.socks5https_relay as socks2https_relay
+import freenet.handlers.socks2https_socks5http as socks5http
 import freenet.handlers.socks5https_dns as socks2https_dns
 import freenet.lib.host_match as host_match
 import freenet.lib.ip_match as ip_match
@@ -27,6 +28,7 @@ ERR_FILE = "%s/s2hsc_err.log" % BASE_DIR
 
 class serverd(dispatcher.dispatcher):
     __cfg_path = None
+    __cfg_relay_path = None
     __host_rules_path = None
     __ip_rules_path = None
     __udp_src_proxy_path = None
@@ -47,6 +49,7 @@ class serverd(dispatcher.dispatcher):
 
     __client_conn_timeout = None
     __client_heartbeat_time = None
+    __socks5http_conn_timeout = None
 
     __socks5_bind_ip = None
     __socks5_bind_ipv6 = None
@@ -61,17 +64,16 @@ class serverd(dispatcher.dispatcher):
     __ip_match = None
     __udp_src_match = None
 
+    __mode = None
+
     def init_func(self, mode, with_dnsserver=False, debug=True):
         self.__packet_id_map = {}
         self.__relay_info = {}
-
-        if mode == "proxy":
-            self.__cfg_path = "%s/fdslight_etc/s2hsc.ini" % BASE_DIR
-            self.__host_rules_path = "%s/fdslight_etc/host_rules.txt" % BASE_DIR
-            self.__ip_rules_path = "%s/fdslight_etc/ip_rules.txt" % BASE_DIR
-            self.__udp_src_proxy_path = "%s/fdslight_etc/udp_src_proxy.txt" % BASE_DIR
-        else:
-            self.__cfg_path = "%s/fdslight_etc/s2hsr.ini" % BASE_DIR
+        self.__cfg_path = "%s/fdslight_etc/s2hsc.ini" % BASE_DIR
+        self.__host_rules_path = "%s/fdslight_etc/host_rules.txt" % BASE_DIR
+        self.__ip_rules_path = "%s/fdslight_etc/ip_rules.txt" % BASE_DIR
+        self.__udp_src_proxy_path = "%s/fdslight_etc/udp_src_proxy.txt" % BASE_DIR
+        self.__cfg_relay_path = "%s/fdslight_etc/s2hsr.ini" % BASE_DIR
 
         self.__debug = debug
 
@@ -93,9 +95,9 @@ class serverd(dispatcher.dispatcher):
             sys.stderr = open(ERR_FILE, "a+")
 
         self.__configs = cfg.ini_parse_from_file(self.__cfg_path)
+        self.__mode = mode
 
         if mode == "relay":
-            if not debug: signal.signal(signal.SIGUSR1, self.__update_relay)
             self.create_relay_service()
 
         if mode == "proxy":
@@ -119,19 +121,13 @@ class serverd(dispatcher.dispatcher):
             self.delete_handler(self.__dnsserver_fd6)
 
         dels = []
-        for fd, v in self.__relay_info: dels.append(fd)
+        for fd, v in self.__relay_info.items(): dels.append(fd)
         for fd in dels: self.delete_handler(fd)
 
     def __exit(self, signum, frame):
         self.release()
         os.remove(PID_PATH)
         sys.exit(0)
-
-    def __update_relay(self, signum, frame):
-        dels = []
-        for fd, v in self.__relay_info: dels.append(fd)
-        for fd in dels: self.delete_handler(fd)
-        self.create_relay_service()
 
     def __update_rules(self, signum, frame):
         """更新白名单规则
@@ -189,14 +185,14 @@ class serverd(dispatcher.dispatcher):
         if conn_timeout < 1:
             raise ValueError("wrong conn_timeout value from s2hsc.ini")
 
-        self.__client_conn_timeout = conn_timeout
+        self.__socks5http_conn_timeout = conn_timeout
 
         self.__socks5http_listen_fd = self.create_handler(
-            -1, socks2https_client.http_socks5_listener, (listen_ip, port), is_ipv6=False
+            -1, socks5http.http_socks5_listener, (listen_ip, port), is_ipv6=False
         )
         if enable_ipv6:
             self.__socks5http_listen_fd6 = self.create_handler(
-                -1, socks2https_client.http_socks5_listener, (listen_ipv6, port), is_ipv6=True
+                -1, socks5http.http_socks5_listener, (listen_ipv6, port), is_ipv6=True
             )
 
     def parse_relay_config(self, name, py_obj):
@@ -222,7 +218,7 @@ class serverd(dispatcher.dispatcher):
         if port < 1 or port > 65535:
             return None
         try:
-            conn_timeout = o.get("conn_timeout", 120)
+            conn_timeout = int(o.get("conn_timeout", 120))
         except ValueError:
             return None
 
@@ -285,7 +281,7 @@ class serverd(dispatcher.dispatcher):
                                                        ns_no_proxy_v6, ns_with_proxy_v6)
 
     def create_relay_service(self):
-        configs = cfg.ini_parse_from_file(self.__cfg_path)
+        configs = cfg.ini_parse_from_file(self.__cfg_relay_path)
         for name in configs:
             o = self.parse_relay_config(name, configs)
             if not o:
@@ -322,6 +318,7 @@ class serverd(dispatcher.dispatcher):
             raise ValueError("wrong port number from s2hsc.ini")
 
         conn_timeout = int(serv_cfg.get("conn_timeout", 100))
+        self.__client_conn_timeout = conn_timeout
 
         if conn_timeout < 1:
             raise ValueError("wrong conn_timeout value from s2hsc.ini")
@@ -418,6 +415,10 @@ class serverd(dispatcher.dispatcher):
         return self.__client_conn_timeout
 
     @property
+    def socks5http_conn_timeout(self):
+        return self.__socks5http_conn_timeout
+
+    @property
     def client_heartbeat_time(self):
         return self.__client_heartbeat_time
 
@@ -434,7 +435,7 @@ class serverd(dispatcher.dispatcher):
         return self.__debug
 
     def myloop(self):
-        self.__ip_match.auto_delete()
+        if self.__mode == "proxy": self.__ip_match.auto_delete()
 
 
 def update_rules():
