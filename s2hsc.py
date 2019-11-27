@@ -20,6 +20,7 @@ import freenet.lib.host_match as host_match
 import freenet.lib.ip_match as ip_match
 import freenet.lib.file_parser as file_parser
 import freenet.lib.utils as utils
+import freenet.lib.os_proxy_config as os_proxy_config
 
 PID_PATH = "/tmp/s2hsc.pid"
 LOG_FILE = "%s/s2hsc.log" % BASE_DIR
@@ -111,6 +112,8 @@ class serverd(dispatcher.dispatcher):
             self.create_socks_http_service()
 
     def release(self):
+        if self.__mode == "proxy": os_proxy_config.os_unconfig()
+
         if self.__socks5http_listen_fd > 0:
             self.delete_handler(self.__socks5http_listen_fd)
         if self.__socks5http_listen_fd6 > 0:
@@ -186,6 +189,8 @@ class serverd(dispatcher.dispatcher):
             raise ValueError("wrong conn_timeout value from s2hsc.ini")
 
         self.__socks5http_conn_timeout = conn_timeout
+
+        os_proxy_config.os_config(listen_ip, port, is_ipv6=False)
 
         self.__socks5http_listen_fd = self.create_handler(
             -1, socks5http.http_socks5_listener, (listen_ip, port), is_ipv6=False
