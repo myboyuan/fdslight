@@ -445,29 +445,6 @@ class serverd(dispatcher.dispatcher):
     def myloop(self):
         if self.__mode == "proxy": self.__ip_match.auto_delete()
 
-    def tun2socks_config(self):
-        configs = cfg.ini_parse_from_file(self.__cfg_path)
-        tun2socks_cfg = configs.get("tun2socks", {})
-
-        bin_path = "%s/%s" % (BASE_DIR, tun2socks_cfg.get("bin_path", ""))
-        if not os.path.isfile(bin_path):
-            sys.stderr.write("cannot found tun2socks binary file")
-            return
-
-        try:
-            enable_ipv6 = bool(int(tun2socks_cfg.get("enable_ipv6", 0)))
-        except ValueError:
-            sys.stderr.write("wrong tun2socks configure")
-            return
-
-        netif_addr = tun2socks_cfg.get("netif_ipaddr", "10.0.0.1")
-        netif_netmask = tun2socks_cfg.get("netif_netmask", "255.255.255.0")
-
-
-    def tun2socks_unconfig(self):
-        pass
-
-
 def update_rules():
     pid = proc.get_pid(PID_PATH)
     if pid < 0:
