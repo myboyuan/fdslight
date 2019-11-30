@@ -26,6 +26,9 @@ PID_PATH = "/tmp/s2hsc.pid"
 LOG_FILE = "%s/s2hsc.log" % BASE_DIR
 ERR_FILE = "%s/s2hsc_err.log" % BASE_DIR
 
+# 虚拟网卡名
+VETH_NAME = "s2hsc"
+
 
 class serverd(dispatcher.dispatcher):
     __cfg_path = None
@@ -67,7 +70,7 @@ class serverd(dispatcher.dispatcher):
 
     __mode = None
 
-    def init_func(self, mode, with_dnsserver=False, debug=True):
+    def init_func(self, mode, with_dnsserver=False, with_tunsocks=False, debug=True):
         self.__packet_id_map = {}
         self.__relay_info = {}
         self.__cfg_path = "%s/fdslight_etc/s2hsc.ini" % BASE_DIR
@@ -442,6 +445,28 @@ class serverd(dispatcher.dispatcher):
     def myloop(self):
         if self.__mode == "proxy": self.__ip_match.auto_delete()
 
+    def tun2socks_config(self):
+        configs = cfg.ini_parse_from_file(self.__cfg_path)
+        tun2socks_cfg = configs.get("tun2socks", {})
+
+        bin_path = "%s/%s" % (BASE_DIR, tun2socks_cfg.get("bin_path", ""))
+        if not os.path.isfile(bin_path):
+            sys.stderr.write("cannot found tun2socks binary file")
+            return
+
+        try:
+            enable_ipv6 = bool(int(tun2socks_cfg.get("enable_ipv6", 0)))
+        except ValueError:
+            sys.stderr.write("wrong tun2socks configure")
+            return
+
+        netif_addr = tun2socks_cfg.get("netif_ipaddr", "10.0.0.1")
+        netif_netmask = tun2socks_cfg.get("netif_netmask", "255.255.255.0")
+
+
+    def tun2socks_unconfig(self):
+        pass
+
 
 def update_rules():
     pid = proc.get_pid(PID_PATH)
@@ -457,10 +482,12 @@ def main():
     -d      debug | start | stop    debug,start or stop application
     -m      relay | proxy           relay mode,proxy mode or all mode
     -u                              update rule files
+    --with-dnsserver                enable DNS server support
+    --with-tun2socks                enable tun2socks support,It only support Linux
     """
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "m:d:u", ["with-dnsserver"])
-    except getopt.GetoptError:
+        opts, args = getopt.getopt(sys.argv[1:], "m:d:u", ["with-dnsserver", "with-tun2socks"])
+    except getopt.GetoptError as e:
         print(help_doc)
         return
 
@@ -468,17 +495,23 @@ def main():
     m = None
     u = None
     enable_dns = False
+    enable_tun2socks = False
+    support_tun2socks = False
 
     if sys.platform.find("win32") > -1:
         is_windows = True
     else:
         is_windows = False
 
+    if sys.platform.find("linux") > -1:
+        support_tun2socks = True
+
     for k, v in opts:
         if k == "-d": d = v
         if k == "-m": m = v
         if k == "-u": u = True
         if k == "--with-dnsserver": enable_dns = True
+        if k == "--with-tun2socks": enable_tun2socks = True
 
     if u and (d or m):
         print(help_doc)
@@ -498,6 +531,10 @@ def main():
 
     if is_windows and d in ("start", "stop",):
         sys.stderr.write("windows only support -d debug")
+        return
+
+    if not support_tun2socks and enable_tun2socks:
+        sys.stderr.write("the platform unsupport tun2socks")
         return
 
     if m not in ("relay", "proxy"):
@@ -529,7 +566,7 @@ def main():
 
     cls = serverd()
     try:
-        cls.ioloop(m, with_dnsserver=enable_dns, debug=debug)
+        cls.ioloop(m, with_dnsserver=enable_dns, with_tun2socks=support_tun2socks, debug=debug)
     except KeyboardInterrupt:
         cls.release()
 
