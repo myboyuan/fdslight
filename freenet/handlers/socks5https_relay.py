@@ -79,6 +79,8 @@ class handler(tcp_handler.tcp_handler):
         self.__conn_timeout = conn_timeout
         self.__is_sent_conn = False
         self.__conn_ok = False
+        self.tcp_recv_buf_size = 2048
+        self.tcp_loop_read_num = 3
 
         self.set_socket(cs)
         self.register(self.fileno)

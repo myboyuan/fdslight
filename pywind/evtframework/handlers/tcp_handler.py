@@ -18,10 +18,17 @@ class tcp_handler(handler.handler):
     __is_listen_socket = False
     __delete_this_no_sent_data = False
 
+    # 一次性循环读取次数
+    tcp_loop_read_num = None
+    # 读取缓冲区大小
+    tcp_recv_buf_size = None
+
     def __init__(self):
         super(tcp_handler, self).__init__()
         self.__reader = reader.reader()
         self.__writer = writer.writer()
+        self.tcp_loop_read_num = 10
+        self.tcp_recv_buf_size = 2048
 
     def init_func(self, creator_fd, *args, **kwargs):
         """
@@ -77,9 +84,9 @@ class tcp_handler(handler.handler):
             return
 
         # 使用for,防止一直读取数据
-        for i in range(10):
+        for i in range(self.tcp_loop_read_num):
             try:
-                recv_data = self.socket.recv(4096)
+                recv_data = self.socket.recv(self.tcp_recv_buf_size)
                 if not recv_data:
                     # 处理未接收完毕的数据
                     if self.reader.size() > 0: self.tcp_readable()
