@@ -318,7 +318,7 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         kv_pairs = [
             ("Server", "Socks2Https"),
             ("Content-Length", 0),
-            ("Connection", "close",)
+            ("Connection", "Keep-Alive",)
         ]
         s = httputils.build_http1x_resp_header(status, kv_pairs)
 
