@@ -72,7 +72,7 @@ class handler(tcp_handler.tcp_handler):
 
         self.__time = time.time()
         self.tcp_recv_buf_size = 4096
-        self.tcp_loop_read_num = 20
+        self.tcp_loop_read_num = 3
 
         self.set_socket(cs)
         self.register(self.fileno)
@@ -451,7 +451,7 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         self.__address = address
 
         self.tcp_recv_buf_size = 4096
-        self.tcp_loop_read_num = 20
+        self.tcp_loop_read_num = 3
 
         if is_ipv6:
             fa = socket.AF_INET6
