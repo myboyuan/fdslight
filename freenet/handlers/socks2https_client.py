@@ -62,6 +62,7 @@ class convert_client(ssl_handler.ssl_handelr):
         logging.print_general("connect_ok", self.__address)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+        # 注意这里要加入写事件,让TLS能够握手成功
         self.add_evt_write(self.fileno)
 
     def rand_string(self, length=8):
