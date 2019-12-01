@@ -311,7 +311,7 @@ class convert_client(ssl_handler.ssl_handelr):
         data_seq = self.__builder.build_tcp_frame_data(packet_id, byte_data, my_win_size=self.__my_win_size,
                                                        win_size=self.__win_size)
 
-        for data in data_seq: self.send_data(data_seq)
+        for data in data_seq: self.send_data(data)
 
     def send_conn_close(self, packet_id):
         if not self.is_conn_ok(): return
