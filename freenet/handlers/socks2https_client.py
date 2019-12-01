@@ -299,7 +299,10 @@ class convert_client(ssl_handler.ssl_handelr):
             if not byte_data: break
             wrap_data = self.__builder.build_tcp_frame_data(packet_id, byte_data[0:0xff00])
             byte_data = byte_data[0xff00:]
-            self.writer.write(wrap_data)
+            if not self.__http_handshake_ok:
+                self.__wait_sent.append(wrap_data)
+            else:
+                self.writer.write(wrap_data)
 
         self.add_evt_write(self.fileno)
 
