@@ -2,7 +2,10 @@
 import os, sys
 
 # 编译器名
-CC = "gcc"
+if sys.platform.find("freebsd") > -1:
+    CC = "cc"
+else:
+    CC = "gcc"
 # Python开发包包含路径
 py_include = ""
 src_path_1 = "freenet/lib/fn_utils.c"
