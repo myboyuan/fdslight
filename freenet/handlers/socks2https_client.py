@@ -75,6 +75,7 @@ class convert_client(ssl_handler.ssl_handelr):
         self.add_evt_read(self.fileno)
         # 注意这里要加入写事件,让TLS能够握手成功
         self.add_evt_write(self.fileno)
+        self.set_timeout(self.fileno, 10)
 
     def rand_string(self, length=8):
         seq = []

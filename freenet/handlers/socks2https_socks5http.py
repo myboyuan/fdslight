@@ -494,6 +494,7 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         self.writer.write(byte_data)
 
     def tcp_readable(self):
+        self.__time = time.time()
         ### 首先确认协议
         if not self.__is_sure_protocol:
             rdata = self.reader.read()
@@ -615,6 +616,7 @@ class raw_tcp_client(tcp_handler.tcp_handler):
     def connect_ok(self):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+        self.set_timeout(self.fileno, 10)
 
         self.add_evt_write(self.fileno)
         while 1:

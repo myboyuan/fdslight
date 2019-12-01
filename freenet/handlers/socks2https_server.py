@@ -482,6 +482,7 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         self.get_handler(self.__creator).tell_conn_ok(self.__packet_id)
+        self.set_timeout(self.fileno, 10)
 
         self.add_evt_write(self.fileno)
         while 1:
@@ -562,6 +563,7 @@ class handler_for_udp(udp_handler.udp_handler):
         self.get_handler(self.__creator).tell_conn_ok(self.__packet_id)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+        self.set_timeout(self.fileno, 10)
 
         return self.fileno
 
