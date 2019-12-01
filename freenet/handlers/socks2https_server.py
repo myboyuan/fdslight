@@ -63,7 +63,6 @@ class handler(tcp_handler.tcp_handler):
     __time = None
     __win_size = 0
     __my_win_size = 0
-    __qos = None
 
     def init_func(self, creator_fd, cs, caddr, is_ipv6=False):
         self.__handshake_ok = False
@@ -72,7 +71,6 @@ class handler(tcp_handler.tcp_handler):
 
         self.__parser = socks2https.parser()
         self.__builder = socks2https.builder()
-        self.__qos = socks2https.qos()
 
         self.__time = time.time()
         self.tcp_recv_buf_size = 4096
@@ -354,12 +352,6 @@ class handler(tcp_handler.tcp_handler):
         self.handle_request_data()
 
     def tcp_writable(self):
-        if self.__handshake_ok:
-            while 1:
-                results = self.__qos.gets()
-                if not results: break
-                for data in results: self.send_data(data)
-            ''''''
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def tcp_error(self):
@@ -433,8 +425,7 @@ class handler(tcp_handler.tcp_handler):
 
         data_seq = self.__builder.build_tcp_frame_data(packet_id, byte_data, my_win_size=self.__my_win_size,
                                                        win_size=self.__win_size)
-        self.__qos.adds(packet_id, data_seq)
-        self.add_evt_write(self.fileno)
+        for data in data_seq: self.send_data(data)
 
     def send_udp_udplite_data(self, packet_id, ip_addr, port, addr_type, byte_data, is_udplite=False):
         if addr_type not in socks2https.addr_types: return

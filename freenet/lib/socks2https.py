@@ -246,35 +246,6 @@ class builder(object):
         return results
 
 
-class qos(object):
-    __data_queue = None
-
-    def __init__(self):
-        self.__data_queue = {}
-
-    def add(self, packet_id, byte_data):
-        if packet_id not in self.__data_queue:
-            self.__data_queue[packet_id] = []
-
-        seq = self.__data_queue[packet_id]
-        seq.append(byte_data)
-
-    def adds(self, packet_id, seq):
-        for byte_data in seq:
-            self.add(packet_id, byte_data)
-
-    def gets(self):
-        results = []
-        for k, seq in self.__data_queue.items():
-            if not seq: continue
-            results.append(seq.pop(0))
-        return results
-
-    def delete(self, packet_id):
-        if packet_id not in self.__data_queue: return
-        del self.__data_queue[packet_id]
-
-
 """
 p = parser()
 b = builder()
