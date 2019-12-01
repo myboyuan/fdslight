@@ -117,7 +117,6 @@ class handler(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
 
-        if not self.__conn_ok: return
         self.__time = time.time()
         self.dispatcher.send_tcp_data(self.__packet_id, self.reader.read())
 

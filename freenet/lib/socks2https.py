@@ -238,6 +238,12 @@ class builder(object):
 
         return self.build_frame(FRAME_TYPE_TCP_DATA, b)
 
+
+class ss_decrypt(object):
+    def __init__(self):
+        pass
+
+
 """
 p = parser()
 b = builder()
