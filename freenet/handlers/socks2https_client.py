@@ -27,6 +27,8 @@ class convert_client(ssl_handler.ssl_handelr):
     __win_size = 0
     __my_win_size = 0
 
+    __ssl_ok = None
+
     def ssl_init(self, address, path, user, passwd, is_ipv6=False, ssl_on=False):
         self.__wait_sent = []
         self.__address = address
@@ -39,6 +41,7 @@ class convert_client(ssl_handler.ssl_handelr):
         self.__time = time.time()
         self.tcp_recv_buf_size = 4096
         self.tcp_loop_read_num = 3
+        self.__ssl_ok = False
 
         if is_ipv6:
             self.__win_size = 1180
@@ -66,6 +69,7 @@ class convert_client(ssl_handler.ssl_handelr):
         return self.fileno
 
     def ssl_handshake_ok(self):
+        self.__ssl_ok = True
         logging.print_general("TLS handshake OK", self.__address)
         self.send_handshake_request()
 
@@ -259,7 +263,7 @@ class convert_client(ssl_handler.ssl_handelr):
         return
 
     def tcp_writable(self):
-        if not self.__http_handshake_ok: return
+        if not self.__ssl_ok: return
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
