@@ -139,6 +139,12 @@ class tcp_handler(handler.handler):
         except TimeoutError:
             self.error()
 
+    def send_now(self):
+        """立刻发送数据
+        :return:
+        """
+        self.evt_write()
+
     def timeout(self):
         if self.__is_async_socket_client and not self.is_conn_ok():
             self.unregister(self.fileno)

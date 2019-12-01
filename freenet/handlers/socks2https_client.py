@@ -302,6 +302,7 @@ class convert_client(ssl_handler.ssl_handelr):
             return
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
+        self.send_now()
 
     def send_conn_request(self, frame_type, packet_id, host, port, addr_type, data=b""):
         data = self.__builder.build_conn_frame(frame_type, packet_id, addr_type, host, port,

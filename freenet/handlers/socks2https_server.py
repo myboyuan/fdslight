@@ -318,6 +318,7 @@ class handler(tcp_handler.tcp_handler):
     def send_data(self, byte_data):
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
+        self.send_now()
 
     def rand_bytes(self):
         n = random.randint(0, 128)
@@ -521,7 +522,6 @@ class handler_for_tcp(tcp_handler.tcp_handler):
 
     def message_from_handler(self, from_fd, byte_data):
         if not self.is_conn_ok():
-            # 客户端在建立连接时恶意发送大量数据规避措施
             self.__wait_sent.append(byte_data)
             return
         self.writer.write(byte_data)
