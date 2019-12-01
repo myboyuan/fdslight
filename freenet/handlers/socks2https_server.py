@@ -472,6 +472,7 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         while 1:
             try:
                 data = self.__wait_sent.pop(0)
+                print(data)
             except IndexError:
                 break
             self.writer.write(data)
@@ -504,7 +505,6 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         self.close()
 
     def message_from_handler(self, from_fd, byte_data):
-        print(byte_data)
         if not self.is_conn_ok():
             # 客户端在建立连接时恶意发送大量数据规避措施
             if self.__wait_sent_size > 0xffff: return
