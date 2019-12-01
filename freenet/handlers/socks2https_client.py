@@ -259,6 +259,7 @@ class convert_client(ssl_handler.ssl_handelr):
         return
 
     def tcp_writable(self):
+        if not self.__http_handshake_ok: return
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
