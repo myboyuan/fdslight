@@ -76,6 +76,8 @@ class handler(tcp_handler.tcp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
+        logging.print_general("connect_ok", self.__caddr)
+
         return self.fileno
 
     def do_handshake(self):
@@ -158,6 +160,8 @@ class handler(tcp_handler.tcp_handler):
         resp_headers += [("Connection", "Upgrade",), ("Upgrade", "websocket",)]
         resp_headers += [("Sec-WebSocket-Accept", ws.gen_handshake_key(sec_ws_key))]
         resp_headers += [("Sec-WebSocket-Protocol", "socks2https")]
+
+        logging.print_general("handshake_ok", self.__caddr)
 
         self.__handshake_ok = True
         self.send_response("101 Switching Protocols", resp_headers)
