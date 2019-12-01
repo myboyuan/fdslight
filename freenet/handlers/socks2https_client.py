@@ -300,3 +300,9 @@ class convert_client(ssl_handler.ssl_handelr):
             self.writer.write(wrap_data)
 
         self.add_evt_write(self.fileno)
+
+    def send_conn_close(self, packet_id):
+        if not self.is_conn_ok(): return
+
+        wrap_data = self.__builder.build_conn_state(packet_id, err_code=1)
+        self.send_data(wrap_data)

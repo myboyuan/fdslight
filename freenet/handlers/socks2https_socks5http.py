@@ -5,7 +5,7 @@ import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.web.lib.httputils as httputils
 import pywind.lib.timer as timer
 
-import socket, time,struct
+import socket, time, struct
 
 import freenet.lib.logging as logging
 import freenet.lib.socks2https as socks2https
@@ -318,7 +318,7 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         kv_pairs = [
             ("Server", "Socks2Https"),
             ("Content-Length", 0),
-            ("Connection", "Keep-Alive",)
+            ("Connection", "close",)
         ]
         s = httputils.build_http1x_resp_header(status, kv_pairs)
 
@@ -516,11 +516,13 @@ class http_socks5_handler(tcp_handler.tcp_handler):
     def tcp_timeout(self):
         t = time.time()
         if t - self.__time > self.dispatcher.socks5http_conn_timeout:
+            if self.__is_sent_to_convert_client: self.dispatcher.send_conn_close(self.__packet_id)
             self.delete_handler(self.fileno)
             return
         self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
+        if self.__is_sent_to_convert_client: self.dispatcher.send_conn_close(self.__packet_id)
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):
@@ -816,6 +818,7 @@ class raw_udp_client(udp_handler.udp_handler):
     def udp_timeout(self):
         t = time.time()
         if t - self.__time > self.dispatcher.socks5http_conn_timeout:
+            if self.__upper_proxy: self.dispatcher.send_conn_close(self.__packet_id)
             self.dispatcher.get_handler(self.__creator).tell_close()
             return
 
@@ -832,6 +835,7 @@ class raw_udp_client(udp_handler.udp_handler):
         self.handle_udp_packet_from_server(message, address)
 
     def udp_error(self):
+        if self.__upper_proxy: self.dispatcher.send_conn_close(self.__packet_id)
         self.dispatcher.get_handler(self.__creator).tell_close()
 
     def udp_delete(self):

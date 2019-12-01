@@ -245,7 +245,10 @@ class handler(tcp_handler.tcp_handler):
     def handle_tcp_conn_state(self, info):
         _id, err_code = info
         if err_code != 0:
-            if _id in self.__packet_id_map: del self.__packet_id_map[_id]
+            if _id not in self.__packet_id_map: return
+            fd = self.__packet_id_map[_id]
+            self.delete_handler(fd)
+            del self.__packet_id_map[_id]
         return
 
     def handle_request_data(self):
@@ -391,6 +394,8 @@ class handler(tcp_handler.tcp_handler):
         return rs
 
     def tell_close(self, packet_id):
+        ### 注意这里可能不存在,如果客户端发送了连接关闭帧
+        if packet_id not in self.__packet_id_map: return
         fd = self.__packet_id_map[packet_id]
         self.send_conn_state(packet_id, 1)
         self.delete_handler(fd)

@@ -43,6 +43,7 @@ goo.gl:1
 *.googletagservices.com:1
 *.ads-twitter.com:1
 *.apple.com:0
+*.withgoogle.com:1
 
 
 #  社交网络
@@ -71,6 +72,8 @@ goo.gl:1
 *.redditmedia.com:1
 *.redd.it:1
 *.flickr.com:1
+*.atdmt.com:1
+*.fbsbx.com:1
 
 # 防止skype重定向到gmw.cn
 *.skype.com:1

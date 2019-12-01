@@ -374,6 +374,12 @@ class serverd(dispatcher.dispatcher):
             frame_type, packet_id, host, port, addr_type, data=data
         )
 
+    def send_conn_close(self, packet_id):
+        if not self.handler_exists(self.__convert_fd): return
+        if packet_id not in self.__packet_id_map: return
+
+        self.get_handler(self.__convert_fd).send_conn_close(packet_id)
+
     def send_tcp_data(self, packet_id, byte_data):
         if not byte_data: return
         # 连接已经断开,那么丢弃tcp数据包
