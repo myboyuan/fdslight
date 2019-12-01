@@ -480,6 +480,7 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         if not self.handler_exists(self.__creator): return
         self.__time = time.time()
         rdata = self.reader.read()
+        print(rdata)
 
         self.get_handler(self.__creator).send_tcp_data(self.__packet_id, rdata)
 
