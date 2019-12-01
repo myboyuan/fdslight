@@ -294,8 +294,6 @@ class convert_client(ssl_handler.ssl_handelr):
         self.send_data(data)
 
     def send_tcp_data(self, packet_id, byte_data):
-        if not self.is_conn_ok(): return
-
         ### 防止数据溢出
         while 1:
             if not byte_data: break
