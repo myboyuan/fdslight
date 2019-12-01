@@ -61,6 +61,9 @@ class handler(tcp_handler.tcp_handler):
     __builder = None
 
     __time = None
+    __win_size = 0
+    __my_win_size = 0
+    __qos = None
 
     def init_func(self, creator_fd, cs, caddr, is_ipv6=False):
         self.__handshake_ok = False
@@ -69,10 +72,18 @@ class handler(tcp_handler.tcp_handler):
 
         self.__parser = socks2https.parser()
         self.__builder = socks2https.builder()
+        self.__qos = socks2https.qos()
 
         self.__time = time.time()
         self.tcp_recv_buf_size = 4096
         self.tcp_loop_read_num = 3
+
+        if is_ipv6:
+            self.__win_size = 1180
+            self.__my_win_size = 1180
+        else:
+            self.__win_size = 1380
+            self.__my_win_size = 1380
 
         self.set_socket(cs)
         self.register(self.fileno)
@@ -190,6 +201,12 @@ class handler(tcp_handler.tcp_handler):
         _id, win_size, tcp_data = info
         if _id not in self.__packet_id_map: return
 
+        # 限制窗口
+        if self.__win_size > 0xff00:
+            self.delete_handler(self.fileno)
+            return
+
+        self.__win_size = win_size
         fd = self.__packet_id_map[_id]
 
         if self.handler_exists(fd):
@@ -408,14 +425,13 @@ class handler(tcp_handler.tcp_handler):
         if packet_id not in self.__packet_id_map: return
         if not byte_data: return
 
-        ### 防止数据溢出
+        data_seq = self.__builder.build_tcp_frame_data(packet_id, byte_data, my_win_size=self.__my_win_size,
+                                                       win_size=self.__win_size)
+        self.__qos.adds(packet_id, data_seq)
         while 1:
-            if not byte_data: break
-            wrap_data = self.__builder.build_tcp_frame_data(packet_id, byte_data[0:0xff00])
-            byte_data = byte_data[0xff00:]
-            self.writer.write(wrap_data)
-
-        self.add_evt_write(self.fileno)
+            results = self.__qos.gets()
+            if not results: break
+            for data in results: self.send_data(data)
 
     def send_udp_udplite_data(self, packet_id, ip_addr, port, addr_type, byte_data, is_udplite=False):
         if addr_type not in socks2https.addr_types: return

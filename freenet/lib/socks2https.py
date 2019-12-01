@@ -232,11 +232,48 @@ class builder(object):
 
         return self.build_frame(FRAME_TYPE_CONN_STATE, a)
 
-    def build_tcp_frame_data(self, packet_id, data, win_size=1200):
-        a = struct.pack("!IHH", packet_id, win_size, 0)
-        b = b"".join([a, data])
+    def build_tcp_frame_data(self, packet_id, byte_data, my_win_size=1200, win_size=1200):
+        results = []
+        while 1:
+            if not byte_data: break
+            slice_data = byte_data[0:win_size]
+            a = struct.pack("!IHH", packet_id, my_win_size, 0)
+            b = b"".join([a, slice_data])
+            c = self.build_frame(FRAME_TYPE_TCP_DATA, b)
+            byte_data = byte_data[win_size:]
+            results.append(c)
 
-        return self.build_frame(FRAME_TYPE_TCP_DATA, b)
+        return results
+
+
+class qos(object):
+    __data_queue = None
+
+    def __init__(self):
+        self.__data_queue = {}
+
+    def add(self, packet_id, byte_data):
+        if packet_id not in self.__data_queue:
+            self.__data_queue[packet_id] = []
+
+        seq = self.__data_queue[packet_id]
+        seq.append(byte_data)
+
+    def adds(self, packet_id, seq):
+        for byte_data in seq:
+            self.add(packet_id, byte_data)
+
+    def gets(self):
+        results = []
+        for k, seq in self.__data_queue.items():
+            if not seq: continue
+            results.append(seq.pop(0))
+        return results
+
+    def delete(self, packet_id):
+        if packet_id not in self.__data_queue: return
+        del self.__data_queue[packet_id]
+
 
 """
 p = parser()

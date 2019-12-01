@@ -24,6 +24,9 @@ class convert_client(ssl_handler.ssl_handelr):
     __parser = None
     __builder = None
     __time = None
+    __win_size = 0
+    __my_win_size = 0
+    __qos = None
 
     def ssl_init(self, address, path, user, passwd, is_ipv6=False, ssl_on=False):
         self.__wait_sent = []
@@ -37,6 +40,14 @@ class convert_client(ssl_handler.ssl_handelr):
         self.__time = time.time()
         self.tcp_recv_buf_size = 4096
         self.tcp_loop_read_num = 3
+        self.__qos = socks2https.qos()
+
+        if is_ipv6:
+            self.__win_size = 1180
+            self.__my_win_size = 1180
+        else:
+            self.__win_size = 1380
+            self.__my_win_size = 1380
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -200,6 +211,8 @@ class convert_client(ssl_handler.ssl_handelr):
 
     def handle_tcp_data(self, info):
         packet_id, win_size, byte_data = info
+
+        self.__win_size = win_size
         self.dispatcher.handle_tcp_data(packet_id, byte_data)
 
     def handle_udp_udplite_data(self, info):
@@ -289,19 +302,21 @@ class convert_client(ssl_handler.ssl_handelr):
     def send_conn_request(self, frame_type, packet_id, host, port, addr_type, data=b""):
         data = self.__builder.build_conn_frame(frame_type, packet_id, addr_type, host, port,
                                                byte_data=data)
+
+        # 限制连接请求帧长度
+        if len(data) > 0xff00: return
         if self.dispatcher.debug:
             logging.print_general("send_conn_request,%s,(%s,%s)" % (frame_type, host, port,), self.__address)
         self.send_data(data)
 
     def send_tcp_data(self, packet_id, byte_data):
-        ### 防止数据溢出
+        data_seq = self.__builder.build_tcp_frame_data(packet_id, byte_data, my_win_size=self.__my_win_size,
+                                                       win_size=self.__win_size)
+        self.__qos.adds(packet_id, data_seq)
         while 1:
-            if not byte_data: break
-            wrap_data = self.__builder.build_tcp_frame_data(packet_id, byte_data[0:0xff00])
-            byte_data = byte_data[0xff00:]
-            self.send_data(wrap_data)
-
-        self.add_evt_write(self.fileno)
+            results = self.__qos.gets()
+            if not results: break
+            for data in results: self.send_data(data)
 
     def send_conn_close(self, packet_id):
         if not self.is_conn_ok(): return
