@@ -143,6 +143,7 @@ class handler(tcp_handler.tcp_handler):
         self.__time = time.time()
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
+        self.send_now()
 
     def tell_conn_ok(self):
         self.__conn_ok = True

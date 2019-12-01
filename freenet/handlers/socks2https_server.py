@@ -527,6 +527,7 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         self.writer.write(byte_data)
         self.add_evt_write(self.fileno)
         self.__time = time.time()
+        self.send_now()
 
 
 class handler_for_udp(udp_handler.udp_handler):

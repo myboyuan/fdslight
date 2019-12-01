@@ -664,6 +664,7 @@ class raw_tcp_client(tcp_handler.tcp_handler):
         self.__time = time.time()
         self.writer.write(byte_data)
         self.add_evt_write(self.fileno)
+        self.send_now()
 
 
 class raw_udp_client(udp_handler.udp_handler):
