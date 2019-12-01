@@ -547,11 +547,6 @@ class http_socks5_handler(tcp_handler.tcp_handler):
         self.__time = time.time()
         self.writer.write(byte_data)
 
-        # 防止数据接收过多
-        if self.writer.size() > 0xffffff:
-            self.writer._getvalue()
-            return
-
         if not self.__is_socks5 and not self.__is_http_tunnel_mode:
             if not self.__http_response_header_ok:
                 rs = self.handle_http_response_header()
@@ -661,8 +656,6 @@ class raw_tcp_client(tcp_handler.tcp_handler):
 
     def message_from_handler(self, from_fd, byte_data):
         if not self.is_conn_ok():
-            # 防止客户端恶意传送大量数据
-            if self.__wait_sent_size > 0xffff: return
             self.__wait_sent.append(byte_data)
             return
 

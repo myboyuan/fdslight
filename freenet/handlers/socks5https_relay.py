@@ -111,11 +111,6 @@ class handler(tcp_handler.tcp_handler):
         if not self.__is_sent_conn:
             self.send_conn_request()
             self.__is_sent_conn = True
-        # 防止客户端大量发送数据,使服务器内存耗尽
-        if not self.__conn_ok and self.reader.size() > 0xfffff:
-            _ = self.reader.read()
-            self.delete_handler(self.fileno)
-            return
 
         self.__time = time.time()
         self.dispatcher.send_tcp_data(self.__packet_id, self.reader.read())
