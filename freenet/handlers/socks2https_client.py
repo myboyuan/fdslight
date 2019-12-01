@@ -260,6 +260,10 @@ class convert_client(ssl_handler.ssl_handelr):
         return
 
     def tcp_writable(self):
+        while 1:
+            results = self.__qos.gets()
+            if not results: break
+            for data in results: self.send_data(data)
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
@@ -313,10 +317,7 @@ class convert_client(ssl_handler.ssl_handelr):
         data_seq = self.__builder.build_tcp_frame_data(packet_id, byte_data, my_win_size=self.__my_win_size,
                                                        win_size=self.__win_size)
         self.__qos.adds(packet_id, data_seq)
-        while 1:
-            results = self.__qos.gets()
-            if not results: break
-            for data in results: self.send_data(data)
+        self.add_evt_write(self.fileno)
 
     def send_conn_close(self, packet_id):
         if not self.is_conn_ok(): return
