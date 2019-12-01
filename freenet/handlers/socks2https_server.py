@@ -477,7 +477,6 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         while 1:
             try:
                 data = self.__wait_sent.pop(0)
-                print(data)
             except IndexError:
                 break
             self.writer.write(data)

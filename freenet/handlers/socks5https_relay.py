@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
-import pywind.evtframework.handlers.udp_handler as udp_handler
 
 import socket, time
 
