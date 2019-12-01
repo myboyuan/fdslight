@@ -35,6 +35,8 @@ class convert_client(ssl_handler.ssl_handelr):
         self.__parser = socks2https.parser()
         self.__builder = socks2https.builder()
         self.__time = time.time()
+        self.tcp_recv_buf_size = 4096
+        self.tcp_loop_read_num = 20
 
         if is_ipv6:
             fa = socket.AF_INET6

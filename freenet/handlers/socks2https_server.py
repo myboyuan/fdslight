@@ -71,8 +71,8 @@ class handler(tcp_handler.tcp_handler):
         self.__builder = socks2https.builder()
 
         self.__time = time.time()
-        self.tcp_recv_buf_size = 2048
-        self.tcp_loop_read_num = 3
+        self.tcp_recv_buf_size = 4096
+        self.tcp_loop_read_num = 20
 
         self.set_socket(cs)
         self.register(self.fileno)
@@ -452,8 +452,8 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         self.__wait_sent_size = 0
         self.__address = address
 
-        self.tcp_recv_buf_size = 2048
-        self.tcp_loop_read_num = 3
+        self.tcp_recv_buf_size = 4096
+        self.tcp_loop_read_num = 20
 
         if is_ipv6:
             fa = socket.AF_INET6
