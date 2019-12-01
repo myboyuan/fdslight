@@ -132,6 +132,8 @@ class tcp_handler(handler.handler):
                 self.delete_handler(self.fileno)
                 return
             self.tcp_writable()
+        except BlockingIOError:
+            return
         except ConnectionError:
             self.error()
         except FileNotFoundError:
@@ -143,6 +145,7 @@ class tcp_handler(handler.handler):
         """立刻发送数据
         :return:
         """
+        if self.__is_async_socket_client and not self.is_conn_ok(): return
         self.evt_write()
 
     def timeout(self):
