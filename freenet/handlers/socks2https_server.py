@@ -505,9 +505,6 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         self.close()
 
     def message_from_handler(self, from_fd, byte_data):
-        import sys
-        print(byte_data)
-        sys.stdout.flush()
         if not self.is_conn_ok():
             # 客户端在建立连接时恶意发送大量数据规避措施
             if self.__wait_sent_size > 0xffff: return
