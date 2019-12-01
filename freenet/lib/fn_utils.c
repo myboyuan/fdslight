@@ -2,8 +2,10 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#ifndef __FreeBSD__
 #include <linux/if.h>
 #include <linux/if_tun.h>
+#endif
 #include <errno.h>
 #include <net/route.h>
 #include <sys/ioctl.h>
@@ -52,6 +54,7 @@ static unsigned short calc_checksum(unsigned short *buffer,int size)
 /**
  * 激活接口
  */
+#ifndef __FreeBSD__
 static int
 interface_up(char *interface_name)
 {
@@ -236,6 +239,7 @@ tuntap_delete(PyObject *self, PyObject *args)
 
 	Py_RETURN_NONE;
 }
+#endif
 
 
 static PyObject *
@@ -279,13 +283,15 @@ get_netcard_ip(PyObject *self,PyObject *args)
 }
 
 static PyMethodDef UtilsMethods[] = {
+#ifndef __FreeBSD__
 	{"tuntap_create",tuntap_create,METH_VARARGS,"create tuntap device"},
 	{"interface_up",tuntap_interface_up,METH_VARARGS,"interface up tuntap "},
 	{"set_ipaddr",tuntap_set_ipaddr,METH_VARARGS,"set tuntap ip address"},
 	{"tuntap_delete",tuntap_delete,METH_VARARGS,"delete tuntap device ,it equals close"},
+	{"get_nc_ip",get_netcard_ip,METH_VARARGS,"get netcard ip address"},
+#endif
 	{"calc_incre_csum",calc_incre_csum,METH_VARARGS,"calculate incremental checksum"},
 	{"calc_csum",calc_csum,METH_VARARGS,"calculate checksum"},
-	{"get_nc_ip",get_netcard_ip,METH_VARARGS,"get netcard ip address"},
 	{NULL,NULL,0,NULL}
 };
 
@@ -302,7 +308,11 @@ PyMODINIT_FUNC
 PyInit_fn_utils(void)
 {
 	PyObject *m;
+	m = PyModule_Create(&utilsmodule);
 
+	if (NULL == m) return NULL;
+
+#ifndef __FreeBSD__
 	const char *const_names[] = {
 		"IFF_TUN",
 		"IFF_TAP",
@@ -325,11 +335,6 @@ PyInit_fn_utils(void)
 
 	int const_count = sizeof(const_names) / sizeof(NULL);
 
-
-	m = PyModule_Create(&utilsmodule);
-
-	if (NULL == m) return NULL;
-
 	for (int n = 0; n < const_count; n++) {
 		if (PyModule_AddIntConstant(m, const_names[n], const_values[n]) < 0) {
 			return NULL;
@@ -337,6 +342,7 @@ PyInit_fn_utils(void)
 	}
 
 	PyModule_AddStringMacro(m,TUN_DEV_NAME);
+#endif
 
 	return m;
 
