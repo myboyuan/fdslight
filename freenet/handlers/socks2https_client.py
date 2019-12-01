@@ -260,7 +260,7 @@ class convert_client(ssl_handler.ssl_handelr):
         return
 
     def tcp_writable(self):
-        while 1:
+        while 1 and self.__http_handshake_ok:
             results = self.__qos.gets()
             if not results: break
             for data in results: self.send_data(data)
