@@ -269,6 +269,7 @@ calc_csum(PyObject *self,PyObject *args)
     return PyLong_FromLong(csum);
 }
 
+#ifndef __FreeBSD__
 static PyObject *
 get_netcard_ip(PyObject *self,PyObject *args)
 {
@@ -281,6 +282,7 @@ get_netcard_ip(PyObject *self,PyObject *args)
 
     return Py_BuildValue("s",eth_ip);
 }
+#endif
 
 static PyMethodDef UtilsMethods[] = {
 #ifndef __FreeBSD__
