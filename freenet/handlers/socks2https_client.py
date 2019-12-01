@@ -299,8 +299,8 @@ class convert_client(ssl_handler.ssl_handelr):
         ### 防止数据溢出
         while 1:
             if not byte_data: break
-            wrap_data = self.__builder.build_tcp_frame_data(packet_id, byte_data[0:0xfff0])
-            byte_data = byte_data[0xfff0:]
+            wrap_data = self.__builder.build_tcp_frame_data(packet_id, byte_data[0:0xff00])
+            byte_data = byte_data[0xff00:]
             self.writer.write(wrap_data)
 
         self.add_evt_write(self.fileno)

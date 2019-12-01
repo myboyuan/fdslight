@@ -411,8 +411,8 @@ class handler(tcp_handler.tcp_handler):
         ### 防止数据溢出
         while 1:
             if not byte_data: break
-            wrap_data = self.__builder.build_tcp_frame_data(packet_id, byte_data[0:0xfff0])
-            byte_data = byte_data[0xfff0:]
+            wrap_data = self.__builder.build_tcp_frame_data(packet_id, byte_data[0:0xff00])
+            byte_data = byte_data[0xff00:]
             self.writer.write(wrap_data)
 
         self.add_evt_write(self.fileno)
@@ -441,7 +441,6 @@ class handler_for_tcp(tcp_handler.tcp_handler):
     __time = None
 
     __wait_sent = None
-    __wait_sent_size = None
     __address = None
 
     def init_func(self, creator_fd, address, packet_id, is_ipv6=False):
@@ -449,7 +448,6 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         self.__packet_id = packet_id
         self.__time = time.time()
         self.__wait_sent = []
-        self.__wait_sent_size = 0
         self.__address = address
 
         self.tcp_recv_buf_size = 4096
@@ -511,8 +509,6 @@ class handler_for_tcp(tcp_handler.tcp_handler):
     def message_from_handler(self, from_fd, byte_data):
         if not self.is_conn_ok():
             # 客户端在建立连接时恶意发送大量数据规避措施
-            if self.__wait_sent_size > 0xffff: return
-            self.__wait_sent_size += len(byte_data)
             self.__wait_sent.append(byte_data)
             return
         self.writer.write(byte_data)
