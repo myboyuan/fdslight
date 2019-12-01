@@ -480,7 +480,6 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         if not self.handler_exists(self.__creator): return
         self.__time = time.time()
         rdata = self.reader.read()
-        print(rdata)
 
         self.get_handler(self.__creator).send_tcp_data(self.__packet_id, rdata)
 
@@ -505,6 +504,7 @@ class handler_for_tcp(tcp_handler.tcp_handler):
         self.close()
 
     def message_from_handler(self, from_fd, byte_data):
+        print(byte_data)
         if not self.is_conn_ok():
             # 客户端在建立连接时恶意发送大量数据规避措施
             if self.__wait_sent_size > 0xffff: return
