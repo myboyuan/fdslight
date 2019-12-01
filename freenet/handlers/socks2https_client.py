@@ -61,7 +61,7 @@ class convert_client(ssl_handler.ssl_handelr):
     def connect_ok(self):
         logging.print_general("connect_ok", self.__address)
         if self.dispatcher.debug:
-            print(self.socket.getfqdn())
+            print(self.socket.getpeername())
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
