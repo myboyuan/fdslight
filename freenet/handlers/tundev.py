@@ -214,3 +214,7 @@ class tundevc(tun_base):
     def msg_from_tunnel(self, message):
         self.add_to_sent_queue(message)
         self.add_evt_write(self.fileno)
+
+
+class freebsd_tundev(handler.handler):
+    pass
