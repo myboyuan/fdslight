@@ -215,6 +215,3 @@ class tundevc(tun_base):
         self.add_to_sent_queue(message)
         self.add_evt_write(self.fileno)
 
-
-class freebsd_tundev(handler.handler):
-    pass
