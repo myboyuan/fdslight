@@ -81,7 +81,11 @@ class dnsd_proxy(dns_base):
         s = socket.socket(fa, socket.SOCK_DGRAM)
 
         self.set_socket(s)
-        self.connect((dns_server, 53))
+        try:
+            self.connect((dns_server, 53))
+        except:
+            self.close()
+            return -1
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
