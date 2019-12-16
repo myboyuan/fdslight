@@ -44,6 +44,7 @@ goo.gl:1
 *.ads-twitter.com:1
 *.apple.com:0
 *.withgoogle.com:1
+*.google:1
 
 
 #  社交网络
