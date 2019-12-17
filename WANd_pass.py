@@ -21,15 +21,32 @@ class service(dispatcher.dispatcher):
     __binds = None
     __debug = None
 
+    __session_id = None
+
     def init_func(self, debug=False):
         self.__binds = {}
         self.__debug = debug
+        self.__session_id = {}
 
-    def register_bind(self, fd, name):
+    def register_bind(self, fd, auth_id):
         pass
 
-    def unregiser_bind(self, name):
+    def unregiser_bind(self, auth_id):
         pass
+
+    def get_bind(self, auth_id):
+        pass
+
+    def session_add(self, session_id, fd):
+        if session_id in self.__session_id: return
+        self.__session_id[session_id] = fd
+
+    def session_del(self, session_id):
+        if session_id not in self.__session_id: return
+        del self.__session_id[session_id]
+
+    def session_get(self, session_id):
+        return self.__session_id.get(session_id, None)
 
     def create_services(self):
         pass
