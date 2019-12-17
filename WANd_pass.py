@@ -19,9 +19,11 @@ import freenet.lib.cfg_check as cfg_check
 
 class service(dispatcher.dispatcher):
     __binds = None
+    __debug = None
 
-    def init_func(self):
+    def init_func(self, debug=False):
         self.__binds = {}
+        self.__debug = debug
 
     def register_bind(self, fd, name):
         pass
@@ -34,6 +36,10 @@ class service(dispatcher.dispatcher):
 
     def release(self):
         pass
+
+    @property
+    def debug(self):
+        return self.__debug
 
 
 def update_configs():
@@ -60,7 +66,7 @@ def start(debug):
 
     cls = service()
     try:
-        cls.ioloop()
+        cls.ioloop(debug=debug)
     except KeyboardInterrupt:
         cls.release()
         sys.exit(0)
@@ -68,13 +74,13 @@ def start(debug):
 
 def main():
     help_doc = """
-    start | stop | debug
+    start | stop | debug | reload
     """
     if len(sys.argv) != 2:
         print(help_doc)
         return
 
-    if sys.argv[1] not in ("start", "stop", "debug"):
+    if sys.argv[1] not in ("start", "stop", "debug", "reload",):
         print(help_doc)
         return
 

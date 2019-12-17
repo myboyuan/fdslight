@@ -58,6 +58,7 @@ class handler(tcp_handler.tcp_handler):
     __auth_id = None
 
     __time = None
+    __role = None
 
     def init_func(self, creator_fd, cs, caddr, auth_id, is_ipv6=False):
 
@@ -145,6 +146,27 @@ class handler(tcp_handler.tcp_handler):
         if not sec_ws_proto:
             self.send_403_response()
             return
+
+        auth_id = self.get_kv_value(kv, "x-auth-id")
+        if not auth_id:
+            self.send_403_response()
+            return
+
+        role = self.get_kv_value(kv, "x-role")
+        if not role:
+            self.send_403_response()
+            return
+
+        self.__role = role.lower()
+        if self.__role not in ("cs", "ms",):
+            self.send_403_response()
+            return
+
+        if self.__role == "ms":
+            session_id = self.get_kv_value(kv, "x-session-id")
+            if not session_id:
+                self.send_403_response()
+                return
 
         resp_headers = [
             ("Content-Length", "0"),
