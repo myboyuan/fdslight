@@ -1,0 +1,29 @@
+### 内网向internet提供服务协议,需要有公网IP主机 
+### 协议详解说明（握手请求采用WebSocket标准握手请求)
+# 附加头部如下:
+    X-Auth-Service-Id: 验证服务ID,由客户端自定义
+    X-Service-Role: 服务角色,有两个值可以选, cs 和 ms,翻译成信道会话与消息会话,信道会话必须时刻在线,保证连接请求能够被传递,ms传递消息内容
+    X-Session-Id:会话ID,由有公网IP的服务器随机生成,该字段只有ms发出请求才有
+
+
+协议头部如下:
+version:1 byte,目前为1
+type:1 byte, 0 表示ping,1表示pong,2表示请求建立连接请求,3表示响应连接状态,4表示消息内容,5表示关闭连接(局域网ms客户端发起)
+length:2 bytes 内容长度,ping和pong的数据长度为随机值
+
+2和3一定是cs角色发起的,cs角色不能传输类型为4的内容,同理ms角色也不能传输2和3的内容
+
+2的格式如下
+session_id:16 bytes,会话ID,由有公网IP的服务器生成
+ip_address:16 bytes ,IP地址
+port:2 bytes,目标端口
+is_ipv6:1byte  是否是IP地址,非0表示IPv6地址
+reverse:1 byte 保留字段
+
+3的格式如下
+session_id:16 bytes,会话ID,由有公网IP的服务器生成
+err_code:4 bytes 故障码,0表示成功,非0表示连接错误
+
+4消息内容
+
+

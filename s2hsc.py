@@ -25,9 +25,6 @@ PID_PATH = "/tmp/s2hsc.pid"
 LOG_FILE = "%s/s2hsc.log" % BASE_DIR
 ERR_FILE = "%s/s2hsc_err.log" % BASE_DIR
 
-# 虚拟网卡名
-VETH_NAME = "s2hsc"
-
 
 class serverd(dispatcher.dispatcher):
     __cfg_path = None
