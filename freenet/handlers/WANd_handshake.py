@@ -10,10 +10,8 @@ import freenet.lib.intranet_pass as intranet_pass
 
 class listener(tcp_handler.tcp_handler):
     __is_ipv6 = None
-    __auth_id = None
 
-    def init_func(self, creator_fd, address, auth_id, is_ipv6=False):
-        self.__auth_id = auth_id
+    def init_func(self, creator_fd, address, is_ipv6=False):
         self.__is_ipv6 = is_ipv6
 
         if is_ipv6:
@@ -55,16 +53,14 @@ class handler(tcp_handler.tcp_handler):
     __caddr = None
     __parser = None
     __builder = None
-    __auth_id = None
 
     __time = None
     __role = None
 
-    def init_func(self, creator_fd, cs, caddr, auth_id, is_ipv6=False):
+    def init_func(self, creator_fd, cs, caddr, is_ipv6=False):
 
         self.__handshake_ok = False
         self.__caddr = caddr
-        self.__auth_id = auth_id
 
         self.__parser = intranet_pass.parser()
         self.__builder = intranet_pass.builder()
@@ -238,3 +234,13 @@ class handler(tcp_handler.tcp_handler):
     def tcp_delete(self):
         self.unregister(self.fileno)
         self.close()
+
+    def send_conn_request(self, session_id, remote_addr, remote_port, is_ipv6=False):
+        pass
+
+    def handle_conn_response(self, byte_data):
+        """处理客户端发送过来的连接响应帧
+        """
+        pass
+
+

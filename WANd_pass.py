@@ -10,6 +10,7 @@ sys.path.append(BASE_DIR)
 PID_PATH = "/tmp/WANd.pid"
 LOG_FILE = "%s/WANd.log" % BASE_DIR
 ERR_FILE = "%s/WANd_err.log" % BASE_DIR
+CFG_FILE = "%s/fdslight_etc/WANd.ini" % BASE_DIR
 
 import pywind.evtframework.evt_dispatcher as dispatcher
 import pywind.lib.configfile as cfg
@@ -18,24 +19,28 @@ import freenet.lib.cfg_check as cfg_check
 
 
 class service(dispatcher.dispatcher):
-    __binds = None
     __debug = None
+    __binds = None
 
     __session_id = None
+
+    # 控制协议帧连接信息
+    __ctl_conns = None
 
     def init_func(self, debug=False):
         self.__binds = {}
         self.__debug = debug
         self.__session_id = {}
+        self.__ctl_conns = {}
 
-    def register_bind(self, fd, auth_id):
-        pass
+    def send_conn_request(self, auth_id, remote_ipaddr, remote_port, is_ipv6=False):
+        """向局域网发送请求
+        """
+        if auth_id not in self.__binds: return None
+        if auth_id not in self.__ctl_conns: return None
 
-    def unregiser_bind(self, auth_id):
-        pass
+        fd = self.__ctl_conns[auth_id]
 
-    def get_bind(self, auth_id):
-        pass
 
     def session_add(self, session_id, fd):
         if session_id in self.__session_id: return
@@ -48,8 +53,55 @@ class service(dispatcher.dispatcher):
     def session_get(self, session_id):
         return self.__session_id.get(session_id, None)
 
+    def __create_service(self, name, configs):
+        listen_ip = configs.get("listen_ip", "0.0.0.0")
+        if not cfg_check.is_ipv6(listen_ip) or not cfg_check.is_ipv4(listen_ip):
+            sys.stderr.write("wrong listen_ip configure from name %s" % name)
+            return False
+
+        is_ipv6 = cfg_check.is_ipv6(listen_ip)
+        if not cfg_check.is_port(configs.get("port", None)):
+            sys.stderr.write("wrong listen port configure from name %s" % name)
+            return False
+
+        port = int(configs["port"])
+
+        remote_addr = configs.get("remote_address", "127.0.0.1")
+        if not cfg_check.is_ipv6(remote_addr) or not cfg_check.is_ipv4(remote_addr):
+            sys.stderr.write("wrong remote_address configure from name %s" % name)
+            return False
+
+        remote_is_ipv6 = cfg_check.is_ipv6(remote_addr)
+        if not cfg_check.is_port(configs.get("remote_port", None)):
+            sys.stderr.write("wrong remote_port configure from name %s" % name)
+            return False
+
+        remote_port = int(configs["remote_port"])
+        if not cfg_check.is_number(configs.get("heartbeat_time", None)):
+            sys.stderr.write("wrong heartbeat_time configure from name %s" % name)
+            return False
+
+        timeout = int(configs["timeout"])
+        if timeout < 1:
+            sys.stderr.write("wrong timeout  configure from name %s" % name)
+            return False
+
+        if "auth_id" not in configs:
+            sys.stderr.write("not found auth_id configure from name %s" % name)
+            return False
+
+        return True
+
     def create_services(self):
-        pass
+        cfgs = cfg.ini_parse_from_file(CFG_FILE)
+
+        for name in cfgs:
+            if name == "listen": continue
+            configs = cfgs[name]
+            if not self.__create_service(name, configs):
+                self.release()
+                sys.stderr.write("wrong WANd configure file name:listen")
+                return
 
     def release(self):
         pass

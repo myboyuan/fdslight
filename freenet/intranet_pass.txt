@@ -2,9 +2,6 @@
 ### 协议详解说明（握手请求采用WebSocket标准握手请求)
 # 附加头部如下:
     X-Auth-Id: 验证服务ID,由客户端自定义
-    X-Role: 服务角色,有两个值可以选, cs 和 ms,翻译成信道会话与消息会话,信道会话必须时刻在线,保证连接请求能够被传递,ms传递消息内容
-    X-Session-Id:会话ID,由有公网IP的服务器随机生成,该字段只有ms发出请求才有
-
 
 协议头部如下:
 version:1 byte,目前为1
@@ -24,6 +21,11 @@ reverse:1 byte 保留字段
 session_id:16 bytes,会话ID,由有公网IP的服务器生成
 err_code:4 bytes 故障码,0表示成功,非0表示连接错误
 
-4消息内容
+4消息内容格式入校
+session_id:16 bytes
+content:...
+
+5关闭连接如下
+session_id:16 bytes
 
 
