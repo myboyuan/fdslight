@@ -22,7 +22,7 @@ class service(dispatcher.dispatcher):
     __debug = None
     __binds = None
 
-    __session_id = None
+    __session_ids = None
 
     # 控制协议帧连接信息
     __ctl_conns = None
@@ -30,28 +30,44 @@ class service(dispatcher.dispatcher):
     def init_func(self, debug=False):
         self.__binds = {}
         self.__debug = debug
-        self.__session_id = {}
+        self.__session_ids = {}
         self.__ctl_conns = {}
 
-    def send_conn_request(self, auth_id, remote_ipaddr, remote_port, is_ipv6=False):
+    def __gen_session_id(self):
+        session_id = os.urandom(16)
+        while session_id in self.__session_ids:
+            session_id = os.urandom(16)
+        return session_id
+
+    def send_conn_request(self, fd, auth_id, remote_ipaddr, remote_port, is_ipv6=False):
         """向局域网发送请求
         """
         if auth_id not in self.__binds: return None
         if auth_id not in self.__ctl_conns: return None
 
-        fd = self.__ctl_conns[auth_id]
+        session_id = self.__gen_session_id()
+        f = self.__ctl_conns[auth_id]
 
+        self.get_handler(f).send_conn_request(session_id, remote_ipaddr, remote_port, is_ipv6=is_ipv6)
+        self.__session_ids[session_id] = fd
 
-    def session_add(self, session_id, fd):
-        if session_id in self.__session_id: return
-        self.__session_id[session_id] = fd
+        return session_id
+
+    def send_conn_data(self, session_id, data):
+        pass
+
+    def tell_conn_fail(self, session_id):
+        pass
+
+    def tell_conn_ok(self, session_id):
+        pass
 
     def session_del(self, session_id):
-        if session_id not in self.__session_id: return
-        del self.__session_id[session_id]
+        if session_id not in self.__session_ids: return
+        del self.__session_ids[session_id]
 
     def session_get(self, session_id):
-        return self.__session_id.get(session_id, None)
+        return self.__session_ids.get(session_id, None)
 
     def __create_service(self, name, configs):
         listen_ip = configs.get("listen_ip", "0.0.0.0")

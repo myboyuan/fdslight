@@ -41,6 +41,9 @@ class service(dispatcher.dispatcher):
     def debug(self):
         return self.__debug
 
+    def tell_delete(self, session_id):
+        pass
+
 
 def update_configs():
     pid = proc.get_pid(PID_PATH)
