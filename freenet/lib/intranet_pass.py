@@ -44,7 +44,7 @@ class parser(object):
             raise ProtoErr("unsupport protocol number %s" % self.__type)
 
     def parse_conn_request(self):
-        if self.__reader.size() < 36:
+        if self.__reader.size() != 36:
             raise ProtoErr("wrong conn request content length")
 
         session_id, byte_addr, port, is_ipv6, _ = struct.unpack("!16s16sHBB", self.__reader.read(36))
@@ -59,12 +59,31 @@ class parser(object):
         )
 
     def parse_conn_response(self):
-        if self.__reader.size() < 20:
+        if self.__length != 20:
             raise ProtoErr("wrong conn response content length")
 
         session_id, err_code = struct.unpack("!16si", self.__reader.read(20))
         self.__results.append(
             (self.__type, (session_id, err_code,))
+        )
+
+    def parse_conn_close(self):
+        if self.__length != 16:
+            raise ProtoErr("wrong conn close content length")
+        session_id = self.__reader.read(16)
+        self.__results.append(
+            (self.__type, session_id,)
+        )
+
+    def parse_conn_data(self):
+        if self.__length < 17:
+            raise ProtoErr("wrong conn data content length")
+
+        session_id = self.__reader.read(16)
+        data = self.__reader.read(self.__reader.read(self.__length - 16))
+
+        self.__results.append(
+            (self.__type, (session_id, data,))
         )
 
     def parse_body(self):
@@ -76,6 +95,12 @@ class parser(object):
             return
         if self.__type == TYPE_CONN_RESP:
             self.parse_conn_response()
+            return
+        if self.__type == TYPE_CONN_CLOSE:
+            self.parse_conn_close()
+            return
+        if self.__type == TYPE_MSG_CONTENT:
+            self.parse_conn_data()
             return
 
         self.__results.append(
