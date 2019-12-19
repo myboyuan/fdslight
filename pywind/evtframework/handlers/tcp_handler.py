@@ -17,6 +17,7 @@ class tcp_handler(handler.handler):
     __is_async_socket_client = False
     __is_listen_socket = False
     __delete_this_no_sent_data = False
+    __is_closed = None
 
     # 一次性循环读取次数
     tcp_loop_read_num = None
@@ -27,6 +28,7 @@ class tcp_handler(handler.handler):
         super(tcp_handler, self).__init__()
         self.__reader = reader.reader()
         self.__writer = writer.writer()
+        self.__is_closed = False
         self.tcp_loop_read_num = 10
         self.tcp_recv_buf_size = 2048
 
@@ -53,6 +55,7 @@ class tcp_handler(handler.handler):
         return self.socket.accept()
 
     def close(self):
+        self.__is_closed = True
         self.socket.close()
 
     @property
@@ -109,6 +112,7 @@ class tcp_handler(handler.handler):
         return
 
     def evt_write(self):
+        if self.__is_closed: return
         if self.__is_async_socket_client and not self.is_conn_ok():
             self.unregister(self.fileno)
             if self.__conn_ev_flag:

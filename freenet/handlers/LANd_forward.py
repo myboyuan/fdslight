@@ -45,6 +45,7 @@ class client(ssl_handler.ssl_handelr):
         context.set_alpn_protocols(["http/1.1"])
         s = context.wrap_socket(s, do_handshake_on_connect=False)
 
+        logging.print_general("connecting", self.__address)
         self.set_socket(s)
         self.connect(address)
 
@@ -111,6 +112,7 @@ class client(ssl_handler.ssl_handelr):
         """
         size = self.reader.size()
         data = self.reader.read()
+        print(data)
 
         p = data.find(b"\r\n\r\n")
 
@@ -223,7 +225,6 @@ class client(ssl_handler.ssl_handelr):
 
     def tcp_delete(self):
         logging.print_general("disconnect", self.__address)
-        self.dispatcher.tell_close_for_all()
         self.unregister(self.fileno)
         self.close()
 

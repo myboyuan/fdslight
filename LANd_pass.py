@@ -30,6 +30,10 @@ class service(dispatcher.dispatcher):
         self.__debug = debug
         self.__sessions = {}
         self.__configs = {}
+        self.__conns = {}
+
+        self.create_poll()
+        self.create_connections()
 
     def __create_conn(self, name, configs):
         if "host" not in configs:
@@ -49,7 +53,7 @@ class service(dispatcher.dispatcher):
         force_ipv6 = bool(int(configs.get("force_ipv6", "0")))
         host = configs["host"]
         is_ipv6 = False
-        if not cfg_check.is_ipv4(host) and not cfg_check.is_ipv6(host): is_ipv6 = True
+        if not cfg_check.is_ipv4(host) and not cfg_check.is_ipv6(host): is_ipv6 = force_ipv6
         if cfg_check.is_ipv6(host): is_ipv6 = True
 
         if not cfg_check.is_port(configs.get("port", "443")):
@@ -58,18 +62,19 @@ class service(dispatcher.dispatcher):
 
         port = int(configs.get("port", "443"))
         auth_id = configs["auth_id"]
-        uri = configs["uri"]
+        uri = configs["URI"]
 
         if auth_id in self.__conns:
             sys.stderr.write("auth id %s exists\r\n" % auth_id)
             return False
 
-        fd = self.create_handler(-1, lan_fwd.client, (host, port,), uri, auth_id, is_ipv6=is_ipv6, ssl_on=True)
+        fd = self.create_handler(-1, lan_fwd.client, (host, port,), uri, auth_id, is_ipv6=is_ipv6)
         if fd < 0:
             sys.stderr.write("create %s connection is failed\r\n" % name)
             return False
 
         self.__conns[auth_id] = fd
+        return True
 
     def create_connections(self):
         cfgs = cfg.ini_parse_from_file(CFG_FILE)
@@ -123,7 +128,9 @@ class service(dispatcher.dispatcher):
 
     def handle_conn_request(self, auth_id, session_id, remote_addr, remote_port, is_ipv6):
         if session_id in self.__sessions:
-            self.tell_delete(session_id)
+            fd = self.__sessions[session_id]
+            self.delete_handler(fd)
+            del self.__sessions[session_id]
 
         fd = self.create_handler(-1, lan_raw.client, (remote_addr, remote_port,), auth_id, session_id, is_ipv6=is_ipv6)
         self.__sessions[session_id] = fd
