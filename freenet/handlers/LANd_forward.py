@@ -22,7 +22,7 @@ class client(ssl_handler.ssl_handelr):
     __ssl_ok = None
     __auth_id = None
 
-    def ssl_init(self, address, path, auth_id, is_ipv6=False, ssl_on=False):
+    def ssl_init(self, address, path, auth_id, is_ipv6=False):
         self.__address = address
         self.__path = path
         self.__http_handshake_ok = False

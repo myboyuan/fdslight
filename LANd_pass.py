@@ -31,10 +31,56 @@ class service(dispatcher.dispatcher):
         self.__sessions = {}
         self.__configs = {}
 
+    def __create_conn(self, name, configs):
+        if "host" not in configs:
+            sys.stderr.write("not found host from configure %s\r\n" % name)
+            return False
+        if "auth_id" not in configs:
+            sys.stderr.write("not found auth_id from configure %s\r\n" % name)
+            return False
+        if "URI" not in configs:
+            sys.stderr.write("not found URI from configure %s\r\n" % name)
+            return False
+
+        if not cfg_check.is_number(configs.get("force_ipv6", "0")):
+            sys.stderr.write("wrong force_ipv6 value from configure %s\r\n" % name)
+            return False
+
+        force_ipv6 = bool(int(configs.get("force_ipv6", "0")))
+        host = configs["host"]
+        is_ipv6 = False
+        if not cfg_check.is_ipv4(host) and not cfg_check.is_ipv6(host): is_ipv6 = True
+        if cfg_check.is_ipv6(host): is_ipv6 = True
+
+        if not cfg_check.is_port(configs.get("port", "443")):
+            sys.stderr.write("wrong port value from configure %s\r\n" % name)
+            return False
+
+        port = int(configs.get("port", "443"))
+        auth_id = configs["auth_id"]
+        uri = configs["uri"]
+
+        if auth_id in self.__conns:
+            sys.stderr.write("auth id %s exists\r\n" % auth_id)
+            return False
+
+        fd = self.create_handler(-1, lan_fwd.client, (host, port,), uri, auth_id, is_ipv6=is_ipv6, ssl_on=True)
+        if fd < 0:
+            sys.stderr.write("create %s connection is failed\r\n" % name)
+            return False
+
+        self.__conns[auth_id] = fd
+
     def create_connections(self):
         cfgs = cfg.ini_parse_from_file(CFG_FILE)
 
-
+        for name in cfgs:
+            rs = self.__create_conn(name, cfgs[name])
+            if not rs:
+                self.release()
+                break
+            ''''''
+        return
 
     def release(self):
         pass
@@ -81,6 +127,11 @@ class service(dispatcher.dispatcher):
 
         fd = self.create_handler(-1, lan_raw.client, (remote_addr, remote_port,), auth_id, session_id, is_ipv6=is_ipv6)
         self.__sessions[session_id] = fd
+
+    def myloop(self):
+        """检查哪些连接已经丢失,对于连接失败的重新建立连接
+        """
+        pass
 
 
 def update_configs():
