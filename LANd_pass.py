@@ -80,7 +80,7 @@ class service(dispatcher.dispatcher):
                 self.release()
                 break
             ''''''
-        return
+        self.__configs = cfgs
 
     def release(self):
         pass
@@ -89,12 +89,12 @@ class service(dispatcher.dispatcher):
     def debug(self):
         return self.__debug
 
-    def tell_delete(self, session_id):
+    def session_del(self, session_id):
         if session_id not in self.__sessions: return
-        fd = self.__sessions[session_id]
-        self.delete_handler(fd)
-
         del self.__sessions[session_id]
+
+    def session_get(self, session_id):
+        return self.__sessions.get(session_id, None)
 
     def send_conn_data_to_local(self, session_id, byte_data):
         if session_id not in self.__sessions: return
@@ -131,7 +131,14 @@ class service(dispatcher.dispatcher):
     def myloop(self):
         """检查哪些连接已经丢失,对于连接失败的重新建立连接
         """
-        pass
+        for name in self.__configs:
+            config = self.__configs[name]
+            auth_id = config["auth_id"]
+            if auth_id not in self.__conns:
+                rs = self.__create_conn(name, config)
+                if not rs: continue
+            ''''''
+        ''''''
 
 
 def update_configs():
