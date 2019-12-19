@@ -12,7 +12,6 @@ import freenet.lib.intranet_pass as intranet_pass
 class client(ssl_handler.ssl_handelr):
     """把任意数据包转换成私有协议
     """
-    __wait_sent = None
     __address = None
     __path = None
     __http_handshake_ok = None
@@ -21,13 +20,9 @@ class client(ssl_handler.ssl_handelr):
     __builder = None
     __time = None
     __ssl_ok = None
-
-    __role = None
     __auth_id = None
-    __session_id = None
 
-    def ssl_init(self, address, path, auth_id, role, session_id=None, is_ipv6=False, ssl_on=False):
-        self.__wait_sent = []
+    def ssl_init(self, address, path, auth_id, is_ipv6=False, ssl_on=False):
         self.__address = address
         self.__path = path
         self.__http_handshake_ok = False
@@ -35,9 +30,7 @@ class client(ssl_handler.ssl_handelr):
         self.__builder = intranet_pass.builder()
         self.__time = time.time()
         self.__ssl_ok = False
-        self.__role = role
         self.__auth_id = auth_id
-        self.__session_id = session_id
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -93,7 +86,9 @@ class client(ssl_handler.ssl_handelr):
             "User-Agent", "LANd_pass",),
                     ("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2"),
                     ("Sec-WebSocket-Version", 13,), ("Sec-WebSocket-Key", self.rand_string(),),
-                    ("Sec-WebSocket-Protocol", "Socks2Https")]
+                    ("Sec-WebSocket-Protocol", "intranet_pass",),
+                    ("X-Auth-Id", self.__auth_id,)
+                    ]
 
         if int(self.__address[1]) == 443:
             host = ("Host", self.__address[0],)
@@ -155,15 +150,6 @@ class client(ssl_handler.ssl_handelr):
 
         self.__http_handshake_ok = True
         logging.print_general("https_handshake_ok", self.__address)
-        # 发送还没有连接的时候堆积的数据包
-        if self.__wait_sent: self.add_evt_write(self.fileno)
-        while 1:
-            try:
-                self.writer.write(self.__wait_sent.pop(0))
-            except IndexError:
-                break
-            ''''''
-        ''''''
 
     def get_http_kv_pairs(self, name, kv_pairs):
         for k, v in kv_pairs:
@@ -172,9 +158,22 @@ class client(ssl_handler.ssl_handelr):
             ''''''
         return
 
-    def rand_bytes(self):
+    def handle_ping(self):
         n = random.randint(0, 128)
-        return os.urandom(n)
+        pong = self.__builder.build_pong(length=n)
+        self.send_data(pong)
+
+    def handle_pong(self):
+        self.__time = time.time()
+
+    def handle_conn_request(self, session_id, remote_addr, remote_port, is_ipv6):
+        self.dispatcher.handle_conn_request(self.__auth_id, session_id, remote_addr, remote_port, is_ipv6)
+
+    def handle_conn_close(self, session_id):
+        self.dispatcher.tell_delete(session_id)
+
+    def handle_conn_data(self, session_id, data):
+        self.dispatcher.send_conn_data_to_local(session_id, data)
 
     def tcp_readable(self):
         if not self.__http_handshake_ok:
@@ -182,10 +181,31 @@ class client(ssl_handler.ssl_handelr):
             return
 
         self.__parser.input(self.reader.read())
-        self.__time = time.time()
-
         while 1:
-            pass
+            try:
+                self.__parser.parse()
+            except intranet_pass.ProtoErr:
+                self.delete_handler(self.fileno)
+                break
+            rs = self.__parser.get_result()
+            if not rs: break
+            _type, o = rs
+            if _type == intranet_pass.TYPE_PING:
+                self.handle_ping()
+                continue
+            if _type == intranet_pass.TYPE_PONG:
+                self.handle_pong()
+                continue
+            if _type == intranet_pass.TYPE_CONN_REQ:
+                self.handle_conn_request(*o)
+                continue
+            if _type == intranet_pass.TYPE_CONN_CLOSE:
+                self.handle_conn_close(*o)
+                continue
+            if _type == intranet_pass.TYPE_MSG_CONTENT:
+                self.handle_conn_data(*o)
+                continue
+            ''''''
 
     def tcp_writable(self):
         if not self.__ssl_ok: return
@@ -209,9 +229,22 @@ class client(ssl_handler.ssl_handelr):
         :param byte_data:
         :return:
         """
-        if not self.__http_handshake_ok:
-            self.__wait_sent.append(byte_data)
-            return
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
         self.send_now()
+
+    def send_conn_data(self, session_id, byte_data):
+        data = self.__builder.build_conn_data(session_id, byte_data)
+        self.send_data(data)
+
+    def send_conn_fail(self, session_id):
+        data = self.__builder.build_conn_response(session_id, 1)
+        self.send_data(data)
+
+    def send_conn_ok(self, session_id):
+        data = self.__builder.build_conn_response(session_id, 0)
+        self.send_data(data)
+
+    def send_conn_close(self, session_id):
+        data = self.__builder.build_conn_close(session_id)
+        self.send_data(data)

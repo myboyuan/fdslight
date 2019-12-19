@@ -3,25 +3,20 @@
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.web.lib.websocket as ws
 import pywind.web.lib.httputils as httputils
-import socket, time, random, os
+import socket, time, random, os, sys
 import freenet.lib.logging as logging
 import freenet.lib.intranet_pass as intranet_pass
 
 
 class listener(tcp_handler.tcp_handler):
-    __is_ipv6 = None
+    __address = None
 
-    def init_func(self, creator_fd, address, is_ipv6=False):
-        self.__is_ipv6 = is_ipv6
+    def init_func(self, creator_fd, address):
+        if os.path.isfile(address):
+            sys.stderr.write("the %s is exists\r\n" % address)
+            return -1
 
-        if is_ipv6:
-            fa = socket.AF_INET6
-        else:
-            fa = socket.AF_INET
-
-        s = socket.socket(fa, socket.SOCK_STREAM)
-        if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
         self.set_socket(s)
         self.bind(address)
@@ -37,7 +32,7 @@ class listener(tcp_handler.tcp_handler):
                 cs, caddr = self.accept()
             except BlockingIOError:
                 break
-            self.create_handler(self.fileno, handler, cs, caddr, self.__auth_id, is_ipv6=self.__is_ipv6)
+            self.create_handler(self.fileno, handler, cs, caddr)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
@@ -57,7 +52,7 @@ class handler(tcp_handler.tcp_handler):
     __time = None
     __role = None
 
-    def init_func(self, creator_fd, cs, caddr, is_ipv6=False):
+    def init_func(self, creator_fd, cs, caddr):
 
         self.__handshake_ok = False
         self.__caddr = caddr
@@ -148,21 +143,9 @@ class handler(tcp_handler.tcp_handler):
             self.send_403_response()
             return
 
-        role = self.get_kv_value(kv, "x-role")
-        if not role:
+        if not self.dispatcher.auth_id_exists(auth_id):
             self.send_403_response()
             return
-
-        self.__role = role.lower()
-        if self.__role not in ("cs", "ms",):
-            self.send_403_response()
-            return
-
-        if self.__role == "ms":
-            session_id = self.get_kv_value(kv, "x-session-id")
-            if not session_id:
-                self.send_403_response()
-                return
 
         resp_headers = [
             ("Content-Length", "0"),
@@ -170,7 +153,7 @@ class handler(tcp_handler.tcp_handler):
 
         resp_headers += [("Connection", "Upgrade",), ("Upgrade", "websocket",)]
         resp_headers += [("Sec-WebSocket-Accept", ws.gen_handshake_key(sec_ws_key))]
-        resp_headers += [("Sec-WebSocket-Protocol", "socks2https")]
+        resp_headers += [("Sec-WebSocket-Protocol", "intranet_pass")]
 
         logging.print_general("handshake_ok", self.__caddr)
 
@@ -196,10 +179,12 @@ class handler(tcp_handler.tcp_handler):
         return None
 
     def handle_ping(self):
-        pass
+        n = random.randint(1, 100)
+        pong = self.__builder.build_pong(length=n)
+        self.send_data(pong)
 
     def handle_pong(self):
-        pass
+        self.__time = time.time()
 
     def handle_data(self):
         rdata = self.reader.read()
@@ -270,16 +255,31 @@ class handler(tcp_handler.tcp_handler):
         byte_data = self.__builder.build_conn_request(session_id, remote_addr, remote_port, is_ipv6=is_ipv6)
         self.send_data(byte_data)
 
+    def send_conn_data(self, session_id, byte_data):
+        pass
+
     def handle_conn_response(self, session_id, err_code):
         """处理客户端发送过来的连接响应帧
         """
+        fd = self.dispatcher.session_get(session_id)
+        if not fd: return
+
         if err_code:
             self.dispatcher.tell_conn_fail(session_id)
         else:
             self.dispatcher.tell_conn_ok(session_id)
 
     def handle_conn_data(self, session_id, byte_data):
-        pass
+        """处理连接数据
+        """
+        fd = self.dispatcher.session_get(session_id)
+        if not fd: return
+
+        self.send_message_to_handler(self.fileno, fd, byte_data)
 
     def handle_conn_close(self, session_id):
-        pass
+        fd = self.dispatcher.session_get(session_id)
+        # 忽略找不到的fd
+        if not fd: return
+        # 删除对应文件描述符
+        self.delete_handler(fd)

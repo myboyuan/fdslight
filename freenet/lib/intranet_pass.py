@@ -159,3 +159,22 @@ class builder(object):
         body_data = struct.pack("!16si", session_id, err_code)
 
         return self.build_data(TYPE_CONN_RESP, body_data)
+
+    def build_conn_close(self, session_id):
+        return self.build_data(TYPE_CONN_CLOSE, session_id)
+
+    def build_conn_data(self, session_id, byte_data):
+        seq = []
+        # 首先对数据分片
+        while 1:
+            t = byte_data[0:0xff00]
+            if not t: break
+            seq.append(t)
+            byte_data = byte_data[0xff00:]
+
+        results = []
+        for data in seq:
+            wrap_data = self.build_data(TYPE_MSG_CONTENT, b"".join([session_id, data, ]))
+            results.append(wrap_data)
+
+        return b"".join(results)

@@ -6,6 +6,7 @@ import socket
 def is_number(value):
     """是否是数字
     """
+    if value == None: return False
     try:
         int(value)
     except ValueError:
@@ -17,7 +18,7 @@ def is_number(value):
 def is_port(value):
     if not is_number(value): return False
 
-    v = value(value)
+    v = int(value)
     if v < 1: return False
     if v > 0xffff: return False
 

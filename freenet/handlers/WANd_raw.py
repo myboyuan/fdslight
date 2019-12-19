@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
-import socket, time, os
+import socket, time, os, sys
 import freenet.lib.logging as logging
 
 
@@ -37,7 +37,7 @@ class listener(tcp_handler.tcp_handler):
                 cs, caddr = self.accept()
             except BlockingIOError:
                 break
-            self.create_handler(self.fileno, handler, cs, caddr, self.__auth_id, is_ipv6=self.__is_ipv6)
+            self.create_handler(self.fileno, handler, cs, caddr, self.__auth_id, self.__remote_info)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
@@ -75,6 +75,7 @@ class handler(tcp_handler.tcp_handler):
         self.__session_id = self.dispatcher.send_conn_request(cs.fileno(), auth_id, remote_addr, remote_port,
                                                               is_ipv6=is_ipv6)
         if not self.__session_id:
+            sys.stderr.write("send conn request fail from auth_id:%s\r\n" % auth_id)
             cs.close()
             return -1
 
@@ -82,6 +83,7 @@ class handler(tcp_handler.tcp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         self.set_timeout(self.fileno, 10)
+        logging.print_general("accepted", self.__caddr)
 
         return self.fileno
 
@@ -117,3 +119,6 @@ class handler(tcp_handler.tcp_handler):
         self.__time = time.time()
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
+
+    def message_from_handler(self, from_fd, byte_data):
+        self.send_data(byte_data)
