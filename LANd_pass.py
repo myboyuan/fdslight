@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, os, getopt, signal, random
+import sys, os, signal, time
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -25,12 +25,14 @@ class service(dispatcher.dispatcher):
     __debug = None
     __sessions = None
     __configs = None
+    __time = None
 
     def init_func(self, debug=False):
         self.__debug = debug
         self.__sessions = {}
         self.__configs = {}
         self.__conns = {}
+        self.__time = time.time()
 
         self.create_poll()
         self.create_connections()
@@ -88,7 +90,13 @@ class service(dispatcher.dispatcher):
         self.__configs = cfgs
 
     def release(self):
-        pass
+        for session_id in self.__sessions:
+            fd = self.__sessions[session_id]
+            self.delete_handler(fd)
+
+        for auth_id in self.__conns:
+            fd = self.__conns[auth_id]
+            self.delete_handler(fd)
 
     @property
     def debug(self):
@@ -97,6 +105,10 @@ class service(dispatcher.dispatcher):
     def session_del(self, session_id):
         if session_id not in self.__sessions: return
         del self.__sessions[session_id]
+
+    def delete_fwd_conn(self, auth_id):
+        if auth_id not in self.__conns: return
+        del self.__conns[auth_id]
 
     def session_get(self, session_id):
         return self.__sessions.get(session_id, None)
@@ -138,6 +150,11 @@ class service(dispatcher.dispatcher):
     def myloop(self):
         """检查哪些连接已经丢失,对于连接失败的重新建立连接
         """
+        # 每隔一段时间重新建立连接
+        t = time.time()
+        if t - self.__time < 10: return
+        self.__time = time.time()
+
         for name in self.__configs:
             config = self.__configs[name]
             auth_id = config["auth_id"]

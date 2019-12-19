@@ -215,7 +215,15 @@ class client(ssl_handler.ssl_handelr):
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
-        pass
+        if not self.is_conn_ok():
+            self.delete_handler(self.fileno)
+            return
+
+        t = time.time()
+        if t - self.__time > 360:
+            self.delete_handler(self.fileno)
+            return
+        self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
         logging.print_general("server_disconnect", self.__address)
@@ -225,12 +233,14 @@ class client(ssl_handler.ssl_handelr):
         logging.print_general("disconnect", self.__address)
         self.unregister(self.fileno)
         self.close()
+        self.dispatcher.delete_fwd_conn(self.__auth_id)
 
     def send_data(self, byte_data):
         """发送数据
         :param byte_data:
         :return:
         """
+        self.__time = time.time()
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
         self.send_now()
