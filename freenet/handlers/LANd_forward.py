@@ -112,8 +112,6 @@ class client(ssl_handler.ssl_handelr):
         """
         size = self.reader.size()
         data = self.reader.read()
-        print(data)
-
         p = data.find(b"\r\n\r\n")
 
         if p < 10 and size > 2048:
