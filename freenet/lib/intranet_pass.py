@@ -151,7 +151,7 @@ class builder(object):
             byte_addr = socket.inet_pton(socket.AF_INET, ip_addr)
             byte_addr = byte_addr + bytes(12)
 
-        byte_data = struct.pack("!16s16sHBB", session_id, byte_addr, port, int(is_ipv6))
+        byte_data = struct.pack("!16s16sHBB", session_id, byte_addr, port, int(is_ipv6),0)
 
         return self.build_data(TYPE_CONN_REQ, byte_data)
 
