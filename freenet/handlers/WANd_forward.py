@@ -97,27 +97,39 @@ class handler(tcp_handler.tcp_handler):
 
         upgrade = self.get_kv_value(kv, "upgrade")
         if not upgrade:
+            if self.dispatcher.debug:
+                sys.stderr.write("no upgrade field\r\n")
             self.send_403_response()
             return
         if upgrade.lower() != "websocket":
+            if self.dispatcher.debug:
+                sys.stderr.write("it is not websocket field\r\n")
             self.send_403_response()
             return
 
         connection = self.get_kv_value(kv, "connection")
         if not connection:
+            if self.dispatcher.debug:
+                sys.stderr.write("no connection field\r\n")
             self.send_403_response()
             return
         if connection.lower() != "upgrade":
+            if self.dispatcher.debug:
+                sys.stderr.write("connection is not upgrade\r\n")
             self.send_403_response()
             return
 
         sec_ws_key = self.get_kv_value(kv, "sec-websocket-key")
         if not sec_ws_key:
+            if self.dispatcher.debug:
+                sys.stderr.write("no websocket key\r\n")
             self.send_403_response()
             return
 
         origin = self.get_kv_value(kv, "origin")
         if not origin:
+            if self.dispatcher.debug:
+                sys.stderr.write("no origin key\r\n")
             self.send_403_response()
             return
         ws_ver = self.get_kv_value(kv, "sec-websocket-version")
@@ -129,20 +141,28 @@ class handler(tcp_handler.tcp_handler):
             return
 
         if v != 13:
+            if self.dispatcher.debug:
+                sys.stderr.write("wrong websocket version\r\n")
             self.send_403_response()
             return
 
         sec_ws_proto = self.get_kv_value(kv, "sec-websocket-protocol")
         if not sec_ws_proto:
+            if self.dispatcher.debug:
+                sys.stderr.write("no sec-websocket-protocol\r\n")
             self.send_403_response()
             return
 
         auth_id = self.get_kv_value(kv, "x-auth-id")
         if not auth_id:
+            if self.dispatcher.debug:
+                sys.stderr.write("no auth-id field\r\n")
             self.send_403_response()
             return
 
         if not self.dispatcher.auth_id_exists(auth_id):
+            if self.dispatcher.debug:
+                sys.stderr.write("not found %s service\r\n" % auth_id)
             self.send_403_response()
             return
 
