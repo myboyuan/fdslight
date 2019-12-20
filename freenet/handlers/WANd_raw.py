@@ -96,7 +96,7 @@ class handler(tcp_handler.tcp_handler):
 
     def tcp_timeout(self):
         t = time.time()
-        if t - self.__timeout > self.__timeout:
+        if t - self.__time > self.__timeout:
             self.delete_handler(self.fileno)
             return
         self.set_timeout(self.fileno, 10)
