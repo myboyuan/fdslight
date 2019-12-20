@@ -144,6 +144,7 @@ class service(dispatcher.dispatcher):
             sys.stderr.write("create listen %s failed\r\n" % name)
             return False
 
+        print(auth_id)
         self.__binds[auth_id] = fd
 
         return True
