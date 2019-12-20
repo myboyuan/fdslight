@@ -18,6 +18,7 @@ import freenet.lib.proc as proc
 import freenet.lib.cfg_check as cfg_check
 import freenet.handlers.LANd_forward as lan_fwd
 import freenet.handlers.LANd_raw as lan_raw
+import freenet.lib.logging as logging
 
 
 class service(dispatcher.dispatcher):
@@ -173,6 +174,7 @@ class service(dispatcher.dispatcher):
             ''''''
         ''''''
 
+
 def update_configs():
     pid = proc.get_pid(PID_PATH)
     if pid < 0:
@@ -184,6 +186,9 @@ def update_configs():
 
 def start(debug):
     if not debug:
+        if os.path.exists(PID_PATH):
+            sys.stderr.write("the process exists\r\n")
+            sys.exit(-1)
         pid = os.fork()
         if pid != 0: sys.exit(0)
 
@@ -193,13 +198,22 @@ def start(debug):
         pid = os.fork()
         if pid != 0: sys.exit(0)
 
+        sys.stderr = open(ERR_FILE, "a")
+        sys.stdout = open(LOG_FILE, "a")
+
         proc.write_pid(PID_PATH)
     cls = service()
     try:
         cls.ioloop(debug=debug)
     except KeyboardInterrupt:
+        if os.path.exists(PID_PATH): os.remove(PID_PATH)
         cls.release()
         sys.exit(0)
+    except:
+        if os.path.exists(PID_PATH): os.remove(PID_PATH)
+        cls.release()
+        logging.print_error()
+        sys.exit(-1)
 
 
 def main():

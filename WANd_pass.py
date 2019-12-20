@@ -208,6 +208,8 @@ def start(debug):
         if pid != 0: sys.exit(0)
 
         proc.write_pid(PID_PATH)
+        sys.stderr = open(ERR_FILE, "a")
+        sys.stdout = open(LOG_FILE, "a")
 
     cls = service()
     try:
@@ -222,6 +224,7 @@ def start(debug):
         if not debug: os.remove(PID_PATH)
         if os.path.exists(SOCK_FILE): os.remove(SOCK_FILE)
         logging.print_error()
+        sys.exit(-1)
 
 
 def main():
