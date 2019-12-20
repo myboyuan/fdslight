@@ -20,6 +20,7 @@ class listener(tcp_handler.tcp_handler):
 
         self.set_socket(s)
         self.bind(address)
+        os.chmod(address, 0o777)
         self.listen(10)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
@@ -65,8 +66,6 @@ class handler(tcp_handler.tcp_handler):
         self.set_socket(cs)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
-
-        logging.print_general("connect_ok", self.__caddr)
 
         return self.fileno
 
