@@ -185,6 +185,8 @@ class client(ssl_handler.ssl_handelr):
             try:
                 self.__parser.parse()
             except intranet_pass.ProtoErr:
+                if self.dispatcher.debug:
+                    logging.print_error("wrong protocol")
                 self.delete_handler(self.fileno)
                 break
             rs = self.__parser.get_result()
