@@ -33,7 +33,7 @@ class listener(tcp_handler.tcp_handler):
                 cs, caddr = self.accept()
             except BlockingIOError:
                 break
-            self.create_handler(self.fileno, handler, cs, caddr, self.__auth_id)
+            self.create_handler(self.fileno, handler, cs, caddr)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
