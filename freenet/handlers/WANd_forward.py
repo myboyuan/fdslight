@@ -286,7 +286,8 @@ class handler(tcp_handler.tcp_handler):
         self.send_data(byte_data)
 
     def send_conn_data(self, session_id, byte_data):
-        self.dispatcher.send_conn_data_to_fwd(self.__auth_id, session_id, byte_data)
+        data = self.__builder.build_conn_data(session_id, byte_data)
+        self.send_data(data)
 
     def handle_conn_response(self, session_id, err_code):
         """处理客户端发送过来的连接响应帧
