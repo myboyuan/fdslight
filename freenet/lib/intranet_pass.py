@@ -80,9 +80,8 @@ class parser(object):
             raise ProtoErr("wrong conn data content length")
 
         session_id = self.__reader.read(16)
-        print(self.__length,self.__reader.size())
-        data = self.__reader.read(self.__reader.read(self.__length - 16))
-        print(data, "---")
+        self.__length = self.__length - 16
+        data = self.__reader.read(self.__length)
 
         self.__results.append(
             (self.__type, (session_id, data,))
