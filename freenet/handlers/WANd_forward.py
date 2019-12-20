@@ -213,7 +213,6 @@ class handler(tcp_handler.tcp_handler):
         rdata = self.reader.read()
         self.__parser.input(rdata)
         self.__time = time.time()
-        print(rdata)
 
         while 1:
             try:
@@ -227,6 +226,7 @@ class handler(tcp_handler.tcp_handler):
             rs = self.__parser.get_result()
             if not rs: break
             _type, o = rs
+            print(_type,o)
 
             if _type == intranet_pass.TYPE_PING:
                 self.handle_ping()
