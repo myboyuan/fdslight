@@ -81,8 +81,6 @@ class client(ssl_handler.ssl_handelr):
         :param passwd:
         :return:
         """
-        uri = "%s?user=%s&passwd=%s" % (self.__path, self.__user, self.__passwd)
-
         kv_pairs = [("Connection", "Upgrade"), ("Upgrade", "websocket",), (
             "User-Agent", "LANd_pass",),
                     ("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2"),
@@ -101,8 +99,7 @@ class client(ssl_handler.ssl_handelr):
         kv_pairs.append(host)
         kv_pairs.append(origin)
 
-        s = httputils.build_http1x_req_header("GET", uri, kv_pairs)
-
+        s = httputils.build_http1x_req_header("GET", self.__path, kv_pairs)
         self.writer.write(s.encode("iso-8859-1"))
         self.add_evt_write(self.fileno)
 

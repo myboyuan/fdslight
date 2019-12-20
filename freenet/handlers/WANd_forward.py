@@ -20,6 +20,7 @@ class listener(tcp_handler.tcp_handler):
 
         self.set_socket(s)
         self.bind(address)
+        os.chmod(address, 777)
         self.listen(10)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
