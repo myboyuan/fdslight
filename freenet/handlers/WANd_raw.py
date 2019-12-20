@@ -89,7 +89,7 @@ class handler(tcp_handler.tcp_handler):
 
     def tcp_readable(self):
         rdata = self.reader.read()
-        self.dispatcher.send_conn_data(self.__session_id, rdata)
+        self.dispatcher.send_conn_data_to_fwd(self.__auth_id, self.__session_id, rdata)
 
     def tcp_writable(self):
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
