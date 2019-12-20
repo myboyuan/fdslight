@@ -65,7 +65,7 @@ class client(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
-        self.dispatcher.send_conn_close(self.__session_id)
+        self.dispatcher.send_conn_close(self.__auth_id, self.__session_id)
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):

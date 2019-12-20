@@ -88,6 +88,7 @@ class parser(object):
 
     def parse_body(self):
         if self.__reader.size() < self.__length: return
+        self.__header_ok = False
         if self.__type == TYPE_CONN_REQ:
             self.parse_conn_request()
             return
