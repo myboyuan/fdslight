@@ -173,7 +173,6 @@ class service(dispatcher.dispatcher):
             ''''''
         ''''''
 
-
 def update_configs():
     pid = proc.get_pid(PID_PATH)
     if pid < 0:
