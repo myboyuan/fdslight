@@ -56,7 +56,7 @@ class handler(tcp_handler.tcp_handler):
     def init_func(self, creator_fd, cs, caddr):
 
         self.__handshake_ok = False
-        self.__caddr = caddr
+        self.__caddr = ("UNIX_SOCKET", 0)
 
         self.__parser = intranet_pass.parser()
         self.__builder = intranet_pass.builder()
