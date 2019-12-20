@@ -82,7 +82,7 @@ class service(dispatcher.dispatcher):
         self.get_handler(fd).tell_conn_ok()
 
     def auth_id_exists(self, auth_id):
-        return auth_id not in self.__binds
+        return auth_id in self.__binds
 
     def session_del(self, session_id):
         if session_id not in self.__session_ids: return
@@ -144,7 +144,6 @@ class service(dispatcher.dispatcher):
             sys.stderr.write("create listen %s failed\r\n" % name)
             return False
 
-        print(auth_id)
         self.__binds[auth_id] = fd
 
         return True
