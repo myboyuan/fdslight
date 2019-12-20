@@ -218,13 +218,13 @@ def start(debug):
 
 def main():
     help_doc = """
-    start | stop | debug | reload
+    start | stop | debug
     """
     if len(sys.argv) != 2:
         print(help_doc)
         return
 
-    if sys.argv[1] not in ("start", "stop", "debug", "reload",):
+    if sys.argv[1] not in ("start", "stop", "debug",):
         print(help_doc)
         return
 
