@@ -89,7 +89,6 @@ class handler(tcp_handler.tcp_handler):
 
     def tcp_readable(self):
         rdata = self.reader.read()
-        print(rdata)
         self.dispatcher.send_conn_data_to_fwd(self.__auth_id, self.__session_id, rdata)
 
     def tcp_writable(self):

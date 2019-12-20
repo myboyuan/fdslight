@@ -302,7 +302,9 @@ class handler(tcp_handler.tcp_handler):
     def handle_conn_data(self, session_id, byte_data):
         """处理连接数据
         """
+        print(byte_data)
         fd = self.dispatcher.session_get(session_id)
+        print(fd)
         if not fd: return
 
         self.send_message_to_handler(self.fileno, fd, byte_data)
