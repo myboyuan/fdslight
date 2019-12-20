@@ -79,9 +79,9 @@ class parser(object):
         if self.__length < 17:
             raise ProtoErr("wrong conn data content length")
 
-        print(self.__length)
         session_id = self.__reader.read(16)
         data = self.__reader.read(self.__reader.read(self.__length - 16))
+        print(data,"---")
 
         self.__results.append(
             (self.__type, (session_id, data,))
