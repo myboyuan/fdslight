@@ -180,7 +180,9 @@ class client(ssl_handler.ssl_handelr):
             self.handle_handshake_response()
             return
 
-        self.__parser.input(self.reader.read())
+        rdata = self.reader.read()
+        print(rdata)
+        self.__parser.input(rdata)
         while 1:
             try:
                 self.__parser.parse()
