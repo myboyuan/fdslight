@@ -71,6 +71,12 @@ class service(dispatcher.dispatcher):
         fd = self.__fwd_conns[auth_id]
         self.get_handler(fd).send_conn_data(session_id, data)
 
+    def send_conn_close_to_fwd(self, auth_id, session_id):
+        if auth_id not in self.__fwd_conns: return
+
+        fd = self.__fwd_conns[auth_id]
+        self.get_handler(fd).send_conn_close(session_id)
+
     def tell_conn_fail(self, session_id):
         if session_id not in self.__session_ids: return
         fd = self.__session_ids[session_id]

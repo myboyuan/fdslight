@@ -289,6 +289,10 @@ class handler(tcp_handler.tcp_handler):
         data = self.__builder.build_conn_data(session_id, byte_data)
         self.send_data(data)
 
+    def send_conn_close(self, session_id):
+        data = self.__builder.build_conn_close(session_id)
+        self.send_data(data)
+
     def handle_conn_response(self, session_id, err_code):
         """处理客户端发送过来的连接响应帧
         """
