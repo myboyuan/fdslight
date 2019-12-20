@@ -226,7 +226,6 @@ class handler(tcp_handler.tcp_handler):
             rs = self.__parser.get_result()
             if not rs: break
             _type, o = rs
-            print(_type,o)
 
             if _type == intranet_pass.TYPE_PING:
                 self.handle_ping()
@@ -287,7 +286,7 @@ class handler(tcp_handler.tcp_handler):
         self.send_data(byte_data)
 
     def send_conn_data(self, session_id, byte_data):
-        pass
+        self.dispatcher.send_conn_data_to_fwd(self.__auth_id, session_id, byte_data)
 
     def handle_conn_response(self, session_id, err_code):
         """处理客户端发送过来的连接响应帧
