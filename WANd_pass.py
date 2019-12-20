@@ -84,6 +84,16 @@ class service(dispatcher.dispatcher):
     def auth_id_exists(self, auth_id):
         return auth_id in self.__binds
 
+    def reg_fwd_conn(self, auth_id, fd):
+        if auth_id in self.__fwd_conns:
+            sys.stderr.write("the auth_id exists at self.__fwd_conns\r\n")
+            return
+        self.__fwd_conns[auth_id] = fd
+
+    def unreg_fwd_conn(self, auth_id):
+        if auth_id not in self.__fwd_conns: return
+        del self.__fwd_conns[auth_id]
+
     def session_del(self, session_id):
         if session_id not in self.__session_ids: return
         del self.__session_ids[session_id]

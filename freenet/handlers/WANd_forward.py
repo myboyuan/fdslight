@@ -33,7 +33,7 @@ class listener(tcp_handler.tcp_handler):
                 cs, caddr = self.accept()
             except BlockingIOError:
                 break
-            self.create_handler(self.fileno, handler, cs, caddr)
+            self.create_handler(self.fileno, handler, cs, caddr, self.__auth_id)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
@@ -51,7 +51,7 @@ class handler(tcp_handler.tcp_handler):
     __builder = None
 
     __time = None
-    __role = None
+    __auth_id = None
 
     def init_func(self, creator_fd, cs, caddr):
 
@@ -67,6 +67,7 @@ class handler(tcp_handler.tcp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         logging.print_general("connect_ok", self.__caddr)
+        self.set_timeout(self.fileno, 10)
 
         return self.fileno
 
@@ -178,6 +179,8 @@ class handler(tcp_handler.tcp_handler):
         logging.print_general("handshake_ok", self.__caddr)
 
         self.__handshake_ok = True
+        self.dispatcher.reg_fwd_conn(auth_id, self.fileno)
+        self.__auth_id = auth_id
         self.send_response("101 Switching Protocols", resp_headers)
 
     def send_response(self, status, headers):
@@ -265,9 +268,14 @@ class handler(tcp_handler.tcp_handler):
         self.delete_handler(self.fileno)
 
     def tcp_timeout(self):
-        pass
+        t = time.time()
+        if t - self.__time > 60:
+            self.delete_handler(self.fileno)
+            return
+        self.set_timeout(self.fileno, 10)
 
     def tcp_delete(self):
+        if self.__auth_id: self.dispatcher.unreg_fwd_conn(self.__auth_id)
         self.unregister(self.fileno)
         self.close()
 
