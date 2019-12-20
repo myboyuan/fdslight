@@ -203,8 +203,7 @@ class client(ssl_handler.ssl_handelr):
                 self.handle_conn_request(*o)
                 continue
             if _type == intranet_pass.TYPE_CONN_CLOSE:
-                print(_type, o)
-                self.handle_conn_close(*o)
+                self.handle_conn_close(o)
                 continue
             if _type == intranet_pass.TYPE_MSG_CONTENT:
                 self.handle_conn_data(*o)
