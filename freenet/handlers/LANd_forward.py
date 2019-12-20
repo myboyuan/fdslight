@@ -243,7 +243,6 @@ class client(ssl_handler.ssl_handelr):
         self.__time = time.time()
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
-        self.send_now()
 
     def send_conn_data(self, session_id, byte_data):
         data = self.__builder.build_conn_data(session_id, byte_data)

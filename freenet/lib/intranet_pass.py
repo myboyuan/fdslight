@@ -55,7 +55,7 @@ class parser(object):
             s_addr = socket.inet_ntop(socket.AF_INET, byte_addr[0:4])
 
         self.__results.append(
-            (self.__type, (session_id, s_addr, port, is_ipv6,))
+            (self.__type, (session_id, s_addr, port, bool(is_ipv6),))
         )
 
     def parse_conn_response(self):
