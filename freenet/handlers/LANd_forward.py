@@ -4,7 +4,7 @@ import pywind.evtframework.handlers.ssl_handler as ssl_handler
 import pywind.web.lib.httputils as httputils
 import pywind.web.lib.websocket as wslib
 
-import socket, time, random, os, ssl
+import socket, time, random, os, ssl, sys
 import freenet.lib.logging as logging
 import freenet.lib.intranet_pass as intranet_pass
 
@@ -179,10 +179,9 @@ class client(ssl_handler.ssl_handelr):
         if not self.__http_handshake_ok:
             self.handle_handshake_response()
             return
-
         rdata = self.reader.read()
-        print(rdata)
         self.__parser.input(rdata)
+
         while 1:
             try:
                 self.__parser.parse()

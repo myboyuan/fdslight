@@ -44,7 +44,7 @@ class parser(object):
             raise ProtoErr("unsupport protocol number %s" % self.__type)
 
     def parse_conn_request(self):
-        if self.__reader.size() != 36:
+        if self.__reader.size() < 36:
             raise ProtoErr("wrong conn request content length")
 
         session_id, byte_addr, port, is_ipv6, _ = struct.unpack("!16s16sHBB", self.__reader.read(36))
@@ -88,8 +88,6 @@ class parser(object):
 
     def parse_body(self):
         if self.__reader.size() < self.__length: return
-        body_data = self.__reader.read(self.__length)
-
         if self.__type == TYPE_CONN_REQ:
             self.parse_conn_request()
             return
@@ -103,6 +101,7 @@ class parser(object):
             self.parse_conn_data()
             return
 
+        body_data = self.__reader.read(self.__length)
         self.__results.append(
             (self.__type, body_data,)
         )
@@ -151,7 +150,7 @@ class builder(object):
             byte_addr = socket.inet_pton(socket.AF_INET, ip_addr)
             byte_addr = byte_addr + bytes(12)
 
-        byte_data = struct.pack("!16s16sHBB", session_id, byte_addr, port, int(is_ipv6),0)
+        byte_data = struct.pack("!16s16sHBB", session_id, byte_addr, port, int(is_ipv6), 0)
 
         return self.build_data(TYPE_CONN_REQ, byte_data)
 

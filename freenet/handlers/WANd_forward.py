@@ -218,6 +218,8 @@ class handler(tcp_handler.tcp_handler):
             try:
                 self.__parser.parse()
             except intranet_pass.ProtoErr:
+                if self.dispatcher.debug:
+                    logging.print_error()
                 self.delete_handler(self.fileno)
                 return
 

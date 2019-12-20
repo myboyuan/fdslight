@@ -33,6 +33,7 @@ class service(dispatcher.dispatcher):
         self.__configs = {}
         self.__conns = {}
         self.__time = time.time()
+        self.__debug = debug
 
         self.create_poll()
         self.create_connections()
@@ -90,12 +91,20 @@ class service(dispatcher.dispatcher):
         self.__configs = cfgs
 
     def release(self):
+        seq = []
         for session_id in self.__sessions:
-            fd = self.__sessions[session_id]
+            seq.append(self.__sessions[session_id])
+
+        for fd in seq:
             self.delete_handler(fd)
+
+        seq = []
 
         for auth_id in self.__conns:
             fd = self.__conns[auth_id]
+            seq.append(fd)
+
+        for fd in seq:
             self.delete_handler(fd)
 
     @property
@@ -188,7 +197,7 @@ def start(debug):
         proc.write_pid(PID_PATH)
     cls = service()
     try:
-        cls.ioloop()
+        cls.ioloop(debug=debug)
     except KeyboardInterrupt:
         cls.release()
         sys.exit(0)
