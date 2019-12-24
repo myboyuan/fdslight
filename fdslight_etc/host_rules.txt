@@ -197,6 +197,7 @@ register.mesh.com:1
 .jetbrains.com:1
 *.akamaitechnologies.com:1
 *.ifixit.com:1
+*.akamaized.net:1
 
 ### 书籍文化
 *.pressstore.com.tw:1
