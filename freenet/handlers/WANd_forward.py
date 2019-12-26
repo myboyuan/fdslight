@@ -209,6 +209,11 @@ class handler(tcp_handler.tcp_handler):
     def handle_pong(self):
         self.__time = time.time()
 
+    def send_ping(self):
+        n = random.randint(1, 100)
+        ping = self.__builder.build_ping(length=n)
+        self.send_data(ping)
+
     def handle_data(self):
         rdata = self.reader.read()
         self.__parser.input(rdata)
@@ -274,6 +279,7 @@ class handler(tcp_handler.tcp_handler):
         if t - self.__time > 60:
             self.delete_handler(self.fileno)
             return
+        if t - self.__time > 30: self.send_ping()
         self.set_timeout(self.fileno, 10)
 
     def tcp_delete(self):
