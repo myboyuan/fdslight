@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, os, signal, time
+import sys, os, signal, time, getopt
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -18,6 +18,7 @@ import freenet.lib.proc as proc
 import freenet.lib.cfg_check as cfg_check
 import freenet.handlers.LANd_forward as lan_fwd
 import freenet.handlers.LANd_raw as lan_raw
+import freenet.handlers.wol_handler as wol_handler
 import freenet.lib.logging as logging
 
 
@@ -28,7 +29,10 @@ class service(dispatcher.dispatcher):
     __configs = None
     __time = None
 
-    def init_func(self, debug=False):
+    __wol_fd = None
+
+    def init_func(self, wol_key, wol_port=5888, debug=False):
+        self.__wol_fd = -1
         self.__debug = debug
         self.__sessions = {}
         self.__configs = {}
@@ -36,8 +40,18 @@ class service(dispatcher.dispatcher):
         self.__time = time.time()
         self.__debug = debug
 
+        if not cfg_check.is_port(wol_port):
+            sys.stderr.write("wrong wol port number %s\r\n")
+            return
+
         self.create_poll()
+        self.create_wol(wol_key, wol_port)
         self.create_connections()
+
+    def create_wol(self, wol_key, wol_port):
+        self.__wol_fd = self.create_handler(
+            -1, wol_handler.listener, ("127.0.0.1", wol_port), wol_key
+        )
 
     def __create_conn(self, name, configs):
         if "host" not in configs:
@@ -107,6 +121,9 @@ class service(dispatcher.dispatcher):
 
         for fd in seq:
             self.delete_handler(fd)
+
+        if self.__wol_fd > 0:
+            self.delete_handler(self.__wol_fd)
 
     @property
     def debug(self):
@@ -184,7 +201,7 @@ def update_configs():
     os.kill(pid, signal.SIGUSR1)
 
 
-def start(debug):
+def start(debug, wol_key, wol_port):
     if not debug:
         if os.path.exists(PID_PATH):
             sys.stderr.write("the process exists\r\n")
@@ -204,7 +221,7 @@ def start(debug):
         proc.write_pid(PID_PATH)
     cls = service()
     try:
-        cls.ioloop(debug=debug)
+        cls.ioloop(wol_key, debug=debug, wol_port=wol_port)
     except KeyboardInterrupt:
         if os.path.exists(PID_PATH): os.remove(PID_PATH)
         cls.release()
@@ -219,8 +236,9 @@ def start(debug):
 def main():
     help_doc = """
     start | stop | debug
+    start | debug  --wol_listen_port=port --wol_key=key
     """
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         print(help_doc)
         return
 
@@ -235,12 +253,35 @@ def main():
         if pid > 0: os.kill(pid, signal.SIGINT)
         return
 
+    try:
+        opts, args = getopt.getopt(sys.argv[2:], "", ["wol_listen_port=", "wol_key="])
+    except getopt.GetoptError:
+        print(help_doc)
+        return
+    except IndexError:
+        print(help_doc)
+        return
+
+    wol_port = 5888
+    wol_key = None
+    for k, v in opts:
+        if k == "--wol_listen_port":
+            if not cfg_check.is_port(v):
+                sys.stderr.write("wrong port number\r\n")
+                return
+            wol_port = int(v)
+        if k == "--wol_key": wol_key = v
+        ''''''
+    if not wol_key:
+        sys.stderr.write("please set wol key\r\n")
+        return
+
     if d == "debug":
         debug = True
     else:
         debug = False
 
-    start(debug)
+    start(debug, wol_key, wol_port)
 
 
 if __name__ == '__main__': main()
