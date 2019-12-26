@@ -95,7 +95,7 @@ class handler(tcp_handler.tcp_handler):
                 break
             rs = self.__parser.get_result()
             if not rs: break
-            _t, o = self.__parser.get_result()
+            _t, o = rs
             if _t == wol.TYPE_WAKEUP_REQ:
                 self.__time = time.time()
                 self.wake_up(*o)
