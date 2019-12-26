@@ -226,7 +226,7 @@ class client(ssl_handler.ssl_handelr):
         self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
-        logging.print_general("server_disconnect", self.__address)
+        logging.print_general("server_disconnect,%s" % self.__auth_id, self.__address)
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):
