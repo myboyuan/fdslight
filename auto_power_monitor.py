@@ -47,7 +47,6 @@ class power_monitor(object):
     __power_off_port = None
     __servers = None
     __timeout = 180
-    __time = None
     __network_is_ok = None
     __debug = None
 
@@ -78,7 +77,6 @@ class power_monitor(object):
     def __init__(self, power_off_port, debug=False):
         self.__power_off_port = power_off_port
         self.__network_is_ok = True
-        self.__time = time.time()
         self.__servers = []
         self.__debug = debug
 
@@ -92,14 +90,13 @@ class power_monitor(object):
         self.__s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.__s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
-        self.__s.sendto(b"hello", ("255.255.255.255", self.__power_off_port))
-
     def check_network_status(self):
         ok = False
 
         for host, port in self.__servers:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
+                s.settimeout(3)
                 s.connect((host, port,))
             except:
                 s.close()
@@ -111,6 +108,7 @@ class power_monitor(object):
         return ok
 
     def send_shutdown(self):
+        if self.__debug: print("send shutdown")
         data = bytes([0xff]) * 128
         self.__s.sendto(data, ("255.255.255.255", self.__power_off_port))
 
@@ -131,7 +129,7 @@ class power_monitor(object):
             rs = self.check_network_status()
 
             if rs and self.__debug: print("network OK")
-            if not rs and self.__debug: print("netowrk fail")
+            if not rs and self.__debug: print("network fail")
 
             # 两次检查网络都无法联通,那么就发送关机信号
             if not rs and not self.__network_is_ok:
@@ -210,7 +208,7 @@ def main():
         if pid != 0: sys.exit(0)
         proc.write_pid(PID_PATH)
 
-    port=int(port)
+    port = int(port)
     cls = power_monitor(port, debug=debug)
     try:
         cls.monitor()

@@ -39,6 +39,7 @@ class power_ctl(object):
         :return:
         """
         platform = sys.platform
+        print("starting shutdown")
 
         if platform.find("win") == 0:
             self.windows_shutdown()
