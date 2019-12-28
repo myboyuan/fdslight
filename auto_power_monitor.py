@@ -46,7 +46,7 @@ class power_monitor(object):
     __s = None
     __power_off_port = None
     __servers = None
-    __timeout = 180
+    __timeout = 60
     __network_is_ok = None
     __debug = None
 
