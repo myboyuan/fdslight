@@ -2,7 +2,7 @@
 """自动能源控制端,此程序运行在各个主机端,负责关闭主机电源,注意该程序必须以管理员或者root身份运行
 支持平台,Windows,Linux,FreeBSD,OSX
 """
-import sys, os, getopt, socket, signal
+import sys, os, getopt, socket, signal, time
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -17,8 +17,10 @@ import freenet.lib.proc as proc
 
 class power_ctl(object):
     __s = None
+    __t = None
 
     def __init__(self, udp_port):
+        self.__t = time.time()
         self.__s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.__s.bind(("0.0.0.0", udp_port))
 
@@ -30,6 +32,9 @@ class power_ctl(object):
             if msg != power_off_msg:
                 sys.stderr.write("wrong power message\r\n")
                 continue
+            t = time.time()
+            # 程序启动的1分钟内不执行关机操作,避免出现其他系统问题
+            if t - self.__t < 60: continue
             break
 
         self.do_shutdown()
