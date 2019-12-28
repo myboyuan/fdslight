@@ -92,6 +92,8 @@ class power_monitor(object):
         self.__s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.__s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
+        self.__s.sendto(b"hello", ("255.255.255.255", self.__power_off_port))
+
     def check_network_status(self):
         ok = False
 
@@ -208,6 +210,7 @@ def main():
         if pid != 0: sys.exit(0)
         proc.write_pid(PID_PATH)
 
+    port=int(port)
     cls = power_monitor(port, debug=debug)
     try:
         cls.monitor()
