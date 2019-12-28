@@ -136,8 +136,10 @@ class power_monitor(object):
                 self.send_shutdown()
                 continue
 
-            # 如果网络已经联通,那么发送广播数据包
-            if rs:
+            # 如果网络已经联通,且之前的状态也是联通,那么发送唤醒信号
+            # 这里需要延迟开机,避免电源又被快速切断导致全部机器开机
+            # 这样有可能造成UPS供电不足
+            if rs and self.__network_is_ok:
                 self.wakeup_machine()
 
             self.__network_is_ok = rs
