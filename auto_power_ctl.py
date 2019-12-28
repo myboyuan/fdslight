@@ -27,7 +27,9 @@ class power_ctl(object):
 
         while 1:
             msg, address = self.__s.recvfrom(4096)
-            if msg != power_off_msg: continue
+            if msg != power_off_msg:
+                sys.stderr.write("wrong power message\r\n")
+                continue
 
         print("auto power shutdown computer")
         self.do_shutdown()
