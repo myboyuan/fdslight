@@ -30,8 +30,8 @@ class power_ctl(object):
             if msg != power_off_msg:
                 sys.stderr.write("wrong power message\r\n")
                 continue
+            break
 
-        print("auto power shutdown computer")
         self.do_shutdown()
 
     def do_shutdown(self):
