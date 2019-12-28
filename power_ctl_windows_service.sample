@@ -1,6 +1,6 @@
 # 添加服务
 
-sc create auto_power_off binPath= "python.exe" start= auto displayname= "Auto Power Off"
+sc create auto_power_off binPath= "python.exe auto_power_ctl debug --port=9999" start= auto displayname= "Auto Power Off"
 
 # 删除服务
 
