@@ -33,8 +33,8 @@ class power_ctl(object):
                 sys.stderr.write("wrong power message\r\n")
                 continue
             t = time.time()
-            # 程序启动的1分钟内不执行关机操作,避免出现其他系统问题
-            if t - self.__t < 60: continue
+            # 程序启动的2分钟内不执行关机操作,避免出现其他系统问题
+            if t - self.__t < 120: continue
             break
 
         self.do_shutdown()

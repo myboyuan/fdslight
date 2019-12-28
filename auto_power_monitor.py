@@ -46,7 +46,7 @@ class power_monitor(object):
     __s = None
     __power_off_port = None
     __servers = None
-    __timeout = 60
+    __timeout = 120
     __network_is_ok = None
     __debug = None
 
@@ -136,8 +136,8 @@ class power_monitor(object):
                 self.send_shutdown()
                 continue
 
-            # 如果之前网络是不通的现在已经联通了,那么发送开机信号
-            if rs and not self.__network_is_ok:
+            # 如果网络已经联通,那么发送广播数据包
+            if rs:
                 self.wakeup_machine()
 
             self.__network_is_ok = rs
