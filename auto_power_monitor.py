@@ -76,7 +76,7 @@ class power_monitor(object):
 
     def __init__(self, power_off_port, debug=False):
         self.__power_off_port = power_off_port
-        self.__network_is_ok = True
+        self.__network_is_ok = False
         self.__servers = []
         self.__debug = debug
 
