@@ -127,9 +127,6 @@ class power_monitor(object):
         cls.release()
 
     def monitor(self):
-        # 程序启动时发送开机信号
-        self.wakeup_machine()
-
         while 1:
             rs = self.check_network_status()
 
@@ -164,7 +161,7 @@ def stop():
 def main():
     help_doc = """
     debug | start | stop | shutdown
-    debug | start  --port=port
+    debug | start | shutdown --port=port
     debug:  windows support it
     start   only unix-like support
     stop    only unix-like support
