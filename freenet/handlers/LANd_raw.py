@@ -53,6 +53,7 @@ class client(tcp_handler.tcp_handler):
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
+            self.dispatcher.send_conn_close(self.__session_id)
             self.delete_handler(self.fileno)
             return
 
