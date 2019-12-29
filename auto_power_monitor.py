@@ -215,7 +215,7 @@ def main():
 
     port = int(port)
     if action == "shutdown":
-        print("send shutdown to all host")
+        print("send shutdown to all hosts")
         shutdown(port)
         return
 
