@@ -42,8 +42,18 @@ def get_machines():
     return o
 
 
+def shutdown(port):
+    data = bytes([0xff]) * 128
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+    s.sendto(data, ("255.255.255.255", port))
+    s.close()
+
+
 class power_monitor(object):
-    __s = None
     __power_off_port = None
     __servers = None
     __timeout = 120
@@ -86,10 +96,6 @@ class power_monitor(object):
             return
         self.__servers = servers
 
-        self.__s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.__s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.__s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-
     def check_network_status(self):
         ok = False
 
@@ -109,8 +115,7 @@ class power_monitor(object):
 
     def send_shutdown(self):
         if self.__debug: print("send shutdown")
-        data = bytes([0xff]) * 128
-        self.__s.sendto(data, ("255.255.255.255", self.__power_off_port))
+        shutdown(self.__power_off_port)
 
     def wakeup_machine(self):
         o = get_machines()
@@ -146,7 +151,7 @@ class power_monitor(object):
             time.sleep(self.__timeout)
 
     def release(self):
-        self.__s.close()
+        pass
 
 
 def stop():
@@ -158,11 +163,12 @@ def stop():
 
 def main():
     help_doc = """
-    debug | start | stop
+    debug | start | stop | shutdown
     debug | start  --port=port
     debug:  windows support it
     start   only unix-like support
     stop    only unix-like support
+    shutdown will close all hosts
     """
 
     if len(sys.argv) < 2:
@@ -171,7 +177,7 @@ def main():
 
     action = sys.argv[1]
 
-    if action not in ("debug", "stop", "start"):
+    if action not in ("debug", "stop", "start", "shutdown",):
         print(help_doc)
         return
 
@@ -211,6 +217,11 @@ def main():
         proc.write_pid(PID_PATH)
 
     port = int(port)
+    if action == "shutdown":
+        print("send shutdown to all host")
+        shutdown(port)
+        return
+
     cls = power_monitor(port, debug=debug)
     try:
         cls.monitor()
