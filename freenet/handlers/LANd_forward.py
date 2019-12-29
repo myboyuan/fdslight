@@ -163,6 +163,11 @@ class client(ssl_handler.ssl_handelr):
     def handle_pong(self):
         self.__time = time.time()
 
+    def send_ping(self):
+        n = random.randint(1, 100)
+        ping = self.__builder.build_ping(length=n)
+        self.send_data(ping)
+
     def handle_conn_request(self, session_id, remote_addr, remote_port, is_ipv6):
         self.dispatcher.handle_conn_request(self.__auth_id, session_id, remote_addr, remote_port, is_ipv6)
 
@@ -220,9 +225,12 @@ class client(ssl_handler.ssl_handelr):
             return
 
         t = time.time()
-        if t - self.__time > 360:
+
+        if t - self.__time > 60:
             self.delete_handler(self.fileno)
             return
+
+        if t - self.__time > 20: self.send_ping()
         self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
