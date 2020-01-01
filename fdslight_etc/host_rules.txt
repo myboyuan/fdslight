@@ -201,6 +201,7 @@ register.mesh.com:1
 *.hp.com:1
 *.hpe.com:1
 *.tuneaero.com:1
+*.mega.nz:1
 
 ### 书籍文化
 *.pressstore.com.tw:1
