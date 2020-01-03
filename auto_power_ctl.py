@@ -28,6 +28,7 @@ class power_ctl(object):
         power_off_msg = bytes([0xff]) * 128
 
         while 1:
+            print("ZZZ")
             msg, address = self.__s.recvfrom(4096)
             if msg != power_off_msg:
                 sys.stderr.write("wrong power message\r\n")
