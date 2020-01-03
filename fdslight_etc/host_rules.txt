@@ -203,6 +203,7 @@ register.mesh.com:1
 *.tuneaero.com:1
 *.mega.nz:1
 *.mega.co.nz:1
+download.proxmox.com:1
 
 ### 书籍文化
 *.pressstore.com.tw:1
