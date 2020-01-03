@@ -53,14 +53,14 @@ class client(tcp_handler.tcp_handler):
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
-            self.dispatcher.send_conn_close(self.__session_id)
+            self.dispatcher.send_conn_close(self.__auth_id, self.__session_id)
             self.delete_handler(self.fileno)
             return
 
         t = time.time()
         # 限制300s没数据那么就关闭连接
         if t - self.__time > 300:
-            self.dispatcher.send_conn_close(self.__session_id)
+            self.dispatcher.send_conn_close(self.__auth_id, self.__session_id)
             self.delete_handler(self.fileno)
             return
         self.set_timeout(self.fileno, 10)
