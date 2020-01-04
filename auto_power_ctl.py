@@ -18,8 +18,10 @@ import freenet.lib.proc as proc
 class power_ctl(object):
     __s = None
     __t = None
+    __debug = None
 
-    def __init__(self, udp_port):
+    def __init__(self, udp_port, debug=False):
+        self.__debug = debug
         self.__t = time.time()
         self.__s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.__s.bind(("0.0.0.0", udp_port))
@@ -34,7 +36,8 @@ class power_ctl(object):
                 continue
             t = time.time()
             # 程序启动的2分钟内不执行关机操作,避免出现其他系统问题
-            if t - self.__t < 120: continue
+            if t - self.__t < 120:
+                continue
             print("power off")
             break
 
@@ -111,7 +114,10 @@ def main():
         sys.stderr.write("wrong port number\r\n")
         return
 
+    debug = True
+
     if action == "start":
+        debug = False
         pid = os.fork()
         if pid != 0: sys.exit(0)
 
@@ -122,7 +128,7 @@ def main():
         if pid != 0: sys.exit(0)
         proc.write_pid(PID_PATH)
 
-    cls = power_ctl(int(port))
+    cls = power_ctl(int(port), debug=debug)
     try:
         cls.wait()
     except KeyboardInterrupt:
