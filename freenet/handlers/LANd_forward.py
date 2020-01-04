@@ -266,4 +266,5 @@ class client(ssl_handler.ssl_handelr):
 
     def send_conn_close(self, session_id):
         data = self.__builder.build_conn_close(session_id)
+        self.dispatcher.session_del(session_id)
         self.send_data(data)
