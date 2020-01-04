@@ -226,6 +226,7 @@ cdn.treasuredata.com:1
 *.vmware.com:1
 login.oracle.com:1
 *.metacpan.org:1
+*.stackoverflow.com:1
 
 ### 医学相关
 *.ncbi.nlm.nih.gov:1
