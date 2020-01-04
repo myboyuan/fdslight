@@ -37,6 +37,7 @@ class power_ctl(object):
             t = time.time()
             # 程序启动的2分钟内不执行关机操作,避免出现其他系统问题
             if t - self.__t < 120:
+                if self.__debug: print("the computer cannot shutdown")
                 continue
             print("power off")
             break
