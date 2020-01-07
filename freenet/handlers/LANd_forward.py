@@ -248,7 +248,6 @@ class client(ssl_handler.ssl_handelr):
         :param byte_data:
         :return:
         """
-        self.__time = time.time()
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
 
