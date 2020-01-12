@@ -56,7 +56,7 @@ def shutdown(port):
 class power_monitor(object):
     __power_off_port = None
     __servers = None
-    __timeout = 120
+    __timeout = 300
     __network_is_ok = None
     __debug = None
 
