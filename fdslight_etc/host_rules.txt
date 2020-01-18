@@ -247,9 +247,6 @@ login.oracle.com:1
 ### 加快访问速度
 *.mit.edu:1
 *.macrumors.com:1
-*.layerpanel.com:1
-*.layerstack.com:1
-*.layerpanel.cloud:1
 
 ### xxx
 *.pornhub.com:1
