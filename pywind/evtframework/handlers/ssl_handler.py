@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-import pywind.evtframework.handlers.tcp_handler as tcp_handelr
+import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import ssl
 
 
-class ssl_handler(tcp_handelr.tcp_handler):
+class ssl_handler(tcp_handler.tcp_handler):
     __creator_fd = None
     __handshake_ok = None
 
