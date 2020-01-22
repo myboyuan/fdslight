@@ -9,7 +9,7 @@ import freenet.lib.logging as logging
 import freenet.lib.intranet_pass as intranet_pass
 
 
-class client(ssl_handler.ssl_handelr):
+class client(ssl_handler.ssl_handler):
     """把任意数据包转换成私有协议
     """
     __address = None

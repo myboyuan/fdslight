@@ -4,7 +4,7 @@ import pywind.evtframework.handlers.tcp_handler as tcp_handelr
 import ssl
 
 
-class ssl_handelr(tcp_handelr.tcp_handler):
+class ssl_handler(tcp_handelr.tcp_handler):
     __creator_fd = None
     __handshake_ok = None
 
