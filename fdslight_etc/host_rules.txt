@@ -232,6 +232,7 @@ login.oracle.com:1
 *.ncbi.nlm.nih.gov:1
 *.pubmed.gov:1
 *.uptodate.com:1
+*.wolterskluwer.io:1
 
 ### 宗教及非政府机构
 # 香港教会
