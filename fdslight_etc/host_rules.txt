@@ -250,6 +250,7 @@ login.oracle.com:1
 *.mit.edu:1
 *.macrumors.com:1
 *.org.uk:1
+*.cochrane.org:1
 
 ### xxx
 *.pornhub.com:1
