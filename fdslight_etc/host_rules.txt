@@ -208,6 +208,7 @@ security.debian.org:1
 *.bandwagonhost.com:1
 *.cookiepro.com:1
 *.typekit.net:1
+*.pagesense.io:1
 
 ### 书籍文化
 *.pressstore.com.tw:1
