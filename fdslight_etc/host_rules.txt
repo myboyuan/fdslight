@@ -212,6 +212,7 @@ security.debian.org:1
 *.wisepops.com:1
 *.gov:1
 *.foresee.com:1
+*.rnao.org:1
 
 ### 书籍文化
 *.pressstore.com.tw:1
