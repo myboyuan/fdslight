@@ -220,6 +220,7 @@ security.debian.org:1
 *.embase.com:1
 *.elsevier.com:1
 *.elsevier.io:1
+*.userzoom.com:1
 
 ### 书籍文化
 *.pressstore.com.tw:1
