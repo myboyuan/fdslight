@@ -210,7 +210,7 @@ security.debian.org:1
 *.typekit.net:1
 *.pagesense.io:1
 *.wisepops.com:1
-*.ahrq.gov:1
+*.gov:1
 *.foresee.com:1
 
 ### 书籍文化
