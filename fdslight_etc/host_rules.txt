@@ -175,7 +175,7 @@ register.mesh.com:1
 *.v2ex.com:0
 *.uukanshu.com:1
 *.jsdelivr.net:0
-*.cloudfront.net:0
+*.cloudfront.net:1
 *.cloudflare.com:1
 *.jwpcdn.com:1
 *.ntdimg.com:1
@@ -208,7 +208,6 @@ security.debian.org:1
 *.bandwagonhost.com:1
 *.cookiepro.com:1
 *.typekit.net:1
-
 
 ### 书籍文化
 *.pressstore.com.tw:1
