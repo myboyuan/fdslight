@@ -43,10 +43,7 @@ class ip_match(object):
 
         return True
 
-    def match(self, ipaddr, is_ipv6=False, is_host=False):
-        if is_host:
-            return ipaddr in self.__ip_hosts
-
+    def match(self, ipaddr, is_ipv6=False):
         if is_ipv6:
             rules = self.__ipv6_rules
         else:
