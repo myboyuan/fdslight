@@ -71,6 +71,9 @@ class _fdslight_client(dispatcher.dispatcher):
     # 是否开启IPV6流量
     __enable_ipv6_traffic = False
 
+    # 服务器地址
+    __server_ip = None
+
     @property
     def https_configs(self):
         configs = self.__configs.get("tunnel_over_https", {})
@@ -121,7 +124,7 @@ class _fdslight_client(dispatcher.dispatcher):
             self.__dns_fileno = self.create_handler(-1, dns_proxy.dnsc_proxy, public["remote_dns"], debug=debug,
                                                     server_side=False)
 
-        self.__set_host_rules(None, None)
+        self.__set_rules(None, None)
 
         if self.__mode == _MODE_GW:
             self.__load_kernel_mod()
@@ -168,7 +171,7 @@ class _fdslight_client(dispatcher.dispatcher):
             sys.stderr = open(ERR_FILE, "a+")
         ''''''
 
-        signal.signal(signal.SIGUSR1, self.__set_host_rules)
+        signal.signal(signal.SIGUSR1, self.__set_rules)
 
     def __load_kernel_mod(self):
         ko_file = "%s/driver/fdslight_dgram.ko" % BASE_DIR
@@ -365,15 +368,27 @@ class _fdslight_client(dispatcher.dispatcher):
 
         return self.__session_id
 
-    def __set_host_rules(self, signum, frame):
+    def __set_rules(self, signum, frame):
         fpath = "%s/fdslight_etc/host_rules.txt" % BASE_DIR
 
-        if not os.path.isfile(fpath):
-            print("cannot found host_rules.txt")
-            self.__exit(signum, frame)
+        fpaths = [
+            "%s/fdslight_etc/host_rules.txt" % BASE_DIR,
+            "%s/fdslight_etc/ip_rules.txt" % BASE_DIR,
+        ]
 
-        rules = file_parser.parse_host_file(fpath)
-        self.get_handler(self.__dns_fileno).set_host_rules(rules)
+        for fpath in fpaths:
+            if not os.path.isfile(fpath):
+                sys.stderr.write("cannot found %s\r\n" % fpath)
+                return
+            try:
+                if fpath.find("ip_rule") < 4:
+                    rules = file_parser.parse_host_file(fpath)
+                    self.get_handler(self.__dns_fileno).set_host_rules(rules)
+                else:
+                    rules = file_parser.parse_ip_subnet_file(fpath)
+                    self.get_handler(self.__dns_fileno).set_ip_rules(rules)
+            except file_parser.FilefmtErr:
+                logging.print_error()
 
     def __open_tunnel(self):
         conn = self.__configs["connection"]
@@ -427,6 +442,8 @@ class _fdslight_client(dispatcher.dispatcher):
         :param host:
         :return:
         """
+        self.__server_ip = host
+
         if utils.is_ipv4_address(host): return host
         if utils.is_ipv6_address(host): return host
 
@@ -451,6 +468,8 @@ class _fdslight_client(dispatcher.dispatcher):
             break
         if self.__mode == _MODE_GW: self.__set_tunnel_ip(ipaddr)
 
+        self.__server_ip = ipaddr
+
         return ipaddr
 
     def myloop(self):
@@ -459,6 +478,8 @@ class _fdslight_client(dispatcher.dispatcher):
 
     def set_route(self, host, timeout=None, is_ipv6=False, is_dynamic=True):
         if host in self.__routes: return
+        # 如果是服务器的地址,那么不设置路由,避免使用ip_rules规则的时候进入死循环,因为服务器地址可能不在ip_rules文件中
+        if host == self.__server_ip: return
 
         # 如果禁止了IPV6流量,那么不设置IPV6路由
         if not self.__enable_ipv6_traffic and is_ipv6: return
@@ -561,7 +582,7 @@ def __stop_service():
     os.kill(pid, signal.SIGINT)
 
 
-def __update_host_rules():
+def __update_rules():
     pid = proc.get_pid(PID_FILE)
 
     if pid < 0:
@@ -575,7 +596,7 @@ def main():
     help_doc = """
     -d      debug | start | stop    debug,start or stop application
     -m      local | gateway         run as local or gateway
-    -u      host_rules              update host rules
+    -u      rules                   update host and ip rules
     """
     try:
         opts, args = getopt.getopt(sys.argv[1:], "u:m:d:")
@@ -598,11 +619,11 @@ def main():
         print(help_doc)
         return
 
-    if u and u != "host_rules":
+    if u and u != "rules":
         print(help_doc)
         return
-    if u == "host_rules":
-        __update_host_rules()
+    if u == "rules":
+        __update_rules()
         return
 
     if d not in ("debug", "start", "stop",):

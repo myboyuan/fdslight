@@ -13,6 +13,7 @@ import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.ippkts as ippkts
 import freenet.lib.host_match as host_match
+import freenet.lib.ip_match as ip_match
 
 
 class dns_base(udp_handler.udp_handler):
@@ -187,6 +188,8 @@ class dnsc_proxy(dns_base):
     """客户端的DNS代理
     """
     __host_match = None
+    __ip_match = None
+    # 是否使用IP地址匹配
     __timer = None
 
     __DNS_QUERY_TIMEOUT = 5
@@ -221,8 +224,8 @@ class dnsc_proxy(dns_base):
             self.connect((address, 53))
 
         self.__debug = debug
-        self.__host_match = host_match
         self.__timer = timer.timer()
+        self.__ip_match = ip_match.ip_match()
         self.__host_match = host_match.host_match()
 
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
@@ -234,6 +237,10 @@ class dnsc_proxy(dns_base):
     def set_host_rules(self, rules):
         self.__host_match.clear()
         for rule in rules: self.__host_match.add_rule(rule)
+
+    def set_ip_rules(self, rules):
+        self.__ip_match.clear()
+        for subnet, prefix in rules: self.__ip_match.add_rule(subnet, prefix)
 
     def set_parent_dnsserver(self, server, is_ipv6=False):
         """当作为网关模式时需要调用此函数来设置上游DNS
@@ -260,14 +267,21 @@ class dnsc_proxy(dns_base):
         )
         message = bytes(L)
 
-        if flags == 1:
-            for rrset in msg.answer:
-                for cname in rrset:
-                    ip = cname.__str__()
-                    if utils.is_ipv4_address(ip): self.dispatcher.set_route(ip, is_dynamic=True)
-                    if utils.is_ipv6_address(ip): self.dispatcher.set_route(ip, is_ipv6=True, is_dynamic=True)
+        for rrset in msg.answer:
+            for cname in rrset:
+                ip = cname.__str__()
+                if utils.is_ipv4_address(ip):
+                    if flags == 1 or not self.__ip_match.match(ip, is_ipv6=False):
+                        self.dispatcher.set_route(ip, is_dynamic=True)
+                    ''''''
+                ''''''
+                if utils.is_ipv6_address(ip):
+                    if flags == 1 or not self.__ip_match.match(ip, is_ipv6=True):
+                        self.dispatcher.set_route(ip, is_ipv6=True, is_dynamic=True)
+                    ''''''
                 ''''''
             ''''''
+        ''''''
         if not self.__server_side:
             if self.__is_ipv6:
                 mtu = 1280
@@ -310,7 +324,7 @@ class dnsc_proxy(dns_base):
         questions = msg.question
 
         if len(questions) != 1 or msg.opcode() != 0:
-            self.__send_to_dns_server(self.__transparent_dns, message)
+            self.send_message_to_handler(self.fileno, self.__udp_client, message)
             return
 
         """
@@ -325,8 +339,8 @@ class dnsc_proxy(dns_base):
         pos = host.find(".")
 
         if pos > 0 and self.__debug: print(host)
-        is_match, flags = self.__host_match.match(host)
 
+        is_match, flags = self.__host_match.match(host)
         # 如果flags为2,那么丢弃DNS请求
         if flags == 2: return
 
@@ -335,7 +349,6 @@ class dnsc_proxy(dns_base):
         if n_dns_id < 0: return
 
         if not is_match: flags = None
-
         self.set_dns_id_map(n_dns_id, (daddr, saddr, sport, dns_id, flags, is_ipv6,))
 
         L = list(message)

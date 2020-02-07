@@ -39,13 +39,13 @@ def parse_host_file(fpath):
     results = []
     for line in lines:
         find = line.find(":")
-        if find < 1: continue
+        if find < 1: raise FilefmtErr("wrong host_rule content %s" % line)
         a = line[0:find]
         e = find + 1
         try:
             b = int(line[e:])
         except ValueError:
-            continue
+            raise FilefmtErr("wrong host_rule content %s" % line)
         results.append((a, b,))
     return results
 
@@ -71,7 +71,7 @@ def parse_ip_subnet_file(fpath):
     results = []
     for line in lines:
         ret = __get_ip_subnet(line)
-        if not ret: print("the wrong format on: %s" % line)
+        if not ret: raise FilefmtErr("the wrong ip_ruleformat on: %s\r\n" % line)
         results.append(ret)
 
     return results
