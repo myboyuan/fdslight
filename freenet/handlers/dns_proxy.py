@@ -271,12 +271,18 @@ class dnsc_proxy(dns_base):
             for cname in rrset:
                 ip = cname.__str__()
                 if utils.is_ipv4_address(ip):
-                    if flags == 1 or not self.__ip_match.match(ip, is_ipv6=False):
+                    is_ip_match = self.__ip_match.match(ip, is_ipv6=False)
+                    # 避免只走DNS加密而不走代理失效
+                    if not is_ip_match and flags == 0: continue
+                    if flags == 1 or not is_ip_match:
                         self.dispatcher.set_route(ip, is_dynamic=True)
                     ''''''
                 ''''''
                 if utils.is_ipv6_address(ip):
-                    if flags == 1 or not self.__ip_match.match(ip, is_ipv6=True):
+                    is_ip_match = self.__ip_match.match(ip, is_ipv6=True)
+                    # 避免只走DNS加密而不走代理失效
+                    if not is_ip_match and flags == 0: continue
+                    if flags == 1 or not is_ip_match:
                         self.dispatcher.set_route(ip, is_ipv6=True, is_dynamic=True)
                     ''''''
                 ''''''
