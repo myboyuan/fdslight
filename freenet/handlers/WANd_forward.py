@@ -182,6 +182,7 @@ class handler(tcp_handler.tcp_handler):
         self.dispatcher.reg_fwd_conn(auth_id, self.fileno)
         self.__auth_id = auth_id
         self.send_response("101 Switching Protocols", resp_headers)
+        self.tcp_loop_read_num = 0xffff
 
     def send_response(self, status, headers):
         s = httputils.build_http1x_resp_header(status, headers)
