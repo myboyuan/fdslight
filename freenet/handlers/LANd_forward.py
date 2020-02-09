@@ -58,6 +58,8 @@ class client(ssl_handler.ssl_handler):
 
     def connect_ok(self):
         logging.print_general("connect_ok", self.__address)
+
+        self.tcp_loop_read_num = 0xffff
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         # 注意这里要加入写事件,让TLS能够握手成功
