@@ -203,14 +203,6 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
             self.response_http_error("403 Forbidden")
             return
 
-        s = "https://%s" % self.dispatcher.http_configs["origin"]
-        p = origin.find(s)
-
-        if p != 0:
-            logging.print_general("http_origin_not_match", self.__address)
-            self.response_http_error("403 Forbidden")
-            return
-
         if auth_id != self.__http_auth_id:
             logging.print_general("http_auth_id_fail:%s" % auth_id, self.__address)
             self.response_http_error("400 Bad Request")
