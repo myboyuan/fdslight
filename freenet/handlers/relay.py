@@ -94,9 +94,11 @@ class relay_tcp_handler(tcp_handler.tcp_handler):
 
 class relay_tcp_client(tcp_handler.tcp_handler):
     __creator = None
+    __sent = None
 
     def init_func(self, creator_fd, address, is_ipv6=False):
         self.__creator = creator_fd
+        self.__sent = []
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -114,6 +116,14 @@ class relay_tcp_client(tcp_handler.tcp_handler):
     def connect_ok(self):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+
+        while 1:
+            try:
+                self.writer.write(self.__sent.pop(0))
+            except IndexError:
+                break
+            ''''''
+        self.add_evt_write(self.fileno)
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
@@ -134,5 +144,9 @@ class relay_tcp_client(tcp_handler.tcp_handler):
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def message_from_handler(self, from_fd, byte_data):
+        if not self.is_conn_ok():
+            self.__sent.append(byte_data)
+            return
+
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
