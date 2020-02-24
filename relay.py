@@ -16,11 +16,17 @@ import freenet.lib.utils as utils
 class service(dispatcher.dispatcher):
     __listen_fd = None
 
-    def init_func(self, bind, redirect, is_ipv6=False, force_ipv6=False):
+    def init_func(self, bind, redirect, is_udp=False, is_ipv6=False, force_ipv6=False):
         self.__listen_fd = -1
         self.create_poll()
-        self.__listen_fd = self.create_handler(-1, relay.tcp_listener, bind, redirect, listen_is_ipv6=is_ipv6,
-                                               relay_is_ipv6=force_ipv6)
+
+        if is_udp:
+            handler = relay.udp_listener
+        else:
+            handler = relay.tcp_listener
+
+        self.__listen_fd = self.create_handler(-1, handler, bind, redirect, listen_is_ipv6=is_ipv6,
+                                               redirect_is_ipv6=force_ipv6)
 
     def release(self):
         if self.__listen_fd > 0: self.delete_handler(self.__listen_fd)
@@ -28,10 +34,10 @@ class service(dispatcher.dispatcher):
 
 def main():
     help_doc = """
-    --bind=address,port --redirect=host,port [-6] [--nofork]
+    --bind=address,port --redirect=host,port -p tcp | udp [-6] [--nofork]
     """
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "-6", ["nofork", "bind=", "redirect=", "help"])
+        opts, args = getopt.getopt(sys.argv[1:], "6p:", ["nofork", "bind=", "redirect=", "help"])
     except getopt.GetoptError:
         print(help_doc)
         return
@@ -44,6 +50,7 @@ def main():
     redirect_s = None
     fork = True
     is_ipv6 = False
+    protocol = None
 
     for k, v in opts:
         if k == "-6": force_ipv6 = True
@@ -53,6 +60,7 @@ def main():
             print(help_doc)
             return
         if k == "--nofork": fork = False
+        if k == "-p": protocol = v
 
     if not bind_s:
         print("please set bind address")
@@ -60,6 +68,14 @@ def main():
 
     if not redirect_s:
         print("please set redirect address")
+        return
+
+    if not protocol:
+        print("not set protocol")
+        return
+
+    if protocol not in ("tcp", "udp",):
+        print("unsupport protocol %s" % protocol)
         return
 
     seq = bind_s.split(",")
@@ -102,9 +118,12 @@ def main():
         pid = os.fork()
         if pid != 0: sys.exit(0)
 
+    is_udp = False
+    if protocol == "udp": is_udp = True
+
     instance = service()
     try:
-        instance.ioloop(bind, redirect, force_ipv6=force_ipv6)
+        instance.ioloop(bind, redirect, is_udp=is_udp, force_ipv6=force_ipv6)
     except KeyboardInterrupt:
         instance.release()
 
