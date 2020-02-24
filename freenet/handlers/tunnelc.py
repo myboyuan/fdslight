@@ -103,7 +103,9 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
                 if action not in proto_utils.ACTS: continue
 
-                if action == proto_utils.ACT_PONG: continue
+                if action == proto_utils.ACT_PONG:
+                    self.__update_time = time.time()
+                    continue
                 if action == proto_utils.ACT_PING: continue
 
                 self.__update_time = time.time()
