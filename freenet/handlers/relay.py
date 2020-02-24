@@ -62,7 +62,6 @@ class relay_tcp_handler(tcp_handler.tcp_handler):
 
     def tcp_readable(self):
         self.__time = time.time()
-
         self.send_message_to_handler(self.fileno, self.__relay_fd, self.reader.read())
 
     def tcp_writable(self):
@@ -129,11 +128,13 @@ class relay_tcp_client(tcp_handler.tcp_handler):
         self.close()
 
     def tcp_readable(self):
+        print("---")
         self.send_message_to_handler(self.fileno, self.__creator, self.reader.read())
 
     def tcp_writable(self):
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def message_from_handler(self, from_fd, byte_data):
+        print("---yyy")
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
