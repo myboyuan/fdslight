@@ -236,6 +236,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             self.send_handshake()
         except ssl.SSLWantReadError:
             self.add_evt_read(self.fileno)
+            self.add_evt_write(self.fileno)
         except ssl.SSLWantWriteError:
             self.add_evt_write(self.fileno)
         except:
