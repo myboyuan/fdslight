@@ -4,8 +4,7 @@ import time, socket
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.evtframework.handlers.udp_handler as udp_handler
 
-TIMEOUT = 180
-
+TIMEOUT = 75
 
 class tcp_listener(tcp_handler.tcp_handler):
     __redirect_is_ipv6 = None
