@@ -420,7 +420,9 @@ class udp_tunnel(udp_handler.udp_handler):
 
         if action not in proto_utils.ACTS: return
 
-        if action == proto_utils.ACT_PONG: return
+        if action == proto_utils.ACT_PONG:
+            self.__update_time = time.time()
+            return
         if action == proto_utils.ACT_PING: return
 
         self.__update_time = time.time()
@@ -440,10 +442,7 @@ class udp_tunnel(udp_handler.udp_handler):
             self.delete_handler(self.fileno)
             return
 
-        if self.__enable_heartbeat:
-            self.set_timeout(self.fileno, self.__heartbeat_timeout)
-        else:
-            self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def __handle_heartbeat_timeout(self):
         t = time.time()
