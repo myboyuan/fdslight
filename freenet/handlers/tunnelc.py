@@ -137,10 +137,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             logging.print_general("connected_timeout", self.__server_address)
             return
 
-        if self.__enable_heartbeat:
-            self.set_timeout(self.fileno, self.__heartbeat_timeout)
-        else:
-            self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def __handle_heartbeat_timeout(self):
         t = time.time()
