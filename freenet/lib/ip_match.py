@@ -1,22 +1,17 @@
 #!/usr/bin/env python3
 
-
 import freenet.lib.utils as utils
-import pywind.lib.timer as timer
 
 
 class ip_match(object):
     __ip_rules = None
     __ipv6_rules = None
-    __ip_hosts = None
 
     __host_timer = None
 
     def __init__(self):
-        self.__ip_rules = []
-        self.__ipv6_rules = []
-        self.__ip_hosts = {}
-        self.__host_timer = timer.timer()
+        self.__ip_rules = {}
+        self.__ipv6_rules = {}
 
     def __check_format(self, subnet, prefix):
         prefix = int(prefix)
@@ -37,9 +32,15 @@ class ip_match(object):
         if not utils.check_subnet_fmt(subnet, prefix, is_ipv6=is_ipv6): return False
 
         if is_ipv6:
-            self.__ipv6_rules.append((subnet, prefix,))
+            subnet = utils.calc_subnet(subnet, prefix, is_ipv6=True)
         else:
-            self.__ip_rules.append((subnet, prefix,))
+            subnet = utils.calc_subnet(subnet, prefix, is_ipv6=False)
+
+        name = "%s/%s" % (subnet, prefix,)
+        if is_ipv6:
+            self.__ipv6_rules[name] = (subnet, prefix,)
+        else:
+            self.__ip_rules[name] = (subnet, prefix,)
 
         return True
 
@@ -49,30 +50,35 @@ class ip_match(object):
         else:
             rules = self.__ip_rules
         result = False
-        for subnet, prefix in rules:
-            rs = utils.check_is_from_subnet(ipaddr, subnet, prefix, is_ipv6=is_ipv6)
-            if not rs: continue
+
+        if is_ipv6:
+            n = 128
+        else:
+            n = 32
+
+        while n >= 0:
+            subnet = utils.calc_subnet(ipaddr, n, is_ipv6=is_ipv6)
+            name = "%s/%s" % (subnet, n)
+            n -= 1
+
+            if name not in rules: continue
             result = True
             break
 
         return result
 
-    def add_ip_host(self, host):
-        if host in self.__ip_hosts: return
-
-        self.__ip_hosts[host] = None
-        self.__host_timer.set_timeout(host, 3)
-
-    def auto_delete(self):
-        names = self.__host_timer.get_timeout_names()
-        for host in names:
-            if host in self.__ip_hosts:
-                del self.__ip_hosts[host]
-            if self.__host_timer.exists(host):
-                self.__host_timer.drop(host)
-            ''''''
-        return
-
     def clear(self):
-        self.__ip_rules = []
-        self.__ipv6_rules = []
+        self.__ip_rules = {}
+        self.__ipv6_rules = {}
+
+
+"""
+import freenet.lib.file_parser as fp
+
+m = ip_match()
+results = fp.parse_ip_subnet_file("../../fdslight_etc/ip_rules.txt")
+
+for sub, prefix in results: m.add_rule(sub, prefix)
+
+print(m.match("223.5.5.5"))
+"""
