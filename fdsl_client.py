@@ -75,8 +75,7 @@ class _fdslight_client(dispatcher.dispatcher):
     __server_ip = None
 
     # 静态路由,即在程序运行期间一直存在
-    __static_routes_v4 = None
-    __static_routes_v6 = None
+    __static_routes = None
 
     @property
     def https_configs(self):
@@ -97,8 +96,7 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__route_timer = timer.timer()
         self.__routes = {}
         self.__configs = configs
-        self.__static_routes_v4 = {}
-        self.__static_routes_v6 = {}
+        self.__static_routes = {}
 
         if mode == "local":
             self.__mode = _MODE_LOCAL
@@ -401,23 +399,36 @@ class _fdslight_client(dispatcher.dispatcher):
                 logging.print_error()
 
     def __set_static_ip_rules(self, rules):
-        # 首先清空路由
-        seq = [
-            self.__static_routes_v4,
-            self.__static_routes_v6,
-        ]
-        for dic in seq:
-            for k in dic:
-                t = dic[k]
-                subnet, prefix, is_ipv6 = t
-                self.__del_route(subnet, prefix=prefix, is_ipv6=is_ipv6, is_dynamic=False)
-            ''''''
-
+        # 查看新的规则
+        kv_pairs_new = {}
         for subnet, prefix in rules:
             if not utils.is_ipv6_address(subnet) and not utils.is_ipv4_address(subnet):
                 logging.print_error("wrong pre ip rule %s/%s" % (subnet, prefix,))
                 continue
             is_ipv6 = utils.is_ipv6_address(subnet)
+            name = "%s/%s" % (subnet, prefix,)
+            kv_pairs_new[name] = (subnet, prefix, is_ipv6,)
+        # 需要删除的列表
+        need_dels = []
+        # 需要增加的路由
+        need_adds = []
+
+        for name in kv_pairs_new:
+            # 新的规则旧的没有那么就需要添加
+            if name not in self.__static_routes:
+                need_adds.append(kv_pairs_new[name])
+
+        for name in self.__static_routes:
+            # 旧的规则新的没有,那么就是需要删除
+            if name not in self.__static_routes:
+                need_dels.append(self.__static_routes[name])
+
+        # 删除需要删除的路由
+        for subnet, preifx, is_ipv6 in need_dels:
+            self.__del_route(subnet, prefix=prefix, is_ipv6=is_ipv6, is_dynamic=False)
+
+        # 增加需要增加的路由
+        for subnet, prefix, is_ipv6 in need_adds:
             self.set_route(subnet, prefix=prefix, is_ipv6=is_ipv6, is_dynamic=False)
 
     def __open_tunnel(self):
@@ -522,10 +533,8 @@ class _fdslight_client(dispatcher.dispatcher):
             if not prefix: prefix = 32
 
         if is_ipv6:
-            r = self.__static_routes_v6
             n = 128
         else:
-            r = self.__static_routes_v4
             n = 32
 
         # 首先查看是否已经加了永久路由
@@ -534,7 +543,7 @@ class _fdslight_client(dispatcher.dispatcher):
             name = "%s/%s" % (subnet, n)
             n -= 1
             # 找到永久路由的记录就直接返回,避免冲突
-            if name not in r: break
+            if name not in self.__static_routes: continue
             return
 
         cmd = "ip %s route add %s/%s dev %s" % (s, host, prefix, self.__DEVNAME)
@@ -542,11 +551,10 @@ class _fdslight_client(dispatcher.dispatcher):
 
         if not is_dynamic:
             name = "%s/%s" % (host, prefix,)
-            r[name] = (host, prefix, is_ipv6,)
+            self.__static_routes[name] = (host, prefix, is_ipv6,)
             return
 
-        if not timeout:
-            timeout = self.__ROUTE_TIMEOUT
+        if not timeout: timeout = self.__ROUTE_TIMEOUT
         self.__route_timer.set_timeout(host, timeout)
         self.__routes[host] = is_ipv6
 
@@ -568,7 +576,9 @@ class _fdslight_client(dispatcher.dispatcher):
         if is_dynamic:
             self.__route_timer.drop(host)
             del self.__routes[host]
-        return
+        else:
+            name = "%s/%s" % (host, prefix,)
+            del self.__static_routes[name]
 
     def __update_route_access(self, host, timeout=None):
         """更新路由访问时间
