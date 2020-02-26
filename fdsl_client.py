@@ -420,7 +420,7 @@ class _fdslight_client(dispatcher.dispatcher):
 
         for name in self.__static_routes:
             # 旧的规则新的没有,那么就是需要删除
-            if name not in self.__static_routes:
+            if name not in kv_pairs_new:
                 need_dels.append(self.__static_routes[name])
 
         # 删除需要删除的路由
