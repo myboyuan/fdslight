@@ -14,6 +14,7 @@ import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.ippkts as ippkts
 import freenet.lib.host_match as host_match
 import freenet.lib.ip_match as ip_match
+import freenet.lib.logging as logging
 
 
 class dns_base(udp_handler.udp_handler):
@@ -240,7 +241,9 @@ class dnsc_proxy(dns_base):
 
     def set_ip_rules(self, rules):
         self.__ip_match.clear()
-        for subnet, prefix in rules: self.__ip_match.add_rule(subnet, prefix)
+        for subnet, prefix in rules:
+            rs = self.__ip_match.add_rule(subnet, prefix)
+            if not rs: logging.print_error("wrong ip format %s/%s on ip_rules" % (subnet, prefix,))
 
     def set_parent_dnsserver(self, server, is_ipv6=False):
         """当作为网关模式时需要调用此函数来设置上游DNS

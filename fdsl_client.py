@@ -74,6 +74,10 @@ class _fdslight_client(dispatcher.dispatcher):
     # 服务器地址
     __server_ip = None
 
+    # 静态路由,即在程序运行期间一直存在
+    __static_routes_v4 = None
+    __static_routes_v6 = None
+
     @property
     def https_configs(self):
         configs = self.__configs.get("tunnel_over_https", {})
@@ -93,6 +97,8 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__route_timer = timer.timer()
         self.__routes = {}
         self.__configs = configs
+        self.__static_routes_v4 = {}
+        self.__static_routes_v6 = {}
 
         if mode == "local":
             self.__mode = _MODE_LOCAL
@@ -374,6 +380,7 @@ class _fdslight_client(dispatcher.dispatcher):
         fpaths = [
             "%s/fdslight_etc/host_rules.txt" % BASE_DIR,
             "%s/fdslight_etc/ip_rules.txt" % BASE_DIR,
+            "%s/fdslight_etc/pre_load_ip_rules.txt" % BASE_DIR
         ]
 
         for fpath in fpaths:
@@ -386,9 +393,32 @@ class _fdslight_client(dispatcher.dispatcher):
                     self.get_handler(self.__dns_fileno).set_host_rules(rules)
                 else:
                     rules = file_parser.parse_ip_subnet_file(fpath)
-                    self.get_handler(self.__dns_fileno).set_ip_rules(rules)
+                    if fpath.find("pre_load") > 0:
+                        self.__set_static_ip_rules(rules)
+                    else:
+                        self.get_handler(self.__dns_fileno).set_ip_rules(rules)
             except file_parser.FilefmtErr:
                 logging.print_error()
+
+    def __set_static_ip_rules(self, rules):
+        # 首先清空路由
+        seq = [
+            self.__static_routes_v4,
+            self.__static_routes_v6,
+        ]
+        for dic in seq:
+            for k in dic:
+                t = dic[k]
+                subnet, prefix, is_ipv6 = t
+                self.__del_route(subnet, prefix=prefix, is_ipv6=is_ipv6, is_dynamic=False)
+            ''''''
+
+        for subnet, prefix in rules:
+            if not utils.is_ipv6_address(subnet) and not utils.is_ipv4_address(subnet):
+                logging.print_error("wrong pre ip rule %s/%s" % (subnet, prefix,))
+                continue
+            is_ipv6 = utils.is_ipv6_address(subnet)
+            self.set_route(subnet, prefix=prefix, is_ipv6=is_ipv6, is_dynamic=False)
 
     def __open_tunnel(self):
         conn = self.__configs["connection"]
@@ -476,45 +506,69 @@ class _fdslight_client(dispatcher.dispatcher):
         names = self.__route_timer.get_timeout_names()
         for name in names: self.__del_route(name)
 
-    def set_route(self, host, timeout=None, is_ipv6=False, is_dynamic=True):
+    def set_route(self, host, prefix=None, timeout=None, is_ipv6=False, is_dynamic=True):
         if host in self.__routes: return
         # 如果是服务器的地址,那么不设置路由,避免使用ip_rules规则的时候进入死循环,因为服务器地址可能不在ip_rules文件中
         if host == self.__server_ip: return
 
         # 如果禁止了IPV6流量,那么不设置IPV6路由
         if not self.__enable_ipv6_traffic and is_ipv6: return
+
         if is_ipv6:
             s = "-6"
-            prefix = 128
+            if not prefix: prefix = 128
         else:
             s = ""
-            prefix = 32
+            if not prefix: prefix = 32
+
+        if is_ipv6:
+            r = self.__static_routes_v6
+            n = 128
+        else:
+            r = self.__static_routes_v4
+            n = 32
+
+        # 首先查看是否已经加了永久路由
+        while n > 0:
+            subnet = utils.calc_subnet(host, n, is_ipv6=is_ipv6)
+            name = "%s/%s" % (subnet, n)
+            n -= 1
+            # 找到永久路由的记录就直接返回,避免冲突
+            if name not in r: break
+            return
 
         cmd = "ip %s route add %s/%s dev %s" % (s, host, prefix, self.__DEVNAME)
         os.system(cmd)
 
-        if not is_dynamic: return
+        if not is_dynamic:
+            name = "%s/%s" % (host, prefix,)
+            r[name] = (host, prefix, is_ipv6,)
+            return
 
         if not timeout:
             timeout = self.__ROUTE_TIMEOUT
         self.__route_timer.set_timeout(host, timeout)
         self.__routes[host] = is_ipv6
 
-    def __del_route(self, host):
-        if host not in self.__routes: return
-        is_ipv6 = self.__routes[host]
+    def __del_route(self, host, prefix=None, is_ipv6=False, is_dynamic=True):
+        if host not in self.__routes and is_dynamic: return
+
+        if is_dynamic: is_ipv6 = self.__routes[host]
 
         if is_ipv6:
             s = "-6"
-            prefix = 128
+            if not prefix: prefix = 128
         else:
             s = ""
-            prefix = 32
+            if not prefix: prefix = 32
 
         cmd = "ip %s route del %s/%s dev %s" % (s, host, prefix, self.__DEVNAME)
         os.system(cmd)
-        self.__route_timer.drop(host)
-        del self.__routes[host]
+
+        if is_dynamic:
+            self.__route_timer.drop(host)
+            del self.__routes[host]
+        return
 
     def __update_route_access(self, host, timeout=None):
         """更新路由访问时间
