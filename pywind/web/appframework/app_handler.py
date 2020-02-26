@@ -5,7 +5,7 @@ import random
 import time
 import urllib.parse
 
-import pywind.lib.reader as reader
+import pywind as reader
 import pywind.web.lib.multipart as http_multipart
 
 
@@ -33,7 +33,7 @@ class _request(object):
     __env = None
     __files = None
 
-    __tmp_dir = "./"
+    __tmp_dir = "/"
 
     __FORM_TYPE_URLENCODED = 1
     __FORM_TYPE_MULTIPART = 2

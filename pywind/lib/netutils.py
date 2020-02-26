@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
-import socket
+import socket, struct
 
 
 def hex_ifaddr(byte_s):
+    """ bytes硬件地址到16进制字符串
+    """
     seq = []
     for n in byte_s:
         t = hex(n)[2:]
@@ -12,6 +14,17 @@ def hex_ifaddr(byte_s):
         seq.append(t)
 
     return ":".join(seq)
+
+
+def ifaddr_to_bytes(s):
+    seq = s.split(":")
+    results = []
+    for v in seq:
+        v = "0x%s" % v
+        x = int(v, 16)
+        results.append(struct.pack("B",x))
+
+    return b"".join(results)
 
 
 def ip_prefix_convert(n, is_ipv6=False):
@@ -115,3 +128,5 @@ def calc_subnet(ip, prefix, is_ipv6=False):
 
 def is_subnet(ip, prefix, subnet, is_ipv6=False):
     return calc_subnet(ip, prefix, is_ipv6=is_ipv6) == subnet
+
+

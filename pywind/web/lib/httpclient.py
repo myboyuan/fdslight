@@ -2,9 +2,9 @@
 
 import pywind.web.lib.httputils as httputils
 import pywind.web.lib.httpchunked as httpchunked
-import pywind.lib.reader as reader
+import pywind as reader
 import pywind.lib.writer as writer
-import socket, time, ssl
+import socket, ssl
 
 
 class HttpErr(Exception): pass

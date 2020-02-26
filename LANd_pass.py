@@ -8,8 +8,8 @@ if not BASE_DIR: BASE_DIR = "."
 sys.path.append(BASE_DIR)
 
 PID_PATH = "/tmp/LANd.pid"
-LOG_FILE = "%s/LANd.log" % BASE_DIR
-ERR_FILE = "%s/LANd_err.log" % BASE_DIR
+LOG_FILE = "/tmp/LANd.log"
+ERR_FILE = "/tmp/LANd_err.log"
 CFG_FILE = "%s/fdslight_etc/LANd.ini" % BASE_DIR
 
 import pywind.evtframework.evt_dispatcher as dispatcher

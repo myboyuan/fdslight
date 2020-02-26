@@ -6,13 +6,21 @@ import ssl
 
 class ssl_handler(tcp_handler.tcp_handler):
     __creator_fd = None
-    __handshake_ok = None
+    __ssl_handshake_ok = None
+    __ssl_on = None
+    __server_side = None
 
     def init_func(self, creator_fd, *args, **kwargs):
         self.__creator_fd = creator_fd
-        self.__handshake_ok = False
+        self.__ssl_handshake_ok = False
 
         return self.ssl_init(*args, **kwargs)
+
+    def set_ssl_on(self):
+        self.__ssl_on = True
+
+    def set_as_server_side(self):
+        self.__server_side = True
 
     @property
     def creator(self):
@@ -27,14 +35,21 @@ class ssl_handler(tcp_handler.tcp_handler):
         return -1
 
     def evt_read(self):
-        if not self.is_conn_ok():
-            super().evt_read()
-            return
+        if self.__server_side:
+            if not self.__ssl_on:
+                super().evt_read()
+                return
+            ''''''
+        else:
+            if not self.is_conn_ok():
+                super().evt_read()
+                return
+            ''''''
 
-        if not self.__handshake_ok:
-            self.__do_handshake()
+        if not self.__ssl_handshake_ok:
+            self.__do_ssl_handshake()
 
-        if not self.__handshake_ok: return
+        if not self.__ssl_handshake_ok: return
 
         try:
             super().evt_read()
@@ -49,15 +64,22 @@ class ssl_handler(tcp_handler.tcp_handler):
             if self.handler_exists(self.fileno): self.delete_handler(self.fileno)
 
     def evt_write(self):
-        if not self.is_conn_ok():
-            super().evt_write()
-            return
+        if self.__server_side:
+            if not self.__ssl_on:
+                super().evt_write()
+                return
+            ''''''
+        else:
+            if not self.is_conn_ok():
+                super().evt_write()
+                return
+            ''''''
 
-        if not self.__handshake_ok:
+        if not self.__ssl_handshake_ok:
             self.remove_evt_write(self.fileno)
-            self.__do_handshake()
+            self.__do_ssl_handshake()
 
-        if not self.__handshake_ok: return
+        if not self.__ssl_handshake_ok: return
         try:
             super().evt_write()
         except ssl.SSLWantReadError:
@@ -75,10 +97,10 @@ class ssl_handler(tcp_handler.tcp_handler):
         """
         pass
 
-    def __do_handshake(self):
+    def __do_ssl_handshake(self):
         try:
             self.socket.do_handshake()
-            self.__handshake_ok = True
+            self.__ssl_handshake_ok = True
             self.ssl_handshake_ok()
         except ssl.SSLWantReadError:
             self.add_evt_read(self.fileno)

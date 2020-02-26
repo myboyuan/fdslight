@@ -64,6 +64,9 @@ def parse_htt1x_request_header(sts):
     t = tuple(tmplist)
     method, url, version = t
 
+    if url[0] != "/":
+        raise Http1xHeaderErr("wrong url %s" % url)
+
     try:
         n_ver = float(version[5:])
     except ValueError:

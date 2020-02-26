@@ -138,10 +138,10 @@ class template(object):
         return exeobj_a._get_buff_content()
 
 
-"""
+"""注意返回的为ISO-8859-1的字符串,如果需要UTF-8需要手工转换
 tpl = template()
 tpl.set_find_directories(["./test"])
 rs = tpl.render("child.html", name="this is template")
 
-print(rs)
+print(rs.encode("iso-8859-1").decode())
 """

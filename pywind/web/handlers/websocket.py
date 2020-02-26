@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import pywind.evtframework.handlers.tcp_handler as tcp_handler
+import pywind as tcp_handler
 import pywind.web.lib.websocket as websocket
 import pywind.web.lib.httputils as httputils
 import socket, time
@@ -104,7 +104,7 @@ class ws_handler(tcp_handler.tcp_handler):
 
     def response_error(self):
         resp_sts = httputils.build_http1x_resp_header("400 Bad Request", [("Sec-WebSocket-Version", 13), ],
-            version="1.1")
+                                                      version="1.1")
 
         self.writer.write(resp_sts.encode("iso-8859-1"))
         self.add_evt_write(self.fileno)

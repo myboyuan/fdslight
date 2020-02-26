@@ -8,8 +8,8 @@ if not BASE_DIR: BASE_DIR = "."
 sys.path.append(BASE_DIR)
 
 PID_PATH = "/tmp/WANd.pid"
-LOG_FILE = "%s/WANd.log" % BASE_DIR
-ERR_FILE = "%s/WANd_err.log" % BASE_DIR
+LOG_FILE = "/tmp/WANd.log"
+ERR_FILE = "/tmp/WANd_err.log"
 CFG_FILE = "%s/fdslight_etc/WANd.ini" % BASE_DIR
 SOCK_FILE = "/tmp/WANd.sock"
 

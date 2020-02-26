@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import pywind.lib.reader as reader
+import pywind as reader
 
 
 class MultipartErr(Exception): pass

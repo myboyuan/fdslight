@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import pywind.evtframework.handlers.handler as handler
 import pywind.lib.timer as timer
-import socket
 
 
 class udp_handler(handler.handler):

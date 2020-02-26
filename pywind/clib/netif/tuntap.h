@@ -1,0 +1,14 @@
+#ifndef NB_TUNTAP_H
+#define NB_TUNTAP_H
+
+int tundev_create(char *tundev_name);
+void tundev_close(int fd, const char *name);
+
+///启用接口
+int tundev_up(const char *name);
+
+int tapdev_create(char *tap_name);
+void tapdev_close(int fd,const char *name);
+int tapdev_up(const char *name);
+
+#endif
