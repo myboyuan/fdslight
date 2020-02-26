@@ -424,7 +424,7 @@ class _fdslight_client(dispatcher.dispatcher):
                 need_dels.append(self.__static_routes[name])
 
         # 删除需要删除的路由
-        for subnet, preifx, is_ipv6 in need_dels:
+        for subnet, prefix, is_ipv6 in need_dels:
             self.__del_route(subnet, prefix=prefix, is_ipv6=is_ipv6, is_dynamic=False)
 
         # 增加需要增加的路由
