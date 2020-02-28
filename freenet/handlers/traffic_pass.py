@@ -81,7 +81,7 @@ class ip4_raw_send(handler.handler):
 
         family = socket.AF_INET
 
-        s = socket.socket(family, socket.SOCK_RAW, socket.IPPROTO_UDP | socket.IPPROTO_ICMP | socket.IPPROTO_UDP | 136)
+        s = socket.socket(family, socket.SOCK_RAW, socket.IPPROTO_UDP | 136)
         s.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
         s.setblocking(0)
 
@@ -210,7 +210,7 @@ class p2p_proxy(udp_handler.udp_handler):
         sport = address[1]
 
         udp_packets = ippkts.build_udp_packets(n_saddr, self.__byte_internal_ip, sport, self.__port, message,
-            mtu=self.__mtu, is_udplite=self.__is_udplite, is_ipv6=self.__is_ipv6)
+                                               mtu=self.__mtu, is_udplite=self.__is_udplite, is_ipv6=self.__is_ipv6)
 
         self.__packets += udp_packets
         self.__send_to_tunnel()

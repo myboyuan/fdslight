@@ -22,7 +22,7 @@ class arp_rewrite(handler.handler):
         if not self.__if_hwaddr:
             raise ValueError("wrong network card name,maybe it is not exists")
 
-        s = socket.socket(socket.PF_PACKET, socket.SOCK_RAW, socket.htons(0x806))
+        s = socket.socket(socket.PF_PACKET, socket.SOCK_RAW, socket.htons(0x0806))
         s.setblocking(0)
         s.bind((if_name, 0,))
 
@@ -83,7 +83,7 @@ class arp_rewrite(handler.handler):
             return
         # 对ARP响应进行重写,并发送给客户端
 
-    def arp_msg_send(self, message):
+    def arp_msg_send(self, session_id, message):
         """修改ARP请求报文
         :param message:
         :return:
@@ -99,7 +99,7 @@ class arp_rewrite(handler.handler):
         if src_hwaddr != src_sender_hwaddr: return
 
         # 加入到映射记录
-        self.__arp_cache = {src_ipaddr: (src_hwaddr, time.time(),)}
+        self.__arp_cache = {src_ipaddr: (session_id, src_hwaddr, time.time(),)}
 
         seq[6:12] = list(self.__if_hwaddr)
         seq[22:28] = list(self.__if_hwaddr)
@@ -113,7 +113,7 @@ class arp_rewrite(handler.handler):
         t = time.time()
 
         for ipaddr in self.__arp_cache:
-            hwaddr, old_t = self.__arp_cache[ipaddr]
+            session_id, hwaddr, old_t = self.__arp_cache[ipaddr]
             if t - old_t >= 10: dels.append(ipaddr)
 
         for ipaddr in dels: del self.__arp_cache[ipaddr]
