@@ -3,6 +3,8 @@
 import pywind.evtframework.handlers.handler as handler
 import socket, struct, time
 
+import freenet.lib.netif_hwinfo as hwinfo
+
 
 class arp_rewrite(handler.handler):
     __s = None
@@ -15,6 +17,10 @@ class arp_rewrite(handler.handler):
     def init_func(self, creator_fd, if_name):
         self.__sent = []
         self.__arp_cache = {}
+        self.__if_hwaddr = hwinfo.hwaddr_get(if_name)
+
+        if not self.__if_hwaddr:
+            raise ValueError("wrong network card name,maybe it is not exists")
 
         s = socket.socket(socket.PF_PACKET, socket.SOCK_RAW, socket.htons(0x806))
         s.setblocking(0)
@@ -92,8 +98,6 @@ class arp_rewrite(handler.handler):
         # 检查ARP包是否合法
         if src_hwaddr != src_sender_hwaddr: return
 
-        # 此处检查此IP地址是否合法
-
         # 加入到映射记录
         self.__arp_cache = {src_ipaddr: (src_hwaddr, time.time(),)}
 
@@ -114,3 +118,7 @@ class arp_rewrite(handler.handler):
 
         for ipaddr in dels: del self.__arp_cache[ipaddr]
         self.set_timeout(self.fileno, 10)
+
+    def delete(self):
+        self.unregister(self.fileno)
+        self.__s.close()
