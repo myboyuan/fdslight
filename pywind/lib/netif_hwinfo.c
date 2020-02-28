@@ -13,6 +13,8 @@ netif_hwinfo_hwaddr_get(PyObject *self,PyObject *args)
 
     rs=hwinfo_get(if_name,buf);
 
+    printf("%s %d\r\n",if_name,rs);
+
     if(rs<0){
         Py_RETURN_NONE;
     }
