@@ -23,9 +23,9 @@ Tuntap_dealloc(Tuntap *self)
 {
     if(self->fd>0){
         if(self->is_tap){
-            nb_tapdev_close(self->fd,self->name);
+            tapdev_close(self->fd,self->name);
         }else{
-            nb_tundev_close(self->fd,self->name);
+            tundev_close(self->fd,self->name);
         }
     }
 
@@ -51,17 +51,17 @@ Tuntap_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     strcpy(self->name,name);
 
     if(is_tap){
-        self->fd=nb_tapdev_create(self->name);
-        nb_tapdev_up(self->name);
+        self->fd=tapdev_create(self->name);
+        tapdev_up(self->name);
     }else{
-        self->fd=nb_tundev_create(self->name);
-        nb_tundev_up(self->name);
+        self->fd=tundev_create(self->name);
+        tundev_up(self->name);
     }
 
     self->is_tap=is_tap;
     
     if(self->fd<0){
-        NB_STDERR("cannot create tuntap %s\r\n",self->name);
+        STDERR("cannot create tuntap %s\r\n",self->name);
         Py_TYPE(self)->tp_free((PyObject *) self);
         return NULL;
     }
@@ -84,9 +84,9 @@ static PyObject *
 Tuntap_close(Tuntap *self,PyObject *args)
 {
     if(self->is_tap){
-        nb_tapdev_close(self->fd,self->name);
+        tapdev_close(self->fd,self->name);
     }else{
-        nb_tundev_close(self->fd,self->name);
+        tundev_close(self->fd,self->name);
     }
 
     self->fd=-1;

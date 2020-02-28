@@ -52,7 +52,7 @@ Netmap_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     netmap = nm_open(buf, NULL, 0, NULL);
 
     if(NULL==netmap){
-        NB_STDERR("cannot open %s\r\n",buf);
+        STDERR("cannot open %s\r\n",buf);
         Py_TYPE(self)->tp_free((PyObject *) self);
         return NULL;
     }
