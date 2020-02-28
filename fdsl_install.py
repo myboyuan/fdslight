@@ -118,7 +118,7 @@ def main():
         return
 
     if mode == "server":
-        build_client(" ".join(argv[1:]))
+        build_server(" ".join(argv[1:]))
         return
 
     if mode == "local": build_client(" ".join(argv[1:]), gw_mode=False)
