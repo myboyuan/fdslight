@@ -22,7 +22,7 @@ static int __tuntap_create(char *name,int flags)
 	int fd, err;
 
 	if ((fd = open("/dev/net/tun", O_RDWR)) < 0){
-        NB_STDERR("cannot open /dev/net/tun\r\n");
+        STDERR("cannot open /dev/net/tun\r\n");
 		return -1;
 	}
 
@@ -32,13 +32,13 @@ static int __tuntap_create(char *name,int flags)
 	if (*name != '\0'){
 		strncpy(ifr.ifr_name, name, IFNAMSIZ);
 	}else{
-        NB_STDERR("wrong tuntap_name\r\n");
+        STDERR("wrong tuntap_name\r\n");
         return -1;
     }
 
 	if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0){
 		close(fd);
-        NB_STDERR("cannot ioctl tuntap device\r\n");
+        STDERR("cannot ioctl tuntap device\r\n");
 		return -1;
 	}
 

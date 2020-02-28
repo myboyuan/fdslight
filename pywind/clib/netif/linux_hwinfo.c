@@ -20,7 +20,7 @@ struct hwinfo *hwinfo_get_all(size_t *nc_num)
 
     int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
     if (sock < 0){
-        NB_STDERR("cannot create socket\r\n");
+        STDERR("cannot create socket\r\n");
         return NULL;
     }
 
@@ -29,7 +29,7 @@ struct hwinfo *hwinfo_get_all(size_t *nc_num)
 
     if (ioctl(sock, SIOCGIFCONF, &ifc) < 0){
         close(sock);
-        NB_STDERR("call ioctl failed\r\n");
+        STDERR("call ioctl failed\r\n");
         return NULL;
     }
 
@@ -54,7 +54,7 @@ struct hwinfo *hwinfo_get_all(size_t *nc_num)
         if(NULL==tmp_info){
             hwinfo_free(rs_head);
             rs_head=NULL;
-            NB_STDERR("cannot malloc memory\r\n");
+            STDERR("cannot malloc memory\r\n");
             break;
         }
 
