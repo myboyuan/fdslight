@@ -211,7 +211,17 @@ class tundevc(tun_base):
     def dev_timeout(self):
         pass
 
-    def msg_from_tunnel(self, message):
+    def msg_from_tunnel(self, message, is_link_data=False):
+        if is_link_data:
+            self.handle_link_data(message)
+            return
+
         self.add_to_sent_queue(message)
         self.add_evt_write(self.fileno)
 
+    def handle_link_data(self, message):
+        """处理链路层数据
+        :param message:
+        :return:
+        """
+        pass

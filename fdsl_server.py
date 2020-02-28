@@ -559,6 +559,9 @@ class _fdslight_server(dispatcher.dispatcher):
 
         sys.exit(0)
 
+    def get_hwaddr_addr_with_ip(self, ipaddr, is_ipv6=False):
+        return None
+
 
 def __start_service(debug):
     if not debug:

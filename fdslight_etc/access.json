@@ -1,5 +1,8 @@
 [
   {
-    "username":"test","password":"test"
+    "username": "test",
+    "password": "test",
+    "bind_ip4s": [],
+    "bind_ip6s": []
   }
 ]

@@ -1,5 +1,5 @@
-#ifndef NB_TUNTAP_H
-#define NB_TUNTAP_H
+#ifndef TUNTAP_H
+#define TUNTAP_H
 
 int tundev_create(char *tundev_name);
 void tundev_close(int fd, const char *name);

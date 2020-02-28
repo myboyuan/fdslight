@@ -12,7 +12,10 @@ ACT_PING = 3
 # PONG
 ACT_PONG = 4
 
-ACTS = (ACT_IPDATA, ACT_DNS, ACT_PING, ACT_PONG,)
+# 链路层数据
+ACT_LINK_DATA = 5
+
+ACTS = (ACT_IPDATA, ACT_DNS, ACT_PING, ACT_PONG, ACT_LINK_DATA,)
 
 
 def rand_bytes(max_size=64):

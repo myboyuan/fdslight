@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os, sys
+import pywind.lib.sys_build as sys_build
 
 # 编译器名
 if sys.platform.find("freebsd") > -1:
@@ -27,26 +28,52 @@ def write_kern_ver_to_file(fpath):
         popen.close()
 
 
+def build_public_ip_client(cflags, enable_netmap=False):
+    files = [
+        "pywind/lib/tuntap.c",
+    ]
+
+    if sys.platform.find("linux") > -1:
+        files.append(
+            "pywind/clib/netif/linux_tuntap.c"
+        )
+    else:
+        files.append(
+            "pywind/clib/netif/freebsd_tuntap.c"
+        )
+    sys_build.do_compile(files, "freenet/lib/tuntap.so", cflags=cflags, debug=True, is_shared=True)
+
+    if not enable_netmap: return
+    sys_build.do_compile(["pywind/lib/netmap.c"], "freenet/lib/netmap.so", debug=True, is_shared=True)
+
+
 def main():
+    help_doc = """
+    gateway | server | local | public_ip_client | public_ip_client_with_netmap  cflags
+    """
+
     argv = sys.argv[1:]
-    if len(argv) != 2:
+    if len(argv) < 2:
         print("it is wrong argument")
         return
 
     __mode = argv[0]
-    if __mode not in ("gateway", "server", "local"):
+    if __mode not in ("gateway", "server", "local", "public_ip_client", "public_ip_client_with_netmap",):
         print("the mode must be gateway,server or local")
         return
 
-    py_include = argv[1]
-    if not os.path.isdir(py_include):
-        print("can not python3 include file")
+    if __mode.find("public_ip_client_with_netmap") > -1:
+        build_public_ip_client(" " % sys.argv[1:], enable_netmap=True)
+        return
+
+    if __mode.find("public_ip_client") > -1:
+        build_public_ip_client(" " % sys.argv[1:], enable_netmap=False)
         return
 
     paths = [(src_path_1, dst_path_1), (src_path_2, dst_path_2,)]
 
     for src, dst in paths:
-        cmd = "%s %s -o %s -I %s -fPIC -shared -g -std=c99" % (
+        cmd = "%s %s -o %s %s -fPIC -shared -g -std=c99" % (
             CC, src, dst, py_include
         )
         os.system(cmd)
@@ -64,5 +91,4 @@ def main():
     ''''''
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == '__main__': main()

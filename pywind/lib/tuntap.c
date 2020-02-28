@@ -7,9 +7,9 @@
 #include <unistd.h>
 #include <string.h>
 
-#include "../../public/netif/tuntap.h"
+#include "../clib/netif/tuntap.h"
 
-#include "../../public/debug.h"
+#include "../clib/debug.h"
 
 typedef struct{
     PyObject_HEAD
