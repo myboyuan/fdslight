@@ -27,10 +27,10 @@ def build_public_ip_client(cflags, enable_netmap=False):
         files.append(
             "pywind/clib/netif/freebsd_tuntap.c"
         )
-    sys_build.do_compile(files, "freenet/lib/tuntap.so", cflags=cflags, debug=True, is_shared=True)
+    sys_build.do_compile(files, "freenet/lib/tuntap.so", cflags, debug=True, is_shared=True)
 
     if not enable_netmap: return
-    sys_build.do_compile(["pywind/lib/netmap.c"], "freenet/lib/netmap.so", debug=True, is_shared=True)
+    sys_build.do_compile(["pywind/lib/netmap.c"], "freenet/lib/netmap.so", cflags, debug=True, is_shared=True)
 
 
 def build_server():
@@ -39,11 +39,11 @@ def build_server():
 
 def build_client(cflags, gw_mode=False):
     sys_build.do_compile(
-        ["freenet/lib/fn_utils.c"], "freenet/lib/fn_utils.so", cflags=cflags, debug=True, is_shared=True
+        ["freenet/lib/fn_utils.c"], "freenet/lib/fn_utils.so", cflags, debug=True, is_shared=True
     )
 
     sys_build.do_compile(
-        ["driver/py_fdsl_ctl.c"], "freenet/lib/fdsl_ctl.so", cflags=cflags, debug=True, is_shared=True
+        ["driver/py_fdsl_ctl.c"], "freenet/lib/fdsl_ctl.so", cflags, debug=True, is_shared=True
     )
 
     if gw_mode:
