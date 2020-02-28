@@ -58,11 +58,10 @@ struct hwinfo *hwinfo_get_all(size_t *nc_num)
             break;
         }
 
-        bzero(tmp_info,sizeof(struct hwinfo));
         memcpy(tmp_info->hwaddr,&ifr.ifr_ifru.ifru_hwaddr.sa_data[0],6);
         strcpy(tmp_info->name,ifr.ifr_name);
 
-        if(NULL!=rs_head) rs_head->next=tmp_info;
+        tmp_info->next=rs_head;
         rs_head=tmp_info;
 
     }
@@ -97,6 +96,7 @@ int hwinfo_get(const char *name, unsigned char *res)
         }
         rs=0;
         memcpy(res,info->hwaddr,6);
+        break;
     }
 
     hwinfo_free(first);
