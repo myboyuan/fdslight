@@ -74,19 +74,18 @@ def main():
         return
 
     if mode == "public_ip_client_with_netmap" > -1:
-        build_public_ip_client(" " % sys.argv[1:], enable_netmap=True)
+        build_public_ip_client(" ".join(argv[1:]), enable_netmap=True)
         return
 
     if mode == "public_ip_client":
-        build_public_ip_client(" " % sys.argv[1:], enable_netmap=False)
+        build_public_ip_client(" ".join(argv[1:]), enable_netmap=False)
         return
 
     if mode == "gateway":
-        print(sys.argv)
-        build_client(" " % sys.argv[1:], gw_mode=True)
+        build_client(" ".join(argv[1:]), gw_mode=True)
         return
 
-    if mode == "local": build_client(" " % sys.argv[1:], gw_mode=False)
+    if mode == "local": build_client(" ".join(argv[1:]), gw_mode=False)
 
 
 if __name__ == '__main__': main()
