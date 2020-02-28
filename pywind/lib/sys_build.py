@@ -42,7 +42,7 @@ def do_compile(flist, output, c_flags, debug=False, is_shared=False):
     cmd += " %s -o %s" % (" ".join(flist), output,)
 
     if debug:
-        cmd += " -g -Wall -D NB_DEBUG"
+        cmd += " -g -Wall -D DEBUG"
 
     if c_flags:
         cmd += " %s" % c_flags

@@ -82,6 +82,7 @@ def main():
         return
 
     if mode == "gateway":
+        print(sys.argv)
         build_client(" " % sys.argv[1:], gw_mode=True)
         return
 
