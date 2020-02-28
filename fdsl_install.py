@@ -42,7 +42,7 @@ def __build_fdsl_ctl(cflags):
     )
 
 
-def build_public_ip_client(cflags, enable_netmap=False):
+def __build_tuntap(cflags):
     files = [
         "pywind/lib/tuntap.c",
     ]
@@ -56,6 +56,10 @@ def build_public_ip_client(cflags, enable_netmap=False):
             "pywind/clib/netif/freebsd_tuntap.c"
         )
     sys_build.do_compile(files, "freenet/lib/tuntap.so", cflags, debug=True, is_shared=True)
+
+
+def build_public_ip_client(cflags, enable_netmap=False):
+    __build_tuntap(cflags)
     __build_netif_hwinfo(cflags)
 
     if not enable_netmap: return
@@ -63,12 +67,14 @@ def build_public_ip_client(cflags, enable_netmap=False):
 
 
 def build_server(cflags):
+    __build_tuntap(cflags)
     __build_fn_utils(cflags)
     __build_fdsl_ctl(cflags)
     __build_netif_hwinfo(cflags)
 
 
 def build_client(cflags, gw_mode=False):
+    __build_tuntap(cflags)
     __build_fn_utils(cflags)
     __build_fdsl_ctl(cflags)
 
