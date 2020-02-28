@@ -98,6 +98,8 @@ int hwinfo_get(const char *name, unsigned char *res)
         rs=0;
         memcpy(res,info->hwaddr,6);
     }
+
+    hwinfo_free(first);
     
     return rs;
 }
