@@ -52,7 +52,7 @@ def build_client(cflags, gw_mode=False):
         os.system("make")
         os.chdir("../")
         write_kern_ver_to_file("fdslight_etc/kern_version")
-        if not os.path.isfile("driver/fdslight.ko"):
+        if not os.path.isfile("driver/fdslight_dgram.ko"):
             print("install fdslight failed!!!")
         ''''''
 
