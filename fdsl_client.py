@@ -506,7 +506,7 @@ class _fdslight_client(dispatcher.dispatcher):
             if name in self.__static_routes:
                 rs = self.__static_routes[name]
                 break
-            ''''''
+            n -= 1
         return rs
 
     def tell_tunnel_close(self):
