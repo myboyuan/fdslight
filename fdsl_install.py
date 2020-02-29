@@ -14,22 +14,6 @@ def write_kern_ver_to_file(fpath):
         popen.close()
 
 
-def __build_netif_hwinfo(cflags):
-    files = [
-        "pywind/lib/netif_hwinfo.c",
-    ]
-
-    if sys.platform.find("linux") > -1:
-        files.append(
-            "pywind/clib/netif/linux_hwinfo.c"
-        )
-    else:
-        files.append(
-            "pywind/clib/netif/freebsd_hwinfo.c"
-        )
-    sys_build.do_compile(files, "freenet/lib/netif_hwinfo.so", cflags, debug=True, is_shared=True)
-
-
 def __build_fn_utils(cflags):
     sys_build.do_compile(
         ["freenet/lib/fn_utils.c"], "freenet/lib/fn_utils.so", cflags, debug=True, is_shared=True
@@ -42,31 +26,12 @@ def __build_fdsl_ctl(cflags):
     )
 
 
-def __build_tuntap(cflags):
-    files = [
-        "pywind/lib/tuntap.c",
-    ]
-
-    if sys.platform.find("linux") > -1:
-        files.append(
-            "pywind/clib/netif/linux_tuntap.c"
-        )
-    else:
-        files.append(
-            "pywind/clib/netif/freebsd_tuntap.c"
-        )
-    sys_build.do_compile(files, "freenet/lib/tuntap.so", cflags, debug=True, is_shared=True)
-
-
 def build_server(cflags):
-    __build_tuntap(cflags)
     __build_fn_utils(cflags)
     __build_fdsl_ctl(cflags)
-    __build_netif_hwinfo(cflags)
 
 
 def build_client(cflags, gw_mode=False):
-    __build_tuntap(cflags)
     __build_fn_utils(cflags)
     __build_fdsl_ctl(cflags)
 
