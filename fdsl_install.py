@@ -48,7 +48,7 @@ def build_client(cflags, gw_mode=False):
 
 def main():
     help_doc = """
-    gateway | server | local | public_ip_client | public_ip_client_with_netmap  python_include
+    gateway | server | local  python3_include
     """
 
     argv = sys.argv[1:]
