@@ -541,7 +541,6 @@ class _fdslight_client(dispatcher.dispatcher):
         if rs:
             self.__del_route(rs[0], prefix=rs[1], is_ipv6=rs[2], is_dynamic=False)
             logging.print_error("conflict route with tunnel ip,it is %s/%s" % (rs[0], rs[1],))
-            return
 
         if ipaddr in self.__routes:
             self.__del_route(ipaddr, is_dynamic=True, is_ipv6=enable_ipv6)
