@@ -475,6 +475,28 @@ class _fdslight_client(dispatcher.dispatcher):
         if not rs:
             self.delete_handler(self.__tunnel_fileno)
 
+    def __get_conflict_from_static_route(self, ipaddr, is_ipv6=False):
+        """获取与static冲突的结果
+        :param ipaddr:
+        :param is_ipv6:
+        :return:
+        """
+        if is_ipv6:
+            n = 128
+        else:
+            n = 32
+
+        rs = None
+
+        while n > 0:
+            sub = utils.calc_subnet(ipaddr, n, is_ipv6=is_ipv6)
+            name = "%s/%s" % (sub, n,)
+            if name in self.__static_routes:
+                rs = self.__static_routes[name]
+                break
+            ''''''
+        return rs
+
     def tell_tunnel_close(self):
         self.__tunnel_fileno = -1
 
@@ -504,27 +526,50 @@ class _fdslight_client(dispatcher.dispatcher):
         except dns.resolver.NoNameservers:
             return None
 
+        ipaddr = None
+
         for anwser in rs:
             ipaddr = anwser.__str__()
             break
         if self.__mode == _MODE_GW: self.__set_tunnel_ip(ipaddr)
 
         self.__server_ip = ipaddr
+        if not ipaddr: return ipaddr
+        # 检查路由是否冲突
+        rs = self.__get_conflict_from_static_route(ipaddr, is_ipv6=enable_ipv6)
+        # 路由冲突那么先删除路由
+        if rs:
+            self.__del_route(rs[0], prefix=rs[1], is_ipv6=rs[2], is_dynamic=False)
+            logging.print_error("conflict route with tunnel ip,it is %s/%s" % (rs[0], rs[1],))
+            return
+
+        if ipaddr in self.__routes:
+            self.__del_route(ipaddr, is_dynamic=True, is_ipv6=enable_ipv6)
 
         return ipaddr
 
     def myloop(self):
         names = self.__route_timer.get_timeout_names()
-        for name in names: self.__del_route(name)
+        for name in names:
+            if self.__route_timer.exists(name): self.__route_timer.drop(name)
+            self.__del_route(name)
 
     def set_route(self, host, prefix=None, timeout=None, is_ipv6=False, is_dynamic=True):
         if host in self.__routes: return
         # 如果是服务器的地址,那么不设置路由,避免使用ip_rules规则的时候进入死循环,因为服务器地址可能不在ip_rules文件中
         if host == self.__server_ip: return
 
+        # 检查默认加载的路由是否和nameserver冲突,如果冲突那么直接返回
+        nameserver = self.__configs["public"]["remote_dns"]
+        ns_is_ipv6 = utils.is_ipv6_address(nameserver)
+        if ns_is_ipv6 == is_ipv6:
+            rs = self.__get_conflict_from_static_route(host, is_ipv6=is_ipv6)
+            if rs:
+                logging.print_error("conflict with nameserver about route %s/%s" % (rs[0], rs[1],))
+                return
+            ''''''
         # 如果禁止了IPV6流量,那么不设置IPV6路由
         if not self.__enable_ipv6_traffic and is_ipv6: return
-
         if is_ipv6:
             s = "-6"
             if not prefix: prefix = 128
