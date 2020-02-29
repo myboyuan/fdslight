@@ -399,6 +399,9 @@ class _fdslight_client(dispatcher.dispatcher):
                 logging.print_error()
 
     def __set_static_ip_rules(self, rules):
+        nameserver = self.__configs["public"]["remote_dns"]
+        ns_is_ipv6 = utils.is_ipv6_address(nameserver)
+
         # 查看新的规则
         kv_pairs_new = {}
         for subnet, prefix in rules:
@@ -406,6 +409,15 @@ class _fdslight_client(dispatcher.dispatcher):
                 logging.print_error("wrong pre ip rule %s/%s" % (subnet, prefix,))
                 continue
             is_ipv6 = utils.is_ipv6_address(subnet)
+
+            # 找到和nameserver冲突的路由那么跳过
+            t = utils.calc_subnet(nameserver, prefix)
+            if t == subnet:
+                logging.print_error(
+                    "conflict preload ip rules %s/%s with nameserver %s" % (subnet, prefix, nameserver,)
+                )
+                continue
+
             name = "%s/%s" % (subnet, prefix,)
             kv_pairs_new[name] = (subnet, prefix, is_ipv6,)
         # 需要删除的列表
@@ -558,15 +570,10 @@ class _fdslight_client(dispatcher.dispatcher):
         # 如果是服务器的地址,那么不设置路由,避免使用ip_rules规则的时候进入死循环,因为服务器地址可能不在ip_rules文件中
         if host == self.__server_ip: return
 
-        # 检查默认加载的路由是否和nameserver冲突,如果冲突那么直接返回
+        # 检查路由是否和nameserver冲突,如果冲突那么不添加路由
         nameserver = self.__configs["public"]["remote_dns"]
-        ns_is_ipv6 = utils.is_ipv6_address(nameserver)
-        if ns_is_ipv6 == is_ipv6:
-            rs = self.__get_conflict_from_static_route(host, is_ipv6=is_ipv6)
-            if rs:
-                logging.print_error("conflict with nameserver about route %s/%s" % (rs[0], rs[1],))
-                return
-            ''''''
+        if nameserver == host: return
+
         # 如果禁止了IPV6流量,那么不设置IPV6路由
         if not self.__enable_ipv6_traffic and is_ipv6: return
         if is_ipv6:
