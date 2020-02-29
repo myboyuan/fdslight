@@ -61,6 +61,7 @@ def calc_subnet(ipaddr, prefix, is_ipv6=False):
     q = int(prefix / 8)
     r = prefix % 8
 
+    print(ipaddr, prefix)
     if is_ipv6:
         byte_ipaddr = socket.inet_pton(socket.AF_INET6, ipaddr)
         results = list(bytes(16))

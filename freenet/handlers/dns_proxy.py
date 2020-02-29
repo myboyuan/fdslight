@@ -274,7 +274,6 @@ class dnsc_proxy(dns_base):
             for cname in rrset:
                 ip = cname.__str__()
                 if utils.is_ipv4_address(ip):
-                    print(ip)
                     is_ip_match = self.__ip_match.match(ip, is_ipv6=False)
                     # 避免只走DNS加密而不走代理失效
                     if not is_ip_match and flags == 0: continue
