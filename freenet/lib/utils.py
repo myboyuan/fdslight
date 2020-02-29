@@ -61,7 +61,6 @@ def calc_subnet(ipaddr, prefix, is_ipv6=False):
     q = int(prefix / 8)
     r = prefix % 8
 
-    print(ipaddr, prefix)
     if is_ipv6:
         byte_ipaddr = socket.inet_pton(socket.AF_INET6, ipaddr)
         results = list(bytes(16))
@@ -130,6 +129,18 @@ def bytes2number(byte_data):
 
 def is_ipv4_address(sts_ipaddr):
     """检查是否是IPv4地址"""
+    if len(sts_ipaddr) < 7: return False
+
+    seq = sts_ipaddr.split(".")
+    if len(seq) != 4: return False
+
+    for c in seq:
+        try:
+            v = int(c)
+            if v > 255: return False
+        except ValueError:
+            return False
+        ''''''
     try:
         socket.inet_aton(sts_ipaddr)
     except OSError:
@@ -139,6 +150,17 @@ def is_ipv4_address(sts_ipaddr):
 
 def is_ipv6_address(sts_ipaddr):
     """检查是否是IPv6地址"""
+    if sts_ipaddr.find(":") < 0: return False
+    seq = sts_ipaddr.split(":")
+
+    for s in seq:
+        if not s: continue
+        s = "0x%s" % s
+        try:
+            int(s, 16)
+        except ValueError:
+            return False
+
     try:
         socket.inet_pton(socket.AF_INET6, sts_ipaddr)
     except OSError:
