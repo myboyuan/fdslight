@@ -48,11 +48,11 @@ def build_client(cflags, gw_mode=False):
 
 def main():
     help_doc = """
-    gateway | server | local | public_ip_client | public_ip_client_with_netmap  cflags
+    gateway | server | local | public_ip_client | public_ip_client_with_netmap  python_include
     """
 
     argv = sys.argv[1:]
-    if len(argv) < 2:
+    if len(argv) != 2:
         print(help_doc)
         return
 
@@ -60,6 +60,10 @@ def main():
 
     if mode not in ("gateway", "server", "local", "public_ip_client",):
         print("the mode must be gateway,server or local")
+        return
+
+    if not os.path.isdir(argv[1]):
+        print("not found directory %s" % argv[1])
         return
 
     cflags = " -I %s" % "".join(argv[1:])
