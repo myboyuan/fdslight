@@ -58,14 +58,6 @@ def __build_tuntap(cflags):
     sys_build.do_compile(files, "freenet/lib/tuntap.so", cflags, debug=True, is_shared=True)
 
 
-def build_public_ip_client(cflags, enable_netmap=False):
-    __build_tuntap(cflags)
-    __build_netif_hwinfo(cflags)
-
-    if not enable_netmap: return
-    sys_build.do_compile(["pywind/lib/netmap.c"], "freenet/lib/netmap.so", cflags, debug=True, is_shared=True)
-
-
 def build_server(cflags):
     __build_tuntap(cflags)
     __build_fn_utils(cflags)
@@ -101,27 +93,21 @@ def main():
 
     mode = argv[0]
 
-    if mode not in ("gateway", "server", "local", "public_ip_client", "public_ip_client_with_netmap",):
+    if mode not in ("gateway", "server", "local", "public_ip_client",):
         print("the mode must be gateway,server or local")
         return
 
-    if mode == "public_ip_client_with_netmap" > -1:
-        build_public_ip_client(" ".join(argv[1:]), enable_netmap=True)
-        return
-
-    if mode == "public_ip_client":
-        build_public_ip_client(" ".join(argv[1:]), enable_netmap=False)
-        return
+    cflags = " -I %s" % "".join(argv[1:])
 
     if mode == "gateway":
-        build_client(" ".join(argv[1:]), gw_mode=True)
+        build_client(cflags, gw_mode=True)
         return
 
     if mode == "server":
-        build_server(" ".join(argv[1:]))
+        build_server(cflags)
         return
 
-    if mode == "local": build_client(" ".join(argv[1:]), gw_mode=False)
+    if mode == "local": build_client(cflags, gw_mode=False)
 
 
 if __name__ == '__main__': main()

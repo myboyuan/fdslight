@@ -177,7 +177,7 @@ def is_uint(s):
     return n >= 0
 
 
-MBUF_AREA_SIZE = 1600
+MBUF_AREA_SIZE = 1501
 
 
 class mbuf(object):

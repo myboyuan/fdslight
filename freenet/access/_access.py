@@ -12,17 +12,10 @@ class access(object):
 
     __dispatcher = None
 
-    # ipv4到session id的映射
-    __ipv4_to_session_id = None
-    # ipv6到session id的映射
-    __ipv6_to_session_id = None
-
     def __init__(self, dispatcher):
         self.__timer = timer.timer()
         self.__sessions = {}
         self.__dispatcher = dispatcher
-        self.__ipv4_to_session_id = {}
-        self.__ipv6_to_session_id = {}
 
         self.init()
 
@@ -55,28 +48,20 @@ class access(object):
         """处理会话关闭"""
         pass
 
-    def add_session(self, fileno, username, session_id, address, bind_ip4s=None, bind_ip6s=None, priv_data=None):
+    def add_session(self, fileno, username, session_id, address, priv_data=None):
         """加入会话
         :param fileno:文件描述符
         :param username:用户名
         :param session_id: 会话ID
         :param address: (ipaddr,port)
-        :param bind_ip4s,给客户端分配的公共IP地址,类型为列表
-        :param bind_ip6s:给客户端分配的公共IPv6地址,类型为列表
         :param priv_data:你的私有数据,如果想要修改数据,priv_data应该是引用类型
         :return:
         """
         if self.session_exists(session_id): return
 
-        for ip in bind_ip4s:
-            self.__ipv4_to_session_id[ip] = session_id
-        for ip in bind_ip6s:
-            self.__ipv6_to_session_id[ip] = session_id
-
-        self.__sessions[session_id] = [fileno, username, address, bind_ip4s, bind_ip6s, priv_data, ]
+        self.__sessions[session_id] = [fileno, username, address, priv_data, ]
         self.__timer.set_timeout(session_id, self.__SESSION_TIMEOUT)
         self.__dispatcher.tell_register_session(session_id)
-
         logging.print_general("add_session:%s" % username, address)
 
     def get_session_info(self, session_id):
@@ -93,16 +78,10 @@ class access(object):
 
         self.__timer.drop(session_id)
         self.handle_close(session_id)
-        fileno, username, address, bind_ip4s, bind_ip6s, priv_data = self.__sessions[session_id]
-        self.__dispatcher.tell_unregister_session(session_id, fileno)
+        fileno, username, address, priv_data = self.__sessions[session_id]
+        self.__dispatcher.tell_unregister_session(session_id,fileno)
 
         logging.print_general("del_session:%s" % username, address)
-
-        for ip in bind_ip4s:
-            del self.__ipv4_to_session_id[ip]
-        for ip in bind_ip6s:
-            del self.__ipv6_to_session_id[ip]
-
         del self.__sessions[session_id]
 
     def modify_session(self, session_id, fileno, address):
@@ -148,16 +127,3 @@ class access(object):
         if b:
             self.modify_session(session_id, fileno, address)
         return b
-
-    def get_session_id_for_ip(self, ip, is_ipv6=False):
-        """根据IP地址获取用户会话ID
-        :param ip:
-        :param is_ipv6:
-        :return:
-        """
-        if is_ipv6:
-            dic = self.__ipv6_to_session_id
-        else:
-            dic = self.__ipv4_to_session_id
-
-        return dic.get(ip, None, )

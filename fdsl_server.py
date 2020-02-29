@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, getopt, os, signal, importlib, socket, struct
+import sys, getopt, os, signal, importlib, socket
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -25,7 +25,6 @@ import freenet.lib.ip6dgram as ip6dgram
 import freenet.handlers.traffic_pass as traffic_pass
 import freenet.lib.logging as logging
 import freenet.lib.fn_utils as fn_utils
-import freenet.handlers.arp_rewrited as arpd
 
 
 class _fdslight_server(dispatcher.dispatcher):
@@ -77,8 +76,6 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __dns_is_ipv6 = None
     __dns_addr = None
-
-    __arp_fd = None
 
     @property
     def http_configs(self):
@@ -163,10 +160,6 @@ class _fdslight_server(dispatcher.dispatcher):
 
         self.__raw_fileno = self.create_handler(-1, traffic_pass.ip4_raw_send)
 
-        public_ip_service = configs["public_ip_service"]
-        if_name = public_ip_service["bind_interface"]
-        self.__arp_fd = self.create_handler(-1, arpd.arp_rewrite, if_name)
-
         self.__access = access.access(self)
 
         self.__mbuf = utils.mbuf()
@@ -237,14 +230,11 @@ class _fdslight_server(dispatcher.dispatcher):
         if size > utils.MBUF_AREA_SIZE: return False
         if action not in proto_utils.ACTS: return False
 
-        if action == proto_utils.ACT_LINK_DATA:
-            self.__handle_link_data(session_id, message)
-            return True
-
         if action == proto_utils.ACT_IPDATA: self.__mbuf.copy2buf(message)
         if action == proto_utils.ACT_DNS:
             self.__request_dns(session_id, message)
             return True
+
         return self.__handle_ipdata_from_tunnel(session_id)
 
     def __handle_ipdata_from_tunnel(self, session_id):
@@ -406,25 +396,6 @@ class _fdslight_server(dispatcher.dispatcher):
     def send_msg_to_tunnel_from_tun(self, message):
         if len(message) > utils.MBUF_AREA_SIZE: return
 
-        ### 首先检查IP地址是否在分配的地址中
-        ver = (message[0] & 0xf0) >> 4
-        if 6 == ver:
-            is_ipv6 = True
-            fa = socket.AF_INET6
-            dst_addr = message[24:40]
-        else:
-            is_ipv6 = False
-            fa = socket.AF_INET
-            dst_addr = message[16:20]
-
-        s = socket.inet_ntop(fa, dst_addr)
-        session_id = self.__access.get_session_id_for_ip(s, is_ipv6=is_ipv6)
-
-        # 找到会话ID那么就构建链路层数据包并直接发送出去
-        if session_id:
-            self.__handle_link_data_from_tundev(session_id, message)
-            return
-
         self.__mbuf.copy2buf(message)
 
         ip_ver = self.__mbuf.ip_version()
@@ -585,87 +556,8 @@ class _fdslight_server(dispatcher.dispatcher):
             self.delete_handler(self.__tcp6_fileno)
         if self.handler_exists(self.__tcp_fileno):
             self.delete_handler(self.__tcp_fileno)
-        if self.handler_exists(self.__arp_fd):
-            self.delete_handler(self.__arp_fd)
-        if self.handler_exists(self.__raw_fileno):
-            self.delete_handler(self.__raw_fileno)
 
         sys.exit(0)
-
-    def __handle_link_data(self, session_id, message):
-        """处理链路层数据
-        :param session_id:
-        :param message:
-        :return:
-        """
-        # 长度合法性检查
-        if len(message) < 42: return
-        dst_hwaddr, src_hwaddr, _type = struct.unpack("!6s6sH", message[0:14])
-        # 限定支持ARP,IPv4和IPv6
-        if _type not in (0x0800, 0x0806, 0x86dd,): return
-
-        if _type == 0x800:
-            self.__handle_link_ip_data(session_id, message[14:])
-            return
-
-        if _type == 0x806:
-            self.__handle_link_arp_data(session_id, message)
-            return
-        self.__handle_link_ipv6_data(session_id, message)
-
-    def __handle_link_arp_data(self, session_id, message):
-        user = self.__access.get_session_info(session_id)
-
-        ip4s = user[3]
-        if not ip4s: ip4s = []
-
-        src_ipaddr = message[28:32]
-        s = socket.inet_ntop(socket.AF_INET, src_ipaddr)
-        # 检查是否是分配给该用户的地址,如果不是,直接抛弃数据包
-        if s not in src_ipaddr: return
-        self.get_handler(self.__arp_fd).arp_msg_send(session_id, message)
-
-    def __handle_link_ip_data(self, session_id, message):
-        user = self.__access.get_session_info(session_id)
-
-        ip4s = user[3]
-        if not ip4s: ip4s = []
-
-        src_ipaddr = message[12:16]
-        s = socket.inet_ntop(socket.AF_INET, src_ipaddr)
-        # 检查是否是分配给该用户的地址,如果不是,直接抛弃数据包
-        if s not in src_ipaddr: return
-        self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(message)
-
-    def __handle_link_ipv6_data(self, session_id, message):
-        """IPv6的数据包暂时丢弃
-        :param session_id:
-        :param message:
-        :return:
-        """
-        pass
-
-    def __handle_link_data_from_tundev(self, session_id, message):
-        """
-        :param session_id:
-        :param message:
-        :return:
-        """
-        dst_hwaddr = None
-        src_hwaddr = None
-        ver = (message[0] & 0xf0) >> 4
-
-        # 添加头部把IP数据包变成链路层数据包
-        if 4 == ver:
-            proto = 0x0800
-        else:
-            proto = 0x86dd
-
-        header = struct.pack("!6s6sH", dst_hwaddr, src_hwaddr, proto)
-        new_msg = b"".join([header, message])
-
-        # 把数据发送到隧道
-        self.__send_msg_to_tunnel(session_id, proto_utils.ACT_LINK_DATA, new_msg)
 
 
 def __start_service(debug):
