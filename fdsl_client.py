@@ -561,9 +561,7 @@ class _fdslight_client(dispatcher.dispatcher):
 
     def myloop(self):
         names = self.__route_timer.get_timeout_names()
-        for name in names:
-            if self.__route_timer.exists(name): self.__route_timer.drop(name)
-            self.__del_route(name)
+        for name in names: self.__del_route(name)
 
     def set_route(self, host, prefix=None, timeout=None, is_ipv6=False, is_dynamic=True):
         if host in self.__routes: return
