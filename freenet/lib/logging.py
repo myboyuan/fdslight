@@ -14,6 +14,7 @@ def print_error(text=""):
     s2 = "</error>"
 
     if text:
+        text = "%s\r\n%s\r\n%s\r\n" % (s1, text, s2,)
         sys.stderr.write(text)
     else:
         excpt = traceback.format_exc()
