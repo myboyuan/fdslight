@@ -13,13 +13,12 @@ jail_jail(PyObject *self,PyObject *args)
     PyObject *ip6_list;
     unsigned int ip4s=0;
     unsigned int ip6s=0;
-    typeobject *ip4_type,*ip6_type;
 
     bzero(&j,sizeof(struct jail));
 
     j.VERSION=JAIL_API_VERSION;
 
-    if(!PyArg_ParseTuple(args,"sssO!O!",&(j.path),&(j.hostname),&(j.jailname),&ip4_type,&ip4_list,&ip6_type,&ip6_list)){
+    if(!PyArg_ParseTuple(args,"sssOO",&(j.path),&(j.hostname),&(j.jailname),&ip4_list,&ip6_list)){
         return NULL;
     }
 
