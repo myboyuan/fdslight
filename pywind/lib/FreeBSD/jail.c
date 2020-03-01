@@ -20,6 +20,10 @@ jail_jail(PyObject *self,PyObject *args)
         return NULL;
     }
 
+    if(!PyList_check(ip4_list) || !PyList_check(ip6_list)){
+        return NULL;
+    }
+
     return NULL;
 }
 
