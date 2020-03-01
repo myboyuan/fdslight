@@ -34,7 +34,7 @@ class client(tcp_handler.tcp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         self.set_timeout(self.fileno, 10)
-        self.tcp_loop_read_num = 0xffff
+        self.tcp_loop_read_num = 10
 
         while 1:
             try:

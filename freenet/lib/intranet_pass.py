@@ -165,17 +165,6 @@ class builder(object):
         return self.build_data(TYPE_CONN_CLOSE, session_id)
 
     def build_conn_data(self, session_id, byte_data):
-        seq = []
-        # 首先对数据分片
-        while 1:
-            t = byte_data[0:0xffffff]
-            if not t: break
-            seq.append(t)
-            byte_data = byte_data[0xffffff:]
+        wrap_data = self.build_data(TYPE_MSG_CONTENT, b"".join([session_id, byte_data, ]))
 
-        results = []
-        for data in seq:
-            wrap_data = self.build_data(TYPE_MSG_CONTENT, b"".join([session_id, data, ]))
-            results.append(wrap_data)
-
-        return b"".join(results)
+        return wrap_data
