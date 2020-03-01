@@ -16,12 +16,9 @@ jail_jail(PyObject *self,PyObject *args)
 
     bzero(&j,sizeof(struct jail));
 
-    j.VERSION=JAIL_API_VERSION;
-
-    if(!PyArg_ParseTuple(args,"sssOO",&(j.path),&(j.hostname),&(j.jailname),&ip4_list,&ip6_list)){
+    if(!PyArg_ParseTuple(args,"IsssOO",&(j.version),&(j.path),&(j.hostname),&(j.jailname),&ip4_list,&ip6_list)){
         return NULL;
     }
-
 
     return NULL;
 }
@@ -78,14 +75,16 @@ PyInit_jail(void)
         "JAIL_CREATE",
         "JAIL_UPDATE",
         "JAIL_ATTACH",
-        "JAIL_DYING"
+        "JAIL_DYING",
+        "JAIL_API_VERSION"
     };
 
     const int values[]={
         JAIL_CREATE,
         JAIL_UPDATE,
         JAIL_ATTACH,
-        JAIL_DYING
+        JAIL_DYING,
+        JAIL_API_VERSION
     };
 
     int const_count = sizeof(names) / sizeof(NULL);
