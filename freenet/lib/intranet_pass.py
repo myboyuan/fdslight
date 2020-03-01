@@ -128,8 +128,8 @@ class parser(object):
 
 class builder(object):
     def build_data(self, t, byte_data):
-        if len(byte_data) > 0xffffff:
-            raise ProtoErr("the data length must be less than 0xffffff")
+        if len(byte_data) > 0xffffffff:
+            raise ProtoErr("the data length must be less than 0xffffffff")
 
         header = struct.pack("!BBI", VER, t, len(byte_data))
 
