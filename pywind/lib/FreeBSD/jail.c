@@ -30,7 +30,7 @@ jail_jail_get(PyObject *self,PyObject *args)
     return NULL;
 }
 
-static PyObjecy *
+static PyObject *
 jail_jail_set(PyObject *self,PyObject *args)
 {
     return NULL;
