@@ -37,8 +37,8 @@ class parser(object):
         self.__results = []
 
     def parse_header(self):
-        if self.__reader.size() < 4: return
-        v, self.__type, self.__length = struct.unpack("!BBH", self.__reader.read(4))
+        if self.__reader.size() < 6: return
+        v, self.__type, self.__length = struct.unpack("!BBI", self.__reader.read(6))
         self.__header_ok = True
         if self.__type not in TYPES:
             raise ProtoErr("unsupport protocol number %s" % self.__type)
@@ -128,10 +128,10 @@ class parser(object):
 
 class builder(object):
     def build_data(self, t, byte_data):
-        if len(byte_data) > 65531:
-            raise ProtoErr("the data length must be less than 65531")
+        if len(byte_data) > 0xffffff:
+            raise ProtoErr("the data length must be less than 0xffffff")
 
-        header = struct.pack("!BBH", VER, t, len(byte_data))
+        header = struct.pack("!BBI", VER, t, len(byte_data))
 
         return b"".join([header, byte_data])
 
@@ -168,10 +168,10 @@ class builder(object):
         seq = []
         # 首先对数据分片
         while 1:
-            t = byte_data[0:0xff00]
+            t = byte_data[0:0xffffff]
             if not t: break
             seq.append(t)
-            byte_data = byte_data[0xff00:]
+            byte_data = byte_data[0xffffff:]
 
         results = []
         for data in seq:
