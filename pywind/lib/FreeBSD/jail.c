@@ -4,6 +4,7 @@
 #include<sys/param.h>
 #include<sys/jail.h>
 #include<sys/uio.h>
+#include<netinet/in.h>
 
 static PyObject *
 jail_jail(PyObject *self,PyObject *args)
@@ -14,6 +15,12 @@ jail_jail(PyObject *self,PyObject *args)
     unsigned int ip4s=0;
     unsigned int ip6s=0;
 
+    // 最大支持256个IP地址
+    struct in_addr[256];
+    struct in6_addr[256];
+
+    Py_ssize_t ip4_ss,ip6_ss;
+
     bzero(&j,sizeof(struct jail));
 
     if(!PyArg_ParseTuple(args,"IsssOO",&(j.version),&(j.path),&(j.hostname),&(j.jailname),&ip4_list,&ip6_list)){
@@ -23,6 +30,19 @@ jail_jail(PyObject *self,PyObject *args)
     if(!PyList_Check(ip4_list) || !PyList_Check(ip6_list)){
         return NULL;
     }
+    
+    ip4_ss=PyList_GET_SIZE(ip4_list);
+    ip6_ss=PyList_GET_SIZE(ip6_list);
+
+    if(ip4_ss>256 || ip6_ss>256){
+        return NULL;
+    }
+
+    
+
+
+
+
 
     return NULL;
 }
