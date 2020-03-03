@@ -275,7 +275,6 @@ login.oracle.com:1
 *.eloqua.com:1
 *.unpkg.com:1
 *.canonical.com:1
-*.office.net:1
 *.msauth.net:1
 
 ### xxx
