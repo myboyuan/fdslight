@@ -98,7 +98,7 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__tunnel_conn_fail_count = 0
 
     @property
-    def tunnel_conn_count(self):
+    def tunnel_conn_fail_count(self):
         return self.__tunnel_conn_fail_count
 
     def init_func(self, mode, debug, configs):
