@@ -278,6 +278,8 @@ class dnsc_proxy(dns_base):
                     # 避免只走DNS加密而不走代理失效
                     if not is_ip_match and flags == 0: continue
                     if flags == 1 or not is_ip_match:
+                        # 隧道无法建立那么就不执行加速
+                        if not is_ip_match and self.dispatcher.tunnel_conn_count > 0: continue
                         self.dispatcher.set_route(ip, is_dynamic=True)
                     ''''''
                 ''''''
@@ -286,6 +288,8 @@ class dnsc_proxy(dns_base):
                     # 避免只走DNS加密而不走代理失效
                     if not is_ip_match and flags == 0: continue
                     if flags == 1 or not is_ip_match:
+                        # 隧道无法建立那么就不执行加速
+                        if not is_ip_match and self.dispatcher.tunnel_conn_count > 0: continue
                         self.dispatcher.set_route(ip, is_ipv6=True, is_dynamic=True)
                     ''''''
                 ''''''

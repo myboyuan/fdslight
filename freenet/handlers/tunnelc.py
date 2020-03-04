@@ -136,6 +136,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
+            self.dispatcher.tunnel_conn_fail()
             logging.print_general("connecting_timeout", self.__server_address)
             self.delete_handler(self.fileno)
             return
@@ -170,7 +171,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         if self.__over_https:
             self.do_ssl_handshake()
 
-        return
+        self.dispatcher.tunnel_conn_ok()
 
     def evt_read(self):
         if not self.is_conn_ok():
@@ -396,6 +397,7 @@ class udp_tunnel(udp_handler.udp_handler):
         try:
             self.connect((server_ip, server_address[1]))
         except socket.gaierror:
+            self.dispatcher.tunnel_conn_ok()
             logging.print_general("not_found_host", server_address)
             return False
 
@@ -406,6 +408,7 @@ class udp_tunnel(udp_handler.udp_handler):
         self.__update_time = time.time()
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
+        self.dispatcher.tunnel_conn_ok()
 
         return True
 

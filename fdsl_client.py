@@ -77,6 +77,9 @@ class _fdslight_client(dispatcher.dispatcher):
     # 静态路由,即在程序运行期间一直存在
     __static_routes = None
 
+    # 隧道尝试连接失败次数
+    __tunnel_conn_fail_count = None
+
     @property
     def https_configs(self):
         configs = self.__configs.get("tunnel_over_https", {})
@@ -88,6 +91,16 @@ class _fdslight_client(dispatcher.dispatcher):
 
         return pyo
 
+    def tunnel_conn_fail(self):
+        self.__tunnel_conn_fail_count += 1
+
+    def tunnel_conn_ok(self):
+        self.__tunnel_conn_fail_count = 0
+
+    @property
+    def tunnel_conn_count(self):
+        return self.__tunnel_conn_fail_count
+
     def init_func(self, mode, debug, configs):
         self.create_poll()
 
@@ -97,6 +110,7 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__routes = {}
         self.__configs = configs
         self.__static_routes = {}
+        self.__tunnel_conn_fail_count = 0
 
         if mode == "local":
             self.__mode = _MODE_LOCAL
