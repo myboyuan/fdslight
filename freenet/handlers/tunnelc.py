@@ -103,9 +103,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
                 if action not in proto_utils.ACTS: continue
 
-                if action == proto_utils.ACT_PONG:
-                    self.__update_time = time.time()
-                    continue
+                if action == proto_utils.ACT_PONG: continue
                 if action == proto_utils.ACT_PING: continue
 
                 self.__update_time = time.time()
@@ -129,16 +127,6 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         logging.print_general("tcp_error", self.__server_address)
         self.delete_handler(self.fileno)
 
-    def __handle_conn_timeout(self):
-        t = time.time()
-
-        if t - self.__update_time > self.__conn_timeout:
-            self.delete_handler(self.fileno)
-            logging.print_general("connected_timeout", self.__server_address)
-            return
-
-        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
-
     def __handle_heartbeat_timeout(self):
         t = time.time()
 
@@ -152,10 +140,19 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             self.delete_handler(self.fileno)
             return
 
-        if self.__enable_heartbeat:
-            self.__handle_heartbeat_timeout()
+        t = time.time()
+        v = t - self.__update_time
 
-        self.__handle_conn_timeout()
+        if v > self.__conn_timeout:
+            self.delete_handler(self.fileno)
+            logging.print_general("connected_timeout", self.__server_address)
+            return
+
+        if self.__enable_heartbeat:
+            if v >= self.__heartbeat_timeout:
+                self.send_msg_to_tunnel(self.dispatcher.session_id, proto_utils.ACT_PING, proto_utils.rand_bytes())
+            ''''''
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def connect_ok(self):
         self.__update_time = time.time()
@@ -420,9 +417,7 @@ class udp_tunnel(udp_handler.udp_handler):
 
         if action not in proto_utils.ACTS: return
 
-        if action == proto_utils.ACT_PONG:
-            self.__update_time = time.time()
-            return
+        if action == proto_utils.ACT_PONG: return
         if action == proto_utils.ACT_PING: return
 
         self.__update_time = time.time()
@@ -435,26 +430,20 @@ class udp_tunnel(udp_handler.udp_handler):
         logging.print_general("udp_error", self.__server_address)
         self.delete_handler(self.fileno)
 
-    def __handle_conn_timeout(self):
+    def udp_timeout(self):
         t = time.time()
-        if t - self.__update_time > self.__conn_timeout:
+        v = t - self.__update_time
+
+        if v > self.__conn_timeout:
             logging.print_general("udp_timeout", self.__server_address)
             self.delete_handler(self.fileno)
             return
 
-        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
-
-    def __handle_heartbeat_timeout(self):
-        t = time.time()
-
-        if t - self.__update_time >= self.__heartbeat_timeout:
-            self.send_msg_to_tunnel(self.dispatcher.session_id, proto_utils.ACT_PING, proto_utils.rand_bytes())
-        return
-
-    def udp_timeout(self):
         if self.__enable_heartbeat:
-            self.__handle_heartbeat_timeout()
-        self.__handle_conn_timeout()
+            if t >= self.__heartbeat_timeout:
+                self.send_msg_to_tunnel(self.dispatcher.session_id, proto_utils.ACT_PING, proto_utils.rand_bytes())
+            ''''''
+        self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
     def udp_delete(self):
         self.unregister(self.fileno)
