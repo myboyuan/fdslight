@@ -18,9 +18,6 @@ struct shm_blk_meta{
     int is_konwn_read;
 };
 
-/// 进程块数据索引对象
-struct shm_blk_data_index{
 
-}
 
 #endif
