@@ -361,9 +361,9 @@ class _fdslight_client(dispatcher.dispatcher):
         :return:
         """
         if is_ipv6:
-            cmd = "ip6tables -t nat -F PREROUTING -d %s -j DNAT --to %s" % (pub_addr, priv_addr,)
+            cmd = "ip6tables -t nat -A PREROUTING -d %s -j DNAT --to %s" % (pub_addr, priv_addr,)
         else:
-            cmd = "iptables -t nat -F PREROUTING -d %s -j DNAT --to %s" % (pub_addr, priv_addr,)
+            cmd = "iptables -t nat -A PREROUTING -d %s -j DNAT --to %s" % (pub_addr, priv_addr,)
         os.system(cmd)
 
     def unset_ip_rewrite_rule(self, is_ipv6=False):
