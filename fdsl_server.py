@@ -428,6 +428,7 @@ class _fdslight_server(dispatcher.dispatcher):
         ok, session_id = self.__access.get_user_info_for_bind_ip(byte_dst_addr)
 
         if ok:
+            print(ok)
             self.__mbuf.offset = 0
             self.__send_msg_to_tunnel(session_id, proto_utils.ACT_PUB_IPDATA, self.__mbuf.get_data())
             return
