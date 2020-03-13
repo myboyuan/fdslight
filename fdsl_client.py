@@ -321,7 +321,8 @@ class _fdslight_client(dispatcher.dispatcher):
                 fa = socket.AF_INET6
                 is_ipv6 = True
             src_addr = socket.inet_ntop(fa, byte_src_addr)
-            self.set_route(src_addr, prefix=128, is_dynamic=True)
+            print("hello---")
+            self.set_route(src_addr, prefix=prefix, is_ipv6=is_ipv6, is_dynamic=True)
 
         self.send_msg_to_tun(message)
 
