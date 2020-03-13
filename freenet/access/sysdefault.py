@@ -26,9 +26,9 @@ class access(_access.access):
             bind_ip = dic.get("bind_ip", None)
             bind_ip6 = dic.get("bind_ip6", None)
 
-            if bind_ip and utils.is_ipv4_address(bind_ip):
+            if bind_ip and not utils.is_ipv4_address(bind_ip):
                 raise ValueError("wrong ip address at %s" % bind_ip)
-            if bind_ip6 and utils.is_ipv6_address(bind_ip6):
+            if bind_ip6 and not utils.is_ipv6_address(bind_ip6):
                 raise ValueError("wrong ipv6 address at %s" % bind_ip6)
 
             session_id = self.gen_session_id(username, passwd)
