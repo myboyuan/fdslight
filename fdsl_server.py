@@ -420,6 +420,7 @@ class _fdslight_server(dispatcher.dispatcher):
         if ip_ver == 4:
             self.__mbuf.offset = 16
             byte_dst_addr = self.__mbuf.get_part(4)
+            print(socket.inet_ntop(socket.AF_INET,byte_dst_addr))
         else:
             self.__mbuf.offset = 24
             byte_dst_addr = self.__mbuf.get_part(16)
