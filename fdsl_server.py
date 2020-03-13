@@ -216,6 +216,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
     def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
         size = len(message)
+        is_pub_ip = False
         # 删除旧的连接
         if self.__access.session_exists(session_id):
             session_info = self.__access.get_session_info(session_id)
@@ -229,18 +230,39 @@ class _fdslight_server(dispatcher.dispatcher):
         if not b: return False
         if size > utils.MBUF_AREA_SIZE: return False
         if action not in proto_utils.ACTS: return False
-
-        if action == proto_utils.ACT_IPDATA: self.__mbuf.copy2buf(message)
         if action == proto_utils.ACT_DNS:
             self.__request_dns(session_id, message)
             return True
+        if action == proto_utils.ACT_IPDATA or action == proto_utils.ACT_PUB_IPDATA:
+            if action == proto_utils.ACT_PUB_IPDATA: is_pub_ip = True
+            self.__mbuf.copy2buf(message)
+        return self.__handle_ipdata_from_tunnel(session_id, is_pub_ip)
 
-        return self.__handle_ipdata_from_tunnel(session_id)
-
-    def __handle_ipdata_from_tunnel(self, session_id):
+    def __handle_ipdata_from_tunnel(self, session_id, is_pub_ip):
         ip_ver = self.__mbuf.ip_version()
 
         if ip_ver not in (4, 6,): return False
+
+        # 此处处理公共IP地址
+        if is_pub_ip:
+            if ip_ver == 4:
+                self.__mbuf.offset = 12
+                byte_src_addr = self.__mbuf.get_part(4)
+                fa = socket.AF_INET
+            else:
+                self.__mbuf.offset = 8
+                byte_src_addr = self.__mbuf.get_part(16)
+                fa = socket.AF_INET6
+            src_addr = socket.inet_ntop(fa, byte_src_addr)
+            ok, session_id_tmp = self.__access.get_user_info_for_bind_ip(src_addr)
+            if not ok: return False
+            # 检查拥有的公网IP是否和服务器的用户一致
+            if session_id_tmp != session_id: return False
+            # 公网IP直接发送数据出去
+            self.__mbuf.offset = 0
+            self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(self.__mbuf.get_data())
+            return True
+
         if ip_ver == 4: return self.__handle_ipv4data_from_tunnel(session_id)
 
         return self.__handle_ipv6data_from_tunnel(session_id)
@@ -375,7 +397,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
     def __send_msg_to_tunnel(self, session_id, action, message):
         if not self.__access.session_exists(session_id): return
-        if not self.__access.data_for_send(session_id, self.__mbuf.payload_size): return
+        if not self.__access.data_for_send(session_id, len(message)): return
 
         session_info = self.__access.get_session_info(session_id)
         fileno = session_info[0]
@@ -390,15 +412,30 @@ class _fdslight_server(dispatcher.dispatcher):
             self.__access.del_session(session_id)
             return
 
-        ### 此处避免由于tunnel handler重用而发错数据
-        if self.get_handler(fileno).session_id != session_id: return
-
     def send_msg_to_tunnel_from_tun(self, message):
         if len(message) > utils.MBUF_AREA_SIZE: return
 
         self.__mbuf.copy2buf(message)
 
         ip_ver = self.__mbuf.ip_version()
+        # 此处检查是否有绑定公网IP地址
+        if ip_ver == 4:
+            self.__mbuf.offset = 16
+            byte_dst_addr = self.__mbuf.get_part(4)
+            fa = socket.AF_INET
+        else:
+            self.__mbuf.offset = 24
+            byte_dst_addr = self.__mbuf.get_part(16)
+            fa = socket.AF_INET6
+
+        dst_addr = socket.inet_ntop(fa, byte_dst_addr)
+        ok, session_id = self.__access.get_user_info_for_bind_ip(dst_addr)
+
+        if ok:
+            self.__mbuf.offset = 0
+            self.__send_msg_to_tunnel(session_id, proto_utils.ACT_PUB_IPDATA, self.__mbuf.get_data())
+            return
+
         if ip_ver == 6 and not self.__enable_nat6: return
         if ip_ver == 4:
             ok, session_id = self.__nat4.get_ippkt2cLan_from_sLan(self.__mbuf)
@@ -548,6 +585,34 @@ class _fdslight_server(dispatcher.dispatcher):
         if not pydict: del self.__dgram_proxy[session_id]
         if session_id in self.__ip4_fragment:
             del self.__ip4_fragment[session_id]
+
+    def set_route(self, subnet, prefix, is_ipv6=False):
+        """设置路由
+        :param subnet:
+        :param prefix:
+        :param is_ipv6:
+        :return:
+        """
+        if is_ipv6:
+            s = "-6"
+        else:
+            s = ""
+        cmd = "ip %s route add %s/%s dev %s" % (s, subnet, prefix, self.__DEVNAME)
+        os.system(cmd)
+
+    def del_route(self, subnet, prefix, is_ipv6=False):
+        """删除路由
+        :param subnet:
+        :param prefix:
+        :param is_ipv6:
+        :return:
+        """
+        if is_ipv6:
+            s = "-6"
+        else:
+            s = ""
+        cmd = "ip %s route del %s/%s dev %s" % (s, subnet, prefix, self.__DEVNAME)
+        os.system(cmd)
 
     def __exit(self, signum, frame):
         if self.handler_exists(self.__dns_fileno):

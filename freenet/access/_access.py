@@ -79,7 +79,7 @@ class access(object):
         self.__timer.drop(session_id)
         self.handle_close(session_id)
         fileno, username, address, priv_data = self.__sessions[session_id]
-        self.__dispatcher.tell_unregister_session(session_id,fileno)
+        self.__dispatcher.tell_unregister_session(session_id, fileno)
 
         logging.print_general("del_session:%s" % username, address)
         del self.__sessions[session_id]
@@ -127,3 +127,11 @@ class access(object):
         if b:
             self.modify_session(session_id, fileno, address)
         return b
+
+    def get_user_info_for_bind_ip(self, ip_addr):
+        """获取用户绑定的IP地址,重写这个方法
+        :param ip_addr:
+        :param is_ipv6:
+        :return: (is_ok,session_id,)
+        """
+        return (False, None,)

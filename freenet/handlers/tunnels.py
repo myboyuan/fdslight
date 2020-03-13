@@ -129,6 +129,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
 
                 if action == proto_utils.ACT_PONG: continue
                 if action == proto_utils.ACT_PING:
+                    self.__update_time = time.time()
                     self.send_msg(session_id, self.__address, proto_utils.ACT_PONG, proto_utils.rand_bytes())
                     continue
                 self.dispatcher.handle_msg_from_tunnel(self.fileno, session_id, self.__address, action, message)
@@ -155,6 +156,9 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         logging.print_general("tcp_disconnect", self.__address)
 
     def send_msg(self, session_id, address, action, message):
+        # 检查session_id是否一致
+        if session_id != self.__session_id: return
+
         sent_pkt = self.__encrypt.build_packet(session_id, action, message)
         self.writer.write(sent_pkt)
         self.add_evt_write(self.fileno)

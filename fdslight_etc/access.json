@@ -1,6 +1,7 @@
 [
   {
     "username": "test",
-    "password": "test"
+    "password": "test",
+    "bind_ips": []
   }
 ]
