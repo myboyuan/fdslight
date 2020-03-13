@@ -692,7 +692,7 @@ def main():
         print(help_doc)
         return
 
-    if not u:
+    if u:
         __update_user_configs()
         return
 
