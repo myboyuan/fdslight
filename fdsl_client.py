@@ -702,10 +702,10 @@ class _fdslight_client(dispatcher.dispatcher):
         self.unset_ip_rewrite_rule(is_ipv6=False)
         self.unset_ip_rewrite_rule(is_ipv6=True)
 
-        if not ipv4_pub and not ipv4_priv:
+        if ipv4_pub and ipv4_priv:
             self.set_ip_rewrite_rule(ipv4_pub, ipv4_priv, is_ipv6=False)
 
-        if not ipv6_pub and not ipv6_priv:
+        if ipv6_pub and ipv6_priv:
             self.set_ip_rewrite_rule(ipv6_pub, ipv6_priv, is_ipv6=True)
 
     def __exit(self, signum, frame):
