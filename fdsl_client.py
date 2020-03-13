@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, os
+import sys, os, json
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -80,12 +80,6 @@ class _fdslight_client(dispatcher.dispatcher):
     # 隧道尝试连接失败次数
     __tunnel_conn_fail_count = None
 
-    __byte_public_ip = None
-    __byte_private_ip = None
-
-    __byte_public_ipv6 = None
-    __byte_private_ipv6 = None
-
     @property
     def https_configs(self):
         configs = self.__configs.get("tunnel_over_https", {})
@@ -117,11 +111,6 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__configs = configs
         self.__static_routes = {}
         self.__tunnel_conn_fail_count = 0
-
-        self.__byte_public_ip = None
-        self.__byte_private_ip = None
-        self.__byte_public_ipv6 = None
-        self.__byte_private_ipv6 = None
 
         if mode == "local":
             self.__mode = _MODE_LOCAL
@@ -356,19 +345,24 @@ class _fdslight_client(dispatcher.dispatcher):
         :return:
         """
         if is_ipv6:
-            cmd = ""
+            cmd = "ip6tables -t nat PREROUTING -d %s -j DNAT --to %s" % (pub_addr, priv_addr,)
         else:
             cmd = "iptables -t nat PREROUTING -d %s -j DNAT --to %s" % (pub_addr, priv_addr,)
         os.system(cmd)
 
-    def unset_ip_rewrite_rule(self, pub_addr, pirv_addr, is_ipv6=False):
+    def unset_ip_rewrite_rule(self, is_ipv6=False):
         """取消IP重写规则设置
         :param pub_addr:
         :param pirv_addr:
         :param is_ipv6:
         :return:
         """
-        pass
+        if is_ipv6:
+            cmd = "ip6tables -F"
+        else:
+            cmd = "iptables -F"
+
+        os.system(cmd)
 
     def __is_dns_request(self):
         mbuf = self.__mbuf
@@ -420,6 +414,7 @@ class _fdslight_client(dispatcher.dispatcher):
         return self.__session_id
 
     def __set_rules(self, signum, frame):
+        conn = self.__configs["connection"]
         fpath = "%s/fdslight_etc/host_rules.txt" % BASE_DIR
 
         fpaths = [
@@ -444,6 +439,8 @@ class _fdslight_client(dispatcher.dispatcher):
                         self.get_handler(self.__dns_fileno).set_ip_rules(rules)
             except file_parser.FilefmtErr:
                 logging.print_error()
+
+        if bool(int(conn.get("enable_public_ip", 0))): self.load_public_ip_rule()
 
     def __set_static_ip_rules(self, rules):
         nameserver = self.__configs["public"]["remote_dns"]
@@ -686,6 +683,29 @@ class _fdslight_client(dispatcher.dispatcher):
         if not timeout:
             timeout = self.__ROUTE_TIMEOUT
         self.__route_timer.set_timeout(host, timeout)
+
+    def load_public_ip_rule(self):
+        fpath = "%s/fdslight_etc/client_public_ip_rules.json" % BASE_DIR
+        with open(fpath, "r") as f:
+            s = f.read()
+        f.close()
+        o = json.loads(s)
+
+        ipv4_pub = o["ipv4_public"]
+        ipv4_priv = o["ipv4_private"]
+
+        ipv6_pub = o["ipv6_public"]
+        ipv6_priv = o["ipv6_private"]
+
+        # 先清除所有规则
+        self.unset_ip_rewrite_rule(is_ipv6=False)
+        self.unset_ip_rewrite_rule(is_ipv6=True)
+
+        if not ipv4_pub and not ipv4_priv:
+            self.set_ip_rewrite_rule(ipv4_pub, ipv4_priv, is_ipv6=False)
+
+        if not ipv6_pub and not ipv6_priv:
+            self.set_ip_rewrite_rule(ipv6_pub, ipv6_priv, is_ipv6=True)
 
     def __exit(self, signum, frame):
         if self.handler_exists(self.__dns_fileno):
