@@ -413,7 +413,6 @@ class _fdslight_client(dispatcher.dispatcher):
             except file_parser.FilefmtErr:
                 logging.print_error()
 
-
     def __set_static_ip_rules(self, rules):
         nameserver = self.__configs["public"]["remote_dns"]
         ns_is_ipv6 = utils.is_ipv6_address(nameserver)
@@ -427,7 +426,7 @@ class _fdslight_client(dispatcher.dispatcher):
             is_ipv6 = utils.is_ipv6_address(subnet)
 
             # 找到和nameserver冲突的路由那么跳过
-            t = utils.calc_subnet(nameserver, prefix)
+            t = utils.calc_subnet(nameserver, prefix, is_ipv6=ns_is_ipv6)
             if t == subnet:
                 logging.print_error(
                     "conflict preload ip rules %s/%s with nameserver %s" % (subnet, prefix, nameserver,)
