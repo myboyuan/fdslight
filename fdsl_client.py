@@ -307,6 +307,22 @@ class _fdslight_client(dispatcher.dispatcher):
         ip_ver = self.__mbuf.ip_version()
         if ip_ver not in (4, 6,): return
 
+        if action == proto_utils.ACT_PUB_IPDATA:
+            if ip_ver == 4:
+                prefix = 32
+                self.__mbuf.offset = 12
+                byte_src_addr = self.__mbuf.get_part(4)
+                fa = socket.AF_INET
+                is_ipv6 = False
+            else:
+                prefix = 128
+                self.__mbuf.offset = 8
+                byte_src_addr = self.__mbuf.get_part(16)
+                fa = socket.AF_INET6
+                is_ipv6 = True
+            src_addr = socket.inet_ntop(fa, byte_src_addr)
+            self.set_route(src_addr, prefix=128, is_dynamic=True)
+
         self.send_msg_to_tun(message)
 
     def send_msg_to_other_dnsservice_for_dns_response(self, message, is_ipv6=False):
@@ -345,10 +361,9 @@ class _fdslight_client(dispatcher.dispatcher):
         :return:
         """
         if is_ipv6:
-            cmd = "ip6tables -t nat PREROUTING -d %s -j DNAT --to %s" % (pub_addr, priv_addr,)
+            cmd = "ip6tables -t nat -F PREROUTING -d %s -j DNAT --to %s" % (pub_addr, priv_addr,)
         else:
-            cmd = "iptables -t nat PREROUTING -d %s -j DNAT --to %s" % (pub_addr, priv_addr,)
-        print(cmd)
+            cmd = "iptables -t nat -F PREROUTING -d %s -j DNAT --to %s" % (pub_addr, priv_addr,)
         os.system(cmd)
 
     def unset_ip_rewrite_rule(self, is_ipv6=False):
