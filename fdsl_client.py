@@ -348,6 +348,7 @@ class _fdslight_client(dispatcher.dispatcher):
             cmd = "ip6tables -t nat PREROUTING -d %s -j DNAT --to %s" % (pub_addr, priv_addr,)
         else:
             cmd = "iptables -t nat PREROUTING -d %s -j DNAT --to %s" % (pub_addr, priv_addr,)
+        print(cmd)
         os.system(cmd)
 
     def unset_ip_rewrite_rule(self, is_ipv6=False):
