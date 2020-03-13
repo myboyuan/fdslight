@@ -129,7 +129,6 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
 
                 if action == proto_utils.ACT_PONG: continue
                 if action == proto_utils.ACT_PING:
-                    self.__update_time = time.time()
                     self.send_msg(session_id, self.__address, proto_utils.ACT_PONG, proto_utils.rand_bytes())
                     continue
                 self.dispatcher.handle_msg_from_tunnel(self.fileno, session_id, self.__address, action, message)

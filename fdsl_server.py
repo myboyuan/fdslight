@@ -217,7 +217,6 @@ class _fdslight_server(dispatcher.dispatcher):
 
     def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
         size = len(message)
-        is_pub_ip = False
         # 删除旧的连接
         if self.__access.session_exists(session_id):
             session_info = self.__access.get_session_info(session_id)
@@ -234,33 +233,14 @@ class _fdslight_server(dispatcher.dispatcher):
         if action == proto_utils.ACT_DNS:
             self.__request_dns(session_id, message)
             return True
-        if action == proto_utils.ACT_IPDATA or action == proto_utils.ACT_PUB_IPDATA:
-            if action == proto_utils.ACT_PUB_IPDATA: is_pub_ip = True
+        if action == proto_utils.ACT_IPDATA:
             self.__mbuf.copy2buf(message)
-        return self.__handle_ipdata_from_tunnel(session_id, is_pub_ip)
+        return self.__handle_ipdata_from_tunnel(session_id)
 
-    def __handle_ipdata_from_tunnel(self, session_id, is_pub_ip):
+    def __handle_ipdata_from_tunnel(self, session_id):
         ip_ver = self.__mbuf.ip_version()
 
         if ip_ver not in (4, 6,): return False
-
-        # 此处处理公共IP地址
-        if is_pub_ip:
-            if ip_ver == 4:
-                self.__mbuf.offset = 12
-                byte_src_addr = self.__mbuf.get_part(4)
-            else:
-                self.__mbuf.offset = 8
-                byte_src_addr = self.__mbuf.get_part(16)
-            ok, session_id_tmp = self.__access.get_user_info_for_bind_ip(byte_src_addr)
-            if not ok: return False
-            # 检查拥有的公网IP是否和服务器的用户一致
-            if session_id_tmp != session_id: return False
-            # 公网IP直接发送数据出去
-            self.__mbuf.offset = 0
-            self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(self.__mbuf.get_data())
-            return True
-
         if ip_ver == 4: return self.__handle_ipv4data_from_tunnel(session_id)
 
         return self.__handle_ipv6data_from_tunnel(session_id)
@@ -416,22 +396,6 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__mbuf.copy2buf(message)
 
         ip_ver = self.__mbuf.ip_version()
-        # 此处检查是否有绑定公网IP地址
-        if ip_ver == 4:
-            self.__mbuf.offset = 16
-            byte_dst_addr = self.__mbuf.get_part(4)
-            print(socket.inet_ntop(socket.AF_INET,byte_dst_addr))
-        else:
-            self.__mbuf.offset = 24
-            byte_dst_addr = self.__mbuf.get_part(16)
-
-        ok, session_id = self.__access.get_user_info_for_bind_ip(byte_dst_addr)
-
-        if ok:
-            print(ok)
-            self.__mbuf.offset = 0
-            self.__send_msg_to_tunnel(session_id, proto_utils.ACT_PUB_IPDATA, self.__mbuf.get_data())
-            return
 
         if ip_ver == 6 and not self.__enable_nat6: return
         if ip_ver == 4:

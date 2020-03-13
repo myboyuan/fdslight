@@ -128,22 +128,9 @@ class access(object):
             self.modify_session(session_id, fileno, address)
         return b
 
-    def get_user_info_for_bind_ip(self, byte_ip_addr):
-        """获取用户绑定的IP地址,重写这个方法
-        :param ip_addr:
-        :param is_ipv6:
-        :return: (is_ok,session_id,)
-        """
-        return (False, None,)
 
     def handle_user_change_signal(self):
         """重写这个方法,处理用户信息改变的信号
         :return:
         """
         pass
-
-    def set_route(self, subnet, prefix, is_ipv6=False):
-        self.__dispatcher.set_route(subnet, prefix, is_ipv6=is_ipv6)
-
-    def del_route(self, subnet, prefix, is_ipv6=False):
-        self.__dispatcher.del_route(subnet, prefix, is_ipv6=is_ipv6)
