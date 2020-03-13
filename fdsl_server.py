@@ -688,7 +688,7 @@ def main():
         print(help_doc)
         return
 
-    if not u and u != "user_configs":
+    if u and u != "user_configs":
         print(help_doc)
         return
 
