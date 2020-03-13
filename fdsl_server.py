@@ -547,34 +547,6 @@ class _fdslight_server(dispatcher.dispatcher):
         if session_id in self.__ip4_fragment:
             del self.__ip4_fragment[session_id]
 
-    def set_route(self, subnet, prefix, is_ipv6=False):
-        """设置路由
-        :param subnet:
-        :param prefix:
-        :param is_ipv6:
-        :return:
-        """
-        if is_ipv6:
-            s = "-6"
-        else:
-            s = ""
-        cmd = "ip %s route add %s/%s dev %s" % (s, subnet, prefix, self.__DEVNAME)
-        os.system(cmd)
-
-    def del_route(self, subnet, prefix, is_ipv6=False):
-        """删除路由
-        :param subnet:
-        :param prefix:
-        :param is_ipv6:
-        :return:
-        """
-        if is_ipv6:
-            s = "-6"
-        else:
-            s = ""
-        cmd = "ip %s route del %s/%s dev %s" % (s, subnet, prefix, self.__DEVNAME)
-        os.system(cmd)
-
     def __exit(self, signum, frame):
         if self.handler_exists(self.__dns_fileno):
             self.delete_handler(self.__dns_fileno)
