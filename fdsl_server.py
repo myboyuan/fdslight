@@ -96,6 +96,7 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__ip4_fragment = {}
 
         signal.signal(signal.SIGINT, self.__exit)
+        signal.signal(signal.SIGUSR1, self.__handle_user_change_signal)
 
         conn_config = self.__configs["connection"]
         mod_name = "freenet.access.%s" % conn_config["access_module"]
@@ -248,13 +249,10 @@ class _fdslight_server(dispatcher.dispatcher):
             if ip_ver == 4:
                 self.__mbuf.offset = 12
                 byte_src_addr = self.__mbuf.get_part(4)
-                fa = socket.AF_INET
             else:
                 self.__mbuf.offset = 8
                 byte_src_addr = self.__mbuf.get_part(16)
-                fa = socket.AF_INET6
-            src_addr = socket.inet_ntop(fa, byte_src_addr)
-            ok, session_id_tmp = self.__access.get_user_info_for_bind_ip(src_addr)
+            ok, session_id_tmp = self.__access.get_user_info_for_bind_ip(byte_src_addr)
             if not ok: return False
             # 检查拥有的公网IP是否和服务器的用户一致
             if session_id_tmp != session_id: return False
@@ -422,14 +420,11 @@ class _fdslight_server(dispatcher.dispatcher):
         if ip_ver == 4:
             self.__mbuf.offset = 16
             byte_dst_addr = self.__mbuf.get_part(4)
-            fa = socket.AF_INET
         else:
             self.__mbuf.offset = 24
             byte_dst_addr = self.__mbuf.get_part(16)
-            fa = socket.AF_INET6
 
-        dst_addr = socket.inet_ntop(fa, byte_dst_addr)
-        ok, session_id = self.__access.get_user_info_for_bind_ip(dst_addr)
+        ok, session_id = self.__access.get_user_info_for_bind_ip(byte_dst_addr)
 
         if ok:
             self.__mbuf.offset = 0
@@ -624,6 +619,9 @@ class _fdslight_server(dispatcher.dispatcher):
 
         sys.exit(0)
 
+    def __handle_user_change_signal(self, signum, frame):
+        self.__access.handle_user_change_signal()
+
 
 def __start_service(debug):
     if not debug:
@@ -659,9 +657,20 @@ def __stop_service():
     os.kill(pid, signal.SIGINT)
 
 
+def __update_user_configs():
+    pid = proc.get_pid(PID_FILE)
+
+    if pid < 0:
+        print("cannot found fdslight server process")
+        return
+
+    os.kill(pid, signal.SIGUSR1)
+
+
 def main():
     help_doc = """
     -d      debug | start | stop    debug,start or stop application
+    -u      user_configs
     """
     try:
         opts, args = getopt.getopt(sys.argv[1:], "u:m:d:")
@@ -669,9 +678,24 @@ def main():
         print(help_doc)
         return
     d = ""
+    u = ""
 
     for k, v in opts:
         if k == "-d": d = v
+        if k == "-u": u = v
+
+    if not u and not d:
+        print(help_doc)
+        return
+
+    if not u and u != "user_configs":
+        print(help_doc)
+        return
+
+    if not u:
+        __update_user_configs()
+        return
+
     if not d:
         print(help_doc)
         return

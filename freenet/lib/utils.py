@@ -129,6 +129,7 @@ def bytes2number(byte_data):
 
 def is_ipv4_address(sts_ipaddr):
     """检查是否是IPv4地址"""
+    if not isinstance(sts_ipaddr, str): return False
     if len(sts_ipaddr) < 7: return False
 
     seq = sts_ipaddr.split(".")
@@ -150,6 +151,7 @@ def is_ipv4_address(sts_ipaddr):
 
 def is_ipv6_address(sts_ipaddr):
     """检查是否是IPv6地址"""
+    if not isinstance(sts_ipaddr, str): return False
     if sts_ipaddr.find(":") < 0: return False
     seq = sts_ipaddr.split(":")
 

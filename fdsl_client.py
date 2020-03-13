@@ -80,6 +80,12 @@ class _fdslight_client(dispatcher.dispatcher):
     # 隧道尝试连接失败次数
     __tunnel_conn_fail_count = None
 
+    __byte_public_ip = None
+    __byte_private_ip = None
+
+    __byte_public_ipv6 = None
+    __byte_private_ipv6 = None
+
     @property
     def https_configs(self):
         configs = self.__configs.get("tunnel_over_https", {})
@@ -111,6 +117,11 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__configs = configs
         self.__static_routes = {}
         self.__tunnel_conn_fail_count = 0
+
+        self.__byte_public_ip = None
+        self.__byte_private_ip = None
+        self.__byte_public_ipv6 = None
+        self.__byte_private_ipv6 = None
 
         if mode == "local":
             self.__mode = _MODE_LOCAL
@@ -344,7 +355,11 @@ class _fdslight_client(dispatcher.dispatcher):
         :param is_ipv6:
         :return:
         """
-        pass
+        if is_ipv6:
+            cmd = ""
+        else:
+            cmd = "iptables -t nat PREROUTING -d %s -j DNAT --to %s" % (pub_addr, priv_addr,)
+        os.system(cmd)
 
     def unset_ip_rewrite_rule(self, pub_addr, pirv_addr, is_ipv6=False):
         """取消IP重写规则设置
