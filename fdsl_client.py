@@ -337,6 +337,24 @@ class _fdslight_client(dispatcher.dispatcher):
     def send_msg_to_tun(self, message):
         self.get_handler(self.__tundev_fileno).msg_from_tunnel(message)
 
+    def set_ip_rewrite_rule(self, pub_addr, priv_addr, is_ipv6=False):
+        """设置IP重写规则
+        :param pub_addr:
+        :param priv_addr:
+        :param is_ipv6:
+        :return:
+        """
+        pass
+
+    def unset_ip_rewrite_rule(self, pub_addr, pirv_addr, is_ipv6=False):
+        """取消IP重写规则设置
+        :param pub_addr:
+        :param pirv_addr:
+        :param is_ipv6:
+        :return:
+        """
+        pass
+
     def __is_dns_request(self):
         mbuf = self.__mbuf
         ip_ver = mbuf.ip_version()
