@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import socket, time
+import socket, time,hashlib
 
 import pywind.evtframework.handlers.udp_handler as udp_handler
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
@@ -192,7 +192,6 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
 
         method, url, version = request
         upgrade = self.get_http_kv_value("upgrade", kv_pairs)
-        auth_id = self.get_http_kv_value("x-auth-id", kv_pairs)
         origin = self.get_http_kv_value("origin", kv_pairs)
 
         if upgrade != "websocket" and method != "GET":
@@ -204,11 +203,6 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         if not origin:
             logging.print_general("http_origin_none", self.__address)
             self.response_http_error("403 Forbidden")
-            return
-
-        if auth_id != self.__http_auth_id:
-            logging.print_general("http_auth_id_fail:%s" % auth_id, self.__address)
-            self.response_http_error("400 Bad Request")
             return
 
         self.__http_ws_key = self.get_http_kv_value("sec-websocket-key", kv_pairs)
@@ -228,6 +222,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
             headers += [("Connection", "Upgrade",), ("Upgrade", "websocket",)]
             headers += [("Sec-WebSocket-Accept", wslib.gen_handshake_key(self.__http_ws_key))]
             headers += [("Sec-WebSocket-Protocol", "fdslight")]
+            headers+=[("X-Auth-Id",hashlib.sha256(self.__http_auth_id.encode()).hexdigest())]
         s = httputils.build_http1x_resp_header(status, headers)
 
         self.add_evt_write(self.fileno)

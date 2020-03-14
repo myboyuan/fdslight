@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """客户端隧道实现
 """
-import socket, time, ssl, random
+import socket, time, ssl, random, hashlib
 
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.evtframework.handlers.udp_handler as udp_handler
@@ -27,8 +27,10 @@ class tcp_tunnel(tcp_handler.tcp_handler):
 
     __ssl_handshake_ok = None
     __over_https = None
+
     __http_handshake_ok = None
     __http_handshake_key = None
+    __http_auth_id = None
 
     __tmp_buf = None
 
@@ -102,7 +104,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
                 session_id, action, message = pkt_info
 
                 if action not in proto_utils.ACTS: continue
-                if action == proto_utils.ACT_PONG:continue
+                if action == proto_utils.ACT_PONG: continue
                 if action == proto_utils.ACT_PING: continue
 
                 self.__update_time = time.time()
@@ -264,13 +266,13 @@ class tcp_tunnel(tcp_handler.tcp_handler):
     def send_handshake(self):
         cfgs = self.dispatcher.https_configs
         url = cfgs["url"]
-        auth_id = cfgs["auth_id"]
+        self.__http_auth_id = cfgs["auth_id"]
 
         # 伪装成websocket握手
         kv_pairs = [("Connection", "Upgrade"), ("Upgrade", "websocket",), (
             "User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:67.0) Gecko/20100101 Firefox/67.0",),
                     ("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2"),
-                    ("X-Auth-Id", auth_id,), ("Sec-WebSocket-Version", 13,), ("Sec-WebSocket-Key", self.rand_string(),),
+                    ("Sec-WebSocket-Version", 13,), ("Sec-WebSocket-Key", self.rand_string(),),
                     ("Sec-WebSocket-Protocol", "fdslight")]
 
         if int(self.__server_address[1]) == 443:
@@ -325,6 +327,12 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         accept_key = self.get_http_kv_pairs("sec-websocket-accept", kv_pairs)
         if wslib.gen_handshake_key(self.__http_handshake_key) != accept_key:
             logging.print_general("https_handshake_error:wrong websocket response key", self.__server_address)
+            self.delete_handler(self.fileno)
+            return
+
+        auth_id = self.get_http_kv_pairs("x-auth-id", kv_pairs)
+        if hashlib.sha256(self.__http_auth_id.encode()).hexdigest() != auth_id:
+            logging.print_general("wrong_auth_id", self.__server_address)
             self.delete_handler(self.fileno)
             return
 
@@ -419,7 +427,7 @@ class udp_tunnel(udp_handler.udp_handler):
 
         if action not in proto_utils.ACTS: return
 
-        if action == proto_utils.ACT_PONG:return
+        if action == proto_utils.ACT_PONG: return
         if action == proto_utils.ACT_PING: return
 
         self.__update_time = time.time()
