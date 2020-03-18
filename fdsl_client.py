@@ -401,7 +401,7 @@ class _fdslight_client(dispatcher.dispatcher):
                 sys.stderr.write("cannot found %s\r\n" % fpath)
                 return
             try:
-                if fpath.find("ip_rule") < 4:
+                if fpath.find("ip_rule") > 0:
                     rules = file_parser.parse_host_file(fpath)
                     self.get_handler(self.__dns_fileno).set_host_rules(rules)
                 else:
