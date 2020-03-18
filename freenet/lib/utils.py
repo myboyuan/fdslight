@@ -94,16 +94,34 @@ def check_subnet_fmt(subnet, prefix, is_ipv6=False):
     if prefix < 0: return False
     if is_ipv6 and prefix > 128: return False
 
+    if is_ipv6:
+        fa = socket.AF_INET6
+    else:
+        fa = socket.AF_INET
+
+    byte_subnet = socket.inet_pton(fa, subnet)
+
     n_subnet = calc_subnet(subnet, prefix, is_ipv6)
 
-    return n_subnet == subnet
+    byte_n_subnet = socket.inet_pton(fa, n_subnet)
+    # 通过二进制比较,因为IPv6地址可简写
+    return byte_n_subnet == byte_subnet
 
 
 def check_is_from_subnet(ipaddr, subnet, prefix, is_ipv6=False):
     """检查IP地址是否来自于子网"""
     n_subnet = calc_subnet(ipaddr, prefix, is_ipv6)
 
-    return n_subnet == subnet
+    if is_ipv6:
+        fa = socket.AF_INET6
+    else:
+        fa = socket.AF_INET
+
+    # 通过二进制比较,因为IPv6地址可简写
+    byte_subnet = socket.inet_pton(fa, subnet)
+    byte_n_subnet = socket.inet_pton(fa, n_subnet)
+
+    return byte_subnet == byte_n_subnet
 
 
 def number2bytes(n, fixed_size=0):
@@ -252,3 +270,5 @@ class mbuf(object):
             self.__list[i] = n
             i += 1
         return True
+
+# print(check_subnet_fmt("F000:0000:0000:0000:0000:0000:0000:0000", 2, is_ipv6=True))
