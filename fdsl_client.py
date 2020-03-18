@@ -387,9 +387,6 @@ class _fdslight_client(dispatcher.dispatcher):
         return self.__session_id
 
     def __set_rules(self, signum, frame):
-        conn = self.__configs["connection"]
-        fpath = "%s/fdslight_etc/host_rules.txt" % BASE_DIR
-
         fpaths = [
             "%s/fdslight_etc/host_rules.txt" % BASE_DIR,
             "%s/fdslight_etc/ip_rules.txt" % BASE_DIR,
@@ -400,18 +397,18 @@ class _fdslight_client(dispatcher.dispatcher):
             if not os.path.isfile(fpath):
                 sys.stderr.write("cannot found %s\r\n" % fpath)
                 return
-            try:
-                if fpath.find("ip_rule") > 0:
-                    rules = file_parser.parse_host_file(fpath)
-                    self.get_handler(self.__dns_fileno).set_host_rules(rules)
-                else:
-                    rules = file_parser.parse_ip_subnet_file(fpath)
-                    if fpath.find("pre_load") > 0:
-                        self.__set_static_ip_rules(rules)
-                    else:
-                        self.get_handler(self.__dns_fileno).set_ip_rules(rules)
-            except file_parser.FilefmtErr:
-                logging.print_error()
+        try:
+            rules = file_parser.parse_host_file(fpaths[0])
+            self.get_handler(self.__dns_fileno).set_host_rules(rules)
+
+            rules = file_parser.parse_ip_subnet_file(fpaths[1])
+            self.get_handler(self.__dns_fileno).set_ip_rules(rules)
+
+            rules = file_parser.parse_ip_subnet_file(fpaths[2])
+            self.__set_static_ip_rules(rules)
+
+        except file_parser.FilefmtErr:
+            logging.print_error()
 
     def __set_static_ip_rules(self, rules):
         nameserver = self.__configs["public"]["remote_dns"]
