@@ -467,6 +467,9 @@ class _fdslight_client(dispatcher.dispatcher):
         tunnel_type = conn["tunnel_type"]
         redundancy = bool(int(conn.get("udp_tunnel_redundancy", 1)))
         over_https = bool(int(conn.get("tunnel_over_https", 0)))
+        enable_https_sni = bool(int(conn.get("enable_https_sni", 0)))
+        https_sni_host = conn.get("https_sni_host", "")
+
         is_udp = False
 
         enable_heartbeat = bool(int(conn.get("enable_heartbeat", 0)))
@@ -489,10 +492,12 @@ class _fdslight_client(dispatcher.dispatcher):
             raise ValueError("the headerbeat_timeout value wrong")
 
         kwargs = {"conn_timeout": conn_timeout, "is_ipv6": enable_ipv6, "enable_heartbeat": enable_heartbeat,
-                  "heartbeat_timeout": heartbeat_timeout, }
+                  "heartbeat_timeout": heartbeat_timeout, "host": host}
 
         if not is_udp:
             kwargs["tunnel_over_https"] = over_https
+            kwargs["enable_https_sni"] = enable_https_sni
+            kwargs["https_sni_host"] = https_sni_host
 
         if tunnel_type.lower() == "udp": kwargs["redundancy"] = redundancy
 

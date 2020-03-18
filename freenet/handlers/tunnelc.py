@@ -31,12 +31,17 @@ class tcp_tunnel(tcp_handler.tcp_handler):
     __http_handshake_ok = None
     __http_handshake_key = None
     __http_auth_id = None
+    __enable_https_sni = None
+    __https_sni_host = None
 
     __tmp_buf = None
 
     def init_func(self, creator, crypto, crypto_configs, conn_timeout=720, is_ipv6=False, **kwargs):
         self.__ssl_handshake_ok = False
         self.__over_https = False
+        self.__https_sni_host = kwargs["https_sni_host"]
+        self.__enable_https_sni = kwargs["enable_https_sni"]
+
         self.__http_handshake_ok = False
         self.__tmp_buf = []
 
@@ -51,7 +56,11 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         if self.__over_https:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS)
             context.set_alpn_protocols(["http/1.1"])
-            s = context.wrap_socket(s, do_handshake_on_connect=False)
+            if self.__enable_https_sni:
+                if not self.__https_sni_host: self.__https_sni_host = kwargs["host"]
+                s = context.wrap_socket(s, do_handshake_on_connect=False, server_hostname=self.__https_sni_host)
+            else:
+                s = context.wrap_socket(s, do_handshake_on_connect=False)
 
         self.set_socket(s)
         self.__conn_timeout = conn_timeout
