@@ -80,6 +80,9 @@ class _fdslight_client(dispatcher.dispatcher):
     # 隧道尝试连接失败次数
     __tunnel_conn_fail_count = None
 
+    __local_dns = None
+    __local_dns6 = None
+
     @property
     def https_configs(self):
         configs = self.__configs.get("tunnel_over_https", {})
@@ -156,6 +159,9 @@ class _fdslight_client(dispatcher.dispatcher):
             local = configs["local"]
             vir_dns = local["virtual_dns"]
             vir_dns6 = local["virtual_dns6"]
+
+            self.__local_dns = vir_dns
+            self.__local_dns6 = vir_dns6
 
             self.set_route(vir_dns, is_ipv6=False, is_dynamic=False)
             if self.__enable_ipv6_traffic: self.set_route(vir_dns6, is_ipv6=True, is_dynamic=False)
@@ -626,6 +632,8 @@ class _fdslight_client(dispatcher.dispatcher):
 
     def __del_route(self, host, prefix=None, is_ipv6=False, is_dynamic=True):
         if host not in self.__routes and is_dynamic: return
+        # 当为local模式时禁止删除dns路由
+        if host == self.__local_dns6 or host == self.__local_dns: return
 
         if is_dynamic: is_ipv6 = self.__routes[host]
 
