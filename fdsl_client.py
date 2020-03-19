@@ -86,10 +86,14 @@ class _fdslight_client(dispatcher.dispatcher):
     @property
     def https_configs(self):
         configs = self.__configs.get("tunnel_over_https", {})
+        enable_https_sni = bool(int(configs.get("enable_https_sni", 0)))
+        https_sni_host = configs.get("https_sni_host", "")
 
         pyo = {
             "url": configs.get("url", "/"),
-            "auth_id": configs.get("auth_id", "fdslight")
+            "auth_id": configs.get("auth_id", "fdslight"),
+            "enable_https_sni": enable_https_sni,
+            "https_sni_host": https_sni_host
         }
 
         return pyo
@@ -470,8 +474,6 @@ class _fdslight_client(dispatcher.dispatcher):
         tunnel_type = conn["tunnel_type"]
         redundancy = bool(int(conn.get("udp_tunnel_redundancy", 1)))
         over_https = bool(int(conn.get("tunnel_over_https", 0)))
-        enable_https_sni = bool(int(conn.get("enable_https_sni", 0)))
-        https_sni_host = conn.get("https_sni_host", "")
 
         is_udp = False
 
@@ -499,8 +501,6 @@ class _fdslight_client(dispatcher.dispatcher):
 
         if not is_udp:
             kwargs["tunnel_over_https"] = over_https
-            kwargs["enable_https_sni"] = enable_https_sni
-            kwargs["https_sni_host"] = https_sni_host
 
         if tunnel_type.lower() == "udp": kwargs["redundancy"] = redundancy
 
