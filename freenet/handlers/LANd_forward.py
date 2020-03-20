@@ -7,6 +7,7 @@ import pywind.web.lib.websocket as wslib
 import socket, time, random, os, ssl, sys
 import freenet.lib.logging as logging
 import freenet.lib.intranet_pass as intranet_pass
+import freenet.lib.utils as utils
 
 
 class client(ssl_handler.ssl_handler):
@@ -43,7 +44,15 @@ class client(ssl_handler.ssl_handler):
 
         context = ssl.SSLContext(ssl.PROTOCOL_TLS)
         context.set_alpn_protocols(["http/1.1"])
-        s = context.wrap_socket(s, do_handshake_on_connect=False)
+
+        kwargs = {}
+        kwargs["do_handshake_on_connect"] = False
+        
+        # 检查如果为域名则开启SNI
+        if not utils.is_ipv6_address(address[0]) or not utils.is_ipv4_address(address[0]):
+            kwargs["server_hostname"] = address[0]
+
+        s = context.wrap_socket(s, **kwargs)
 
         logging.print_general("connecting", self.__address)
         self.set_socket(s)
