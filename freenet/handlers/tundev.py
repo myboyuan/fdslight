@@ -16,7 +16,7 @@ class tun_base(handler.handler):
     # 要写入到tun的IP包
     ___ip_packets_for_write = []
     # 写入tun设备的最大IP数据包的个数
-    __MAX_WRITE_QUEUE_SIZE = 20
+    __MAX_WRITE_QUEUE_SIZE = 1024
     # 当前需要写入tun设备的IP数据包的个数
     __current_write_queue_n = 0
 
@@ -66,7 +66,7 @@ class tun_base(handler.handler):
         pass
 
     def evt_read(self):
-        for i in range(10):
+        for i in range(32):
             try:
                 ip_packet = os.read(self.fileno, self.__BLOCK_SIZE)
             except BlockingIOError:
@@ -214,4 +214,3 @@ class tundevc(tun_base):
     def msg_from_tunnel(self, message):
         self.add_to_sent_queue(message)
         self.add_evt_write(self.fileno)
-
