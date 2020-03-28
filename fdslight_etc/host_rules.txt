@@ -154,6 +154,8 @@ goo.gl:1
 *.wikimedia.org:1
 *.wikidata.org:1
 *.akamaihd.net:1
+*.akamaiedge.net:1
+*.akamaitechnologies.com:1
 *.chinadigitaltimes.net:1
 *.vpngate.net:1
 *.akamai.net:1
