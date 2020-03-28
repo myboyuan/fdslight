@@ -74,6 +74,7 @@ goo.gl:1
 *.flickr.com:1
 *.atdmt.com:1
 *.fbsbx.com:1
+*.pinterest.com:1
 
 # 防止skype重定向到gmw.cn
 *.skype.com:1
