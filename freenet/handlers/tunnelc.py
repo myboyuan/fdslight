@@ -71,6 +71,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             if self.__strict_https:
                 context.verify_mode = ssl.CERT_REQUIRED
                 context.load_verify_locations(self.dispatcher.ca_path)
+                print("enable strict https")
             else:
                 context.verify_mode = ssl.CERT_NONE
 
