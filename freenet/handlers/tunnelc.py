@@ -33,6 +33,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
     __http_auth_id = None
     __enable_https_sni = None
     __https_sni_host = None
+    __strict_https = None
 
     __tmp_buf = None
 
@@ -57,6 +58,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             cfgs = self.dispatcher.https_configs
             self.__enable_https_sni = cfgs["enable_https_sni"]
             self.__https_sni_host = cfgs["https_sni_host"]
+            self.__strict_https = cfgs["strict_https"]
 
             context = ssl.SSLContext(ssl.PROTOCOL_TLS)
             context.set_alpn_protocols(["http/1.1"])
@@ -65,6 +67,12 @@ class tcp_tunnel(tcp_handler.tcp_handler):
                 s = context.wrap_socket(s, do_handshake_on_connect=False, server_hostname=self.__https_sni_host)
             else:
                 s = context.wrap_socket(s, do_handshake_on_connect=False)
+
+            if self.__strict_https:
+                context.verify_mode = ssl.CERT_REQUIRED
+                context.load_verify_locations(self.dispatcher.ca_path)
+            else:
+                context.verify_mode = ssl.CERT_NONE
 
         self.set_socket(s)
         self.__conn_timeout = conn_timeout
@@ -212,6 +220,8 @@ class tcp_tunnel(tcp_handler.tcp_handler):
             if self.reader.size() > 0:
                 self.tcp_readable()
             if self.handler_exists(self.fileno): self.delete_handler(self.fileno)
+        except ssl.SSLError:
+            self.delete_handler(self.fileno)
 
     def evt_write(self):
         if not self.is_conn_ok():
@@ -242,6 +252,12 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         try:
             self.socket.do_handshake()
             self.__ssl_handshake_ok = True
+
+            # 如果开启SNI那么匹配证书
+            if self.__enable_https_sni:
+                cert = self.socket.getpeercert()
+                ssl.match_hostname(cert, self.__https_sni_host)
+
             logging.print_general("TLS_handshake_ok", self.__server_address)
             self.add_evt_read(self.fileno)
             self.send_handshake()

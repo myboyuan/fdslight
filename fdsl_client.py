@@ -88,12 +88,14 @@ class _fdslight_client(dispatcher.dispatcher):
         configs = self.__configs.get("tunnel_over_https", {})
         enable_https_sni = bool(int(configs.get("enable_https_sni", 0)))
         https_sni_host = configs.get("https_sni_host", "")
+        strict_https = bool(int(configs.get("strict_https", "0")))
 
         pyo = {
             "url": configs.get("url", "/"),
             "auth_id": configs.get("auth_id", "fdslight"),
             "enable_https_sni": enable_https_sni,
-            "https_sni_host": https_sni_host
+            "https_sni_host": https_sni_host,
+            "strict_https": strict_https,
         }
 
         return pyo
@@ -684,6 +686,14 @@ class _fdslight_client(dispatcher.dispatcher):
         if self.__mode == _MODE_GW:
             self.get_handler(self.__dgram_fetch_fileno).set_tunnel_ip(ip)
         return
+
+    @property
+    def ca_path(self):
+        """获取CA路径
+        :return:
+        """
+        path = "%s/fdslight_etc/ca-bundle.crt" % BASE_DIR
+        return path
 
 
 def __start_service(mode, debug):
