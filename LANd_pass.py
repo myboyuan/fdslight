@@ -125,6 +125,8 @@ class service(dispatcher.dispatcher):
         if self.__wol_fd > 0:
             self.delete_handler(self.__wol_fd)
 
+        os.remove(PID_PATH)
+
     @property
     def debug(self):
         return self.__debug
