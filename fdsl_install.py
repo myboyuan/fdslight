@@ -44,6 +44,9 @@ def build_client(cflags, gw_mode=False):
         if not os.path.isfile("driver/fdsl_dgram/fdslight_dgram.ko"):
             print("install fdslight failed!!!")
             return
+
+        path = "driver/fdslight_dgram.ko"
+        if os.path.isfile(path): os.remove(path)
         shutil.move("driver/fdsl_dgram/fdslight_dgram.ko", "driver")
 
 
