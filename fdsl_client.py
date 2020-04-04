@@ -742,6 +742,7 @@ def __update_rules():
 
     os.kill(pid, signal.SIGUSR1)
 
+
 def main():
     help_doc = """
     -d      debug | start | stop    debug,start or stop application
@@ -749,7 +750,7 @@ def main():
     -u      rules                   update host and ip rules
     """
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "u:m:d:", ["script_file="])
+        opts, args = getopt.getopt(sys.argv[1:], "u:m:d:", [])
     except getopt.GetoptError:
         print(help_doc)
         return
