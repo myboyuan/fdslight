@@ -562,6 +562,9 @@ class _fdslight_server(dispatcher.dispatcher):
         if self.handler_exists(self.__tcp_fileno):
             self.delete_handler(self.__tcp_fileno)
 
+        if self.__enable_nat_module:
+            os.system("rmmod %s/driver/xt_FULLCONENAT.ko" % BASE_DIR)
+
         sys.exit(0)
 
     def __handle_user_change_signal(self, signum, frame):
