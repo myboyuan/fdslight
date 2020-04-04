@@ -26,9 +26,28 @@ def __build_fdsl_ctl(cflags):
     )
 
 
-def build_server(cflags):
+def build_server(cflags, kern_nat_mod=False):
     __build_fn_utils(cflags)
     __build_fdsl_ctl(cflags)
+
+    build_cone_nat()
+
+
+def build_cone_nat():
+    """构建内核cone nat模块
+    :return:
+    """
+    os.chdir("driver/netfilter-full-cone-nat")
+    os.system("make clean")
+    os.system("make")
+
+    fname = "xt_FULLCONENAT.ko"
+    fpath = "../%s" % fname
+
+    if os.path.isfile(fpath): os.remove(fpath)
+    shutil.move(fname, fpath)
+
+    write_kern_ver_to_file("fdslight_etc/kern_version")
 
 
 def build_client(cflags, gw_mode=False):
