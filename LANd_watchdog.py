@@ -13,7 +13,7 @@ LAN_PID_PATH = "/tmp/LANd.pid"
 
 
 def main():
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 5:
         sys.stderr.write("wrong argument\r\n")
         return
 
