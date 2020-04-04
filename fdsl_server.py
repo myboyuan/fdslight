@@ -299,8 +299,8 @@ class _fdslight_server(dispatcher.dispatcher):
 
         if protocol not in self.__support_ip4_protocols: return False
 
-        # 对UDP和UDPLite进行特殊处理,以支持内网穿透
-        if protocol == 17 or protocol == 136:
+        # 对没有启用NAT内核模块UDP和UDPLite进行特殊处理,以支持内网穿透
+        if (protocol == 17 or protocol == 136) and not self.__enable_nat_module:
             is_udplite = False
             if protocol == 136: is_udplite = True
             self.__handle_ipv4_dgram_from_tunnel(session_id, is_udplite=is_udplite)
@@ -688,8 +688,6 @@ def main():
         __stop_service()
         return
 
-    print(enable_nat_module)
-    sys.exit(-1)
     if d == "debug": debug = True
     if d == "start": debug = False
 
