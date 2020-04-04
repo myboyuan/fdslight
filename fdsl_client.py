@@ -742,13 +742,11 @@ def __update_rules():
 
     os.kill(pid, signal.SIGUSR1)
 
-
 def main():
     help_doc = """
     -d      debug | start | stop    debug,start or stop application
     -m      local | gateway         run as local or gateway
     -u      rules                   update host and ip rules
-    --script_file=script_path       execute script before software start,it can be used for dual network card gateway
     """
     try:
         opts, args = getopt.getopt(sys.argv[1:], "u:m:d:", ["script_file="])
@@ -758,7 +756,6 @@ def main():
     d = ""
     m = ""
     u = ""
-    script_path = None
 
     for k, v in opts:
         if k == "-u":
@@ -767,8 +764,6 @@ def main():
 
         if k == "-m": m = v
         if k == "-d": d = v
-        if k == "--script_file":
-            script_path = v
 
     if not d and not m and not u:
         print(help_doc)
@@ -787,19 +782,6 @@ def main():
 
     if m not in ("local", "gateway"):
         print(help_doc)
-        return
-
-    # 如果设置了执行脚本那么就首先执行脚本
-    if script_path:
-        if m != "gateway":
-            print("only gateway mode support script_file")
-            return
-        if not os.path.isfile(script_path):
-            print("not found script file %s" % script_path)
-            return
-        FDSL_NAT_MOD = "%s/driver/xt_FULLCAONENAT.ko" % BASE_DIR
-        os.environ["FDSL_NAT_MOD"] = FDSL_NAT_MOD
-        os.system("sh %s" % script_path)
         return
 
     if d in ("start", "debug",):
