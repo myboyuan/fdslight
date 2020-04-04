@@ -22,7 +22,7 @@ def __build_fn_utils(cflags):
 
 def __build_fdsl_ctl(cflags):
     sys_build.do_compile(
-        ["driver/py_fdsl_ctl.c"], "freenet/lib/fdsl_ctl.so", cflags, debug=True, is_shared=True
+        ["driver/fdsl_dgram/py_fdsl_ctl.c"], "freenet/lib/fdsl_ctl.so", cflags, debug=True, is_shared=True
     )
 
 
@@ -45,7 +45,6 @@ def build_client(cflags, gw_mode=False):
             print("install fdslight failed!!!")
             return
         shutil.move("driver/fdsl_dgram/fdslight_dgram.ko", "driver")
-        ''''''
 
 
 def main():
