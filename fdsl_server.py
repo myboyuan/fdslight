@@ -77,6 +77,9 @@ class _fdslight_server(dispatcher.dispatcher):
     __dns_is_ipv6 = None
     __dns_addr = None
 
+    # 是否开启NAT模块
+    __enable_nat_module = None
+
     @property
     def http_configs(self):
         configs = self.__configs.get("tunnel_over_http", {})
@@ -85,7 +88,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
         return pyo
 
-    def init_func(self, debug, configs):
+    def init_func(self, debug, configs, enable_nat_module=False):
         self.create_poll()
 
         self.__configs = configs
@@ -94,6 +97,9 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__ip6_dgram = {}
         self.__dgram_proxy = {}
         self.__ip4_fragment = {}
+        self.__enable_nat_module = enable_nat_module
+
+        if enable_nat_module: self.__load_nat_module()
 
         signal.signal(signal.SIGINT, self.__exit)
         signal.signal(signal.SIGUSR1, self.__handle_user_change_signal)
@@ -437,7 +443,13 @@ class _fdslight_server(dispatcher.dispatcher):
         # 开启ip forward
         os.system("echo 1 > /proc/sys/net/ipv4/ip_forward")
         # 开启IPV4 NAT
+
+        if self.__enable_nat_module:
+            os.system("iptables -t nat -A POSTROUTING -o %s -j FULLCONENAT" % eth_name)
         os.system("iptables -t nat -A POSTROUTING -s %s/%s -o %s -j MASQUERADE" % (subnet, prefix, eth_name,))
+
+        if self.__enable_nat_module:
+            os.system("iptables -t nat -A POSTROUTING -o %s -j FULLCONENAT" % eth_name)
         os.system("iptables -A FORWARD -s %s/%s -j ACCEPT" % (subnet, prefix))
 
     def __config_gateway6(self, ip6_subnet, prefix, ip6_gw, eth_name):
@@ -560,6 +572,30 @@ class _fdslight_server(dispatcher.dispatcher):
     def __handle_user_change_signal(self, signum, frame):
         self.__access.handle_user_change_signal()
 
+    def __load_nat_module(self):
+        ko_file = "%s/driver/xt_FULLCONENAT.ko" % BASE_DIR
+
+        if not os.path.isfile(ko_file):
+            print("you must")
+            sys.exit(-1)
+
+        fpath = "%s/fdslight_etc/kern_version" % BASE_DIR
+        if not os.path.isfile(fpath):
+            print("you must build nat module")
+            sys.exit(-1)
+
+        with open(fpath, "r") as f:
+            cp_ver = f.read()
+            fp = os.popen("uname -r")
+            now_ver = fp.read()
+            fp.close()
+
+        if cp_ver != now_ver:
+            print("the kernel is changed,please reinstall this software")
+            sys.exit(-1)
+
+        os.system("insmod %s" % ko_file)
+
 
 def __start_service(debug):
     if not debug:
@@ -608,6 +644,7 @@ def __update_user_configs():
 def main():
     help_doc = """
     -d      debug | start | stop    debug,start or stop application
+    --enable_nat_module             enable kernel cone nat module
     -u      user_configs
     """
     try:

@@ -83,6 +83,8 @@ class _fdslight_client(dispatcher.dispatcher):
     __local_dns = None
     __local_dns6 = None
 
+    __enable_nat_module = None
+
     @property
     def https_configs(self):
         configs = self.__configs.get("tunnel_over_https", {})
@@ -110,7 +112,7 @@ class _fdslight_client(dispatcher.dispatcher):
     def tunnel_conn_fail_count(self):
         return self.__tunnel_conn_fail_count
 
-    def init_func(self, mode, debug, configs):
+    def init_func(self, mode, debug, configs, enable_nat_module=False):
         self.create_poll()
 
         signal.signal(signal.SIGINT, self.__exit)
@@ -120,6 +122,7 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__configs = configs
         self.__static_routes = {}
         self.__tunnel_conn_fail_count = 0
+        self.__enable_nat_module = enable_nat_module
 
         if mode == "local":
             self.__mode = _MODE_LOCAL
@@ -212,7 +215,7 @@ class _fdslight_client(dispatcher.dispatcher):
 
         fpath = "%s/fdslight_etc/kern_version" % BASE_DIR
         if not os.path.isfile(fpath):
-            print("you must install this softwar")
+            print("you must install this software")
             sys.exit(-1)
 
         with open(fpath, "r") as f:
