@@ -47,6 +47,7 @@ def build_cone_nat():
     if os.path.isfile(fpath): os.remove(fpath)
     shutil.move(fname, fpath)
 
+    os.chdir("../../")
     write_kern_ver_to_file("fdslight_etc/kern_version")
 
 
