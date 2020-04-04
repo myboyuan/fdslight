@@ -797,7 +797,7 @@ def main():
         if not os.path.isfile(script_path):
             print("not found script file %s" % script_path)
             return
-        os.chmod(script_path, stat.S_IEXEC)
+        os.chmod(script_path, 0o755)
         FDSL_NAT_MOD = "%s/driver/xt_FULLCAONENAT.ko"
         os.environ["FDSL_NAT_MOD"] = FDSL_NAT_MOD
         os.system(script_path)
