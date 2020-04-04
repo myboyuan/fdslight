@@ -444,12 +444,7 @@ class _fdslight_server(dispatcher.dispatcher):
         os.system("echo 1 > /proc/sys/net/ipv4/ip_forward")
         # 开启IPV4 NAT
 
-        if self.__enable_nat_module:
-            os.system("iptables -t nat -A POSTROUTING -o %s -j FULLCONENAT" % eth_name)
         os.system("iptables -t nat -A POSTROUTING -s %s/%s -o %s -j MASQUERADE" % (subnet, prefix, eth_name,))
-
-        if self.__enable_nat_module:
-            os.system("iptables -t nat -A POSTROUTING -o %s -j FULLCONENAT" % eth_name)
         os.system("iptables -A FORWARD -s %s/%s -j ACCEPT" % (subnet, prefix))
 
     def __config_gateway6(self, ip6_subnet, prefix, ip6_gw, eth_name):
