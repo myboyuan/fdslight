@@ -800,6 +800,7 @@ def main():
         os.chmod(script_path, 0o755)
         FDSL_NAT_MOD = "%s/driver/xt_FULLCAONENAT.ko"
         os.environ["FDSL_NAT_MOD"] = FDSL_NAT_MOD
+        print(script_path)
         os.system(script_path)
         return
 
