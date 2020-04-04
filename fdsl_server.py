@@ -597,7 +597,7 @@ class _fdslight_server(dispatcher.dispatcher):
         os.system("insmod %s" % ko_file)
 
 
-def __start_service(debug):
+def __start_service(debug, enable_nat_module):
     if not debug:
         pid = os.fork()
         if pid != 0: sys.exit(0)
@@ -613,10 +613,10 @@ def __start_service(debug):
     cls = _fdslight_server()
 
     if debug:
-        cls.ioloop(debug, configs)
+        cls.ioloop(debug, configs, enable_nat_module=enable_nat_module)
         return
     try:
-        cls.ioloop(debug, configs)
+        cls.ioloop(debug, configs, enable_nat_module=enable_nat_module)
     except:
         logging.print_error()
 
@@ -648,16 +648,19 @@ def main():
     -u      user_configs
     """
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "u:m:d:")
+        opts, args = getopt.getopt(sys.argv[1:], "u:m:d:", ["enable_nat_module"])
     except getopt.GetoptError:
         print(help_doc)
         return
     d = ""
     u = ""
 
+    enable_nat_module = False
+
     for k, v in opts:
         if k == "-d": d = v
         if k == "-u": u = v
+        if k == "--enable_nat_module": enable_nat_module = True
 
     if not u and not d:
         print(help_doc)
@@ -684,10 +687,13 @@ def main():
     if d == "stop":
         __stop_service()
         return
+
+    print(enable_nat_module)
+    sys.exit(-1)
     if d == "debug": debug = True
     if d == "start": debug = False
 
-    __start_service(debug)
+    __start_service(debug, enable_nat_module)
 
 
 if __name__ == '__main__': main()
