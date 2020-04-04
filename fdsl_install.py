@@ -45,8 +45,8 @@ def build_cone_nat():
     fpath = "../%s" % fname
 
     if os.path.isfile(fpath): os.remove(fpath)
-    if not os.path.isfile(fpath):
-        print("please install linux kernel headers")
+    if not os.path.isfile(fname):
+        print("ERROR: please install linux kernel headers")
         return
     shutil.move(fname, fpath)
 
