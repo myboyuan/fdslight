@@ -12,8 +12,12 @@ import freenet.lib.wol as wol
 class listener(tcp_handler.tcp_handler):
     __key = None
 
-    def init_func(self, creator_fd, address, key, is_ipv6=False):
+    __wol_bind_ip = None
+
+    def init_func(self, creator_fd, address, wol_bind_ip, key, is_ipv6=False):
         self.__key = key
+        self.__wol_bind_ip = wol_bind_ip
+
         if is_ipv6:
             fa = socket.AF_INET6
         else:
@@ -37,7 +41,7 @@ class listener(tcp_handler.tcp_handler):
                 cs, caddr = self.accept()
             except BlockingIOError:
                 break
-            self.create_handler(self.fileno, handler, cs, caddr, self.__key)
+            self.create_handler(self.fileno, handler, cs, caddr, self.__wol_bind_ip, self.__key)
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
@@ -54,8 +58,11 @@ class handler(tcp_handler.tcp_handler):
     __time = None
     __key = None
 
-    def init_func(self, creator_fd, cs, caddr, key):
+    __bind_ip = None
+
+    def init_func(self, creator_fd, cs, caddr, wol_bind_ip, key):
         self.__key = key
+        self.__bind_ip = wol_bind_ip
         self.__caddr = caddr
         self.__builder = wol.builder()
         self.__parser = wol.parser()
@@ -75,7 +82,7 @@ class handler(tcp_handler.tcp_handler):
             is_error = 0
 
         if not is_error:
-            cls = wol.wake_on_lan()
+            cls = wol.wake_on_lan(bind_ip=self.__bind_ip)
             for hwaddr in seq: cls.wake(hwaddr)
             cls.release()
 

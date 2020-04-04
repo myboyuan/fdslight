@@ -16,9 +16,9 @@ class wake_on_lan(object):
     """
     __s = None
 
-    def __init__(self):
+    def __init__(self, bind_ip="0.0.0.0"):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.bind(("0.0.0.0", 0))
+        s.bind((bind_ip, 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.__s = s

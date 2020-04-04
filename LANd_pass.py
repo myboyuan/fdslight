@@ -31,7 +31,7 @@ class service(dispatcher.dispatcher):
 
     __wol_fd = None
 
-    def init_func(self, wol_key, wol_port=5888, debug=False):
+    def init_func(self, wol_key, wol_port=5888, wol_bind_ip="0.0.0.0", debug=False):
         self.__wol_fd = -1
         self.__debug = debug
         self.__sessions = {}
@@ -45,12 +45,12 @@ class service(dispatcher.dispatcher):
             return
 
         self.create_poll()
-        self.create_wol(wol_key, wol_port)
+        self.create_wol(wol_key, wol_port, wol_bind_ip)
         self.create_connections()
 
-    def create_wol(self, wol_key, wol_port):
+    def create_wol(self, wol_key, wol_port, wol_bind_ip):
         self.__wol_fd = self.create_handler(
-            -1, wol_handler.listener, ("127.0.0.1", wol_port), wol_key
+            -1, wol_handler.listener, ("127.0.0.1", wol_port), wol_bind_ip, wol_key
         )
 
     def __create_conn(self, name, configs):
@@ -201,7 +201,7 @@ def update_configs():
     os.kill(pid, signal.SIGUSR1)
 
 
-def start(debug, wol_key, wol_port):
+def start(debug, wol_key, wol_port, wol_bind_ip):
     if not debug:
         if os.path.exists(PID_PATH):
             sys.stderr.write("the process exists\r\n")
@@ -221,7 +221,7 @@ def start(debug, wol_key, wol_port):
         proc.write_pid(PID_PATH)
     cls = service()
     try:
-        cls.ioloop(wol_key, debug=debug, wol_port=wol_port)
+        cls.ioloop(wol_key, wol_bind_ip=wol_bind_ip, debug=debug, wol_port=wol_port)
     except KeyboardInterrupt:
         if os.path.exists(PID_PATH): os.remove(PID_PATH)
         cls.release()
@@ -236,7 +236,7 @@ def start(debug, wol_key, wol_port):
 def main():
     help_doc = """
     start | stop | debug
-    start | debug  --wol_listen_port=port --wol_key=key
+    start | debug  --wol_listen_port=port --wol_key=key --wol_bind_ip=ip
     """
     if len(sys.argv) < 2:
         print(help_doc)
@@ -254,7 +254,7 @@ def main():
         return
 
     try:
-        opts, args = getopt.getopt(sys.argv[2:], "", ["wol_listen_port=", "wol_key="])
+        opts, args = getopt.getopt(sys.argv[2:], "", ["wol_listen_port=", "wol_key=", "wol_bind_ip="])
     except getopt.GetoptError:
         print(help_doc)
         return
@@ -264,6 +264,8 @@ def main():
 
     wol_port = 5888
     wol_key = None
+    wol_bind_ip = None
+
     for k, v in opts:
         if k == "--wol_listen_port":
             if not cfg_check.is_port(v):
@@ -271,9 +273,13 @@ def main():
                 return
             wol_port = int(v)
         if k == "--wol_key": wol_key = v
+        if k == "--wol_bind_ip": wol_bind_ip = v
         ''''''
     if not wol_key:
         sys.stderr.write("please set wol key\r\n")
+        return
+    if not wol_bind_ip:
+        sys.stderr.write("please set wol bind ip")
         return
 
     if d == "debug":
@@ -281,7 +287,7 @@ def main():
     else:
         debug = False
 
-    start(debug, wol_key, wol_port)
+    start(debug, wol_key, wol_port, wol_bind_ip)
 
 
 if __name__ == '__main__': main()
