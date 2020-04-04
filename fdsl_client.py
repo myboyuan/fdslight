@@ -797,7 +797,7 @@ def main():
         if not os.path.isfile(script_path):
             print("not found script file %s" % script_path)
             return
-        FDSL_NAT_MOD = "%s/driver/xt_FULLCAONENAT.ko"
+        FDSL_NAT_MOD = "%s/driver/xt_FULLCAONENAT.ko" % BASE_DIR
         os.environ["FDSL_NAT_MOD"] = FDSL_NAT_MOD
         os.system("sh %s" % script_path)
         return
