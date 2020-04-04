@@ -645,7 +645,7 @@ def main():
     help_doc = """
     -d      debug | start | stop    debug,start or stop application
     --enable_nat_module             enable kernel cone nat module
-    -u      user_configs
+    -u      user_configs            update configs           
     """
     try:
         opts, args = getopt.getopt(sys.argv[1:], "u:m:d:", ["enable_nat_module"])

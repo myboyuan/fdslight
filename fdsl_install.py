@@ -56,6 +56,8 @@ def build_client(cflags, gw_mode=False):
     __build_fdsl_ctl(cflags)
 
     if gw_mode:
+        build_cone_nat()
+
         os.chdir("driver/fdsl_dgram")
         os.system("make clean")
         os.system("make")
