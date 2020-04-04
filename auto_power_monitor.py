@@ -42,10 +42,11 @@ def get_machines():
     return o
 
 
-def shutdown(port):
+def shutdown(bind_ip, port):
     data = bytes([0xff]) * 128
 
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.bind((bind_ip, 0))
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
@@ -59,6 +60,8 @@ class power_monitor(object):
     __timeout = 300
     __network_is_ok = None
     __debug = None
+
+    __bind_ip = None
 
     def get_check_servers(self):
         path = "%s/fdslight_etc/power_monitor.json" % BASE_DIR
@@ -84,11 +87,12 @@ class power_monitor(object):
 
         return servers
 
-    def __init__(self, power_off_port, debug=False):
+    def __init__(self, power_off_port, bind_ip="0.0.0.0", debug=False):
         self.__power_off_port = power_off_port
         self.__network_is_ok = False
         self.__servers = []
         self.__debug = debug
+        self.__bind_ip = bind_ip
 
         servers = self.get_check_servers()
         if None == servers:
@@ -115,13 +119,13 @@ class power_monitor(object):
 
     def send_shutdown(self):
         if self.__debug: print("send shutdown")
-        shutdown(self.__power_off_port)
+        shutdown(self.__bind_ip, self.__power_off_port)
 
     def wakeup_machine(self):
         o = get_machines()
         if None == o: return
 
-        cls = wol.wake_on_lan()
+        cls = wol.wake_on_lan(bind_ip=self.__bind_ip)
         for k, v in o.items():
             cls.wake(v)
         cls.release()
@@ -163,7 +167,7 @@ def main():
     debug | start | stop | shutdown
     debug | start | shutdown --port=port
     debug:  windows support it
-    start   only unix-like support
+    start   only unix-like support --bind_ip=bind_ip
     stop    only unix-like support
     shutdown will close all hosts
     """
@@ -183,16 +187,19 @@ def main():
         return
 
     try:
-        opts, args = getopt.getopt(sys.argv[2:], "", ["port="])
+        opts, args = getopt.getopt(sys.argv[2:], "", ["port=", "bind_ip="])
     except getopt.GetoptError:
         print(help_doc)
         return
 
     port = None
+    bind_ip = None
+
     for k, v in opts:
         if k == "--port": port = v
+        if k == "--bind_ip": bind_ip = v
 
-    if None == port:
+    if None == port or not bind_ip:
         print(help_doc)
         return
 
@@ -216,10 +223,10 @@ def main():
     port = int(port)
     if action == "shutdown":
         print("send shutdown to all hosts")
-        shutdown(port)
+        shutdown(bind_ip, port)
         return
 
-    cls = power_monitor(port, debug=debug)
+    cls = power_monitor(port, debug=debug, bind_ip=bind_ip)
     try:
         cls.monitor()
     except KeyboardInterrupt:
