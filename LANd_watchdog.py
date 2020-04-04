@@ -29,6 +29,7 @@ def main():
     while 1:
         if not os.path.isfile(LAN_PID_PATH):
             cmd = "%s %s/LANd_pass.py start %s %s %s" % (sys.argv[1], BASE_DIR, sys.argv[2], sys.argv[3], sys.argv[4])
+            print(cmd)
             os.system(cmd)
             # 进程启动以及生成pid文件需要时间,因此这里需要休眠
             time.sleep(60)
