@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, sys
+import os, sys, shutil
 import pywind.lib.sys_build as sys_build
 
 
@@ -36,13 +36,15 @@ def build_client(cflags, gw_mode=False):
     __build_fdsl_ctl(cflags)
 
     if gw_mode:
-        os.chdir("driver")
+        os.chdir("driver/fdsl_dgram")
         os.system("make clean")
         os.system("make")
-        os.chdir("../")
+        os.chdir("../../")
         write_kern_ver_to_file("fdslight_etc/kern_version")
-        if not os.path.isfile("driver/fdslight_dgram.ko"):
+        if not os.path.isfile("driver/fdsl_dgram/fdslight_dgram.ko"):
             print("install fdslight failed!!!")
+            return
+        shutil.move("driver/fdsl_dgram/fdslight_dgram.ko", "driver")
         ''''''
 
 
