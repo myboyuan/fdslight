@@ -13,6 +13,8 @@ LAN_PID_PATH = "/tmp/LANd.pid"
 
 
 def main():
+    flags = False
+
     if len(sys.argv) != 5:
         sys.stderr.write("wrong argument\r\n")
         return
@@ -29,7 +31,10 @@ def main():
     while 1:
         if not os.path.isfile(LAN_PID_PATH):
             cmd = "%s %s/LANd_pass.py start %s %s %s" % (sys.argv[1], BASE_DIR, sys.argv[2], sys.argv[3], sys.argv[4])
-            print(cmd)
+            # 第一次执行的时候打印命令
+            if not flags:
+                flags = True
+                print(cmd)
             os.system(cmd)
             # 进程启动以及生成pid文件需要时间,因此这里需要休眠
             time.sleep(60)
