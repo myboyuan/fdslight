@@ -54,7 +54,8 @@ class service(dispatcher.dispatcher):
     def send_conn_request(self, fd, auth_id, remote_ipaddr, remote_port, is_ipv6=False):
         """向局域网发送请求
         """
-        print(auth_id, '  AAA')
+        if self.debug:
+            print("send conn request %s" % auth_id)
         if auth_id not in self.__binds: return None
         if auth_id not in self.__fwd_conns: return None
 
@@ -92,7 +93,8 @@ class service(dispatcher.dispatcher):
         return auth_id in self.__binds
 
     def reg_fwd_conn(self, auth_id, fd):
-        print(auth_id, " __")
+        if self.debug:
+            print("register connection %s" % auth_id)
         if auth_id in self.__fwd_conns:
             sys.stderr.write("the auth_id exists at self.__fwd_conns\r\n")
             return
