@@ -57,6 +57,8 @@ class service(dispatcher.dispatcher):
         if auth_id not in self.__binds: return None
         if auth_id not in self.__fwd_conns: return None
 
+        print(remote_ipaddr, remote_port)
+
         session_id = self.__gen_session_id()
         f = self.__fwd_conns[auth_id]
 
