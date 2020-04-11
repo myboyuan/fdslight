@@ -565,6 +565,8 @@ class _fdslight_client(dispatcher.dispatcher):
             return None
         except dns.resolver.NoNameservers:
             return None
+        except:
+            return None
 
         ipaddr = None
 

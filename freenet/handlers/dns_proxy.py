@@ -220,6 +220,7 @@ class dnsc_proxy(dns_base):
         self.__server_side = server_side
 
         if server_side:
+            s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
             self.bind((address, 53))
         else:
             self.connect((address, 53))
