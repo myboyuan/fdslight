@@ -277,7 +277,9 @@ class _fdslight_server(dispatcher.dispatcher):
             return True
 
         b = self.__nat6.get_ippkt2sLan_from_cLan(session_id, self.__mbuf)
-        if not b: return False
+        if not b:
+            logging.print_error("cannot modify source address from client packet for ipv6")
+            return False
 
         self.__mbuf.offset = 24
         self.__mbuf.offset = 0
@@ -308,7 +310,9 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__mbuf.offset = 0
 
         rs = self.__nat4.get_ippkt2sLan_from_cLan(session_id, self.__mbuf)
-        if not rs: return
+        if not rs:
+            logging.print_error("cannot modify source address from client packet for ipv4")
+            return
         self.__mbuf.offset = 0
         self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(self.__mbuf.get_data())
         return True
