@@ -60,7 +60,7 @@ int time_wheel_new(struct time_wheel *time_wheel,unsigned int tick_size,time_t e
 
     // 检查参数是否合法,时间不能小于等于0
     if(tick_size * every_tick_timeout <0){
-        NB_STDERR("wrong argument value\r\n");
+        STDERR("wrong argument value\r\n");
         return -1;
     }
 
@@ -71,7 +71,7 @@ int time_wheel_new(struct time_wheel *time_wheel,unsigned int tick_size,time_t e
         tick=malloc(sizeof(struct time_tick));
         if(NULL==tick){
             time_wheel_release(time_wheel);
-            NB_STDERR("no memory for malloc struct time_tick\r\n");
+            STDERR("no memory for malloc struct time_tick\r\n");
             return -1;
         }
 
@@ -86,7 +86,7 @@ int time_wheel_new(struct time_wheel *time_wheel,unsigned int tick_size,time_t e
         tdata=malloc(sizeof(struct time_data));
         if(NULL==tdata){
             time_wheel_release(time_wheel);
-            NB_STDERR("no memory for malloc struct time_data\r\n");
+            STDERR("no memory for malloc struct time_data\r\n");
             return -1;
         }
 
@@ -135,13 +135,13 @@ struct time_data *time_wheel_add(struct time_wheel *time_wheel,void *data,time_t
     unsigned int tick_n;
 
     if(timeout<0){
-        NB_STDERR("the timeout must be more than zero\r\n");
+        STDERR("the timeout must be more than zero\r\n");
         return NULL;
     }
 
     // 因为之前tick_size增加了1,所以这里需要减去1
     if(timeout>(time_wheel->tick_size-1) * time_wheel->every_tick_timeout){
-        NB_STDERR("the value of timeout out of range\r\n");
+        STDERR("the value of timeout out of range\r\n");
         return NULL;
     }
 
@@ -149,13 +149,13 @@ struct time_data *time_wheel_add(struct time_wheel *time_wheel,void *data,time_t
     tick_n=timeout / time_wheel->every_tick_timeout;
     // 这里的时间必须大于或者等于一个tick的值
     if(tick_n<1){
-        NB_STDERR("the value of timeout is too small\r\n");
+        STDERR("the value of timeout is too small\r\n");
         return NULL;
     }
 
     tdata=time_data_get(time_wheel);
     if(NULL==tdata){
-        NB_STDERR("no memory for struct time_data\r\n");
+        STDERR("no memory for struct time_data\r\n");
         return NULL;
     }
 

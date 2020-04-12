@@ -17,7 +17,7 @@ static int shm_key_get_from_file(const char *path)
     int id;
     // 首先检查文件是否存在
     if(access(path,F_OK)){
-        NB_STDERR("the shared memory file %s not exists at function %s\r\n",path,__func__);
+        STDERR("the shared memory file %s not exists at function %s\r\n",path,__func__);
         return -1;
     }
     f=fopen(path,"r");
@@ -33,25 +33,25 @@ static int shm_get(key_t key, size_t size, int shmflg)
     if(rs<0){
         switch (errno){
         case EINVAL:
-            NB_STDERR("shmmin or shmmax error at function %s\r\n",__func__);
+            STDERR("shmmin or shmmax error at function %s\r\n",__func__);
             break;
         case EEXIST:
-            NB_STDERR("shared memory exists at function %s\r\n",__func__);
+            STDERR("shared memory exists at function %s\r\n",__func__);
             break;
         case EIDRM:
-            NB_STDERR("shared memory has been deleted at function %s\r\n",__func__);
+            STDERR("shared memory has been deleted at function %s\r\n",__func__);
             break;
         case ENOSPC:
-            NB_STDERR("shared memory shmall at function %s\r\n",__func__);
+            STDERR("shared memory shmall at function %s\r\n",__func__);
             break;
         case ENOENT:
-            NB_STDERR("not exists from key at function %s\r\n",__func__);
+            STDERR("not exists from key at function %s\r\n",__func__);
             break;
         case EACCES:
-            NB_STDERR("cannot access shared memory %s\r\n",__func__);
+            STDERR("cannot access shared memory %s\r\n",__func__);
             break;
         case ENOMEM:
-            NB_STDERR("the os no memory at function %s\r\n",__func__);
+            STDERR("the os no memory at function %s\r\n",__func__);
             break;
         }
 
@@ -98,13 +98,13 @@ void *nb_shm_shared_get_ref(const char *path)
     if((long long)(result)<0){
         switch(errno){
             case EACCES:
-                NB_STDERR("not permit access shared memory at function %s\r\n",__func__);
+                STDERR("not permit access shared memory at function %s\r\n",__func__);
                 break;
             case EINVAL:
-                NB_STDERR("invalid shmid or shmaddr at function %s\r\n",__func__);
+                STDERR("invalid shmid or shmaddr at function %s\r\n",__func__);
                 break;
             case ENOMEM:
-                NB_STDERR("no system memory at function %s\r\n",__func__);
+                STDERR("no system memory at function %s\r\n",__func__);
                 break;
         }
 
