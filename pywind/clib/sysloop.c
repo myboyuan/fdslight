@@ -33,7 +33,7 @@ struct sysloop *sysloop_add(sysloop_fn_cb_t cb_fb,void *data)
     
     loop=malloc(sizeof(struct sysloop));
     if(NULL==loop){
-        NB_STDERR("no memory for struct sysloop\r\n");
+        STDERR("no memory for struct sysloop\r\n");
         return NULL;
     }
 
