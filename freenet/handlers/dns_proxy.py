@@ -265,7 +265,7 @@ class dnsc_proxy(dns_base):
 
         if flags == 1 or is_ip_match:
             if not is_ip_match and self.dispatcher.tunnel_conn_fail_count > 0: return
-            self.dispatcher.set_route(ip, is_ipv6 == is_ipv6, is_dynamic=True)
+            self.dispatcher.set_route(ip, is_ipv6=is_ipv6, is_dynamic=True)
             return
 
     def __handle_msg_from_response(self, message):
