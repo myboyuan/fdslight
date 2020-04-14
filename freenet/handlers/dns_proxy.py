@@ -220,7 +220,7 @@ class dnsc_proxy(dns_base):
         self.__server_side = server_side
 
         if server_side:
-            s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.bind((address, 53))
         else:
             self.connect((address, 53))
@@ -253,6 +253,21 @@ class dnsc_proxy(dns_base):
         """
         self.__udp_client = self.create_handler(self.fileno, udp_client_for_dns, server, is_ipv6=is_ipv6)
 
+    def __set_route(self, ip, flags, is_ipv6=False):
+        """设置路由
+        :param ip:
+        :param is_ipv6:
+        :return:
+        """
+        # 排除DNS只走加密和不走加密的情况
+        if flags in (0, 3,): return
+        is_ip_match = self.__ip_match.match(ip, is_ipv6=is_ipv6)
+
+        if flags == 1 or is_ip_match:
+            if not is_ip_match and self.dispatcher.tunnel_conn_fail_count > 0: return
+            self.dispatcher.set_route(ip, is_ipv6 == is_ipv6, is_dynamic=True)
+            return
+
     def __handle_msg_from_response(self, message):
         try:
             msg = dns.message.from_wire(message)
@@ -275,25 +290,9 @@ class dnsc_proxy(dns_base):
             for cname in rrset:
                 ip = cname.__str__()
                 if utils.is_ipv4_address(ip):
-                    is_ip_match = self.__ip_match.match(ip, is_ipv6=False)
-                    # 避免只走DNS加密而不走代理失效
-                    if not is_ip_match and flags == 0: continue
-                    if flags == 1 or not is_ip_match:
-                        # 隧道无法建立那么就不执行加速
-                        if not is_ip_match and self.dispatcher.tunnel_conn_fail_count > 0: continue
-                        self.dispatcher.set_route(ip, is_dynamic=True)
-                    ''''''
-                ''''''
+                    self.__set_route(ip, flags, is_ipv6=False)
                 if utils.is_ipv6_address(ip):
-                    is_ip_match = self.__ip_match.match(ip, is_ipv6=True)
-                    # 避免只走DNS加密而不走代理失效
-                    if not is_ip_match and flags == 0: continue
-                    if flags == 1 or not is_ip_match:
-                        # 隧道无法建立那么就不执行加速
-                        if not is_ip_match and self.dispatcher.tunnel_conn_fail_count > 0: continue
-                        self.dispatcher.set_route(ip, is_ipv6=True, is_dynamic=True)
-                    ''''''
-                ''''''
+                    self.__set_route(ip, flags, is_ipv6=True)
             ''''''
         ''''''
         if not self.__server_side:
@@ -374,14 +373,15 @@ class dnsc_proxy(dns_base):
         message = bytes(L)
         self.__timer.set_timeout(n_dns_id, self.__DNS_QUERY_TIMEOUT)
 
-        if not is_match and self.__server_side:
+        if (not is_match and self.__server_side) or (is_match and flags == 3):
             self.send_message_to_handler(self.fileno, self.__udp_client, message)
             return
 
-        if not is_match and not self.__server_side:
+        if (not is_match and not self.__server_side) or (is_match and flags == 3):
             self.send(message)
             self.add_evt_write(self.fileno)
             return
+
         self.dispatcher.send_msg_to_tunnel(proto_utils.ACT_DNS, message)
 
     def message_from_handler(self, from_fd, message):
