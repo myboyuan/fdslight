@@ -261,6 +261,7 @@ class dnsc_proxy(dns_base):
         """
         # 排除DNS只走加密和不走加密的情况
         if flags in (0, 3,): return
+        # 查找是否匹配地址,不匹配说明需要走代理
         is_ip_match = self.__ip_match.match(ip, is_ipv6=is_ipv6)
 
         if flags == 1 or not is_ip_match:
