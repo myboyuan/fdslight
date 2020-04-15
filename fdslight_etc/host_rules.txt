@@ -292,12 +292,15 @@ login.oracle.com:1
 *.msauth.net:1
 *.layerpanel.com:1
 
-### test
-*.whatismyip.com:3
-
 ### xxx
 *.pornhub.com:1
 *.phncdn.com:1
 *.sdhdbd1.com:1
+
+###------------------no proxy-----------------------
+*.whatismyip.com:3
+*.whatismyipaddress.com:3
+*.microsoft.com:3
+
 
 
