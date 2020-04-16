@@ -57,6 +57,7 @@ class dispatcher(object):
         :return:
         """
         if fd not in self.__handlers: return
+
         if self.__timer.exists(fd): self.__timer.drop(fd)
         handler = self.__handlers[fd]
         handler.delete()
