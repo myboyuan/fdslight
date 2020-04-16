@@ -55,7 +55,11 @@ class client(ssl_handler.ssl_handler):
 
         logging.print_general("connecting,%s" % auth_id, self.__address)
         self.set_socket(s)
-        self.connect(address)
+
+        try:
+            self.connect(address)
+        except:
+            return -1
 
         return self.fileno
 

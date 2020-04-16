@@ -218,11 +218,7 @@ class tcp_handler(handler.handler):
     def connect(self, address, timeout=3):
         self.__is_async_socket_client = True
 
-        try:
-            err = self.socket.connect_ex(address)
-        except socket.gaierror:
-            self.error()
-            return
+        err = self.socket.connect_ex(address)
 
         if err:
             self.register(self.fileno)
