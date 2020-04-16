@@ -245,6 +245,7 @@ class client(ssl_handler.ssl_handler):
 
     def tcp_error(self):
         logging.print_general("server_disconnect,%s" % self.__auth_id, self.__address)
+        self.dispatcher.delete_fwd_conn(self.__auth_id)
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):

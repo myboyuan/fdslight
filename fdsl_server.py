@@ -600,6 +600,10 @@ class _fdslight_server(dispatcher.dispatcher):
 
 
 def __start_service(debug, enable_nat_module):
+    if not debug and os.path.isfile(PID_FILE):
+        print("the fdsl_server process exists")
+        return
+
     if not debug:
         pid = os.fork()
         if pid != 0: sys.exit(0)

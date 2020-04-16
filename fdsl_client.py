@@ -702,6 +702,10 @@ class _fdslight_client(dispatcher.dispatcher):
 
 
 def __start_service(mode, debug):
+    if not debug and os.path.isfile(PID_FILE):
+        print("the fdsl_client process exists")
+        return
+
     if not debug:
         pid = os.fork()
         if pid != 0: sys.exit(0)
@@ -724,8 +728,6 @@ def __start_service(mode, debug):
         return
     try:
         cls.ioloop(mode, debug, configs)
-    except KeyboardInterrupt:
-        pass
     except:
         logging.print_error()
 
