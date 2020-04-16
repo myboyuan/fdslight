@@ -53,7 +53,7 @@ class client(ssl_handler.ssl_handler):
 
         s = context.wrap_socket(s, **kwargs)
 
-        logging.print_general("connecting,%s", auth_id, self.__address)
+        logging.print_general("connecting,%s" % auth_id, self.__address)
         self.set_socket(s)
         self.connect(address)
 
@@ -61,11 +61,11 @@ class client(ssl_handler.ssl_handler):
 
     def ssl_handshake_ok(self):
         self.__ssl_ok = True
-        logging.print_general("TLS handshake OK,%s", self.__auth_id, self.__address)
+        logging.print_general("TLS handshake OK,%s" % self.__auth_id, self.__address)
         self.send_handshake_request()
 
     def connect_ok(self):
-        logging.print_general("connect_ok,%s", self.__auth_id, self.__address)
+        logging.print_general("connect_ok,%s" % self.__auth_id, self.__address)
 
         self.tcp_loop_read_num = 10
         self.register(self.fileno)
@@ -248,7 +248,7 @@ class client(ssl_handler.ssl_handler):
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):
-        logging.print_general("disconnect,%s", self.__auth_id, self.__address)
+        logging.print_general("disconnect,%s" % self.__auth_id, self.__address)
         self.unregister(self.fileno)
         self.close()
         self.dispatcher.delete_fwd_conn(self.__auth_id)
