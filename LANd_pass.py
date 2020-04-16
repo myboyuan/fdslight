@@ -182,14 +182,16 @@ class service(dispatcher.dispatcher):
         if t - self.__time < 10: return
         self.__time = time.time()
 
+        names = []
+
         for name in self.__configs:
             config = self.__configs[name]
             auth_id = config["auth_id"]
-            if auth_id not in self.__conns:
-                rs = self.__create_conn(name, config)
-                if not rs: continue
-            ''''''
+            if auth_id not in self.__conns: names.append((name, config,))
         ''''''
+
+        for name, config in names:
+            self.__create_conn(name, config)
 
 
 def update_configs():

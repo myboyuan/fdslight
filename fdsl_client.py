@@ -128,6 +128,7 @@ class _fdslight_client(dispatcher.dispatcher):
             self.__mode = _MODE_LOCAL
         else:
             self.__mode = _MODE_GW
+            self.__load_kernel_mod()
 
         self.__mbuf = utils.mbuf()
         self.__debug = debug
@@ -157,7 +158,6 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__set_rules(None, None)
 
         if self.__mode == _MODE_GW:
-            self.__load_kernel_mod()
             udp_global = bool(int(gateway["dgram_global_proxy"]))
             if udp_global:
                 self.__dgram_fetch_fileno = self.create_handler(-1, traffic_pass.traffic_read,
