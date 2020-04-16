@@ -283,6 +283,7 @@ class handler(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, 10)
 
     def tcp_delete(self):
+        logging.print_general("disconnect", self.__caddr)
         if self.__auth_id: self.dispatcher.unreg_fwd_conn(self.__auth_id)
         self.unregister(self.fileno)
         self.close()
