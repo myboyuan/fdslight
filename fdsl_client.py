@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, os, time
+import sys, os
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -83,6 +83,8 @@ class _fdslight_client(dispatcher.dispatcher):
     __local_dns = None
     __local_dns6 = None
 
+    __enable_nat_module = None
+
     @property
     def https_configs(self):
         configs = self.__configs.get("tunnel_over_https", {})
@@ -110,7 +112,7 @@ class _fdslight_client(dispatcher.dispatcher):
     def tunnel_conn_fail_count(self):
         return self.__tunnel_conn_fail_count
 
-    def init_func(self, mode, debug, configs):
+    def init_func(self, mode, debug, configs, enable_nat_module=False):
         self.create_poll()
 
         signal.signal(signal.SIGINT, self.__exit)
@@ -120,6 +122,7 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__configs = configs
         self.__static_routes = {}
         self.__tunnel_conn_fail_count = 0
+        self.__enable_nat_module = enable_nat_module
 
         if mode == "local":
             self.__mode = _MODE_LOCAL
@@ -710,25 +713,23 @@ def __start_service(mode, debug):
         if pid != 0: sys.exit(0)
         proc.write_pid(PID_FILE)
 
-    while 1:
-        config_path = "%s/fdslight_etc/fn_client.ini" % BASE_DIR
-        configs = configfile.ini_parse_from_file(config_path)
+    config_path = "%s/fdslight_etc/fn_client.ini" % BASE_DIR
 
-        cls = _fdslight_client()
+    configs = configfile.ini_parse_from_file(config_path)
 
-        if debug:
-            cls.ioloop(mode, debug, configs)
-            return
+    cls = _fdslight_client()
 
-        try:
-            cls.ioloop(mode, debug, configs)
-        except KeyboardInterrupt:
-            break
-        except:
-            # 发生未知错误打印错误,程序睡眠一定时间并重启服务
-            # 注意这里一定要睡眠,否则一直不断错误占用CPU以及可能会使磁盘数据写满
-            logging.print_error()
-            time.sleep(300)
+    if debug:
+        cls.ioloop(mode, debug, configs)
+        return
+    try:
+        cls.ioloop(mode, debug, configs)
+    except KeyboardInterrupt:
+        pass
+    except:
+        logging.print_error()
+
+    os.remove(PID_FILE)
 
 
 def __stop_service():
