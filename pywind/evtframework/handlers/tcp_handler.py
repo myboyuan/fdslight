@@ -204,6 +204,7 @@ class tcp_handler(handler.handler):
         """重写这个方法
         :return:
         """
+        pass
 
     def tcp_delete(self):
         """重写这个方法
