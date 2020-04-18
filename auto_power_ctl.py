@@ -51,7 +51,7 @@ class power_ctl(object):
         platform = sys.platform
         print("starting shutdown")
 
-        if platform.find("win") == 0:
+        if sys.platform.startswith("win32"):
             self.windows_shutdown()
             return
 
