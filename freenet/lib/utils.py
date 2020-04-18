@@ -54,6 +54,125 @@ def calc_net_prefix_num(prefix, is_ipv6=False):
     return (~r) & n
 
 
+def get_byte_net_mask(prefix, is_ipv6=False):
+    """通过prefix获取byte形式的掩码
+    :param prefix:
+    :param is_ipv6:
+    :return:
+    """
+    a = int(prefix / 8)
+    b = prefix % 8
+    seq = []
+
+    pad_num = 0
+
+    if b == 0:
+        if is_ipv6:
+            pad_num = 16 - a
+        else:
+            pad_num = 4 - a
+    else:
+        if is_ipv6:
+            pad_num = 15 - a
+        else:
+            pad_num = 3 - a
+
+    for i in range(a): seq.append(0xff)
+
+    if b != 0:
+        x = 0
+        for i in range(b):
+            x |= 1 << (7 - i)
+        seq.append(x)
+
+    for i in range(pad_num):
+        seq.append(0x00)
+
+    return bytes(seq)
+
+
+def ip_addr_plus(byte_ip):
+    """把IP地址加1
+    :param byte_ip:
+    :param is_ipv6:
+    :return:
+    """
+    seq = list(byte_ip)
+    seq.reverse()
+    size = len(seq)
+
+    carry = False
+    for i in range(size):
+        n = seq[i]
+        if i == 0 or carry:
+            n = n + 1
+            if n > 0xff:
+                carry = True
+                n = 0
+                seq[i] = n
+                continue
+            carry = False
+            seq[i] = n
+            break
+        ''''''
+    seq.reverse()
+    return bytes(seq)
+
+
+def ip_addr_minus(byte_ip):
+    """对IP地址减1
+    :param byte_ip:
+    :return:
+    """
+    seq = list(byte_ip)
+    size = len(seq)
+    seq.reverse()
+
+    flags = False
+    for i in range(size):
+        n = seq[i]
+        if i == 0 or flags:
+            if 0 == n:
+                n = 0xff
+                flags = True
+                seq[i] = n
+                continue
+            flags = False
+            seq[i] = n - 1
+            break
+        ''''''
+    seq.reverse()
+    return bytes(seq)
+
+
+def get_ip_addr_max(subnet, prefix, is_ipv6=False):
+    """获取当前子网的最大IP地址
+    :param subnet:
+    :param prefix:
+    :param is_ipv6:
+    :return:
+    """
+    if is_ipv6:
+        fa = socket.AF_INET6
+        size = 16
+    else:
+        fa = socket.AF_INET
+        size = 4
+
+    byte_subnet = socket.inet_pton(fa, subnet)
+    byte_mask = get_byte_net_mask(prefix, is_ipv6=is_ipv6)
+
+    seq_a = list(byte_subnet)
+    seq_b = list(byte_mask)
+    results = []
+
+    for i in range(size):
+        n = seq_a[i] | ((~seq_b[i]) & 0xff)
+        results.append(n)
+
+    return socket.inet_ntop(fa, bytes(results))
+
+
 def calc_subnet(ipaddr, prefix, is_ipv6=False):
     if is_ipv6 and prefix == 128: return ipaddr
     if not is_ipv6 and prefix == 32: return ipaddr

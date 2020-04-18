@@ -72,7 +72,7 @@ class nat(_nat_base):
     __ip_alloc = None
     __timer = None
     # 映射IP的有效时间
-    __VALID_TIME = 1800
+    __VALID_TIME = 1200
     __is_ipv6 = False
 
     def __init__(self, subnet, is_ipv6=False):
