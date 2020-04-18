@@ -69,7 +69,7 @@ class ipalloc(object):
 """
 
 
-class ip_alloc(object):
+class ipalloc(object):
     __byte_subnet = None
     __byte_subnet_max = None
     __byte_subnet_cur = None
