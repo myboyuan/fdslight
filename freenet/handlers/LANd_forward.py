@@ -194,6 +194,8 @@ class client(ssl_handler.ssl_handler):
         self.dispatcher.send_conn_data_to_local(session_id, data)
 
     def tcp_readable(self):
+        self.__time = time.time()
+
         if not self.__http_handshake_ok:
             self.handle_handshake_response()
             return
