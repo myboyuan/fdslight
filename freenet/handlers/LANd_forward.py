@@ -242,6 +242,7 @@ class client(ssl_handler.ssl_handler):
         t = time.time()
 
         if t - self.__time > 60:
+            logging.print_general("timeout,%s" % self.__auth_id, self.__address)
             self.delete_handler(self.fileno)
             return
 
