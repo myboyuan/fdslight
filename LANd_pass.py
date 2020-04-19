@@ -168,6 +168,7 @@ class service(dispatcher.dispatcher):
     def handle_conn_request(self, auth_id, session_id, remote_addr, remote_port, is_ipv6):
         if session_id in self.__sessions:
             fd = self.__sessions[session_id]
+            logging.print_general("delete %s,%s" % (auth_id, session_id,), (remote_addr, remote_port,))
             self.delete_handler(fd)
             del self.__sessions[session_id]
 
