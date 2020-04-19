@@ -253,6 +253,7 @@ class handler(tcp_handler.tcp_handler):
             ''''''
 
     def send_data(self, byte_data):
+        self.__time = time.time()
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
         self.send_now()
