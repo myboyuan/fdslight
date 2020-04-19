@@ -84,7 +84,7 @@ class handler(tcp_handler.tcp_handler):
         self.add_evt_read(self.fileno)
         self.set_timeout(self.fileno, 10)
 
-        self.tcp_loop_read_num = 100
+        self.tcp_loop_read_num = 200
         logging.print_general("accepted", self.__caddr)
 
         return self.fileno
