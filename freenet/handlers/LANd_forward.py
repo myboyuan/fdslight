@@ -187,6 +187,7 @@ class client(ssl_handler.ssl_handler):
     def handle_conn_close(self, session_id):
         fd = self.dispatcher.session_get(session_id)
         if not fd: return
+        logging.print_general("close %s,%s" % (self.__auth_id, session_id,), self.__address)
         self.dispatcher.session_del(session_id)
         self.delete_handler(fd)
 
