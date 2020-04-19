@@ -2,7 +2,7 @@
 
 type:1表示WAN请求,2表示WAN响应
 reverse:1 byte 保留字节
-length:2 bytes 长度
+length:4 bytes 长度
 
 key_len:1 byte 验证key长度
 key:255 bytes
