@@ -189,6 +189,8 @@ class client(ssl_handler.ssl_handler):
         if not fd: return
         logging.print_general("close %s,%s" % (self.__auth_id, session_id,), self.__address)
         self.dispatcher.session_del(session_id)
+        if fd == self.fileno:
+            logging.print_error("conflict session_id map value,the program have bug")
         self.delete_handler(fd)
 
     def handle_conn_data(self, session_id, data):
