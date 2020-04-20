@@ -262,7 +262,6 @@ class handler(tcp_handler.tcp_handler):
                 sys.stderr.write("session id not exists\r\n")
                 self.delete_handler(self.fileno)
                 return
-            print("send to %d" % fd)
             self.send_message_to_handler(self.fileno, fd, rdata)
             return
 
@@ -334,6 +333,3 @@ class handler(tcp_handler.tcp_handler):
     def send_conn_request(self, session_id, remote_addr, remote_port, is_ipv6=False):
         byte_data = self.__builder.build_conn_request(session_id, remote_addr, remote_port, is_ipv6=is_ipv6)
         self.send_data(byte_data)
-
-    def send_message_to_handler(self, src_fd, dst_fd, data):
-        self.send_data(data)
