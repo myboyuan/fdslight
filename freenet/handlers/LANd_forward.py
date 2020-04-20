@@ -70,7 +70,6 @@ class client(ssl_handler.ssl_handler):
         s = socket.socket(fa, socket.SOCK_STREAM)
         if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
 
-        s.setsockopt(socket.IPPROTO_IP, socket.TCP_NODELAY, 1)
         context = ssl.SSLContext(ssl.PROTOCOL_TLS)
         context.set_alpn_protocols(["http/1.1"])
 
