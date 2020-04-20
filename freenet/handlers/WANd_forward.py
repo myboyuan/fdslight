@@ -230,6 +230,7 @@ class handler(tcp_handler.tcp_handler):
                 byte_data = self.__wait_sent.pop(0)
             except IndexError:
                 break
+            print(byte_data)
             self.send_data(byte_data)
 
     def send_response(self, status, headers):

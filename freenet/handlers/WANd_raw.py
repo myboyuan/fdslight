@@ -133,7 +133,6 @@ class handler(tcp_handler.tcp_handler):
                 byte_data = self.__wait_sent.pop(0)
             except IndexError:
                 break
-            print(byte_data)
             self.dispatcher.send_data_to_msg_tunnel(self.__session_id, byte_data)
 
     def send_data(self, byte_data):
