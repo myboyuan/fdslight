@@ -195,7 +195,7 @@ class handler(tcp_handler.tcp_handler):
                 sys.stderr.write("session id not exists\r\n")
                 self.send_403_response()
                 return
-            self.dispatcher.tell_msg_tunnel_conn_ok(self.__session_id, self.fileno)
+            self.dispatcher.tell_listener_conn_ok(self.__session_id, self.fileno)
         else:
             self.dispatcher.reg_fwd_conn(auth_id, self.fileno)
 

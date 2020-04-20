@@ -64,7 +64,7 @@ class service(dispatcher.dispatcher):
 
         self.get_handler(f).send_conn_request(session_id, remote_ipaddr, remote_port,
                                               is_ipv6=is_ipv6)
-        self.__session_ids[session_id] = fd
+        self.__session_ids[session_id] = [fd, -1]
         return session_id
 
     def send_data_to_msg_tunnel(self, session_id, data):
@@ -89,9 +89,11 @@ class service(dispatcher.dispatcher):
         self.delete_handler(accepted_fd)
         self.delete_handler(msg_tunnel_fd)
 
-    def tell_msg_tunnel_conn_ok(self, session_id, fd):
+    def tell_listener_conn_ok(self, session_id, fd):
         if session_id not in self.__session_ids: return
+
         accepted_fd, msg_tunnel_fd = self.__session_ids[session_id]
+        self.__session_ids[session_id] = [accepted_fd, fd, ]
 
         self.get_handler(accepted_fd).tell_conn_ok()
 
