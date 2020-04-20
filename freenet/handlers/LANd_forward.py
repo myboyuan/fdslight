@@ -273,7 +273,6 @@ class client(ssl_handler.ssl_handler):
             return
         rdata = self.reader.read()
         if self.__is_msg_tunnel:
-            print(rdata)
             self.send_message_to_handler(self.fileno, self.__forward_fd, rdata)
             return
 
