@@ -335,4 +335,5 @@ class handler(tcp_handler.tcp_handler):
         self.send_data(byte_data)
 
     def message_from_handler(self, from_fd, byte_data):
+        print(byte_data)
         self.send_data(byte_data)
