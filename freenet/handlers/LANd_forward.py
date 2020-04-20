@@ -227,7 +227,6 @@ class client(ssl_handler.ssl_handler):
                 data = self.__wait_sent.pop(0)
             except IndexError:
                 break
-            print(data)
             self.send_data(data)
 
     def get_http_kv_pairs(self, name, kv_pairs):
