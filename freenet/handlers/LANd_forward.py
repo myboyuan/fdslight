@@ -114,7 +114,7 @@ class client(ssl_handler.ssl_handler):
         if self.__is_msg_tunnel:
             logging.print_general("connect_ok,msg_tunnel,%s" % self.__auth_id, self.__address)
 
-        self.tcp_loop_read_num = 10
+        self.tcp_loop_read_num = 200
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         # 注意这里要加入写事件,让TLS能够握手成功
