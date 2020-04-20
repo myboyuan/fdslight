@@ -72,6 +72,8 @@ class service(dispatcher.dispatcher):
             sys.stderr.write("session id not exists\r\n")
             return
         accepted_fd, msg_tunnel_fd = self.__session_ids[session_id]
+        # 此处可能消息隧道没创建，所以要加判断
+        if msg_tunnel_fd < 0: return
         self.send_message_to_handler(accepted_fd, msg_tunnel_fd, data)
 
     def tell_session_close_from_listener(self, session_id):
