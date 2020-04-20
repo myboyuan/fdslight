@@ -339,4 +339,4 @@ class client(ssl_handler.ssl_handler):
         if self.__is_msg_tunnel:
             self.dispatcher.tell_session_close(self.__session_id)
         else:
-            self.delete_handler()
+            self.delete_handler(self.fileno)
