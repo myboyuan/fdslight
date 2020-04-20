@@ -92,21 +92,28 @@ class handler(tcp_handler.tcp_handler):
     def tcp_readable(self):
         self.__time = time.time()
         rdata = self.reader.read()
-        self.dispatcher.send_conn_data_to_fwd(self.__auth_id, self.__session_id, rdata)
+        self.dispatcher.send_data_to_msg_tunnel(self.__session_id, rdata)
 
     def tcp_writable(self):
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
         t = time.time()
-        if t - self.__time > self.__timeout:
-            self.dispatcher.send_conn_close_to_fwd(self.__auth_id, self.__session_id)
+
+        if not self.__conn_ok:
+            self.dispatcher.tell_session_close_from_listen(self.__auth_id, self.__session_id)
             self.delete_handler(self.fileno)
             return
+
+        if t - self.__time > self.__timeout:
+            self.dispatcher.tell_session_close_from_listen(self.__auth_id, self.__session_id)
+            self.delete_handler(self.fileno)
+            return
+
         self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
-        self.dispatcher.send_conn_close_to_fwd(self.__auth_id, self.__session_id)
+        self.dispatcher.tell_session_close_from_listener(self.__auth_id, self.__session_id)
         self.delete_handler(self.fileno)
 
     def tcp_delete(self):
