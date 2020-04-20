@@ -342,6 +342,7 @@ class client(ssl_handler.ssl_handler):
         self.__time = time.time()
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
+        self.send_now()
 
     def message_from_handler(self, from_fd, byte_data):
         if not self.__http_handshake_ok:
