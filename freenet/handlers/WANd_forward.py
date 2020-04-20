@@ -19,7 +19,7 @@ class listener(tcp_handler.tcp_handler):
             return -1
 
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.setsockopt(socket.IPPROTO_IP, socket.TCP_NODELAY, 1)
+
         self.set_socket(s)
         self.bind(address)
         os.chmod(address, 0o777)
@@ -72,6 +72,8 @@ class handler(tcp_handler.tcp_handler):
         self.__wait_sent = []
 
         self.__time = time.time()
+
+        cs.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
         self.set_socket(cs)
         self.register(self.fileno)

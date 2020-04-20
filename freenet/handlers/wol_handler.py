@@ -26,7 +26,6 @@ class listener(tcp_handler.tcp_handler):
         s = socket.socket(fa, socket.SOCK_STREAM)
         if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.setsockopt(socket.IPPROTO_IP, socket.TCP_NODELAY, 1)
 
         self.set_socket(s)
         self.bind(address)
@@ -69,6 +68,7 @@ class handler(tcp_handler.tcp_handler):
         self.__parser = wol.parser()
         self.__time = time.time()
 
+        cs.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.set_socket(cs)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
