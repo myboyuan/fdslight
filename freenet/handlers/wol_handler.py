@@ -68,6 +68,8 @@ class handler(tcp_handler.tcp_handler):
         self.__parser = wol.parser()
         self.__time = time.time()
 
+        print("hello---------")
+
         self.set_socket(cs)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
