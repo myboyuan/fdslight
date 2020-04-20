@@ -74,11 +74,13 @@ class service(dispatcher.dispatcher):
         accepted_fd, msg_tunnel_fd = self.__session_ids[session_id]
         self.send_message_to_handler(accepted_fd, msg_tunnel_fd, data)
 
-    def tell_session_close_from_listener(self, auth_id, session_id):
-        if auth_id not in self.__fwd_conns: return
+    def tell_session_close_from_listener(self, session_id):
+        if session_id not in self.__session_ids: return
 
-        fd = self.__fwd_conns[auth_id]
-        self.get_handler(fd).send_conn_close(session_id)
+        accepted_fd, msg_tunnel_fd = self.__session_ids[session_id]
+        if msg_tunnel_fd > 0:
+            self.delete_handler(msg_tunnel_fd)
+        self.delete_handler(accepted_fd)
 
     def tell_session_fail_from_msg_tunnel(self, session_id):
         if session_id not in self.__session_ids: return
@@ -87,10 +89,11 @@ class service(dispatcher.dispatcher):
         self.delete_handler(accepted_fd)
         self.delete_handler(msg_tunnel_fd)
 
-    def tell_conn_ok(self, session_id):
+    def tell_msg_tunnel_conn_ok(self, session_id):
         if session_id not in self.__session_ids: return
-        fd = self.__session_ids[session_id]
-        self.get_handler(fd).tell_conn_ok()
+        accepted_fd, msg_tunnel_fd = self.__session_ids[session_id]
+
+        self.get_handler(accepted_fd).tell_conn_ok()
 
     def auth_id_exists(self, auth_id):
         return auth_id in self.__binds
