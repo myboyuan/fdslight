@@ -108,23 +108,20 @@ class handler(tcp_handler.tcp_handler):
         t = time.time()
 
         if not self.__conn_ok:
-            self.dispatcher.tell_session_close_from_listener(self.__auth_id, self.__session_id)
+            self.dispatcher.tell_session_close(self.__session_id)
             self.delete_handler(self.fileno)
             return
 
         if t - self.__time > self.__timeout:
-            self.dispatcher.tell_session_close_from_listener(self.__auth_id, self.__session_id)
-            self.delete_handler(self.fileno)
+            self.dispatcher.tell_session_close(self.__session_id)
             return
 
         self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
-        self.dispatcher.tell_session_close_from_listener(self.__auth_id, self.__session_id)
-        self.delete_handler(self.fileno)
+        self.dispatcher.tell_session_close(self.__session_id)
 
     def tcp_delete(self):
-        self.dispatcher.session_del(self.__session_id)
         self.unregister(self.fileno)
         self.close()
 

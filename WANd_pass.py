@@ -76,13 +76,14 @@ class service(dispatcher.dispatcher):
         if msg_tunnel_fd < 0: return
         self.send_message_to_handler(accepted_fd, msg_tunnel_fd, data)
 
-    def tell_session_close_from_listener(self, session_id):
+    def tell_session_close(self, session_id):
         if session_id not in self.__session_ids: return
 
         accepted_fd, msg_tunnel_fd = self.__session_ids[session_id]
         if msg_tunnel_fd > 0:
             self.delete_handler(msg_tunnel_fd)
         self.delete_handler(accepted_fd)
+        del self.__session_ids[session_id]
 
     def tell_session_fail_from_msg_tunnel(self, session_id):
         if session_id not in self.__session_ids: return

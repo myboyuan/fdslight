@@ -166,7 +166,7 @@ class client(ssl_handler.ssl_handler):
 
         if p < 10 and size > 2048:
             logging.print_general("wrong_http_response_header", self.__address)
-            self.delete_handler(self.fileno)
+            self.close_conn()
             return
 
         if p < 0:
@@ -182,20 +182,20 @@ class client(ssl_handler.ssl_handler):
             resp, kv_pairs = httputils.parse_http1x_response_header(s)
         except httputils.Http1xHeaderErr:
             logging.print_general("wrong_http_reponse_header", self.__address)
-            self.delete_handler(self.fileno)
+            self.close_conn()
             return
 
         version, status = resp
 
         if status.find("101") != 0:
             logging.print_general("https_handshake_error:%s" % status, self.__address)
-            self.delete_handler(self.fileno)
+            self.close_conn()
             return
 
         accept_key = self.get_http_kv_pairs("sec-websocket-accept", kv_pairs)
         if wslib.gen_handshake_key(self.__http_handshake_key) != accept_key:
             logging.print_general("https_handshake_error:wrong websocket response key", self.__address)
-            self.delete_handler(self.fileno)
+            self.close_conn()
             return
 
         self.__http_handshake_ok = True
@@ -325,11 +325,11 @@ class client(ssl_handler.ssl_handler):
         data = self.__builder.build_conn_response(session_id, 0)
         self.send_data(data)
 
-    def tell_local_close(self):
-        """告知本地连接关闭
-        :return:
-        """
-        self.delete_handler(self.fileno)
-
     def send_message_to_handler(self, src_fd, dst_fd, data):
         self.send_data(data)
+
+    def close_conn(self):
+        if self.__is_msg_tunnel:
+            self.dispatcher.tell_session_close(self.__session_id)
+        else:
+            self.delete_handler()
