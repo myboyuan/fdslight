@@ -68,8 +68,6 @@ class handler(tcp_handler.tcp_handler):
         self.__parser = wol.parser()
         self.__time = time.time()
 
-        print("----------")
-
         self.set_socket(cs)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
@@ -89,14 +87,12 @@ class handler(tcp_handler.tcp_handler):
             cls.release()
 
         data = self.__builder.build_response(is_error=is_error)
-        print(data)
         self.writer.write(data)
         self.add_evt_write(self.fileno)
 
     def tcp_readable(self):
         rdata = self.reader.read()
         self.__parser.input(rdata)
-        print(rdata)
 
         while 1:
             try:
