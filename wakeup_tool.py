@@ -83,6 +83,7 @@ class wake_up_internet(object):
             if not packet: break
             size = self.__s.send(packet)
             packet = packet[size:]
+            print("zzzzzz")
 
     def recv_request(self):
         while 1:
