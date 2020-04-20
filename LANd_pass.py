@@ -165,14 +165,14 @@ class service(dispatcher.dispatcher):
         fd = self.__conns[auth_id]
         self.get_handler(fd).send_conn_close(session_id)
 
-    def handle_conn_request(self, auth_id, session_id, remote_addr, remote_port, is_ipv6):
+    def handle_conn_request(self, path, auth_id, session_id, remote_addr, remote_port, is_ipv6):
         if session_id in self.__sessions:
             fd = self.__sessions[session_id]
             logging.print_general("delete %s,%s" % (auth_id, session_id,), (remote_addr, remote_port,))
             self.delete_handler(fd)
             del self.__sessions[session_id]
 
-        fd = self.create_handler(-1, lan_fwd.client, (remote_addr, remote_port,), auth_id, session_id=session_id,
+        fd = self.create_handler(-1, lan_fwd.client, (remote_addr, remote_port,), path, auth_id, session_id=session_id,
                                  is_ipv6=is_ipv6)
         self.__sessions[session_id] = fd
 
