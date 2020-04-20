@@ -89,10 +89,14 @@ class client(ssl_handler.ssl_handler):
     def ssl_handshake_ok(self):
         self.__ssl_ok = True
         logging.print_general("TLS handshake OK,%s" % self.__auth_id, self.__address)
+
         self.send_handshake_request()
 
     def connect_ok(self):
         logging.print_general("connect_ok,%s" % self.__auth_id, self.__address)
+
+        if self.__is_msg_tunnel:
+            logging.print_general("connect_ok,msg_tunnel,%s" % self.__auth_id, self.__address)
 
         self.tcp_loop_read_num = 10
         self.register(self.fileno)
