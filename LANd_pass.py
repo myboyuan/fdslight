@@ -173,7 +173,7 @@ class service(dispatcher.dispatcher):
             del self.__sessions[session_id]
 
         fd = self.create_handler(-1, lan_fwd.client, (remote_addr, remote_port,), path, auth_id, session_id=session_id,
-                                 is_ipv6=is_ipv6)
+                                 is_msg_tunnel=True, is_ipv6=is_ipv6)
         self.__sessions[session_id] = fd
 
     def myloop(self):

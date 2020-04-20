@@ -59,6 +59,8 @@ class handler(tcp_handler.tcp_handler):
     __wait_fwd_data = None
     __conn_ok = None
 
+    __wait_sent = None
+
     def init_func(self, creator_fd, cs, caddr, auth_id, remote_info):
         self.__caddr = caddr
         self.__remote_info = remote_info
@@ -67,6 +69,7 @@ class handler(tcp_handler.tcp_handler):
         self.__timeout = remote_info["timeout"]
         self.__wait_fwd_data = []
         self.__conn_ok = False
+        self.__wait_sent = []
 
         remote_addr = remote_info["address"]
         remote_port = remote_info["port"]
@@ -90,8 +93,12 @@ class handler(tcp_handler.tcp_handler):
         return self.fileno
 
     def tcp_readable(self):
-        self.__time = time.time()
         rdata = self.reader.read()
+        if self.__conn_ok:
+            self.__time = time.time()
+        else:
+            self.__wait_sent.append(rdata)
+            return
         self.dispatcher.send_data_to_msg_tunnel(self.__session_id, rdata)
 
     def tcp_writable(self):
@@ -101,7 +108,7 @@ class handler(tcp_handler.tcp_handler):
         t = time.time()
 
         if not self.__conn_ok:
-            self.dispatcher.tell_session_close_from_listen(self.__auth_id, self.__session_id)
+            self.dispatcher.tell_session_close_from_listener(self.__auth_id, self.__session_id)
             self.delete_handler(self.fileno)
             return
 
@@ -126,6 +133,12 @@ class handler(tcp_handler.tcp_handler):
 
     def tell_conn_ok(self):
         self.__conn_ok = True
+        while 1:
+            try:
+                byte_data = self.__wait_sent.pop(0)
+            except IndexError:
+                break
+            self.dispatcher.send_data_to_msg_tunnel(self.__session_id, byte_data)
 
     def send_data(self, byte_data):
         self.__time = time.time()
