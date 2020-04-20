@@ -60,6 +60,7 @@ class client(ssl_handler.ssl_handler):
 
         self.__forward_fd = -1
         self.__wait_sent = []
+        self.__forward_conn_ok = False
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -94,11 +95,18 @@ class client(ssl_handler.ssl_handler):
         self.__ssl_ok = True
         logging.print_general("TLS handshake OK,%s" % self.__auth_id, self.__address)
 
+        if not self.__is_msg_tunnel:
+            self.send_handshake_request()
+            return
+
         logging.print_general("https_handshake_ok,msg_tunnel", self.__address)
         self.__forward_fd = self.create_handler(self.fileno, fwd.client, self.__forwarding_addr,
                                                 is_ipv6=self.__forwarding_is_ipv6)
+        if self.__forward_fd < 0:
+            self.close_conn()
+            return
 
-        if self.__forward_fd < 0: self.close_conn()
+        self.send_handshake_request()
 
     def connect_ok(self):
         logging.print_general("connect_ok,%s" % self.__auth_id, self.__address)
@@ -334,7 +342,7 @@ class client(ssl_handler.ssl_handler):
         self.writer.write(byte_data)
 
     def send_message_to_handler(self, src_fd, dst_fd, data):
-        if not self.__ssl_ok:
+        if not self.__http_handshake_ok:
             self.__wait_sent.append(data)
             return
 
@@ -346,5 +354,3 @@ class client(ssl_handler.ssl_handler):
     def tell_forwarding_close(self):
         self.delete_handler(self.__forward_fd)
 
-    def tell_forwaring_conn_ok(self):
-        self.send_handshake_request()

@@ -41,7 +41,6 @@ class client(tcp_handler.tcp_handler):
                 break
             ''''''
         self.add_evt_write(self.fileno)
-        self.get_handler(self.__creator).tell_forwarding_conn_ok()
 
     def tcp_readable(self):
         self.__time = time.time()
