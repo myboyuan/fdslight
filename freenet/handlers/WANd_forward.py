@@ -297,6 +297,7 @@ class handler(tcp_handler.tcp_handler):
         self.__time = time.time()
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
+        self.send_now()
 
     def rand_bytes(self):
         n = random.randint(0, 128)
