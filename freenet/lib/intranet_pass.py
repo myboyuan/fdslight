@@ -8,11 +8,10 @@ VER = 1
 TYPE_PING = 0
 TYPE_PONG = 1
 TYPE_CONN_REQ = 2
-TYPE_CONN_RESP = 3
 
 TYPES = (
     TYPE_PING, TYPE_PONG,
-    TYPE_CONN_REQ, TYPE_CONN_RESP,
+    TYPE_CONN_REQ
 )
 
 
@@ -89,9 +88,6 @@ class parser(object):
         if self.__type == TYPE_CONN_REQ:
             self.parse_conn_request()
             return
-        if self.__type == TYPE_CONN_RESP:
-            self.parse_conn_response()
-            return
 
         body_data = self.__reader.read(self.__length)
         self.__results.append(
@@ -145,8 +141,3 @@ class builder(object):
         byte_data = struct.pack("!16s16sHBB", session_id, byte_addr, port, int(is_ipv6), 0)
 
         return self.build_data(TYPE_CONN_REQ, byte_data)
-
-    def build_conn_response(self, session_id, err_code):
-        body_data = struct.pack("!16si", session_id, err_code)
-
-        return self.build_data(TYPE_CONN_RESP, body_data)

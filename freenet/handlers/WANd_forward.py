@@ -218,6 +218,9 @@ class handler(tcp_handler.tcp_handler):
         self.send_response("101 Switching Protocols", resp_headers)
         self.tcp_loop_read_num = 10
 
+        # 注意这里如果是消息隧道一定要等待握手协议发送完毕再告知连接成功,连接成功会发送堆积在服务器上的数据
+        if v: self.dispatcher.tell_listener_conn_ok()
+
     def send_response(self, status, headers):
         s = httputils.build_http1x_resp_header(status, headers)
         byte_data = s.encode("iso-8859-1")
@@ -283,10 +286,6 @@ class handler(tcp_handler.tcp_handler):
             if _type == intranet_pass.TYPE_PONG:
                 self.handle_pong()
                 continue
-
-            if _type == intranet_pass.TYPE_CONN_RESP:
-                self.handle_conn_response(*o)
-                continue
             ''''''
 
     def send_data(self, byte_data):
@@ -334,17 +333,6 @@ class handler(tcp_handler.tcp_handler):
     def send_conn_request(self, session_id, remote_addr, remote_port, is_ipv6=False):
         byte_data = self.__builder.build_conn_request(session_id, remote_addr, remote_port, is_ipv6=is_ipv6)
         self.send_data(byte_data)
-
-    def handle_conn_response(self, session_id, err_code):
-        """处理客户端发送过来的连接响应帧
-        """
-        fd = self.dispatcher.session_get(session_id)
-        if not fd: return
-
-        if err_code:
-            self.dispatcher.tell_conn_fail(session_id)
-        else:
-            self.dispatcher.tell_conn_ok(session_id)
 
     def send_message_to_handler(self, src_fd, dst_fd, data):
         self.send_data(data)

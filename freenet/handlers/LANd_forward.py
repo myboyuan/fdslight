@@ -57,6 +57,8 @@ class client(ssl_handler.ssl_handler):
         self.__is_msg_tunnel = is_msg_tunnel
         self.__session_id = session_id
 
+        self.__forward_fd = -1
+
         if is_ipv6:
             fa = socket.AF_INET6
         else:
@@ -210,10 +212,9 @@ class client(ssl_handler.ssl_handler):
         logging.print_general("https_handshake_ok,msg_tunnel", self.__address)
         self.__forward_fd = self.create_handler(self.fileno, fwd.client, self.__forwarding_addr,
                                                 is_ipv6=self.__forwarding_is_ipv6)
-        if self.__forward_fd < 1:
-            self.send_conn_fail(self.__session_id)
-        else:
-            self.send_conn_ok(self.__session_id)
+
+        if self.__forward_fd < 0:
+            self.close_conn()
 
     def get_http_kv_pairs(self, name, kv_pairs):
         for k, v in kv_pairs:
@@ -313,7 +314,9 @@ class client(ssl_handler.ssl_handler):
 
         if not self.__is_msg_tunnel:
             self.dispatcher.delete_fwd_conn(self.__auth_id)
-        else:
+            return
+
+        if self.__forward_fd > 0:
             self.delete_handler(self.__forward_fd)
 
     def send_data(self, byte_data):
@@ -324,21 +327,6 @@ class client(ssl_handler.ssl_handler):
         self.__time = time.time()
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
-
-    def send_conn_fail(self, session_id):
-        if self.__is_msg_tunnel:
-            self.dispatcher.send_conn_fail(self.__auth_id, session_id)
-            return
-        data = self.__builder.build_conn_response(session_id, 1)
-        self.send_data(data)
-
-    def send_conn_ok(self, session_id):
-        if self.__is_msg_tunnel:
-            self.dispatcher.send_conn_ok(self.__auth_id, session_id)
-            return
-
-        data = self.__builder.build_conn_response(session_id, 0)
-        self.send_data(data)
 
     def send_message_to_handler(self, src_fd, dst_fd, data):
         self.send_data(data)
