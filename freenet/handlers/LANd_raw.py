@@ -74,6 +74,7 @@ class client(tcp_handler.tcp_handler):
             self.__wait_sent.append(byte_data)
             return
 
+        self.__time = time.time()
         self.writer.write(byte_data)
         self.add_evt_write(self.fileno)
 
