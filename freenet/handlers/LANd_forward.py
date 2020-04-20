@@ -342,6 +342,7 @@ class client(ssl_handler.ssl_handler):
         self.writer.write(byte_data)
 
     def message_from_handler(self, from_fd, byte_data):
+        print(byte_data)
         if not self.__http_handshake_ok:
             self.__wait_sent.append(byte_data)
             return
