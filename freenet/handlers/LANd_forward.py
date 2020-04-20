@@ -271,7 +271,6 @@ class client(ssl_handler.ssl_handler):
             return
         rdata = self.reader.read()
         if self.__is_msg_tunnel:
-            print(self.__forward_fd)
             self.send_message_to_handler(self.fileno, self.__forward_fd, rdata)
             return
 
@@ -353,5 +352,4 @@ class client(ssl_handler.ssl_handler):
         self.delete_handler(self.fileno)
 
     def tell_forwarding_close(self):
-        print("---------------")
         self.delete_handler(self.fileno)
