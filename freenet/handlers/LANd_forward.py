@@ -270,8 +270,8 @@ class client(ssl_handler.ssl_handler):
             self.handle_handshake_response()
             return
         rdata = self.reader.read()
+        print(rdata)
         if self.__is_msg_tunnel:
-            print(rdata)
             self.send_message_to_handler(self.fileno, self.__forward_fd, rdata)
             return
 
