@@ -257,6 +257,7 @@ class handler(tcp_handler.tcp_handler):
         self.__time = time.time()
 
         if self.__is_msg_tunnel:
+            print(rdata)
             fd = self.dispatcher.session_get(self.__session_id)
             if not fd:
                 sys.stderr.write("session id not exists\r\n")
