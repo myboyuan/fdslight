@@ -160,11 +160,6 @@ class service(dispatcher.dispatcher):
         fd = self.__conns[auth_id]
         self.get_handler(fd).send_conn_ok(session_id)
 
-    def send_conn_close(self, auth_id, session_id):
-        if auth_id not in self.__conns: return
-        fd = self.__conns[auth_id]
-        self.get_handler(fd).send_conn_close(session_id)
-
     def handle_conn_request(self, address, path, auth_id, session_id, remote_addr, remote_port, is_ipv6):
         if session_id in self.__sessions:
             fd = self.__sessions[session_id]

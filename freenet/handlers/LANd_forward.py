@@ -326,10 +326,17 @@ class client(ssl_handler.ssl_handler):
         self.writer.write(byte_data)
 
     def send_conn_fail(self, session_id):
+        if self.__is_msg_tunnel:
+            self.dispatcher.send_conn_fail(self.__auth_id, session_id)
+            return
         data = self.__builder.build_conn_response(session_id, 1)
         self.send_data(data)
 
     def send_conn_ok(self, session_id):
+        if self.__is_msg_tunnel:
+            self.dispatcher.send_conn_ok(self.__auth_id, session_id)
+            return
+
         data = self.__builder.build_conn_response(session_id, 0)
         self.send_data(data)
 
