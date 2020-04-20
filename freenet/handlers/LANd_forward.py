@@ -329,6 +329,7 @@ class client(ssl_handler.ssl_handler):
         self.writer.write(byte_data)
 
     def send_message_to_handler(self, src_fd, dst_fd, data):
+        print(data)
         self.send_data(data)
 
     def close_conn(self):
