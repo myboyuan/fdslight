@@ -96,6 +96,7 @@ class handler(tcp_handler.tcp_handler):
     def tcp_readable(self):
         rdata = self.reader.read()
         self.__parser.input(rdata)
+        print(rdata)
 
         while 1:
             try:
