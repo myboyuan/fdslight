@@ -7,6 +7,8 @@ import socket, time, random, os, sys
 import freenet.lib.logging as logging
 import freenet.lib.intranet_pass as intranet_pass
 
+import base64
+
 
 class listener(tcp_handler.tcp_handler):
     __address = None
@@ -53,9 +55,13 @@ class handler(tcp_handler.tcp_handler):
     __time = None
     __auth_id = None
 
-    def init_func(self, creator_fd, cs, caddr):
+    __is_msg_tunnel = None
+    __session_id = None
 
+    def init_func(self, creator_fd, cs, caddr):
+        self.__is_msg_tunnel = False
         self.__handshake_ok = False
+
         self.__caddr = ("UNIX_SOCKET", 0)
 
         self.__parser = intranet_pass.parser()
@@ -168,6 +174,28 @@ class handler(tcp_handler.tcp_handler):
             self.send_403_response()
             return
 
+        is_msg_tunnel = self.get_kv_value(kv, "x-msg-tunnel")
+        if not is_msg_tunnel:
+            sys.stderr.write("not found X-Msg-Tunnel value\r\n")
+            self.send_403_response()
+            return
+
+        try:
+            v = bool(int(is_msg_tunnel))
+        except ValueError:
+            sys.stderr.write("wrong X-Msg-Tunnel value type\r\n")
+            self.send_403_response()
+            return
+
+        self.__is_msg_tunnel = v
+        if v:
+            s = self.get_kv_value(kv, "x-session-id")
+            self.__session_id = base64.b64decode(s.encode())
+            if not self.dispatcher.session_get(self.__session_id):
+                sys.stderr.write("session id not exists\r\n")
+                self.send_403_response()
+                return
+
         resp_headers = [
             ("Content-Length", "0"),
         ]
@@ -217,6 +245,17 @@ class handler(tcp_handler.tcp_handler):
 
     def handle_data(self):
         rdata = self.reader.read()
+        self.__time = time.time()
+
+        if self.__is_msg_tunnel:
+            fd = self.dispatcher.session_get(self.__session_id)
+            if not fd:
+                sys.stderr.write("session id not exists\r\n")
+                self.delete_handler(self.fileno)
+                return
+            self.send_message_to_handler(self.fileno, fd, rdata)
+            return
+
         self.__parser.input(rdata)
 
         while 1:
@@ -237,14 +276,6 @@ class handler(tcp_handler.tcp_handler):
                 continue
             if _type == intranet_pass.TYPE_PONG:
                 self.handle_pong()
-                continue
-
-            if _type == intranet_pass.TYPE_MSG_CONTENT:
-                self.handle_conn_data(*o)
-                continue
-
-            if _type == intranet_pass.TYPE_CONN_CLOSE:
-                self.handle_conn_close(o)
                 continue
 
             if _type == intranet_pass.TYPE_CONN_RESP:
@@ -293,14 +324,6 @@ class handler(tcp_handler.tcp_handler):
         byte_data = self.__builder.build_conn_request(session_id, remote_addr, remote_port, is_ipv6=is_ipv6)
         self.send_data(byte_data)
 
-    def send_conn_data(self, session_id, byte_data):
-        data = self.__builder.build_conn_data(session_id, byte_data)
-        self.send_data(data)
-
-    def send_conn_close(self, session_id):
-        data = self.__builder.build_conn_close(session_id)
-        self.send_data(data)
-
     def handle_conn_response(self, session_id, err_code):
         """处理客户端发送过来的连接响应帧
         """
@@ -312,17 +335,5 @@ class handler(tcp_handler.tcp_handler):
         else:
             self.dispatcher.tell_conn_ok(session_id)
 
-    def handle_conn_data(self, session_id, byte_data):
-        """处理连接数据
-        """
-        fd = self.dispatcher.session_get(session_id)
-        if not fd: return
-
-        self.send_message_to_handler(self.fileno, fd, byte_data)
-
-    def handle_conn_close(self, session_id):
-        fd = self.dispatcher.session_get(session_id)
-        # 忽略找不到的fd
-        if not fd: return
-        # 删除对应文件描述符
-        self.delete_handler(fd)
+    def send_message_to_handler(self, src_fd, dst_fd, data):
+        self.send_data(data)

@@ -11,10 +11,8 @@ class client(tcp_handler.tcp_handler):
     __wait_sent = None
     __time = None
 
-    def init_func(self, creator_fd, address, auth_id, session_id, is_ipv6=False):
+    def init_func(self, creator_fd, address, is_ipv6=False):
         self.__creator = creator_fd
-        self.__session_id = session_id
-        self.__auth_id = auth_id
         self.__wait_sent = []
         self.__time = time.time()
 
@@ -47,28 +45,25 @@ class client(tcp_handler.tcp_handler):
     def tcp_readable(self):
         self.__time = time.time()
         rdata = self.reader.read()
-        self.dispatcher.send_conn_data_to_server(self.__auth_id, self.__session_id, rdata)
+        self.send_message_to_handler(self.fileno, self.__creator, rdata)
 
     def tcp_writable(self):
         if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
-            self.dispatcher.send_conn_close(self.__auth_id, self.__session_id)
-            self.delete_handler(self.fileno)
+            self.get_handler(self.__creator).tell_local_close()
             return
 
         t = time.time()
         # 限制300s没数据那么就关闭连接
         if t - self.__time > 300:
-            self.dispatcher.send_conn_close(self.__auth_id, self.__session_id)
-            self.delete_handler(self.fileno)
+            self.get_handler(self.__creator).tell_local_close()
             return
         self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
-        self.dispatcher.send_conn_close(self.__auth_id, self.__session_id)
-        self.delete_handler(self.fileno)
+        self.get_handler(self.__creator).tell_local_close()
 
     def tcp_delete(self):
         self.unregister(self.fileno)

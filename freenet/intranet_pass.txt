@@ -2,6 +2,7 @@
 ### 协议详解说明（握手请求采用WebSocket标准握手请求)
 # 附加头部如下:
     X-Auth-Id: 验证服务ID,由客户端自定义
+    X-Msg-Tunnel: 消息隧道,0表示传输连接信息作用,1表示传输消息内容
 
 协议头部如下:
 version:1 byte,目前为1
@@ -21,11 +22,6 @@ reverse:1 byte 保留字段
 session_id:16 bytes,会话ID,由有公网IP的服务器生成
 err_code:4 bytes 故障码,0表示成功,非0表示连接错误
 
-4消息内容格式入校
-session_id:16 bytes
-content:...
 
-5关闭连接如下
-session_id:16 bytes
 
 

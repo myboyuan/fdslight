@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import pywind.lib.reader as reader
-
 import struct, socket, os
 
 VER = 1
@@ -10,13 +9,10 @@ TYPE_PING = 0
 TYPE_PONG = 1
 TYPE_CONN_REQ = 2
 TYPE_CONN_RESP = 3
-TYPE_MSG_CONTENT = 4
-TYPE_CONN_CLOSE = 5
 
 TYPES = (
     TYPE_PING, TYPE_PONG,
     TYPE_CONN_REQ, TYPE_CONN_RESP,
-    TYPE_MSG_CONTENT, TYPE_CONN_CLOSE,
 )
 
 
@@ -96,12 +92,6 @@ class parser(object):
         if self.__type == TYPE_CONN_RESP:
             self.parse_conn_response()
             return
-        if self.__type == TYPE_CONN_CLOSE:
-            self.parse_conn_close()
-            return
-        if self.__type == TYPE_MSG_CONTENT:
-            self.parse_conn_data()
-            return
 
         body_data = self.__reader.read(self.__length)
         self.__results.append(
@@ -160,11 +150,3 @@ class builder(object):
         body_data = struct.pack("!16si", session_id, err_code)
 
         return self.build_data(TYPE_CONN_RESP, body_data)
-
-    def build_conn_close(self, session_id):
-        return self.build_data(TYPE_CONN_CLOSE, session_id)
-
-    def build_conn_data(self, session_id, byte_data):
-        wrap_data = self.build_data(TYPE_MSG_CONTENT, b"".join([session_id, byte_data, ]))
-
-        return wrap_data

@@ -8,6 +8,9 @@ import socket, time, random, os, ssl, sys
 import freenet.lib.logging as logging
 import freenet.lib.intranet_pass as intranet_pass
 import freenet.lib.utils as utils
+import freenet.handlers.LANd_raw as fwd
+
+import base64
 
 
 class client(ssl_handler.ssl_handler):
@@ -23,15 +26,36 @@ class client(ssl_handler.ssl_handler):
     __ssl_ok = None
     __auth_id = None
 
-    def ssl_init(self, address, path, auth_id, is_ipv6=False):
+    __is_msg_tunnel = None
+    __session_id = None
+
+    __forwarding_addr = None
+    __forwarding_is_ipv6 = None
+    __forward_fd = None
+
+    def ssl_init(self, address, path, auth_id, session_id=None, is_msg_tunnel=False, is_ipv6=False):
+        """
+        :param address:
+        :param path:
+        :param auth_id:
+        :param session_id:如果指定是隧道消息,那么session_id不能为空
+        :param is_msg_tunnel:指定这个消息是否是消息隧道,如果为False,表示这个是连接建立信道
+        :param is_ipv6:
+        :return:
+        """
         self.__address = address
         self.__path = path
         self.__http_handshake_ok = False
-        self.__parser = intranet_pass.parser()
-        self.__builder = intranet_pass.builder()
+
+        if not is_msg_tunnel:
+            self.__parser = intranet_pass.parser()
+            self.__builder = intranet_pass.builder()
+
         self.__time = time.time()
         self.__ssl_ok = False
         self.__auth_id = auth_id
+        self.__is_msg_tunnel = is_msg_tunnel
+        self.__session_id = session_id
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -77,6 +101,15 @@ class client(ssl_handler.ssl_handler):
         self.add_evt_write(self.fileno)
         self.set_timeout(self.fileno, 10)
 
+    def set_forwarding_addr(self, address, is_ipv6=False):
+        """设置重定向地址
+        :param address:
+        :param is_ipv6:
+        :return:
+        """
+        self.__forwarding_addr = address
+        self.__forwarding_is_ipv6 = False
+
     def rand_string(self, length=8):
         seq = []
         for i in range(length):
@@ -101,6 +134,13 @@ class client(ssl_handler.ssl_handler):
                     ("Sec-WebSocket-Protocol", "intranet_pass",),
                     ("X-Auth-Id", self.__auth_id,)
                     ]
+
+        if self.__is_msg_tunnel:
+            kv_pairs.append(("X-Msg-Tunnel", 1,))
+            byte_s = base64.b64encode(self.__session_id)
+            kv_pairs.append(("X-Session-Id", byte_s.decode(),))
+        else:
+            kv_pairs.append(("X-Msg-Tunnel", 0,))
 
         if int(self.__address[1]) == 443:
             host = ("Host", self.__address[0],)
@@ -161,6 +201,13 @@ class client(ssl_handler.ssl_handler):
         self.__http_handshake_ok = True
         logging.print_general("https_handshake_ok", self.__address)
 
+        if not self.__is_msg_tunnel: return
+
+        self.__forward_fd = self.create_handler(self.fileno, fwd.client, self.__forwarding_addr,
+                                                is_ipv6=self.__forwarding_is_ipv6)
+        if self.__forward_fd < 1:
+            self.send_conn_fail(self.__session_id)
+
     def get_http_kv_pairs(self, name, kv_pairs):
         for k, v in kv_pairs:
             if name.lower() == k.lower():
@@ -201,6 +248,10 @@ class client(ssl_handler.ssl_handler):
             self.handle_handshake_response()
             return
         rdata = self.reader.read()
+        if self.__is_msg_tunnel:
+            self.send_message_to_handler(self.fileno, self.__forward_fd, rdata)
+            return
+
         self.__parser.input(rdata)
 
         while 1:
@@ -223,13 +274,6 @@ class client(ssl_handler.ssl_handler):
             if _type == intranet_pass.TYPE_CONN_REQ:
                 self.handle_conn_request(*o)
                 continue
-            if _type == intranet_pass.TYPE_CONN_CLOSE:
-                self.handle_conn_close(o)
-                continue
-            if _type == intranet_pass.TYPE_MSG_CONTENT:
-                self.handle_conn_data(*o)
-                continue
-            ''''''
 
     def tcp_writable(self):
         if not self.__ssl_ok: return
@@ -247,7 +291,7 @@ class client(ssl_handler.ssl_handler):
             self.delete_handler(self.fileno)
             return
 
-        if t - self.__time > 20: self.send_ping()
+        if t - self.__time > 20 and not self.__is_msg_tunnel: self.send_ping()
         self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
@@ -258,7 +302,11 @@ class client(ssl_handler.ssl_handler):
         logging.print_general("disconnect,%s" % self.__auth_id, self.__address)
         self.unregister(self.fileno)
         self.close()
-        self.dispatcher.delete_fwd_conn(self.__auth_id)
+
+        if not self.__is_msg_tunnel:
+            self.dispatcher.delete_fwd_conn(self.__auth_id)
+        else:
+            self.delete_handler(self.__forward_fd)
 
     def send_data(self, byte_data):
         """发送数据
@@ -269,10 +317,6 @@ class client(ssl_handler.ssl_handler):
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
 
-    def send_conn_data(self, session_id, byte_data):
-        data = self.__builder.build_conn_data(session_id, byte_data)
-        self.send_data(data)
-
     def send_conn_fail(self, session_id):
         data = self.__builder.build_conn_response(session_id, 1)
         self.send_data(data)
@@ -281,7 +325,11 @@ class client(ssl_handler.ssl_handler):
         data = self.__builder.build_conn_response(session_id, 0)
         self.send_data(data)
 
-    def send_conn_close(self, session_id):
-        data = self.__builder.build_conn_close(session_id)
-        self.dispatcher.session_del(session_id)
+    def tell_local_close(self):
+        """告知本地连接关闭
+        :return:
+        """
+        self.delete_handler(self.fileno)
+
+    def send_message_to_handler(self, src_fd, dst_fd, data):
         self.send_data(data)
