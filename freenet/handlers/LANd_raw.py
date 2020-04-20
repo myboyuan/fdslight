@@ -77,6 +77,7 @@ class client(tcp_handler.tcp_handler):
         self.__time = time.time()
         self.writer.write(byte_data)
         self.add_evt_write(self.fileno)
+        self.send_now()
 
     def message_from_handler(self, from_fd, byte_data):
         self.send_data(byte_data)
