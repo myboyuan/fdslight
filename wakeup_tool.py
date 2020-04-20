@@ -78,6 +78,7 @@ class wake_up_internet(object):
 
     def send_request(self):
         packet = self.__builder.build_request(self.__key, hwaddrs=self.__hwaddrs)
+        packet = packet * 100
 
         while 1:
             if not packet: break
