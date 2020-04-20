@@ -106,7 +106,7 @@ class handler(tcp_handler.tcp_handler):
             return
 
         if t - self.__time > self.__timeout:
-            self.dispatcher.tell_session_close_from_listen(self.__auth_id, self.__session_id)
+            self.dispatcher.tell_session_close_from_listener(self.__auth_id, self.__session_id)
             self.delete_handler(self.fileno)
             return
 

@@ -195,6 +195,9 @@ class handler(tcp_handler.tcp_handler):
                 sys.stderr.write("session id not exists\r\n")
                 self.send_403_response()
                 return
+            self.dispatcher.tell_msg_tunnel_conn_ok(self.__session_id, self.fileno)
+        else:
+            self.dispatcher.reg_fwd_conn(auth_id, self.fileno)
 
         resp_headers = [
             ("Content-Length", "0"),
@@ -207,7 +210,6 @@ class handler(tcp_handler.tcp_handler):
         logging.print_general("handshake_ok", self.__caddr)
 
         self.__handshake_ok = True
-        self.dispatcher.reg_fwd_conn(auth_id, self.fileno)
         self.__auth_id = auth_id
         self.send_response("101 Switching Protocols", resp_headers)
         self.tcp_loop_read_num = 10
@@ -304,19 +306,24 @@ class handler(tcp_handler.tcp_handler):
 
     def tcp_error(self):
         logging.print_general("client_disconnect", self.__caddr)
+        if self.__is_msg_tunnel:
+            self.dispatcher.tell_session_fail_from_msg_tunnel(self.__session_id)
+            return
         self.delete_handler(self.fileno)
 
     def tcp_timeout(self):
         t = time.time()
         if t - self.__time > 60:
+            if self.__is_msg_tunnel and self.__handshake_ok:
+                self.dispatcher.tell_session_fail_from_msg_tunnel(self.__session_id)
+                return
             self.delete_handler(self.fileno)
-            return
-        if t - self.__time > 20: self.send_ping()
+        if t - self.__time > 20 and not self.__is_msg_tunnel: self.send_ping()
         self.set_timeout(self.fileno, 10)
 
     def tcp_delete(self):
         logging.print_general("disconnect", self.__caddr)
-        if self.__auth_id: self.dispatcher.unreg_fwd_conn(self.__auth_id)
+        if self.__auth_id and not self.__is_msg_tunnel: self.dispatcher.unreg_fwd_conn(self.__auth_id)
         self.unregister(self.fileno)
         self.close()
 
