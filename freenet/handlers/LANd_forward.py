@@ -341,12 +341,12 @@ class client(ssl_handler.ssl_handler):
         self.add_evt_write(self.fileno)
         self.writer.write(byte_data)
 
-    def send_message_to_handler(self, src_fd, dst_fd, data):
+    def message_from_handler(self, from_fd, byte_data):
         if not self.__http_handshake_ok:
-            self.__wait_sent.append(data)
+            self.__wait_sent.append(byte_data)
             return
 
-        self.send_data(data)
+        self.send_data(byte_data)
 
     def close_conn(self):
         self.delete_handler(self.fileno)
