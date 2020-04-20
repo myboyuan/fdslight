@@ -219,7 +219,7 @@ class handler(tcp_handler.tcp_handler):
         self.tcp_loop_read_num = 10
 
         # 注意这里如果是消息隧道一定要等待握手协议发送完毕再告知连接成功,连接成功会发送堆积在服务器上的数据
-        if v: self.dispatcher.tell_listener_conn_ok()
+        if v: self.dispatcher.tell_listener_conn_ok(self.__session_id, self.fileno)
 
     def send_response(self, status, headers):
         s = httputils.build_http1x_resp_header(status, headers)

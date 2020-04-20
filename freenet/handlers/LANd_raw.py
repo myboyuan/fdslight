@@ -52,18 +52,18 @@ class client(tcp_handler.tcp_handler):
 
     def tcp_timeout(self):
         if not self.is_conn_ok():
-            self.get_handler(self.__creator).tell_local_close()
+            self.get_handler(self.__creator).tell_forwarding_close()
             return
 
         t = time.time()
         # 限制300s没数据那么就关闭连接
         if t - self.__time > 300:
-            self.get_handler(self.__creator).tell_local_close()
+            self.get_handler(self.__creator).tell_forwarding_close()
             return
         self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
-        self.get_handler(self.__creator).tell_local_close()
+        self.get_handler(self.__creator).tell_forwarding_close()
 
     def tcp_delete(self):
         self.unregister(self.fileno)

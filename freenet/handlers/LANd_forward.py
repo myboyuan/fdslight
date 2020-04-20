@@ -332,7 +332,7 @@ class client(ssl_handler.ssl_handler):
         self.send_data(data)
 
     def close_conn(self):
-        if self.__is_msg_tunnel:
-            self.dispatcher.tell_session_close(self.__session_id)
-        else:
-            self.delete_handler(self.fileno)
+        self.delete_handler(self.fileno)
+
+    def tell_forwarding_close(self):
+        self.delete_handler(self.__forward_fd)
