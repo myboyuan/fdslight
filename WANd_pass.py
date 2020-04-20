@@ -74,6 +74,7 @@ class service(dispatcher.dispatcher):
         accepted_fd, msg_tunnel_fd = self.__session_ids[session_id]
         # 此处可能消息隧道没创建，所以要加判断
         if msg_tunnel_fd < 0: return
+        print(msg_tunnel_fd)
         self.send_message_to_handler(accepted_fd, msg_tunnel_fd, data)
 
     def tell_session_close(self, session_id):
