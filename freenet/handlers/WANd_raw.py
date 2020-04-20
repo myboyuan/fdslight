@@ -88,6 +88,8 @@ class handler(tcp_handler.tcp_handler):
         self.add_evt_read(self.fileno)
         self.set_timeout(self.fileno, 10)
 
+        print("accept socket %d" % self.fileno)
+
         self.tcp_loop_read_num = 200
         logging.print_general("accepted", self.__caddr)
 
@@ -141,4 +143,5 @@ class handler(tcp_handler.tcp_handler):
         self.writer.write(byte_data)
 
     def message_from_handler(self, from_fd, byte_data):
+        print(byte_data)
         self.send_data(byte_data)
