@@ -258,6 +258,7 @@ class handler(tcp_handler.tcp_handler):
 
         if self.__is_msg_tunnel:
             fd, _ = self.dispatcher.session_get(self.__session_id)
+            print(fd, self.fileno)
             if not fd:
                 sys.stderr.write("session id not exists\r\n")
                 self.delete_handler(self.fileno)
