@@ -34,6 +34,8 @@ class client(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, 10)
         self.tcp_loop_read_num = 200
 
+        print("accept socket %s" % self.fileno)
+
         while 1:
             try:
                 self.writer.write(self.__wait_sent.pop(0))

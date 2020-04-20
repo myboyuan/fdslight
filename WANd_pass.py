@@ -85,13 +85,6 @@ class service(dispatcher.dispatcher):
         self.delete_handler(accepted_fd)
         del self.__session_ids[session_id]
 
-    def tell_session_fail_from_msg_tunnel(self, session_id):
-        if session_id not in self.__session_ids: return
-        accepted_fd, msg_tunnel_fd = self.__session_ids[session_id]
-
-        self.delete_handler(accepted_fd)
-        self.delete_handler(msg_tunnel_fd)
-
     def tell_listener_conn_ok(self, session_id, fd):
         if session_id not in self.__session_ids: return
 
@@ -114,10 +107,6 @@ class service(dispatcher.dispatcher):
     def unreg_fwd_conn(self, auth_id):
         if auth_id not in self.__fwd_conns: return
         del self.__fwd_conns[auth_id]
-
-    def session_del(self, session_id):
-        if session_id not in self.__session_ids: return
-        del self.__session_ids[session_id]
 
     def session_get(self, session_id):
         return self.__session_ids.get(session_id, None)

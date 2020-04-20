@@ -258,7 +258,7 @@ class handler(tcp_handler.tcp_handler):
 
         if self.__is_msg_tunnel:
             fd, _ = self.dispatcher.session_get(self.__session_id)
-            print(fd, self.fileno)
+            print(fd)
             if not fd:
                 sys.stderr.write("session id not exists\r\n")
                 self.delete_handler(self.fileno)
@@ -311,7 +311,7 @@ class handler(tcp_handler.tcp_handler):
     def tcp_error(self):
         logging.print_general("client_disconnect", self.__caddr)
         if self.__is_msg_tunnel:
-            self.dispatcher.tell_session_fail_from_msg_tunnel(self.__session_id)
+            self.dispatcher.tell_session_close(self.__session_id)
             return
         self.delete_handler(self.fileno)
 
@@ -319,7 +319,7 @@ class handler(tcp_handler.tcp_handler):
         t = time.time()
         if t - self.__time > 60:
             if self.__is_msg_tunnel and self.__handshake_ok:
-                self.dispatcher.tell_session_fail_from_msg_tunnel(self.__session_id)
+                self.dispatcher.tell_session_close(self.__session_id)
                 return
             self.delete_handler(self.fileno)
         if t - self.__time > 20 and not self.__is_msg_tunnel: self.send_ping()

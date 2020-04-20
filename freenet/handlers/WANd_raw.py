@@ -75,14 +75,15 @@ class handler(tcp_handler.tcp_handler):
         remote_port = remote_info["port"]
         is_ipv6 = remote_info["is_ipv6"]
 
-        self.__session_id = self.dispatcher.send_conn_request(cs.fileno(), auth_id, remote_addr, remote_port,
+        self.set_socket(cs)
+
+        self.__session_id = self.dispatcher.send_conn_request(self.fileno, auth_id, remote_addr, remote_port,
                                                               is_ipv6=is_ipv6)
         if not self.__session_id:
             sys.stderr.write("send conn request fail from auth_id:%s\r\n" % auth_id)
-            cs.close()
+            self.close()
             return -1
 
-        self.set_socket(cs)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         self.set_timeout(self.fileno, 10)
@@ -125,9 +126,6 @@ class handler(tcp_handler.tcp_handler):
         self.unregister(self.fileno)
         self.close()
 
-    def tell_conn_fail(self):
-        self.delete_handler(self.fileno)
-
     def tell_conn_ok(self):
         self.__conn_ok = True
         while 1:
@@ -143,5 +141,4 @@ class handler(tcp_handler.tcp_handler):
         self.writer.write(byte_data)
 
     def message_from_handler(self, from_fd, byte_data):
-        print(byte_data)
         self.send_data(byte_data)
