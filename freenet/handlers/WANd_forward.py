@@ -73,6 +73,8 @@ class handler(tcp_handler.tcp_handler):
 
         self.__time = time.time()
 
+        cs.setsockopt(socket.IPPROTO_IP, socket.TCP_NODELAY, 1)
+
         self.set_socket(cs)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
