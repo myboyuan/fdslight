@@ -225,13 +225,6 @@ class handler(tcp_handler.tcp_handler):
 
         # 注意这里如果是消息隧道一定要等待握手协议发送完毕再告知连接成功,连接成功会发送堆积在服务器上的数据
         self.dispatcher.tell_listener_conn_ok(self.__session_id, self.fileno)
-        while 1:
-            try:
-                byte_data = self.__wait_sent.pop(0)
-            except IndexError:
-                break
-            print(byte_data)
-            self.send_data(byte_data)
 
     def send_response(self, status, headers):
         s = httputils.build_http1x_resp_header(status, headers)
@@ -347,7 +340,4 @@ class handler(tcp_handler.tcp_handler):
         self.send_data(byte_data)
 
     def message_from_handler(self, from_fd, byte_data):
-        if not self.__handshake_ok:
-            self.__wait_sent.append(byte_data)
-            return
         self.send_data(byte_data)
