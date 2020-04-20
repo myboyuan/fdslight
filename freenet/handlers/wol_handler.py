@@ -68,7 +68,7 @@ class handler(tcp_handler.tcp_handler):
         self.__parser = wol.parser()
         self.__time = time.time()
 
-        print("hello---------")
+        print("----------")
 
         self.set_socket(cs)
         self.register(self.fileno)
@@ -89,6 +89,7 @@ class handler(tcp_handler.tcp_handler):
             cls.release()
 
         data = self.__builder.build_response(is_error=is_error)
+        print(data)
         self.writer.write(data)
         self.add_evt_write(self.fileno)
 
@@ -110,12 +111,14 @@ class handler(tcp_handler.tcp_handler):
                 self.wake_up(*o)
 
     def tcp_writable(self):
-        if self.writer.is_empty():
-            print("---h")
-            self.remove_evt_write(self.fileno)
+        if self.writer.is_empty(): self.remove_evt_write(self.fileno)
 
     def tcp_timeout(self):
-        self.delete_handler(self.fileno)
+        t = time.time()
+        if t - self.__time > 30:
+            self.delete_handler(self.fileno)
+            return
+        self.set_timeout(self.fileno, 10)
 
     def tcp_delete(self):
         self.unregister(self.fileno)
