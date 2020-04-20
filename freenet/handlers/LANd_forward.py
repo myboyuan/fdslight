@@ -337,6 +337,7 @@ class client(ssl_handler.ssl_handler):
         self.send_data(data)
 
     def close_conn(self):
+        print("------------------")
         if self.__is_msg_tunnel:
             self.dispatcher.tell_session_close(self.__session_id)
         else:
