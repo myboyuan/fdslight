@@ -156,8 +156,6 @@ class client(ssl_handler.ssl_handler):
         kv_pairs.append(host)
         kv_pairs.append(origin)
 
-        if self.__is_msg_tunnel:
-            print("----")
 
         s = httputils.build_http1x_req_header("GET", self.__path, kv_pairs)
         self.writer.write(s.encode("iso-8859-1"))

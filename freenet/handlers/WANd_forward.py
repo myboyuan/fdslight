@@ -168,15 +168,19 @@ class handler(tcp_handler.tcp_handler):
             self.send_403_response()
             return
 
+        is_msg_tunnel = self.get_kv_value(kv, "x-msg-tunnel")
+        if not is_msg_tunnel:
+            sys.stderr.write("not found X-Msg-Tunnel value\r\n")
+            self.send_403_response()
+            return
+
         if not self.dispatcher.auth_id_exists(auth_id):
             if self.dispatcher.debug:
                 sys.stderr.write("not found %s service\r\n" % auth_id)
             self.send_403_response()
             return
 
-        is_msg_tunnel = self.get_kv_value(kv, "x-msg-tunnel")
-        if not is_msg_tunnel:
-            sys.stderr.write("not found X-Msg-Tunnel value\r\n")
+        if self.dispatcher.auth_id_exists(auth_id) and not is_msg_tunnel:
             self.send_403_response()
             return
 
