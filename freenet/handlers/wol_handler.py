@@ -108,7 +108,8 @@ class handler(tcp_handler.tcp_handler):
                 self.wake_up(*o)
 
     def tcp_writable(self):
-        if self.writer.is_empty(): self.remove_evt_write(self.fileno)
+        if self.writer.is_empty():
+            self.delete_handler(self.fileno)
 
     def tcp_timeout(self):
         t = time.time()
