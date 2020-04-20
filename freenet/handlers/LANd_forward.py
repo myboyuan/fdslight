@@ -207,10 +207,13 @@ class client(ssl_handler.ssl_handler):
 
         if not self.__is_msg_tunnel: return
 
+        logging.print_general("https_handshake_ok,msg_tunnel", self.__address)
         self.__forward_fd = self.create_handler(self.fileno, fwd.client, self.__forwarding_addr,
                                                 is_ipv6=self.__forwarding_is_ipv6)
         if self.__forward_fd < 1:
             self.send_conn_fail(self.__session_id)
+        else:
+            self.send_conn_ok(self.__session_id)
 
     def get_http_kv_pairs(self, name, kv_pairs):
         for k, v in kv_pairs:
