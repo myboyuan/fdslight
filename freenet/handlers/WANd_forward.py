@@ -333,3 +333,6 @@ class handler(tcp_handler.tcp_handler):
     def send_conn_request(self, session_id, remote_addr, remote_port, is_ipv6=False):
         byte_data = self.__builder.build_conn_request(session_id, remote_addr, remote_port, is_ipv6=is_ipv6)
         self.send_data(byte_data)
+
+    def message_from_handler(self, from_fd, byte_data):
+        self.send_data(byte_data)
