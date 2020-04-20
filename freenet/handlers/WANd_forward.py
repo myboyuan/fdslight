@@ -58,6 +58,8 @@ class handler(tcp_handler.tcp_handler):
     __is_msg_tunnel = None
     __session_id = None
 
+    __wait_sent = None
+
     def init_func(self, creator_fd, cs, caddr):
         self.__is_msg_tunnel = False
         self.__handshake_ok = False
@@ -66,6 +68,8 @@ class handler(tcp_handler.tcp_handler):
 
         self.__parser = intranet_pass.parser()
         self.__builder = intranet_pass.builder()
+
+        self.__wait_sent = []
 
         self.__time = time.time()
 
@@ -199,7 +203,6 @@ class handler(tcp_handler.tcp_handler):
                 sys.stderr.write("session id not exists\r\n")
                 self.send_403_response()
                 return
-            self.dispatcher.tell_listener_conn_ok(self.__session_id, self.fileno)
         else:
             self.dispatcher.reg_fwd_conn(auth_id, self.fileno)
 
@@ -218,8 +221,16 @@ class handler(tcp_handler.tcp_handler):
         self.send_response("101 Switching Protocols", resp_headers)
         self.tcp_loop_read_num = 10
 
+        if not v: return
+
         # 注意这里如果是消息隧道一定要等待握手协议发送完毕再告知连接成功,连接成功会发送堆积在服务器上的数据
-        if v: self.dispatcher.tell_listener_conn_ok(self.__session_id, self.fileno)
+        self.dispatcher.tell_listener_conn_ok(self.__session_id, self.fileno)
+        while 1:
+            try:
+                byte_data = self.__wait_sent.pop(0)
+            except IndexError:
+                break
+            self.send_data(byte_data)
 
     def send_response(self, status, headers):
         s = httputils.build_http1x_resp_header(status, headers)
@@ -335,5 +346,7 @@ class handler(tcp_handler.tcp_handler):
         self.send_data(byte_data)
 
     def message_from_handler(self, from_fd, byte_data):
-        print(byte_data)
+        if not self.__handshake_ok:
+            self.__wait_sent.append(byte_data)
+            return
         self.send_data(byte_data)
