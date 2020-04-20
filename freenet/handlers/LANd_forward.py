@@ -156,7 +156,6 @@ class client(ssl_handler.ssl_handler):
         kv_pairs.append(host)
         kv_pairs.append(origin)
 
-
         s = httputils.build_http1x_req_header("GET", self.__path, kv_pairs)
         self.writer.write(s.encode("iso-8859-1"))
         self.add_evt_write(self.fileno)
@@ -237,7 +236,8 @@ class client(ssl_handler.ssl_handler):
         self.send_data(ping)
 
     def handle_conn_request(self, session_id, remote_addr, remote_port, is_ipv6):
-        self.dispatcher.handle_conn_request(self.__path, self.__auth_id, session_id, remote_addr, remote_port, is_ipv6)
+        self.dispatcher.handle_conn_request(self.__address, self.__path, self.__auth_id, session_id, remote_addr,
+                                            remote_port, is_ipv6)
 
     def handle_conn_close(self, session_id):
         fd = self.dispatcher.session_get(session_id)
@@ -337,7 +337,6 @@ class client(ssl_handler.ssl_handler):
         self.send_data(data)
 
     def close_conn(self):
-        print("------------------")
         if self.__is_msg_tunnel:
             self.dispatcher.tell_session_close(self.__session_id)
         else:
