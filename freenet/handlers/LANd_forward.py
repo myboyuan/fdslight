@@ -323,7 +323,6 @@ class client(ssl_handler.ssl_handler):
 
         if self.__forward_fd > 0:
             self.delete_handler(self.__forward_fd)
-            raise SystemError
 
     def send_data(self, byte_data):
         """发送数据
@@ -339,7 +338,7 @@ class client(ssl_handler.ssl_handler):
         if not self.__http_handshake_ok:
             self.__wait_sent.append(byte_data)
             return
-
+        print(len(byte_data))
         self.send_data(byte_data)
 
     def close_conn(self):
