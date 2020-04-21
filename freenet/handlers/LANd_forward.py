@@ -96,7 +96,6 @@ class client(tcp_handler.tcp_handler):
             self.send_handshake_request()
             return
 
-        logging.print_general("https_handshake_ok,msg_tunnel", self.__address)
         self.__forward_fd = self.create_handler(self.fileno, fwd.client, self.__forwarding_addr,
                                                 is_ipv6=self.__forwarding_is_ipv6)
         if self.__forward_fd < 0:
