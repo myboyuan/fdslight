@@ -20,16 +20,13 @@ import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.handlers.tunnels as tunnels
 import freenet.lib.logging as logging
-import freenet.lib.fn_utils as fn_utils
+import freenet.lib.port_map as port_map
 
 
 class _fdslight_server(dispatcher.dispatcher):
     __configs = None
     __debug = None
     __mbuf = None
-
-    __nat4 = None
-    __nat6 = None
 
     __udp6_fileno = -1
     __tcp6_fileno = -1
@@ -49,6 +46,9 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __DEVNAME = "portmap"
 
+    __port_mapv4 = None
+    __port_mapv6 = None
+
     @property
     def http_configs(self):
         configs = self.__configs.get("tunnel_over_http", {})
@@ -62,6 +62,9 @@ class _fdslight_server(dispatcher.dispatcher):
 
         self.__configs = configs
         self.__debug = debug
+
+        self.__port_mapv4 = port_map.port_map(is_ipv6=False)
+        self.__port_mapv6 = port_map.port_map(is_ipv6=True)
 
         signal.signal(signal.SIGUSR1, self.__sig_handle)
 
@@ -100,6 +103,7 @@ class _fdslight_server(dispatcher.dispatcher):
         listen6 = (listen_ip6, listen_port)
 
         over_http = bool(int(conn_config["tunnel_over_http"]))
+        self.__mbuf = utils.mbuf()
 
         if enable_ipv6:
             self.__tcp6_fileno = self.create_handler(-1, tunnels.tcp_tunnel, listen6, self.__tcp_crypto,
@@ -107,7 +111,6 @@ class _fdslight_server(dispatcher.dispatcher):
                                                      over_http=over_http)
             self.__udp6_fileno = self.create_handler(-1, tunnels.udp_tunnel, listen6, self.__udp_crypto,
                                                      self.__crypto_configs, is_ipv6=True)
-
         self.__tcp_fileno = self.create_handler(-1, tunnels.tcp_tunnel, listen, self.__tcp_crypto,
                                                 self.__crypto_configs, conn_timeout=conn_timeout, is_ipv6=False,
                                                 over_http=over_http)
@@ -115,7 +118,6 @@ class _fdslight_server(dispatcher.dispatcher):
                                                 self.__crypto_configs, is_ipv6=False)
 
         self.__tundev_fileno = self.create_handler(-1, tundev.tundevs, self.__DEVNAME)
-        self.__mbuf = utils.mbuf()
 
         if not debug:
             sys.stdout = open(LOG_FILE, "a+")

@@ -22,7 +22,7 @@ def ifaddr_to_bytes(s):
     for v in seq:
         v = "0x%s" % v
         x = int(v, 16)
-        results.append(struct.pack("B",x))
+        results.append(struct.pack("B", x))
 
     return b"".join(results)
 
@@ -130,3 +130,16 @@ def is_subnet(ip, prefix, subnet, is_ipv6=False):
     return calc_subnet(ip, prefix, is_ipv6=is_ipv6) == subnet
 
 
+def is_port_number(n):
+    """检查是否是端口号
+    :param n:
+    :return:
+    """
+    try:
+        v = int(n)
+    except ValueError:
+        return False
+
+    if v > 0xffff or v < 1: return False
+
+    return True
