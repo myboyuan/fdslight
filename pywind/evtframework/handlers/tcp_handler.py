@@ -127,23 +127,14 @@ class tcp_handler(handler.handler):
         if self.writer.size() == 0:
             self.tcp_writable()
         try:
-            b = 0
-            e = b + 1024
+            sent_size = self.socket.send(sent_data)
 
-            while 1:
-                packet = sent_data[b:e]
-                if not packet: break
-                sent_size = self.socket.send(packet)
-
-                if 1024 > sent_size:
-                    self.writer.write(packet[sent_size:])
-                    self.writer.write(sent_data[e:])
-                    break
-                if self.__delete_this_no_sent_data and self.writer.size() == 0:
-                    self.delete_handler(self.fileno)
-                    break
-                b = e
-                e = e + 1024
+            if size > sent_size:
+                self.writer.write(sent_data[sent_size:])
+                return
+            if self.__delete_this_no_sent_data and self.writer.size() == 0:
+                self.delete_handler(self.fileno)
+                return
             self.tcp_writable()
         except BlockingIOError:
             return
