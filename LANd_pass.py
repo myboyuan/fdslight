@@ -17,7 +17,6 @@ import pywind.lib.configfile as cfg
 import freenet.lib.proc as proc
 import freenet.lib.cfg_check as cfg_check
 import freenet.handlers.LANd_forward as lan_fwd
-import freenet.handlers.LANd_raw as lan_raw
 import freenet.handlers.wol_handler as wol_handler
 import freenet.lib.logging as logging
 
@@ -129,36 +128,9 @@ class service(dispatcher.dispatcher):
     def debug(self):
         return self.__debug
 
-    def session_del(self, session_id):
-        if session_id not in self.__sessions: return
-        del self.__sessions[session_id]
-
     def delete_fwd_conn(self, auth_id):
         if auth_id not in self.__conns: return
         del self.__conns[auth_id]
-
-    def session_get(self, session_id):
-        return self.__sessions.get(session_id, None)
-
-    def send_conn_data_to_local(self, session_id, byte_data):
-        if session_id not in self.__sessions: return
-        fd = self.__sessions[session_id]
-        self.send_message_to_handler(-1, fd, byte_data)
-
-    def send_conn_data_to_server(self, auth_id, session_id, byte_data):
-        if auth_id not in self.__conns: return
-        fd = self.__conns[auth_id]
-        self.get_handler(fd).send_conn_data(session_id, byte_data)
-
-    def send_conn_fail(self, auth_id, session_id):
-        if auth_id not in self.__conns: return
-        fd = self.__conns[auth_id]
-        self.get_handler(fd).send_conn_fail(session_id)
-
-    def send_conn_ok(self, auth_id, session_id):
-        if auth_id not in self.__conns: return
-        fd = self.__conns[auth_id]
-        self.get_handler(fd).send_conn_ok(session_id)
 
     def handle_conn_request(self, address, path, auth_id, session_id, remote_addr, remote_port, is_ipv6):
         if session_id in self.__sessions:
