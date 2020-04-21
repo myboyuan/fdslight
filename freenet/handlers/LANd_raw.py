@@ -63,6 +63,7 @@ class client(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
+        print("----------------")
         self.get_handler(self.__creator).tell_forwarding_close()
 
     def tcp_delete(self):
