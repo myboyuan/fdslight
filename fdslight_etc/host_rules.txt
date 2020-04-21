@@ -241,8 +241,8 @@ security.debian.org:1
 
 ### 游戏相关
 *.steamcommunity.com:1
-*.nintendo.net:0
-*.nintendo.com:0
+*.nintendo.net:1
+*.nintendo.com:1
 cdn.treasuredata.com:1
 
 ### 开发相关

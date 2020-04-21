@@ -15,14 +15,10 @@ import pywind.evtframework.evt_dispatcher as dispatcher
 import pywind.lib.configfile as configfile
 
 import freenet.lib.proc as proc
-import freenet.handlers.dns_proxy as dns_proxy
 import freenet.handlers.tundev as tundev
 import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
-import freenet.lib.nat as nat
 import freenet.handlers.tunnels as tunnels
-import freenet.lib.ip6dgram as ip6dgram
-import freenet.handlers.traffic_pass as traffic_pass
 import freenet.lib.logging as logging
 import freenet.lib.fn_utils as fn_utils
 
@@ -30,8 +26,6 @@ import freenet.lib.fn_utils as fn_utils
 class _fdslight_server(dispatcher.dispatcher):
     __configs = None
     __debug = None
-
-    __access = None
     __mbuf = None
 
     __nat4 = None
@@ -53,7 +47,7 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __tundev_fileno = -1
 
-    __DEVNAME = "fdslight_port_map"
+    __DEVNAME = "portmap"
 
     @property
     def http_configs(self):
@@ -73,12 +67,10 @@ class _fdslight_server(dispatcher.dispatcher):
 
         conn_config = self.__configs["connection"]
 
-        crypto_mod_name = conn_config["crypto_module"]
-
-        tcp_crypto = "freenet.lib.crypto.nonay.noany_tcp"
+        tcp_crypto = "freenet.lib.crypto.noany.noany_tcp"
         udp_crypto = "freenet.lib.crypto.noany.noany_udp"
 
-        crypto_configfile = "%s/fdslight_etc/%s" % (BASE_DIR, conn_config["crypto_configfile"])
+        crypto_configfile = "%s/fdslight_etc/noany.json" % BASE_DIR
 
         try:
             self.__tcp_crypto = importlib.import_module(tcp_crypto)
@@ -134,6 +126,23 @@ class _fdslight_server(dispatcher.dispatcher):
 
     def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
         size = len(message)
+
+    def __handle_msg_from_tun_for_ipv4(self):
+        pass
+
+    def __handle_msg_from_tun_for_ipv6(self):
+        pass
+
+    def send_msg_to_tunnel_from_tun(self, packet):
+        self.__mbuf.copy2buf(packet)
+        ver = self.__mbuf.ip_version()
+
+        if ver not in (4, 6,): return
+
+        if ver == 4:
+            self.__handle_msg_from_tun_for_ipv4()
+        else:
+            self.__handle_msg_from_tun_for_ipv6()
 
     def __sig_handle(self, signum, frame):
         pass
