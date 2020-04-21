@@ -126,7 +126,6 @@ class tcp_handler(handler.handler):
         sent_data = self.writer._getvalue()
         if self.writer.size() == 0:
             self.tcp_writable()
-
         try:
             sent_size = self.socket.send(sent_data)
 
