@@ -28,7 +28,6 @@ class client(tcp_handler.tcp_handler):
         return self.fileno
 
     def connect_ok(self):
-        self.dispatcher.send_conn_ok(self.__auth_id, self.__session_id)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         self.set_timeout(self.fileno, 10)
