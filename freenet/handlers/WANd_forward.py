@@ -14,10 +14,6 @@ class listener(tcp_handler.tcp_handler):
     __address = None
 
     def init_func(self, creator_fd, address, is_ipv6=False):
-        if os.path.isfile(address):
-            sys.stderr.write("the %s is exists\r\n" % address)
-            return -1
-
         if is_ipv6:
             fa = socket.AF_INET6
         else:
