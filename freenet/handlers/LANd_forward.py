@@ -353,7 +353,9 @@ class client(ssl_handler.ssl_handler):
         self.send_data(byte_data)
 
     def close_conn(self):
+        print("szzzzzz")
         self.delete_handler(self.fileno)
 
     def tell_forwarding_close(self):
+        print("uuuuuuu")
         self.delete_handler(self.fileno)
