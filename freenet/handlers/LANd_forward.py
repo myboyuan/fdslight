@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-import pywind.evtframework.handlers.ssl_handler as ssl_handler
+import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import pywind.web.lib.httputils as httputils
 import pywind.web.lib.websocket as wslib
 
-import socket, time, random, os, ssl, sys
+import socket, time, random, sys
 import freenet.lib.logging as logging
 import freenet.lib.intranet_pass as intranet_pass
 import freenet.lib.utils as utils
@@ -13,7 +13,7 @@ import freenet.handlers.LANd_raw as fwd
 import base64
 
 
-class client(ssl_handler.ssl_handler):
+class client(tcp_handler.tcp_handler):
     """把任意数据包转换成私有协议
     """
     __address = None
@@ -34,8 +34,9 @@ class client(ssl_handler.ssl_handler):
     __forward_fd = None
     __wait_sent = None
 
-    def ssl_init(self, address, path, auth_id, session_id=None, is_msg_tunnel=False, is_ipv6=False):
+    def init_func(self, creator_fd, address, path, auth_id, session_id=None, is_msg_tunnel=False, is_ipv6=False):
         """
+        :param creator_fd
         :param address:
         :param path:
         :param auth_id:
@@ -44,13 +45,14 @@ class client(ssl_handler.ssl_handler):
         :param is_ipv6:
         :return:
         """
+
         self.__address = address
         self.__path = path
         self.__http_handshake_ok = False
 
         if not is_msg_tunnel:
             self.__parser = intranet_pass.parser()
-            self.__builder = intranet_pass.builder()
+        self.__builder = intranet_pass.builder()
 
         self.__time = time.time()
         self.__ssl_ok = False
@@ -71,19 +73,6 @@ class client(ssl_handler.ssl_handler):
         if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
 
         s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-        context.set_alpn_protocols(["http/1.1"])
-
-        kwargs = {}
-        kwargs["do_handshake_on_connect"] = False
-
-        # 检查如果为域名则开启SNI
-        if not utils.is_ipv6_address(address[0]) or not utils.is_ipv4_address(address[0]):
-            kwargs["server_hostname"] = address[0]
-
-        s = context.wrap_socket(s, **kwargs)
-
         logging.print_general("connecting,%s" % auth_id, self.__address)
         self.set_socket(s)
         try:
@@ -93,9 +82,15 @@ class client(ssl_handler.ssl_handler):
 
         return self.fileno
 
-    def ssl_handshake_ok(self):
-        self.__ssl_ok = True
-        logging.print_general("TLS handshake OK,%s" % self.__auth_id, self.__address)
+    def connect_ok(self):
+        logging.print_general("connect_ok,%s" % self.__auth_id, self.__address)
+
+        if self.__is_msg_tunnel:
+            logging.print_general("connect_ok,msg_tunnel,%s" % self.__auth_id, self.__address)
+
+        self.tcp_loop_read_num = 200
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
 
         if not self.__is_msg_tunnel:
             self.send_handshake_request()
@@ -110,17 +105,6 @@ class client(ssl_handler.ssl_handler):
 
         self.send_handshake_request()
 
-    def connect_ok(self):
-        logging.print_general("connect_ok,%s" % self.__auth_id, self.__address)
-
-        if self.__is_msg_tunnel:
-            logging.print_general("connect_ok,msg_tunnel,%s" % self.__auth_id, self.__address)
-
-        self.tcp_loop_read_num = 200
-        self.register(self.fileno)
-        self.add_evt_read(self.fileno)
-        # 注意这里要加入写事件,让TLS能够握手成功
-        self.add_evt_write(self.fileno)
         self.set_timeout(self.fileno, 10)
 
     def set_forwarding_addr(self, address, is_ipv6=False):
@@ -130,7 +114,7 @@ class client(ssl_handler.ssl_handler):
         :return:
         """
         self.__forwarding_addr = address
-        self.__forwarding_is_ipv6 = False
+        self.__forwarding_is_ipv6 = is_ipv6
 
     def rand_string(self, length=8):
         seq = []
