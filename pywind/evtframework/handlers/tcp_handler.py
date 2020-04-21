@@ -136,7 +136,8 @@ class tcp_handler(handler.handler):
                 sent_size = self.socket.send(packet)
 
                 if 2048 > sent_size:
-                    self.writer.write(sent_data[sent_size:])
+                    self.writer.write(packet[sent_size:])
+                    self.writer.write(sent_data[e:])
                     break
                 if self.__delete_this_no_sent_data and self.writer.size() == 0:
                     self.delete_handler(self.fileno)
