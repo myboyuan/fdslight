@@ -307,7 +307,6 @@ class client(tcp_handler.tcp_handler):
 
         if self.__forward_fd > 0:
             self.delete_handler(self.__forward_fd)
-            raise SystemError
 
     def send_data(self, byte_data):
         """发送数据
