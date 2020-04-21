@@ -322,7 +322,6 @@ class client(ssl_handler.ssl_handler):
             return
 
         if self.__forward_fd > 0:
-            print("----")
             self.delete_handler(self.__forward_fd)
 
     def send_data(self, byte_data):
@@ -346,4 +345,5 @@ class client(ssl_handler.ssl_handler):
         self.delete_handler(self.fileno)
 
     def tell_forwarding_close(self):
+        print("-----------")
         self.delete_handler(self.fileno)
