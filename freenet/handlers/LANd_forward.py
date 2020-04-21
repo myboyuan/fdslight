@@ -322,6 +322,7 @@ class client(ssl_handler.ssl_handler):
             return
 
         if self.__forward_fd > 0:
+            print(self.writer.size())
             raise ValueError
             #self.delete_handler(self.__forward_fd)
 
