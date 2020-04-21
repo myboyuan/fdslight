@@ -255,6 +255,16 @@ class client(ssl_handler.ssl_handler):
         self.dispatcher.handle_conn_request(self.__address, self.__path, self.__auth_id, session_id, remote_addr,
                                             remote_port, is_ipv6)
 
+    def handle_conn_close(self, session_id):
+        fd = self.dispatcher.session_get(session_id)
+        if not fd: return
+        logging.print_general("close %s" % self.__auth_id, self.__address)
+        self.dispatcher.session_del(session_id)
+        self.delete_handler(fd)
+
+    def handle_conn_data(self, session_id, data):
+        self.dispatcher.send_conn_data_to_local(session_id, data)
+
     def tcp_readable(self):
         self.__time = time.time()
 
