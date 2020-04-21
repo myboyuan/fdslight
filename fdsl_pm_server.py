@@ -55,8 +55,6 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __DEVNAME = "fdslight_port_map"
 
-    __IP6_ROUTER_TIMEOUT = 900
-
     @property
     def http_configs(self):
         configs = self.__configs.get("tunnel_over_http", {})
@@ -71,17 +69,9 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__configs = configs
         self.__debug = debug
 
-        signal.signal(signal.SIGINT, self.__exit)
-        signal.signal(signal.SIGUSR1, self.__handle_user_change_signal)
+        signal.signal(signal.SIGUSR1, self.__sig_handle)
 
         conn_config = self.__configs["connection"]
-        mod_name = "freenet.access.%s" % conn_config["access_module"]
-
-        try:
-            access = importlib.import_module(mod_name)
-        except ImportError:
-            print("cannot found access module")
-            sys.exit(-1)
 
         crypto_mod_name = conn_config["crypto_module"]
 
@@ -108,9 +98,7 @@ class _fdslight_server(dispatcher.dispatcher):
             sys.exit(-1)
 
         enable_ipv6 = bool(int(conn_config["enable_ipv6"]))
-
-        listen_port = int(conn_config["listen_port"])
-
+        listen_port = int(conn_config["port"])
         conn_timeout = int(conn_config["conn_timeout"])
 
         listen_ip = conn_config["listen_ip"]
@@ -142,66 +130,18 @@ class _fdslight_server(dispatcher.dispatcher):
             sys.stderr = open(ERR_FILE, "a+")
 
     def myloop(self):
-        return
+        pass
 
     def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
         size = len(message)
-        pass
 
-    def __handle_ipv4data_from_tunnel(self, session_id):
-        self.__mbuf.offset = 9
-        protocol = self.__mbuf.get_part(1)
-
-        hdrlen = self.__get_ip4_hdrlen()
-        if hdrlen + 8 < 28: return False
-
-        # 检查IP数据报长度是否合法
-        self.__mbuf.offset = 2
-        payload_length = utils.bytes2number(self.__mbuf.get_part(2))
-        if payload_length != self.__mbuf.payload_size: return False
-
-        if protocol not in self.__support_ip4_protocols: return False
-
-        # 对没有启用NAT内核模块UDP和UDPLite进行特殊处理,以支持内网穿透
-        if (protocol == 17 or protocol == 136) and not self.__enable_nat_module:
-            is_udplite = False
-            if protocol == 136: is_udplite = True
-            self.__handle_ipv4_dgram_from_tunnel(session_id, is_udplite=is_udplite)
-            return True
-        self.__mbuf.offset = 0
-
-        rs = self.__nat4.get_ippkt2sLan_from_cLan(session_id, self.__mbuf)
-        if not rs:
-            logging.print_error("cannot modify source address from client packet for ipv4")
-            return
-        self.__mbuf.offset = 0
-        self.get_handler(self.__tundev_fileno).handle_msg_from_tunnel(self.__mbuf.get_data())
-        return True
-
-    def send_msg_to_tunnel_from_tun(self, message):
-        if len(message) > utils.MBUF_AREA_SIZE: return
-
-        self.__mbuf.copy2buf(message)
-
-        ip_ver = self.__mbuf.ip_version()
-
-        if ip_ver == 6 and not self.__enable_nat6: return
-        if ip_ver == 4:
-            ok, session_id = self.__nat4.get_ippkt2cLan_from_sLan(self.__mbuf)
-        else:
-            ok, session_id = self.__nat6.get_ippkt2cLan_from_sLan(self.__mbuf)
-
-        if not ok: return
-
-        self.__mbuf.offset = 0
-
-    def __exit(self, signum, frame):
+    def __sig_handle(self, signum, frame):
         pass
 
 
 def __start_service(debug, enable_nat_module):
     if not debug and os.path.isfile(PID_FILE):
-        print("the fdsl_server process exists")
+        print("the fdsl_pm_server process exists")
         return
 
     if not debug:
@@ -215,7 +155,7 @@ def __start_service(debug, enable_nat_module):
         if pid != 0: sys.exit(0)
         proc.write_pid(PID_FILE)
 
-    configs = configfile.ini_parse_from_file("%s/fdslight_etc/fn_server.ini" % BASE_DIR)
+    configs = configfile.ini_parse_from_file("%s/fdslight_etc/fn_pm_server.ini" % BASE_DIR)
     cls = _fdslight_server()
 
     if debug:
@@ -239,11 +179,11 @@ def __stop_service():
     os.kill(pid, signal.SIGINT)
 
 
-def __update_user_configs():
+def __update_configs():
     pid = proc.get_pid(PID_FILE)
 
     if pid < 0:
-        print("cannot found fdslight server process")
+        print("cannot found fdslight port map server process")
         return
 
     os.kill(pid, signal.SIGUSR1)
@@ -252,8 +192,7 @@ def __update_user_configs():
 def main():
     help_doc = """
     -d      debug | start | stop    debug,start or stop application
-    --enable_nat_module             enable kernel cone nat module
-    -u      user_configs            update configs           
+    -u      rules                   update rules         
     """
     try:
         opts, args = getopt.getopt(sys.argv[1:], "u:m:d:", ["enable_nat_module"])
@@ -279,7 +218,7 @@ def main():
         return
 
     if u:
-        __update_user_configs()
+        __update_configs()
         return
 
     if not d:
