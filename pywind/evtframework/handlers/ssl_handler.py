@@ -89,7 +89,8 @@ class ssl_handler(tcp_handler.tcp_handler):
         except ssl.SSLEOFError:
             self.delete_handler(self.fileno)
         except ssl.SSLError:
-            self.delete_handler(self.fileno)
+            pass
+            # self.delete_handler(self.fileno)
 
     def ssl_handshake_ok(self):
         """握手成功后的处理,重写这个方法
