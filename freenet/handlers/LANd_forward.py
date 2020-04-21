@@ -96,6 +96,7 @@ class client(tcp_handler.tcp_handler):
             self.send_handshake_request()
             return
 
+        logging.print_general("http_handshake_ok,msg_tunnel", self.__address)
         self.__forward_fd = self.create_handler(self.fileno, fwd.client, self.__forwarding_addr,
                                                 is_ipv6=self.__forwarding_is_ipv6)
         if self.__forward_fd < 0:
@@ -149,10 +150,10 @@ class client(tcp_handler.tcp_handler):
 
         if int(self.__address[1]) == 443:
             host = ("Host", self.__address[0],)
-            origin = ("Origin", "https://%s" % self.__address[0])
+            origin = ("Origin", "http://%s" % self.__address[0])
         else:
             host = ("Host", "%s:%s" % self.__address,)
-            origin = ("Origin", "https://%s:%s" % self.__address,)
+            origin = ("Origin", "http://%s:%s" % self.__address,)
 
         kv_pairs.append(host)
         kv_pairs.append(origin)
@@ -193,18 +194,18 @@ class client(tcp_handler.tcp_handler):
         version, status = resp
 
         if status.find("101") != 0:
-            logging.print_general("https_handshake_error:%s" % status, self.__address)
+            logging.print_general("http_handshake_error:%s" % status, self.__address)
             self.close_conn()
             return
 
         accept_key = self.get_http_kv_pairs("sec-websocket-accept", kv_pairs)
         if wslib.gen_handshake_key(self.__http_handshake_key) != accept_key:
-            logging.print_general("https_handshake_error:wrong websocket response key", self.__address)
+            logging.print_general("http_handshake_error:wrong websocket response key", self.__address)
             self.close_conn()
             return
 
         self.__http_handshake_ok = True
-        logging.print_general("https_handshake_ok", self.__address)
+        logging.print_general("http_handshake_ok", self.__address)
 
         if not self.__is_msg_tunnel: return
         while 1:
@@ -306,6 +307,7 @@ class client(tcp_handler.tcp_handler):
 
         if self.__forward_fd > 0:
             self.delete_handler(self.__forward_fd)
+            raise SystemError
 
     def send_data(self, byte_data):
         """发送数据
