@@ -11,6 +11,7 @@ PID_PATH = "/tmp/WANd.pid"
 LOG_FILE = "/tmp/WANd.log"
 ERR_FILE = "/tmp/WANd_err.log"
 CFG_FILE = "%s/fdslight_etc/WANd.ini" % BASE_DIR
+SOCK_FILE = "/tmp/WANd.sock"
 
 import pywind.evtframework.evt_dispatcher as dispatcher
 import pywind.lib.configfile as cfg
@@ -48,7 +49,7 @@ class service(dispatcher.dispatcher):
         return session_id
 
     def create_http(self):
-        self.__http_upgrade_fd = self.create_handler(-1, wan_fwd.listener, ("0.0.0.0", 4444,))
+        self.__http_upgrade_fd = self.create_handler(-1, wan_fwd.listener, SOCK_FILE)
 
     def send_conn_request(self, fd, auth_id, remote_ipaddr, remote_port, is_ipv6=False):
         """向局域网发送请求
@@ -226,10 +227,12 @@ def start(debug):
     except KeyboardInterrupt:
         cls.release()
         if not debug: os.remove(PID_PATH)
+        if os.path.exists(SOCK_FILE): os.remove(SOCK_FILE)
         sys.exit(0)
     except:
         cls.release()
         if not debug: os.remove(PID_PATH)
+        if os.path.exists(SOCK_FILE): os.remove(SOCK_FILE)
         logging.print_error()
         sys.exit(-1)
 

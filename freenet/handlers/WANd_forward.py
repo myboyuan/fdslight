@@ -13,18 +13,16 @@ import base64
 class listener(tcp_handler.tcp_handler):
     __address = None
 
-    def init_func(self, creator_fd, address, is_ipv6=False):
-        if is_ipv6:
-            fa = socket.AF_INET6
-        else:
-            fa = socket.AF_INET
+    def init_func(self, creator_fd, address):
+        if os.path.isfile(address):
+            sys.stderr.write("the %s is exists\r\n" % address)
+            return -1
 
-        s = socket.socket(fa, socket.SOCK_STREAM)
-        if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
         self.set_socket(s)
         self.bind(address)
+        os.chmod(address, 0o777)
         self.listen(10)
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
@@ -66,7 +64,7 @@ class handler(tcp_handler.tcp_handler):
         self.__is_msg_tunnel = False
         self.__handshake_ok = False
 
-        self.__caddr = caddr
+        self.__caddr = ("UNIX_SOCKET", 0)
 
         self.__parser = intranet_pass.parser()
         self.__builder = intranet_pass.builder()
