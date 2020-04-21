@@ -1,0 +1,9 @@
+[
+  {
+    "is_ipv6": false,
+    "protocol": "tcp",
+    "address": "10.10.10.1",
+    "rewrite": "192.168.1.2",
+    "port": 80
+  }
+]
