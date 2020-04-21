@@ -322,9 +322,8 @@ class client(ssl_handler.ssl_handler):
             return
 
         if self.__forward_fd > 0:
-            print(self.writer.size())
-            raise ValueError
-            #self.delete_handler(self.__forward_fd)
+            self.delete_handler(self.__forward_fd)
+            raise SystemError
 
     def send_data(self, byte_data):
         """发送数据
