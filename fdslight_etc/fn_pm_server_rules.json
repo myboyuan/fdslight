@@ -1,0 +1,8 @@
+{
+  "test_key": {
+    "port": 80,
+    "protocol": "tcp",
+    "is_ipv6": false,
+    "address": "10.10.1.1"
+  }
+}
