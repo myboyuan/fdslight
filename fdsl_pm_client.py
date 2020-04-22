@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, getopt, signal, importlib, socket, sys, json
+import os, getopt, signal, importlib, socket, sys, json, struct
 import dns.resolver
 
 BASE_DIR = os.path.dirname(sys.argv[0])
@@ -150,6 +150,41 @@ class _fdslight_pm_client(dispatcher.dispatcher):
 
         self.send_msg_to_tunnel(action, message)
 
+    def __get_ip4_hdrlen(self):
+        self.__mbuf.offset = 0
+        n = self.__mbuf.get_part(1)
+        hdrlen = (n & 0x0f) * 4
+
+        return hdrlen
+
+    def __handle_ipv4_data_from_tunnel(self):
+        self.__mbuf.offset = 12
+        byte_src_addr = self.__mbuf.get_part(4)
+        self.__mbuf.offset = 16
+        byte_dst_addr = self.__mbuf.get_part(4)
+        self.__mbuf.offset = 9
+        protocol = self.__mbuf.get_part(1)
+
+        hdrlen = self.__get_ip4_hdrlen()
+        if hdrlen + 8 < 28: return False
+
+        # 检查IP数据报长度是否合法
+        self.__mbuf.offset = 2
+        payload_length = utils.bytes2number(self.__mbuf.get_part(2))
+
+        if payload_length != self.__mbuf.payload_size: return
+        if protocol not in self.__support_ip4_protocols: return
+
+        self.__mbuf.offset = hdrlen + 2
+        byte_dst_port = self.__mbuf.get_part(2)
+        dst_port, = struct.unpack("H", byte_dst_port)
+
+        rule = self.__port_mapv4.find_rule(protocol, dst_port)
+        if not rule: return
+
+    def __handle_ipv6_data_from_tunnel(self):
+        pass
+
     def handle_msg_from_tunnel(self, seession_id, action, message):
         if seession_id != self.session_id: return
         if action != proto_utils.ACT_IPDATA: return
@@ -158,7 +193,10 @@ class _fdslight_pm_client(dispatcher.dispatcher):
         ip_ver = self.__mbuf.ip_version()
         if ip_ver not in (4, 6,): return
 
-        self.send_msg_to_tun(message)
+        if 4 == ip_ver:
+            self.__handle_ipv4_data_from_tunnel()
+        else:
+            self.__handle_ipv6_data_from_tunnel()
 
     @property
     def session_id(self):
@@ -309,7 +347,14 @@ class _fdslight_pm_client(dispatcher.dispatcher):
         return ipaddr
 
     def myloop(self):
-        pass
+        names = self.__route_timer.get_timeout_names()
+        for name in names:
+            if self.__route_timer.exists(name):
+                self.__route_timer.drop(name)
+                host, prefix, is_ipv6 = self.__routes[name]
+                self.__del_route(host, prefix=prefix, is_ipv6=is_ipv6)
+            ''''''
+        return
 
     def set_route(self, host, prefix=None, is_ipv6=False):
         if host in self.__routes: return
@@ -323,10 +368,16 @@ class _fdslight_pm_client(dispatcher.dispatcher):
             s = ""
             if not prefix: prefix = 32
 
-        if is_ipv6:
-            n = 128
-        else:
-            n = 32
+        # 已經存在的路由不添加s
+        k = "%s/%s" % (host, prefix,)
+        if k in self.__routes: return
+
+        cmd = "ip %s route add %s/%s dev %s" % (s, host, prefix, self.__DEVNAME)
+
+        self.__routes[k] = (host, prefix, is_ipv6,)
+        self.__route_timer.set_timeout(k, self.__ROUTE_TIMEOUT)
+
+        os.system(cmd)
 
     def __del_route(self, host, prefix=None, is_ipv6=False):
         if is_ipv6:
