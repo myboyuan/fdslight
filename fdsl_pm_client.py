@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, os
+import os, getopt, signal, importlib, socket, sys, json
 import dns.resolver
 
 BASE_DIR = os.path.dirname(sys.argv[0])
@@ -11,14 +11,16 @@ sys.path.append(BASE_DIR)
 
 import pywind.evtframework.evt_dispatcher as dispatcher
 import pywind.lib.configfile as configfile
+import pywind.lib.timer as timer
+
 import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.proc as proc
 import freenet.handlers.tundev as tundev
-import os, getopt, signal, importlib, socket
 import freenet.handlers.tunnelc as tunnelc
 import freenet.lib.logging as logging
 import freenet.lib.port_map as port_map
+import freenet.lib.cfg_check as cfg_check
 
 PID_FILE = "/tmp/fdslight_pm.pid"
 LOG_FILE = "/tmp/fdslight_pm.log"
@@ -49,6 +51,11 @@ class _fdslight_pm_client(dispatcher.dispatcher):
 
     __port_mapv4 = None
     __port_mapv6 = None
+
+    # 路由超时
+    __ROUTE_TIMEOUT = 600
+    __route_timer = None
+    __session_id = None
 
     @property
     def https_configs(self):
@@ -81,6 +88,9 @@ class _fdslight_pm_client(dispatcher.dispatcher):
 
         self.__port_mapv4 = port_map.port_map(is_ipv6=False)
         self.__port_mapv6 = port_map.port_map(is_ipv6=True)
+
+        self.__ROUTE_TIMEOUT = 1200
+        self.__route_timer = timer.timer()
 
         conn = configs["connection"]
 
@@ -155,8 +165,67 @@ class _fdslight_pm_client(dispatcher.dispatcher):
         if not self.__session_id:
             connection = self.__configs["connection"]
             auth_id = connection["auth_id"]
+            self.__session_id = proto_utils.calc_content_md5(auth_id)
+        return self.__session_id
 
-        return bytes(16)
+    def __check_rule(self, rule: dict):
+        """检查每一条规则
+        :param rule:
+        :return:
+        """
+        keys = (
+            "is_ipv6", "dest_addr", "rewrite", "port",
+        )
+
+        for k in keys:
+            if k not in rule: return False
+
+        is_ipv6 = rule["is_ipv6"]
+        dest_addr = rule["dest_addr"]
+        rewrite = rule["rewrite"]
+        port = rule["port"]
+        protocol = rule["protocol"]
+
+        if protocol not in ("tcp", "udp", "udplite", "sctp",): return False
+
+        if is_ipv6 and (not utils.is_ipv6_address(dest_addr) or not utils.is_ipv6_address(rewrite)):
+            return False
+
+        if not is_ipv6 and (not utils.is_ipv4_address(dest_addr) or not utils.is_ipv4_address(rewrite)):
+            return False
+
+        if not cfg_check.is_port(port): return False
+
+        return True
+
+    def __load_port_map_rules(self):
+        fpath = "%s/fdslight_etc/fn_pm_client_rules.json" % BASE_DIR
+
+        with open(fpath, "r") as f:
+            s = f.read()
+        f.close()
+
+        try:
+            rules = json.loads(s)
+        except json.JSONDecodeError:
+            logging.print_error("wrong port map client rules")
+            return
+
+        if not isinstance(rules, list):
+            logging.print_error("wrong port map client rules,it must be list type")
+            return
+
+        for info in rules:
+            if not self.__check_rule(info):
+                logging.print_error("wrong port map rule about %s" % info)
+                break
+
+            is_ipv6 = info["is_ipv6"]
+            if is_ipv6:
+                cls = self.__port_mapv6
+            else:
+                cls = self.__port_mapv4
+            cls.add_rule(info["rewrite"], info["protocol"], info["port"])
 
     def __open_tunnel(self):
         conn = self.__configs["connection"]
@@ -215,7 +284,6 @@ class _fdslight_pm_client(dispatcher.dispatcher):
 
         enable_ipv6 = bool(int(self.__configs["connection"]["enable_ipv6"]))
         resolver = dns.resolver.Resolver()
-        resolver.nameservers = [self.__configs["public"]["remote_dns"]]
 
         try:
             if enable_ipv6:
