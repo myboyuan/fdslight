@@ -18,13 +18,14 @@ import freenet.handlers.tundev as tundev
 import os, getopt, signal, importlib, socket
 import freenet.handlers.tunnelc as tunnelc
 import freenet.lib.logging as logging
+import freenet.lib.port_map as port_map
 
 PID_FILE = "/tmp/fdslight_pm.pid"
 LOG_FILE = "/tmp/fdslight_pm.log"
 ERR_FILE = "/tmp/fdslight_pm_error.log"
 
 
-class _fdslight_client(dispatcher.dispatcher):
+class _fdslight_pm_client(dispatcher.dispatcher):
     __routes = None
 
     __DEVNAME = "portmap"
@@ -45,6 +46,9 @@ class _fdslight_client(dispatcher.dispatcher):
     __support_ip6_protocols = (6, 17, 132, 136,)
     # 服务器地址
     __server_ip = None
+
+    __port_mapv4 = None
+    __port_mapv6 = None
 
     @property
     def https_configs(self):
@@ -75,6 +79,9 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__debug = debug
         self.__tundev_fileno = self.create_handler(-1, tundev.tundevc, self.__DEVNAME)
 
+        self.__port_mapv4 = port_map.port_map(is_ipv6=False)
+        self.__port_mapv6 = port_map.port_map(is_ipv6=True)
+
         conn = configs["connection"]
 
         m = "freenet.lib.crypto.noany"
@@ -103,8 +110,6 @@ class _fdslight_client(dispatcher.dispatcher):
             sys.stdout = open(LOG_FILE, "a+")
             sys.stderr = open(ERR_FILE, "a+")
         ''''''
-
-        signal.signal(signal.SIGUSR1, self.__set_rules)
 
     def handle_msg_from_tundev(self, message):
         """处理来TUN设备的数据包
@@ -298,7 +303,7 @@ def __start_service(mode, debug):
 
     configs = configfile.ini_parse_from_file(config_path)
 
-    cls = _fdslight_client()
+    cls = _fdslight_pm_client()
 
     if debug:
         cls.ioloop(mode, debug, configs)

@@ -23,7 +23,7 @@ import freenet.lib.logging as logging
 import freenet.lib.port_map as port_map
 
 
-class _fdslight_server(dispatcher.dispatcher):
+class _fdslight_pm_server(dispatcher.dispatcher):
     __configs = None
     __debug = None
     __mbuf = None
@@ -48,6 +48,8 @@ class _fdslight_server(dispatcher.dispatcher):
 
     __port_mapv4 = None
     __port_mapv6 = None
+
+    __access = None
 
     @property
     def http_configs(self):
@@ -167,7 +169,7 @@ def __start_service(debug, enable_nat_module):
         proc.write_pid(PID_FILE)
 
     configs = configfile.ini_parse_from_file("%s/fdslight_etc/fn_pm_server.ini" % BASE_DIR)
-    cls = _fdslight_server()
+    cls = _fdslight_pm_server()
 
     if debug:
         cls.ioloop(debug, configs, enable_nat_module=enable_nat_module)
