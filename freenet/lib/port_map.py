@@ -7,10 +7,12 @@ import socket, struct
 class port_map(object):
     __is_ipv6 = None
 
-    __rules = None
+    __in_rules = None
+    __out_rules = None
 
     def __init__(self, is_ipv6=False):
-        self.__rules = {}
+        self.__in_rules = {}
+        self.__out_rules = {}
         self.__is_ipv6 = is_ipv6
 
     def __get_protcol_number(self, name):
@@ -23,14 +25,9 @@ class port_map(object):
 
         return m.get(name, -1)
 
-    def add_rule(self, ip: str, protocol: str, port: int, extra_data=None):
-        """
-        :param ip:重写之后的IP地质
-        :param protocol:
-        :param port:
-        :return:
-        """
+    def __build_key(self, ip: str, protocol: str, port: int):
         p = self.__get_protcol_number(protocol)
+
         if p < 0:
             raise ValueError("wrong protocol value %s,it must be tcp,udp,sctp or udplite" % protocol)
 
@@ -40,18 +37,57 @@ class port_map(object):
             fa = socket.AF_INET
 
         byte_ip = socket.inet_pton(fa, ip)
-        k = struct.pack("BH", p, port)
-        self.__rules[k] = (byte_ip, extra_data,)
 
-    def find_rule(self, protocol_number: int, port: int):
-        k = struct.pack("BH", protocol_number, port)
-        return self.__rules.get(k, None)
+        return self.__build_key2(byte_ip, p, port)
 
-    def del_rule(self, protocol: str, port: int):
-        p = self.__get_protcol_number(protocol)
-        if p < 0:
-            raise ValueError("wrong protocol value %s,it must be tcp,udp,sctp or udplite" % protocol)
+    def __build_key2(self, byte_ip: bytes, proto: int, port: int):
+        if self.__is_ipv6:
+            fmt = "!16sBH"
+        else:
+            fmt = "!4sBH"
+        key = struct.pack(fmt, byte_ip, proto, port)
 
-        k = struct.pack("BH", p, port)
+        return key
 
-        del self.__rules[k]
+    def add_rule(self, dest_ip: str, rewrite_dest_ip: str, protocol: str, dest_port: int, rewrite_dest_port: int,
+                 extra_data=None):
+        """
+        :param dest_ip:
+        :param rewrite_dest_ip:
+        :param protocol:
+        :param dest_port:
+        :param rewrite_dest_port:
+        :param extra_data:
+        :return:
+        """
+        in_key = self.__build_key(dest_ip, protocol, dest_port)
+        out_key = self.__build_key(rewrite_dest_ip, protocol, rewrite_dest_port)
+
+        if self.__is_ipv6:
+            fa = socket.AF_INET6
+        else:
+            fa = socket.AF_INET
+
+        byte_rewrite_dest_ip = socket.inet_pton(fa, rewrite_dest_ip)
+        byte_dest_ip = socket.inet_pton(fa, dest_ip)
+
+        self.__in_rules[in_key] = (out_key, byte_rewrite_dest_ip, p, rewrite_dest_port,)
+        self.__out_rules[out_key] = (in_key, byte_dest_ip, p, byte_dest_ip,)
+
+    def find_rule_for_in(self, byte_dest_ip: bytes, proto: int, dest_port: int):
+        key = self.__build_key2(byte_dest_ip, proto, dest_port)
+
+        return self.__in_rules.get(key, None)
+
+    def find_rule_for_out(self, byte_src_ip: bytes, proto: int, src_port: int):
+        key = self.__build_key2(byte_src_ip, proto, src_port)
+
+        return self.__out_rules.get(key, None)
+
+    def del_rule_with_in(self, dest_ip: str, protocol: str, dest_port: int):
+        key = self.__build_key(dest_ip, protocol, dest_port)
+
+        if key not in self.__in_rules: return
+
+        rs = self.__in_rules[key]
+        del self.__out_rules[rs[0]]

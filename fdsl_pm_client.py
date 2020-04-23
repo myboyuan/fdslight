@@ -180,7 +180,7 @@ class _fdslight_pm_client(dispatcher.dispatcher):
         byte_dst_port = self.__mbuf.get_part(2)
         dst_port, = struct.unpack("H", byte_dst_port)
 
-        rule = self.__port_mapv4.find_rule(protocol, dst_port)
+        rule = self.__port_mapv4.find_rule_for_in(byte_dst_addr, protocol, dst_port)
         if not rule: return
 
         src_addr = socket.inet_ntop(socket.AF_INET, byte_src_addr)
@@ -254,7 +254,7 @@ class _fdslight_pm_client(dispatcher.dispatcher):
         :return:
         """
         keys = (
-            "is_ipv6", "dest_addr", "rewrite", "port",
+            "is_ipv6", "dest_addr", "rewrite_dest_addr", "dest_port", "rewrite_dest_port",
         )
 
         for k in keys:
@@ -262,19 +262,21 @@ class _fdslight_pm_client(dispatcher.dispatcher):
 
         is_ipv6 = rule["is_ipv6"]
         dest_addr = rule["dest_addr"]
-        rewrite = rule["rewrite"]
-        port = rule["port"]
+        rewrite_dest = rule["rewrite_dest_addr"]
+        dest_port = rule["dest_port"]
+        rewrite_dest_port = rule["rewrite_dest_port"]
         protocol = rule["protocol"]
 
         if protocol not in ("tcp", "udp", "udplite", "sctp",): return False
 
-        if is_ipv6 and (not utils.is_ipv6_address(dest_addr) or not utils.is_ipv6_address(rewrite)):
+        if is_ipv6 and (not utils.is_ipv6_address(dest_addr) or not utils.is_ipv6_address(rewrite_dest)):
             return False
 
-        if not is_ipv6 and (not utils.is_ipv4_address(dest_addr) or not utils.is_ipv4_address(rewrite)):
+        if not is_ipv6 and (not utils.is_ipv4_address(dest_addr) or not utils.is_ipv4_address(rewrite_dest)):
             return False
 
-        if not cfg_check.is_port(port): return False
+        if not cfg_check.is_port(dest_port): return False
+        if not cfg_check.is_port(rewrite_dest_port): return False
 
         return True
 
@@ -305,7 +307,6 @@ class _fdslight_pm_client(dispatcher.dispatcher):
                 cls = self.__port_mapv6
             else:
                 cls = self.__port_mapv4
-            cls.add_rule(info["rewrite"], info["protocol"], info["port"])
 
     def __open_tunnel(self):
         conn = self.__configs["connection"]

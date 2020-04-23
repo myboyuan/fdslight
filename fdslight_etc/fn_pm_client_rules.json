@@ -2,8 +2,9 @@
   {
     "is_ipv6": false,
     "dest_addr": "10.10.10.1",
-    "rewrite": "192.168.1.2",
+    "rewrite_dest_addr": "192.168.1.2",
     "protocol": "tcp",
-    "port": 80
+    "dest_port": 80,
+    "rewrite_dest_port": 80
   }
 ]
