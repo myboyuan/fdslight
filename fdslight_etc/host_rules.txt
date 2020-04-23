@@ -153,6 +153,7 @@ goo.gl:1
 *.nextmedia.com:1
 *.nextmedia.com.hk:1
 *.twnextdigital.com:1
+*.nxtdig.com.hk:1
 
 # 网络存储
 *.dropbox.com:1
