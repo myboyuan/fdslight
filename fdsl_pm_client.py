@@ -21,6 +21,7 @@ import freenet.handlers.tunnelc as tunnelc
 import freenet.lib.logging as logging
 import freenet.lib.port_map as port_map
 import freenet.lib.cfg_check as cfg_check
+import freenet.lib.ippkts as ippkts
 
 PID_FILE = "/tmp/fdslight_pm.pid"
 LOG_FILE = "/tmp/fdslight_pm.log"
@@ -182,8 +183,49 @@ class _fdslight_pm_client(dispatcher.dispatcher):
         rule = self.__port_mapv4.find_rule(protocol, dst_port)
         if not rule: return
 
+        src_addr = socket.inet_ntop(socket.AF_INET, byte_src_addr)
+        k = "%s/32" % src_addr
+        if k not in self.__routes:
+            self.set_route(src_addr, prefix=32, is_ipv6=False)
+
+        byte_rewrite, extra_data = rule
+        # 此处重写IP地址
+        ippkts.modify_ip4address(byte_rewrite, self.__mbuf, flags=1)
+        self.__mbuf.offset = 0
+        byte_data = self.__mbuf.get_data()
+        self.get_handler(self.__tundev_fileno).msg_from_tunnel(byte_data)
+
     def __handle_ipv6_data_from_tunnel(self):
-        pass
+        self.__mbuf.offset = 4
+        payload_length = utils.bytes2number(self.__mbuf.get_part(2))
+        if payload_length + 40 != self.__mbuf.payload_size: return
+
+        self.__mbuf.offset = 6
+        nexthdr = self.__mbuf.get_part(1)
+
+        if nexthdr not in self.__support_ip6_protocols: return
+
+        self.__mbuf.offset = 40
+        nexthdr = self.__mbuf.get_part(1)
+        byte_dst_port = self.__mbuf.get_part(2)
+        dst_port, = struct.unpack("H", byte_dst_port)
+
+        rule = self.__port_mapv6.find_rule(nexthdr, dst_port)
+        if not rule: return
+
+        self.__mbuf.offset = 8
+        byte_src_addr = self.__mbuf.get_part(16)
+        src_addr = socket.inet_ntop(socket.AF_INET6, byte_src_addr)
+        k = "%s/132" % src_addr
+
+        if k not in self.__routes:
+            self.set_route(src_addr, prefix=132, is_ipv6=True)
+        # 此处重写IP地址
+        byte_rewrite, extra_data = rule
+        ippkts.modify_ip4address(byte_rewrite, self.__mbuf, flags=1)
+        self.__mbuf.offset = 0
+        byte_data = self.__mbuf.get_data()
+        self.get_handler(self.__tundev_fileno).msg_from_tunnel(byte_data)
 
     def handle_msg_from_tunnel(self, seession_id, action, message):
         if seession_id != self.session_id: return
