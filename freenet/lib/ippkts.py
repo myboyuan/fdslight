@@ -70,8 +70,7 @@ def modify_ip4address(ip_packet, mbuf, flags=0):
     mbuf.replace(utils.number2bytes(csum, 2))
 
     mbuf.offset = 6
-    offset = utils.bytes2number(mbuf.get_part(2)) & 0x1fffff
-    print(offset)
+    offset = utils.bytes2number(mbuf.get_part(2)) & 0x1fff
     # 修改第一个数据包
     if protocol in (6, 17, 132, 136,) and offset == 0:
         if protocol == 6:
