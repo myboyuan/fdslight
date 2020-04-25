@@ -35,11 +35,24 @@ def __calc_udp_csum(saddr, daddr, udp_data, is_ipv6=False):
     return csum
 
 
+def modify_port(port, protocol, mbuf, flags=0, is_ipv6=False):
+    """修改TCP/SCTP/UDP/UDPLite端口
+    :param port:
+    :param protocol:支持的协议是6,17,132以及136
+    :param mbuf:
+    :param flags: 0表示修改源端口,1表示修改目的端口
+    :return:
+    """
+    protocols = (6, 17, 132, 136,)
+    if protocol not in protocols:
+        raise ValueError("unsupport protocol number %d" % protocol)
+
+
 def modify_ip4address(ip_packet, mbuf, flags=0):
     """
     :param ip_packet:
     :param mbuf:
-    :param flags: 0表示修改源地址和端口,1表示修改目的地址和端口
+    :param flags: 0表示修改源地址,1表示修改目的地址
     :return:
     """
 
@@ -56,7 +69,11 @@ def modify_ip4address(ip_packet, mbuf, flags=0):
     csum = calc_checksum_for_ip_change(old_ip_packet, ip_packet, csum)
     mbuf.replace(utils.number2bytes(csum, 2))
 
-    if protocol in (6, 17, 132, 136,):
+    mbuf.offset = 6
+    offset = utils.bytes2number(mbuf.get_part(2)) & 0x1fffff
+
+    # 修改第一个数据包
+    if protocol in (6, 17, 132, 136,) and offset == 0:
         if protocol == 6:
             p = 1
         else:
@@ -441,6 +458,7 @@ def __build_ipv6_fragment_hdr(nexthdr, frag_off, m_flag, frag_id):
     ]
 
     return b"".join(byte_seq)
+
 
 """
 import os

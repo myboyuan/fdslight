@@ -188,9 +188,9 @@ class _fdslight_pm_client(dispatcher.dispatcher):
         if k not in self.__routes:
             self.set_route(src_addr, prefix=32, is_ipv6=False)
 
-        byte_rewrite, extra_data = rule
+        _, rewrite_dest_ip, p, rewrite_dest_port = rule
         # 此处重写IP地址
-        ippkts.modify_ip4address(byte_rewrite, self.__mbuf, flags=1)
+        ippkts.modify_ip4address(rewrite_dest_ip, self.__mbuf, flags=1)
         self.__mbuf.offset = 0
         byte_data = self.__mbuf.get_data()
         self.get_handler(self.__tundev_fileno).msg_from_tunnel(byte_data)
