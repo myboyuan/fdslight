@@ -22,6 +22,7 @@ class listener(tcp_handler.tcp_handler):
         s = socket.socket(fa, socket.SOCK_STREAM)
         if is_ipv6: s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
         self.set_socket(s)
         self.bind(address)
@@ -71,7 +72,6 @@ class handler(tcp_handler.tcp_handler):
         self.__conn_ok = False
         self.__wait_sent = []
 
-        cs.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         remote_addr = remote_info["address"]
         remote_port = remote_info["port"]
         is_ipv6 = remote_info["is_ipv6"]
