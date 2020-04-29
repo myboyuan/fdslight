@@ -196,6 +196,7 @@ def start(debug, wol_key, wol_port, wol_bind_ip):
     try:
         cls.ioloop(wol_key, wol_bind_ip=wol_bind_ip, debug=debug, wol_port=wol_port)
     except KeyboardInterrupt:
+        print("-----------------")
         cls.release()
     except:
         cls.release()
@@ -203,7 +204,6 @@ def start(debug, wol_key, wol_port, wol_bind_ip):
 
     print(os.path.isfile(PID_PATH))
     if os.path.isfile(PID_PATH): os.remove(PID_PATH)
-    sys.exit(0)
 
 
 def main():
