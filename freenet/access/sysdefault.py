@@ -7,7 +7,6 @@ import os, json, socket
 
 class access(_access.access):
     __users = None
-    __bind_ip_info = None
 
     def load_configs(self):
         my_dir = os.path.dirname(__file__)
@@ -21,31 +20,10 @@ class access(_access.access):
             passwd = dic["password"]
 
             session_id = self.gen_session_id(username, passwd)
-
             self.__users[session_id] = username
-            bind_ips = dic.get("bind_ips", [])
-            if not isinstance(bind_ips, list):
-                raise ValueError("wrong bind ip format from access file")
-
-            for s in bind_ips:
-                if not utils.is_ipv4_address(s) and not utils.is_ipv6_address(s):
-                    raise ValueError("wrong bind ip format from access file")
-                is_ipv6 = utils.is_ipv6_address(s)
-
-                if is_ipv6:
-                    fa = socket.AF_INET6
-                else:
-                    fa = socket.AF_INET
-
-                byte_ip = socket.inet_pton(fa, s)
-                self.set_reserve_ip(s, is_ipv6=is_ipv6)
-
-                self.__bind_ip_info[byte_ip] = session_id
 
     def init(self):
         self.__users = {}
-        self.__bind_ip_info = {}
-
         self.load_configs()
 
     def handle_recv(self, fileno, session_id, address, data_len):
@@ -67,7 +45,4 @@ class access(_access.access):
         pass
 
     def handle_user_change_signal(self):
-        self.init()
-
-    def get_user_bind_ip_info(self, byte_ip: bytes):
-        return self.__bind_ip_info.get(byte_ip, None)
+        self.load_configs()

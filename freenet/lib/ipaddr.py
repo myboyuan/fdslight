@@ -74,13 +74,9 @@ class ipalloc(object):
     __byte_subnet_max = None
     __byte_subnet_cur = None
     __emptys = None
-    __reserve_ip = None
-    __is_ipv6 = None
 
     def __init__(self, subnet, prefix, is_ipv6=False):
         self.__emptys = {}
-        self.__reserve_ip = {}
-        self.__is_ipv6 = is_ipv6
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -108,42 +104,14 @@ class ipalloc(object):
             del self.__emptys[byte_ip]
             return byte_ip
 
-        while 1:
-            if self.__byte_subnet_cur == self.__byte_subnet_max:
-                raise IpaddrNoEnoughErr("not enough ip address")
+        if self.__byte_subnet_cur == self.__byte_subnet_max:
+            raise IpaddrNoEnoughErr("not enough ip address")
 
-            byte_ip = self.__byte_subnet_cur
-            self.__byte_subnet_cur = utils.ip_addr_plus(byte_ip)
-            if byte_ip in self.__reserve_ip: continue
-            break
+        byte_ip = self.__byte_subnet_cur
+        self.__byte_subnet_cur = utils.ip_addr_plus(byte_ip)
 
         return byte_ip
 
-    def set_reserve_ip(self, addr):
-        """设置保留IP地址,设置此值之后,系统江不会随机分配此IP地址
-        :param addr:
-        :return:
-        """
-        if self.__is_ipv6:
-            fa = socket.AF_INET6
-        else:
-            fa = socket.AF_INET
-
-        byte_ip = socket.inet_pton(fa, addr)
-        # 防止IP地址被分配
-        if byte_ip in self.__emptys:
-            del self.__emptys[byte_ip]
-        self.__reserve_ip[byte_ip] = None
-
-    def clear_reserve_ip(self):
-        """清除保留IP地址
-        :return:
-        """
-        for byte_ip in self.__reserve_ip:
-            if byte_ip in self.__emptys:
-                del self.__emptys[byte_ip]
-            ''''''
-        self.__reserve_ip = {}
 
 """
 byte_ip = socket.inet_pton(socket.AF_INET, "255.255.255.255")

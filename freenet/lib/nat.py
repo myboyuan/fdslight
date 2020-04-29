@@ -139,6 +139,3 @@ class nat(_nat_base):
             self.delLan(name)
             self.__ip_alloc.put_addr(name)
         return
-
-    def set_reserve_ip(self, ip):
-        self.__ip_alloc.set_reserve_ip(ip)

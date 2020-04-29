@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, os, json
+import sys, os
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -318,31 +318,9 @@ class _fdslight_client(dispatcher.dispatcher):
         if action == proto_utils.ACT_DNS:
             self.get_handler(self.__dns_fileno).msg_from_tunnel(message)
             return
-        size = len(message)
-        if size > utils.MBUF_AREA_SIZE: return
-        if size < 28: return
         self.__mbuf.copy2buf(message)
         ip_ver = self.__mbuf.ip_version()
-
         if ip_ver not in (4, 6,): return
-        if ip_ver == 6 and size < 48: return
-
-        if ip_ver == 4:
-            is_ipv6 = False
-            self.__mbuf.offset = 12
-            byte_saddr = self.__mbuf.get_part(4)
-            fa = socket.AF_INET
-            prefix = 32
-        else:
-            is_ipv6 = True
-            self.__mbuf.offset = 8
-            byte_saddr = self.__mbuf.get_part(16)
-            fa = socket.AF_INET6
-            prefix = 128
-
-        if action == proto_utils.ACT_VLAN:
-            saddr = socket.inet_ntop(fa, byte_saddr)
-            self.set_route(saddr, prefix=prefix, is_ipv6=is_ipv6, is_dynamic=True)
 
         self.send_msg_to_tun(message)
 

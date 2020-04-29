@@ -128,18 +128,9 @@ class access(object):
             self.modify_session(session_id, fileno, address)
         return b
 
+
     def handle_user_change_signal(self):
         """重写这个方法,处理用户信息改变的信号
         :return:
         """
         pass
-
-    def get_user_bind_ip_info(self, byte_ip: bytes):
-        """获取用户绑定的IP地址信息,重写这个方法
-        :param session_id:
-        :return:
-        """
-        return None
-
-    def set_reserve_ip(self, address: str, is_ipv6=False):
-        self.__dispatcher.set_reverse_ip(address, is_ipv6=is_ipv6)

@@ -80,9 +80,6 @@ class _fdslight_server(dispatcher.dispatcher):
     # 是否开启NAT模块
     __enable_nat_module = None
 
-    __subnet = None
-    __subnet6 = None
-
     @property
     def http_configs(self):
         configs = self.__configs.get("tunnel_over_http", {})
@@ -208,13 +205,10 @@ class _fdslight_server(dispatcher.dispatcher):
             self.__nat6 = nat.nat((subnet, prefix,), is_ipv6=True)
             self.__enable_nat6 = True
             self.__config_gateway6(subnet, prefix, ip6_gw, eth_name)
-            self.__subnet6 = (subnet, int(prefix),)
 
         subnet, prefix = utils.extract_subnet_info(nat_config["virtual_ip_subnet"])
-
         self.__nat4 = nat.nat((subnet, prefix,), is_ipv6=False)
         self.__config_gateway(subnet, prefix, eth_name)
-        self.__subnet = (subnet, int(prefix))
 
         if not debug:
             sys.stdout = open(LOG_FILE, "a+")
@@ -226,34 +220,6 @@ class _fdslight_server(dispatcher.dispatcher):
         self.__nat4.recycle()
         self.__access.access_loop()
         return
-
-    def __handle_vlan_from_tunnel(self, session_id):
-        ip_ver = self.__mbuf.ip_version()
-        is_ipv6 = False
-        if ip_ver not in (4, 6,): return
-
-        if ip_ver == 4:
-            self.__mbuf.offset = 16
-            byte_ip = self.__mbuf.get_part(4)
-            str_ip = socket.inet_ntop(socket.AF_INET, byte_ip)
-            subnet, prefix = self.__subnet
-        else:
-            is_ipv6 = True
-            self.__mbuf.offset = 24
-            byte_ip = self.__mbuf.get_part(16)
-            str_ip = socket.inet_ntop(socket.AF_INET6, byte_ip)
-            subnet, prefix = self.__subnet6
-
-        is_subnet = utils.check_is_from_subnet(str_ip, subnet, prefix, is_ipv6=is_ipv6)
-        if not is_subnet: return
-
-        dst_session_id = self.__access.get_user_bind_ip_info(byte_ip)
-        if not dst_session_id: return
-        # 排除自己访问自己
-        if dst_session_id == session_id: return
-
-        self.__mbuf.offset = 0
-        self.__send_msg_to_tunnel(dst_session_id, proto_utils.ACT_VLAN, self.__mbuf.get_data())
 
     def handle_msg_from_tunnel(self, fileno, session_id, address, action, message):
         size = len(message)
@@ -273,10 +239,6 @@ class _fdslight_server(dispatcher.dispatcher):
         if action == proto_utils.ACT_DNS:
             self.__request_dns(session_id, message)
             return True
-        if action == proto_utils.ACT_VLAN:
-            self.__mbuf.copy2buf(message)
-            self.__handle_vlan_from_tunnel(session_id)
-            return
         if action == proto_utils.ACT_IPDATA:
             self.__mbuf.copy2buf(message)
         return self.__handle_ipdata_from_tunnel(session_id)
@@ -595,12 +557,6 @@ class _fdslight_server(dispatcher.dispatcher):
         if not pydict: del self.__dgram_proxy[session_id]
         if session_id in self.__ip4_fragment:
             del self.__ip4_fragment[session_id]
-
-    def set_reserve_ip(self, address, is_ipv6=False):
-        if is_ipv6:
-            self.__nat6.set_reserve_ip(address)
-        else:
-            self.__nat6.set_reserve_ip(address)
 
     def __exit(self, signum, frame):
         if self.handler_exists(self.__dns_fileno):
