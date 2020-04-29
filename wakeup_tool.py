@@ -81,7 +81,7 @@ class wake_up_internet(object):
         packet = self.__builder.build_request(self.__key, hwaddrs=self.__hwaddrs)
 
         # 多发一些数据包,避免缓冲区问题导致数据不会正常接收到
-        # packet = packet * 5
+        packet = packet * 10
 
         while 1:
             if not packet: break
