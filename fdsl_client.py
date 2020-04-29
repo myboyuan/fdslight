@@ -85,8 +85,6 @@ class _fdslight_client(dispatcher.dispatcher):
 
     __enable_nat_module = None
 
-    __enable_vlan = None
-
     @property
     def https_configs(self):
         configs = self.__configs.get("tunnel_over_https", {})
@@ -178,12 +176,6 @@ class _fdslight_client(dispatcher.dispatcher):
             if self.__enable_ipv6_traffic: self.set_route(vir_dns6, is_ipv6=True, is_dynamic=False)
 
         conn = configs["connection"]
-
-        try:
-            self.__enable_vlan = bool(int(conn.get("enable_vlan", 0)))
-        except ValueError:
-            print("wrong enable_vlan value from configure file")
-            sys.exit(-1)
 
         m = "freenet.lib.crypto.%s" % conn["crypto_module"]
         try:
@@ -326,9 +318,31 @@ class _fdslight_client(dispatcher.dispatcher):
         if action == proto_utils.ACT_DNS:
             self.get_handler(self.__dns_fileno).msg_from_tunnel(message)
             return
+        size = len(message)
+        if size > utils.MBUF_AREA_SIZE: return
+        if size < 28: return
         self.__mbuf.copy2buf(message)
         ip_ver = self.__mbuf.ip_version()
+
         if ip_ver not in (4, 6,): return
+        if ip_ver == 6 and size < 48: return
+
+        if ip_ver == 4:
+            is_ipv6 = False
+            self.__mbuf.offset = 12
+            byte_saddr = self.__mbuf.get_part(4)
+            fa = socket.AF_INET
+            prefix = 32
+        else:
+            is_ipv6 = True
+            self.__mbuf.offset = 8
+            byte_saddr = self.__mbuf.get_part(16)
+            fa = socket.AF_INET6
+            prefix = 128
+
+        if action == proto_utils.ACT_VLAN:
+            saddr = socket.inet_ntop(fa, byte_saddr)
+            self.set_route(saddr, prefix=prefix, is_ipv6=is_ipv6, is_dynamic=True)
 
         self.send_msg_to_tun(message)
 
