@@ -201,7 +201,7 @@ def start(debug, wol_key, wol_port, wol_bind_ip):
         cls.release()
         logging.print_error()
 
-    if os.path.isfile(PID_PATH): os.remove(PID_PATH)
+    os.remove(PID_PATH)
 
 
 def main():
