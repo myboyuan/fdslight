@@ -200,8 +200,8 @@ def start(debug, wol_key, wol_port, wol_bind_ip):
     except:
         cls.release()
         logging.print_error()
-
-    os.remove(PID_PATH)
+    print(os.path.isfile(PID_PATH))
+    if os.path.isfile(PID_PATH): os.remove(PID_PATH)
 
 
 def main():
