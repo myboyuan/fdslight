@@ -19,7 +19,3 @@ port:2 bytes,目标端口
 is_ipv6:1byte  是否是IP地址,非0表示IPv6地址
 reverse:1 byte 保留字段
 
-
-
-
-
