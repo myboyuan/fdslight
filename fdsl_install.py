@@ -28,34 +28,6 @@ def __build_fdsl_ctl(cflags):
     )
 
 
-def __build_portmap_driver():
-    os.chdir("driver/fdsl_portmap")
-    os.system("make")
-    os.chdir("../../")
-
-    path = "driver/fdsl_portmap/fdslight_portmap.ko"
-    if not os.path.isfile(path): return
-
-    f = "driver/fdslight_portmap.ko"
-    if os.path.isfile(f): os.remove(f)
-
-    shutil.move(path, "driver")
-
-
-def __build_portmap_ctl(cflags):
-    sys_build.do_compile(
-        ["driver/fdsl_portmap/py_fdsl_portmap_ctl.c"], "freenet/lib/fdsl_portmap_ctl.so", cflags, debug=True,
-        is_shared=True
-    )
-
-
-def build_port_map(cflags):
-    __build_fn_utils(cflags)
-    __build_portmap_driver()
-    __build_portmap_ctl(cflags)
-    write_kern_ver_to_file("fdslight_etc/kern_version")
-
-
 def build_server(cflags, kern_nat_mod=False):
     __build_fn_utils(cflags)
     __build_fdsl_ctl(cflags)
@@ -109,7 +81,7 @@ def build_client(cflags, gw_mode=False):
 
 def main():
     help_doc = """
-    gateway | server | local | port_map  python3_include
+    gateway | server | local   python3_include
     """
 
     argv = sys.argv[1:]
@@ -119,7 +91,7 @@ def main():
 
     mode = argv[0]
 
-    if mode not in ("gateway", "server", "local", "port_map",):
+    if mode not in ("gateway", "server", "local",):
         print("the mode must be gateway,server or local")
         return
 
@@ -135,10 +107,6 @@ def main():
 
     if mode == "server":
         build_server(cflags)
-        return
-
-    if mode == "port_map":
-        build_port_map(cflags)
         return
 
     if mode == "local":
