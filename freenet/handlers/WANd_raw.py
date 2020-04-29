@@ -71,6 +71,7 @@ class handler(tcp_handler.tcp_handler):
         self.__conn_ok = False
         self.__wait_sent = []
 
+        cs.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         remote_addr = remote_info["address"]
         remote_port = remote_info["port"]
         is_ipv6 = remote_info["is_ipv6"]
