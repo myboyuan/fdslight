@@ -1,0 +1,25 @@
+### 内网向internet提供服务协议,需要有公网IP主机 
+### 协议详解说明（握手请求采用WebSocket标准握手请求)
+# 附加头部如下:
+    X-Auth-Id: 验证服务ID,由客户端自定义
+    X-Msg-Tunnel: 消息隧道,0表示传输连接信息作用,1表示传输消息内容
+
+协议头部如下:
+version:1 byte,目前为1
+type:1 byte, 0 表示ping,1表示pong,2表示请求建立连接请求,3表示响应连接状态,4表示消息内容,5表示关闭连接
+length:4 bytes 内容长度,ping和pong的数据长度为随机值
+
+
+
+type 为 2
+格式如下
+session_id:16 bytes,会话ID,由有公网IP的服务器生成
+ip_address:16 bytes ,IP地址
+port:2 bytes,目标端口
+is_ipv6:1byte  是否是IP地址,非0表示IPv6地址
+reverse:1 byte 保留字段
+
+
+
+
+
