@@ -2,6 +2,7 @@
 
 import pywind.evtframework.handlers.tcp_handler as tcp_handler
 import time, socket
+import freenet.lib.logging as logging
 
 
 class client(tcp_handler.tcp_handler):
@@ -10,11 +11,13 @@ class client(tcp_handler.tcp_handler):
     __auth_id = None
     __wait_sent = None
     __time = None
+    __address = None
 
     def init_func(self, creator_fd, address, is_ipv6=False):
         self.__creator = creator_fd
         self.__wait_sent = []
         self.__time = time.time()
+        self.__address = address
 
         if is_ipv6:
             fa = socket.AF_INET6
@@ -62,6 +65,7 @@ class client(tcp_handler.tcp_handler):
         self.set_timeout(self.fileno, 10)
 
     def tcp_error(self):
+        logging.print_general("local server close connection", self.__address)
         self.get_handler(self.__creator).tell_forwarding_close()
 
     def tcp_delete(self):
