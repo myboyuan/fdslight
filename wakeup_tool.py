@@ -72,6 +72,7 @@ class wake_up_internet(object):
             fa = socket.AF_INET
 
         s = socket.socket(fa, socket.SOCK_STREAM)
+        s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         s.connect((host, port))
 
         self.__s = s
@@ -80,7 +81,7 @@ class wake_up_internet(object):
         packet = self.__builder.build_request(self.__key, hwaddrs=self.__hwaddrs)
 
         # 多发一些数据包,避免缓冲区问题导致数据不会正常接收到
-        packet = packet * 5
+        # packet = packet * 5
 
         while 1:
             if not packet: break
