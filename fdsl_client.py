@@ -729,8 +729,10 @@ def __start_service(mode, debug):
     try:
         cls.ioloop(mode, debug, configs)
     except:
-        os.remove(PID_FILE)
         logging.print_error()
+
+    os.remove(PID_FILE)
+    sys.exit(0)
 
 
 def __stop_service():
