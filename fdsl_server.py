@@ -624,9 +624,10 @@ def __start_service(debug, enable_nat_module):
     try:
         cls.ioloop(debug, configs, enable_nat_module=enable_nat_module)
     except:
+        os.remove(PID_FILE)
         logging.print_error()
 
-    os.remove(PID_FILE)
+    sys.exit(0)
 
 
 def __stop_service():
