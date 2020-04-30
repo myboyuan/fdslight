@@ -40,7 +40,12 @@ def main():
 
     pid_file = sys.argv[2]
 
-    cmd = "%s %s/%s %s" % (sys.executable, BASE_DIR, sys.argv[1], " ".join(sys.argv[3:]))
+    path = "%s/%s" % (BASE_DIR, sys.argv[1])
+    if not os.path.isfile(path):
+        sys.stderr.write("not found file %s\r\n" % path)
+        return
+
+    cmd = "%s %s %s" % (sys.executable, path, " ".join(sys.argv[3:]))
 
     while 1:
         if not os.path.isfile(pid_file):
