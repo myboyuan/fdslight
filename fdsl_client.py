@@ -145,8 +145,6 @@ class _fdslight_client(dispatcher.dispatcher):
         if self.__mode == _MODE_GW:
             self.__dns_fileno = self.create_handler(-1, dns_proxy.dnsc_proxy, gateway["dnsserver_bind"], debug=debug,
                                                     server_side=True, is_ipv6=False)
-            self.get_handler(self.__dns_fileno).set_parent_dnsserver(public["remote_dns"], is_ipv6=is_ipv6)
-
             if self.__enable_ipv6_traffic:
                 self.__dns_listen6 = self.create_handler(-1, dns_proxy.dnsc_proxy, gateway["dnsserver_bind6"],
                                                          debug=debug, server_side=True, is_ipv6=True)
@@ -154,6 +152,7 @@ class _fdslight_client(dispatcher.dispatcher):
         else:
             self.__dns_fileno = self.create_handler(-1, dns_proxy.dnsc_proxy, public["remote_dns"], debug=debug,
                                                     server_side=False)
+        self.get_handler(self.__dns_fileno).set_parent_dnsserver(public["remote_dns"], is_ipv6=is_ipv6)
 
         self.__set_rules(None, None)
 
