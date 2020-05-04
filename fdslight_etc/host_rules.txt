@@ -240,6 +240,7 @@ security.debian.org:1
 *.v2ray.com:1
 #防止AMP 404
 *.ampproject.org:1
+*.medium.com:1
 
 ### 书籍文化
 *.pressstore.com.tw:1
