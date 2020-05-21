@@ -61,7 +61,7 @@ static int shm_get(key_t key, size_t size, int shmflg)
     return rs;
 }
 
-int nb_shm_shared_create(const char *path,size_t size,int flags)
+int shm_shared_create(const char *path,size_t size,int flags)
 {
     int id=shm_get(IPC_PRIVATE,size,flags);
     FILE *f=NULL;
@@ -75,7 +75,7 @@ int nb_shm_shared_create(const char *path,size_t size,int flags)
     return id;
 }
 
-void nb_shm_shared_delete(const char *path)
+void shm_shared_delete(const char *path)
 {
     int id=shm_key_get_from_file(path);
 
@@ -86,14 +86,14 @@ void nb_shm_shared_delete(const char *path)
     remove(path);
 }
 
-void *nb_shm_shared_get_ref(const char *path)
+void *shm_shared_get_ref(const char *path)
 {
     void *result;
     int id=shm_key_get_from_file(path);
 
     if(id<0) return NULL;
 
-    result=shmat(id,NULL, ~SHM_RDONLY);
+    result=shmat(id,NULL, SHM_RND);
     
     if((long long)(result)<0){
         switch(errno){
@@ -114,7 +114,7 @@ void *nb_shm_shared_get_ref(const char *path)
     return result;
 }
 
-void nb_shm_shared_no_ref(void *shmaddr)
+void shm_shared_no_ref(void *shmaddr)
 {
     shmdt(shmaddr);
 }

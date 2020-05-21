@@ -157,6 +157,7 @@ void ev_loop(void)
 {
     int rs;
 
+__LOOP:
     for(;;){
         ev_each();
         rs=select(ev_nfds,&ev_readfds,&ev_writefds,NULL,&ev_time);
@@ -181,7 +182,7 @@ void ev_loop(void)
             STDERR("select EFAULT error\r\n");
             break;
         case EINTR:
-            STDERR("select EINTR error\r\n");
+            goto __LOOP;
             break;
         case EINVAL:
             STDERR("select EINVAL error\r\n");

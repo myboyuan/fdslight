@@ -8,18 +8,22 @@
 #include<net/if.h>
 #include<sys/sysctl.h>
 #include<net/if_tun.h>
+#include<sys/socket.h>
+#include<stdlib.h>
+#include<sys/stat.h>
+#include<sys/ioctl.h>
 
 #include "tuntap.h"
 
 static int __tuntap_create(char *tuntap_name,int is_tap)
 {
-    int newv = 1, fd, v,flags;
+    int newv = 1, fd, v;
     char oldv[64];
     size_t size;
     struct stat stat;
 
     char *name, buf[256];
-    const char *sysctl_name[512];
+    char sysctl_name[512];
 
     if(is_tap) strcpy(sysctl_name,"net.link.tap.devfs_cloning");
     else strcpy(sysctl_name,"net.link.tun.devfs_cloning");
