@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <string.h>
 
-#include "../../public/debug.h"
+#include "../../clib/debug.h"
 
 #define NETMAP_WITH_LIBS
 #include<net/netmap_user.h>
