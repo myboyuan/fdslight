@@ -27,8 +27,6 @@ typedef struct{
     struct mbuf *tap_sent_head;
     struct mbuf *tap_sent_last;
 
-    struct mbuf_pool pool;
-    struct qos qos;
     int tap_fd;
 }fdsl_gw;
 
@@ -62,8 +60,8 @@ gw_dealloc(fdsl_gw *self)
 {
     if(NULL!=self->netmap) nm_close(self->netmap);
 
-    qos_uninit(&(self->qos));
-    mbuf_pool_uninit(&(self->pool));
+    qos_uninit();
+    mbuf_pool_uninit();
 
     Py_TYPE(self)->tp_free((PyObject *) self);
 }
@@ -111,7 +109,7 @@ gw_nm_handle_for_read(PyObject *self,PyObject *args)
 
         if(NULL==buf) break;
 
-        mbuf=mbuf_pool_get(&(gw->pool));
+        mbuf=mbuf_pool_get();
         if(NULL==mbuf) break;
 
         mbuf->begin=MBUF_BEGIN;
@@ -150,12 +148,12 @@ gw_tap_handle_for_read(PyObject *self,PyObject *args)
     if(!PyArg_ParseTuple(args,"i",&count)) return NULL;
     
     for(int n=0;n<count;n++){
-        m=mbuf_pool_get(&(gw->pool));
+        m=mbuf_pool_get();
         if(NULL==m) break;
 
         read_size=read(fd,m->data+MBUF_BEGIN,MBUF_DATA_MAX-MBUF_BEGIN);
         if(read_size < 0) {
-            mbuf_pool_put(&(gw->pool),m);
+            mbuf_pool_put(m);
 
             if(EAGAIN==errno){
                 rs=0;

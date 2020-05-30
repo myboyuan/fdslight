@@ -5,17 +5,23 @@
 
 #include "mbuf.h"
 
-int mbuf_pool_init(struct mbuf_pool *pool,u_int32_t pre_alloc_num)
+static struct mbuf_pool mbuf_pool;
+static int mbuf_pool_is_initialized=0;
+
+int mbuf_pool_init(u_int32_t pre_alloc_num)
 {
     struct mbuf *m;
+    struct mbuf_pool *pool=&mbuf_pool;
 
     bzero(pool,sizeof(struct mbuf_pool));
+
+    mbuf_pool_is_initialized=1;
 
     for(u_int32_t n=0;n<pre_alloc_num;n++){
         m=malloc(sizeof(struct mbuf));
         if(NULL==m){
             STDERR("no memory for pre alloc struct mbuf\r\n");
-            mbuf_pool_uninit(pool);
+            mbuf_pool_uninit();
             return -1;
         }
 
@@ -29,8 +35,9 @@ int mbuf_pool_init(struct mbuf_pool *pool,u_int32_t pre_alloc_num)
     return 0;
 }
 
-void mbuf_pool_uninit(struct mbuf_pool *pool)
+void mbuf_pool_uninit(void)
 {
+    struct mbuf_pool *pool=&mbuf_pool;
     struct mbuf *t,*m=pool->empty_head;
 
     while(NULL!=m){
@@ -38,11 +45,14 @@ void mbuf_pool_uninit(struct mbuf_pool *pool)
         free(m);
         m=t;
     }
+
+    mbuf_pool_is_initialized=0;
 }
 
-struct mbuf * mbuf_pool_get(struct mbuf_pool *pool)
+struct mbuf * mbuf_pool_get(void)
 {
     struct mbuf *m=NULL;
+    struct mbuf_pool *pool=&mbuf_pool;
 
     if(NULL!=pool->empty_head){
         m=pool->empty_head;
@@ -65,8 +75,9 @@ struct mbuf * mbuf_pool_get(struct mbuf_pool *pool)
     return m;
 }
 
-void mbuf_pool_put(struct mbuf_pool *pool,struct mbuf *m)
+void mbuf_pool_put(struct mbuf *m)
 {
+    struct mbuf_pool *pool=&mbuf_pool;
     if(pool->pre_alloc_num > pool->cur_alloc_num){
         free(m);
         pool->cur_alloc_num-=1;

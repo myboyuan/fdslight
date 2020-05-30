@@ -5,6 +5,15 @@
 
 struct mbuf{
     struct mbuf *next;
+    // 表示物理网卡
+#define MBUF_IF_PHY 0
+    // 表示TAP网卡
+#define MBUF_IF_TAP 1
+    int if_flags;
+    // 流量传输方向
+#define MBUF_DIR_IN 0
+#define MBUF_DIR_OUT 1
+    int traffic_dir;
 #define MBUF_BEGIN 128
     u_int32_t begin;
     u_int32_t offset;
@@ -21,10 +30,10 @@ struct mbuf_pool{
     u_int32_t cur_alloc_num;
 };
 
-int mbuf_pool_init(struct mbuf_pool *pool,u_int32_t pre_alloc_num);
-void mbuf_pool_uninit(struct mbuf_pool *pool);
+int mbuf_pool_init(u_int32_t pre_alloc_num);
+void mbuf_pool_uninit(void);
 
-struct mbuf * mbuf_pool_get(struct mbuf_pool *pool);
-void mbuf_pool_put(struct mbuf_pool *pool,struct mbuf *m);
+struct mbuf * mbuf_pool_get(void);
+void mbuf_pool_put(struct mbuf *m);
 
 #endif

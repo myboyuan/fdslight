@@ -2,11 +2,19 @@
 
 #include "ether.h"
 #include "ip.h"
+#include "mbuf.h"
 
 void ether_handle(struct mbuf *m)
 {
     struct ether_header *header=(struct ether_header *)(m->data+m->begin);
     unsigned short type=ntohs(header->type);
+
+    if(type<0x0800){
+        mbuf_pool_put(m);
+        return;
+    }
+
+    m->offset+=14;
 
     switch(type){
         // IPv4

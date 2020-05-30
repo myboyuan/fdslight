@@ -3,9 +3,13 @@
 
 #include<sys/types.h>
 
+#include "mbuf.h"
+
 #define QOS_SLOT_SIZE 256
 
 struct qos_slot{
+    // 用于对所有可用槽组成一个列表
+    struct qos_slot *speed_next;
     struct qos_slot *last;
     struct qos_slot *next;
     void *data;
@@ -21,12 +25,10 @@ struct qos{
     u_int32_t pre_alloc_num;
 };
 
-u_int64_t qos_calc_slot(unsigned char *dst_addr,u_int16_t id,int is_ipv6);
 
-int qos_init(struct qos *q,u_int32_t pre_alloc_num);
-void qos_uninit(struct qos *q);
+int qos_init(u_int32_t pre_alloc_num);
+void qos_uninit(void);
 
-int qos_put(struct qos *q,void *data,u_int32_t slot);
-void *qos_get(struct qos *q);
+void qos_handle(struct mbuf *m,int is_ipv6);
 
 #endif
