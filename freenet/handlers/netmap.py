@@ -4,22 +4,30 @@ import pywind.evtframework.handlers.handler as handler
 
 
 class nm_handler(handler.handler):
-    def init_func(self, creator_fd, if_name):
+    def init_func(self, creator_fd, fd):
         """
         :param creator_fd:
-        :param if_name:
+        :param fd:
         :return:
         """
-        pass
+        self.set_fileno(fd)
+        self.register(self.fileno)
+        self.add_evt_read(self.fileno)
+
+        return self.fileno
+
+    @property
+    def gw(self):
+        return self.dispatcher.gw
 
     def evt_read(self):
-        pass
+        rs = self.gw.nm_handle_for_read(100)
 
     def evt_write(self):
-        pass
+        rs = self.gw.nm_handle_for_write()
 
     def delete(self):
-        pass
+        self.unregister(self.fileno)
 
     def error(self):
         pass
