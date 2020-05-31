@@ -17,6 +17,8 @@ import pywind.lib.configfile as configfile
 import freenet.lib.logging as logging
 import freenet.lib.proc as proc
 import freenet.lib.gw as gw
+import freenet.handlers.gw_netmap as nm_handler
+import freenet.handlers.gw_tapdev as tap_handler
 
 
 class fdsl_gw(dispatcher.dispatcher):
@@ -24,9 +26,34 @@ class fdsl_gw(dispatcher.dispatcher):
     __debug = None
     __gw = None
 
+    __netmap_fd = None
+    __tap_fd = None
+
     def init_func(self, debug, configs):
         # netmap 只能使用select事件监听
         self.create_poll(force_select=True)
+        self.__configs = configs
+        self.__debug = debug
+
+        self.gw_init()
+
+    def gw_init(self):
+        devices = self.__configs["network_devices"]
+        lan_address = self.__configs["lan_address"]
+
+        netmap_name = devices["ethernet_name"]
+        tap_name = devices.get("tap_name", "gateway")
+
+        cmds = [
+            "modprobe -r veth", "insmod %s/netmap/netmap.ko" % BASE_DIR
+        ]
+
+        for cmd in cmds: os.system(cmd)
+
+        self.__gw = gw.gw(netmap_name, tap_name, 1024, 1024, self.gw_cb)
+
+        self.__netmap_fd = self.create_handler(-1, nm_handler.nm_handler, self.gw.netmap_fd())
+        self.__tap_fd = self.create_handler(-1, tap_handler.tapdev_handler, self.gw.tap_fd())
 
     @property
     def debug(self):
@@ -41,6 +68,43 @@ class fdsl_gw(dispatcher.dispatcher):
         return self.__gw
 
     def myloop(self):
+        pass
+
+    def gw_cb(self, name: str, ev_name: str, is_added: bool):
+        if name not in ("netmap", "tap",): return
+        if ev_name not in ("read", "write",): return
+
+        if name == "netmap":
+            if is_added:
+                if ev_name == "write":
+                    self.get_handler(self.__netmap_fd).add_evt_write(self.__netmap_fd)
+                else:
+                    self.get_handler(self.__netmap_fd).add_evt_read(self.__netmap_fd)
+                ''''''
+            else:
+                if ev_name == "write":
+                    self.get_handler(self.__netmap_fd).remove_evt_write(self.__netmap_fd)
+                else:
+                    self.get_handler(self.__netmap_fd).remove_evt_read(self.__netmap_fd)
+                ''''''
+            ''''''
+        else:
+            if is_added:
+                if ev_name == "write":
+                    self.get_handler(self.__tap_fd).add_evt_write(self.__tap_fd)
+                else:
+                    self.get_handler(self.__tap_fd).add_evt_read(self.__tap_fd)
+                ''''''
+            else:
+                if ev_name == "write":
+                    self.get_handler(self.__tap_fd).remove_evt_write(self.__tap_fd)
+                else:
+                    self.get_handler(self.__tap_fd).remove_evt_read(self.__tap_fd)
+                ''''''
+            ''''''
+        return
+
+    def release(self):
         pass
 
 
@@ -69,6 +133,7 @@ def __start_service(debug):
     try:
         cls.ioloop(debug, configs)
     except:
+        cls.release()
         logging.print_error()
 
     os.remove(PID_FILE)
