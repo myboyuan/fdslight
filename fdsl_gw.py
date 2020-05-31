@@ -45,7 +45,10 @@ class fdsl_gw(dispatcher.dispatcher):
         tap_name = devices.get("tap_name", "gateway")
 
         cmds = [
-            "modprobe -r veth", "insmod %s/netmap/netmap.ko" % BASE_DIR
+            "modprobe -r veth",
+            "insmod %s/netmap/netmap.ko" % BASE_DIR,
+            # 设置网卡为混杂模式
+            "ip link set %s promisc on" % netmap_name,
         ]
 
         for cmd in cmds: os.system(cmd)

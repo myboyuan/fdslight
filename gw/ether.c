@@ -4,6 +4,11 @@
 #include "ip.h"
 #include "mbuf.h"
 
+static __ether_send(struct mbuf *m)
+{
+    
+}
+
 void ether_handle(struct mbuf *m)
 {
     struct ether_header *header=(struct ether_header *)(m->data+m->begin);
@@ -24,8 +29,8 @@ void ether_handle(struct mbuf *m)
         case 0x86dd:
             ip_handle(m,1);
             break;
-        // 直接发送到tap设备
         default:
+            __ether_send(m);
             break;
     }
 }
