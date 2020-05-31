@@ -21,6 +21,7 @@
 
 typedef struct{
     PyObject_HEAD
+
     struct nm_desc *netmap;
     
     struct mbuf *nm_sent_head;
@@ -31,6 +32,10 @@ typedef struct{
     int tap_fd;
     char tap_name[512];
 }fdsl_gw;
+
+static PyObject *ev_notify_cb=NULL;
+static int netmap_write_flags=0;
+static int tap_write_flags=0;
 
 static struct nm_desc *__nm_open(const char *if_name)
 {
@@ -69,6 +74,8 @@ gw_dealloc(fdsl_gw *self)
     qos_uninit();
     mbuf_pool_uninit();
 
+    Py_DECREF(ev_notify_cb);
+
     Py_TYPE(self)->tp_free((PyObject *) self);
 }
 
@@ -78,6 +85,7 @@ gw_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     u_int32_t pre_alloc_mbuf,pre_alloc_qos_slot;
     fdsl_gw *self;
     struct nm_desc *netmap;
+    PyObject *cb;
 
     const char *tap_name;
     const char *if_name;
@@ -86,24 +94,31 @@ gw_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     tap_name2[0]='\0';
 
-    self=(fdsl_gw *)type->tp_alloc(type,0);
-    if(NULL==self) return NULL;
+    Py_XDECREF(ev_notify_cb);
 
-    if(!PyArg_ParseTuple(args,"ssII",&tap_name,&if_name,&pre_alloc_mbuf,&pre_alloc_qos_slot)){
-        Py_TYPE(self)->tp_free((PyObject *) self);
+    if(!PyArg_ParseTuple(args,"ssIIO:set_callback",&if_name,&tap_name,&pre_alloc_mbuf,&pre_alloc_qos_slot,&cb)) return NULL;
+    
+
+    if(!PyCallable_Check(cb)){
+        PyErr_SetString(PyExc_TypeError,"parameter must be callback");
         return NULL;
     }
 
-    strcpy(tap_name2,if_name);
+    self=(fdsl_gw *)type->tp_alloc(type,0);
+    if(NULL==self) return NULL;
+
+    strcpy(tap_name2,tap_name);
 
     netmap=__nm_open(if_name);
     if(NULL==netmap){
+        Py_TYPE(self)->tp_free((PyObject *) self);
         STDERR("cannot open if_name %s for netmap\r\n",if_name);
         return NULL;
     }
 
     self->tap_fd=tapdev_create(tap_name2);
     if(self->tap_fd<0){
+        Py_TYPE(self)->tp_free((PyObject *) self);
         STDERR("cannot create tap device %s\r\n",tap_name2);
         __nm_close(netmap);
         return NULL;
@@ -123,6 +138,9 @@ gw_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     flags=fcntl(self->tap_fd,F_GETFL,0);
     fcntl(self->tap_fd,F_SETFL,flags | O_NONBLOCK);
+    
+    Py_INCREF(cb);
+    ev_notify_cb=cb;
 
     return (PyObject *)self;
 }
@@ -171,9 +189,16 @@ gw_nm_handle_for_write(PyObject *self,PyObject *args)
     fdsl_gw *gw=(fdsl_gw *)self;
     struct mbuf *m;
     int r;
+    PyObject *f=ev_notify_cb,*arglist,*cb_rs;
 
     // 此处调用回调函数取消事件
     if(NULL==gw->nm_sent_last){
+        netmap_write_flags=0;
+        arglist=Py_BuildValue("ssp","netmap","write",0);
+        cb_rs=PyObject_CallObject(f,arglist);
+
+        Py_DECREF(arglist);
+        Py_DECREF(cb_rs);
         Py_RETURN_TRUE;
     }
 
@@ -229,9 +254,16 @@ gw_tap_handle_for_write(PyObject *self,PyObject *args)
     fdsl_gw *gw=(fdsl_gw *)self;
     struct mbuf *m;
     ssize_t r;
+    PyObject *f=ev_notify_cb,*arglist,*cb_rs;
 
     // 此处调用回调函数取消事件
     if(NULL==gw->tap_sent_last){
+        tap_write_flags=0;
+        arglist=Py_BuildValue("ssp","tap","write",0);
+        cb_rs=PyObject_CallObject(f,arglist);
+
+        Py_DECREF(arglist);
+        Py_DECREF(cb_rs);
         Py_RETURN_TRUE;
     }
 
@@ -254,13 +286,48 @@ gw_tap_handle_for_write(PyObject *self,PyObject *args)
     Py_RETURN_TRUE;
 }
 
+static PyObject *
+gw_tap_fd(PyObject *self,PyObject *args)
+{
+    fdsl_gw *gw=(fdsl_gw *)self;
+    return PyLong_FromLong(gw->tap_fd);
+}
+
+static PyObject *
+gw_netmap_fd(PyObject *self,PyObject *args)
+{
+    fdsl_gw *gw=(fdsl_gw *)self;
+    return PyLong_FromLong(gw->netmap->fd);
+}
+
 void send_data(struct mbuf *m)
 {
+    PyObject *f=ev_notify_cb,*arglist,*result;
+    int *flags;
+    const char *name;
+    const char *names[]={"netmap","tap"};
+
     if(NULL==m) return;
     m->next=NULL;
 
-    
-    // 此处加入监听事件列表
+    if(MBUF_IF_PHY==m->if_flags){
+        flags=&netmap_write_flags;
+        name=names[0];
+    }else{
+        flags=&tap_write_flags;
+        name=names[1];
+    }
+
+    // 已经加入过写事件那么不再加入该事件
+    if(*flags) return;
+
+    *flags=1;
+
+    arglist=Py_BuildValue("ssp",name,"write",1);
+    result=PyObject_CallObject(f,arglist);
+
+    Py_DECREF(arglist);
+    Py_DECREF(result);
 }
 
 static PyMethodDef gw_methods[]={
@@ -268,6 +335,8 @@ static PyMethodDef gw_methods[]={
     {"nm_handle_for_write",(PyCFunction)gw_nm_handle_for_write,METH_NOARGS,"handle write for netmap"},
     {"tap_handle_for_read",(PyCFunction)gw_tap_handle_for_read,METH_VARARGS,"handle read for tap device"},
     {"tap_handle_for_write",(PyCFunction)gw_tap_handle_for_write,METH_NOARGS,"handle write for tap device"},
+    {"tap_fd",(PyCFunction)gw_tap_fd,METH_NOARGS,"get tap device fileno"},
+    {"netmap_fd",(PyCFunction)gw_netmap_fd,METH_NOARGS,"get netmap device fileno"},
     {NULL}
 };
 
