@@ -15,6 +15,7 @@
 #include "../../gw/mbuf.h"
 #include "../../gw/ether.h"
 #include "../../gw/qos.h"
+#include "../../gw/gw.h"
 
 #include "../../pywind/clib/netif/tuntap.h"
 
@@ -28,6 +29,7 @@ typedef struct{
     struct mbuf *tap_sent_last;
 
     int tap_fd;
+    char tap_name[512];
 }fdsl_gw;
 
 static struct nm_desc *__nm_open(const char *if_name)
@@ -37,6 +39,8 @@ static struct nm_desc *__nm_open(const char *if_name)
     int flags;
 
     sprintf(name,"netmap:%s",if_name);
+
+    netmap=nm_open(name,NULL,0,0);
 
     if(NULL==netmap){
         STDERR("cannot open %s\r\n",if_name);
@@ -60,6 +64,8 @@ gw_dealloc(fdsl_gw *self)
 {
     if(NULL!=self->netmap) nm_close(self->netmap);
 
+    tapdev_close(self->tap_fd,self->tap_name);
+
     qos_uninit();
     mbuf_pool_uninit();
 
@@ -76,6 +82,7 @@ gw_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     const char *tap_name;
     const char *if_name;
     char tap_name2[512];
+    int flags;
 
     tap_name2[0]='\0';
 
@@ -87,7 +94,37 @@ gw_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    return NULL;
+    strcpy(tap_name2,if_name);
+
+    netmap=__nm_open(if_name);
+    if(NULL==netmap){
+        STDERR("cannot open if_name %s for netmap\r\n",if_name);
+        return NULL;
+    }
+
+    self->tap_fd=tapdev_create(tap_name2);
+    if(self->tap_fd<0){
+        STDERR("cannot create tap device %s\r\n",tap_name2);
+        __nm_close(netmap);
+        return NULL;
+    }
+
+    tapdev_up(tap_name2);
+    
+    strcpy(self->tap_name,tap_name2);
+
+    self->netmap=netmap;
+    
+    self->nm_sent_head=NULL;
+    self->nm_sent_last=NULL;
+    
+    self->tap_sent_head=NULL;
+    self->tap_sent_last=NULL;
+
+    flags=fcntl(self->tap_fd,F_GETFL,0);
+    fcntl(self->tap_fd,F_SETFL,flags | O_NONBLOCK);
+
+    return (PyObject *)self;
 }
 
 static PyObject *
@@ -104,7 +141,7 @@ gw_nm_handle_for_read(PyObject *self,PyObject *args)
     if(!PyArg_ParseTuple(args,"i",&count)) return NULL;
 
     for(int n=0;n<count;n++){
-        buf=nm_nexpkt(nm,&h);
+        buf=nm_nextpkt(nm,&h);
         size=h.len;
 
         if(NULL==buf) break;
@@ -125,23 +162,39 @@ gw_nm_handle_for_read(PyObject *self,PyObject *args)
 
     ioctl(nm->fd,NIOCRXSYNC,NULL);
 
-    return NULL;
+    Py_RETURN_TRUE;
 }
 
 static PyObject *
 gw_nm_handle_for_write(PyObject *self,PyObject *args)
 {
+    fdsl_gw *gw=(fdsl_gw *)self;
+    struct mbuf *m;
+    int r;
 
+    // 此处调用回调函数取消事件
+    if(NULL==gw->nm_sent_last){
+        Py_RETURN_TRUE;
+    }
 
+    while(1){
+        m=gw->nm_sent_head;
+        if(NULL==m) break;
 
-    return NULL;
+        r=nm_inject(gw->netmap,m->data+m->begin,m->end-m->begin);
+        if(r<1) break;
+        gw->nm_sent_head=m->next;
+        if(NULL==gw->nm_sent_head) gw->nm_sent_last=NULL;
+    }
+
+    Py_RETURN_TRUE;
 }
 
 static PyObject *
 gw_tap_handle_for_read(PyObject *self,PyObject *args)
 {
     fdsl_gw *gw=(fdsl_gw *)self;
-    int fd=gw->tap_fd,count,rs;
+    int fd=gw->tap_fd,count;
     ssize_t read_size;
     struct mbuf *m;
 
@@ -155,10 +208,8 @@ gw_tap_handle_for_read(PyObject *self,PyObject *args)
         if(read_size < 0) {
             mbuf_pool_put(m);
 
-            if(EAGAIN==errno){
-                rs=0;
-                break;
-            }
+            if(EAGAIN==errno) break;
+            else {Py_RETURN_FALSE;}
         }
 
         m->begin=MBUF_BEGIN;
@@ -169,13 +220,47 @@ gw_tap_handle_for_read(PyObject *self,PyObject *args)
         ether_handle(m);
     }
 
-    return NULL;
+    Py_RETURN_TRUE;
 }
 
 static PyObject *
 gw_tap_handle_for_write(PyObject *self,PyObject *args)
 {
-    return NULL;
+    fdsl_gw *gw=(fdsl_gw *)self;
+    struct mbuf *m;
+    ssize_t r;
+
+    // 此处调用回调函数取消事件
+    if(NULL==gw->tap_sent_last){
+        Py_RETURN_TRUE;
+    }
+
+    while(1){
+        m=gw->tap_sent_head;
+        if(NULL==m) break;
+
+        r=write(gw->tap_fd,m->data+m->begin,m->end-m->begin);
+        
+        if(r<0){
+            if(EAGAIN==errno) break;
+            Py_RETURN_FALSE;
+        }
+
+        gw->tap_sent_head=m->next;
+        if(NULL==gw->tap_sent_head) gw->tap_sent_last=NULL;
+    }
+
+    
+    Py_RETURN_TRUE;
+}
+
+void send_data(struct mbuf *m)
+{
+    if(NULL==m) return;
+    m->next=NULL;
+
+    
+    // 此处加入监听事件列表
 }
 
 static PyMethodDef gw_methods[]={

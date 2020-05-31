@@ -2,4 +2,4 @@
 
 import freenet.lib.gw as gw
 
-print(gw)
+print(dir(gw.gw))

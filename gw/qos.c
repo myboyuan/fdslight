@@ -3,6 +3,9 @@
 #include<stdlib.h>
 
 #include "qos.h"
+#include "gw.h"
+
+#include "../pywind/clib/sysloop.h"
 
 static int64_t __qos_calc_slot(unsigned char *dst_addr,u_int16_t id,int is_ipv6)
 {
@@ -30,8 +33,7 @@ void qos_uninit(void)
 }
 
 
-
 void qos_handle(struct mbuf *m,int is_ipv6)
 {
-
+    send_data(m);
 }
