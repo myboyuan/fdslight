@@ -28,14 +28,29 @@ def __build_fdsl_ctl(cflags):
     )
 
 
-def build_server(cflags, kern_nat_mod=False):
+def __build_gateway_module(cflags):
+    files = sys_build.get_c_files("gw")
+    files += [
+        "freenet/lib/gw.c", "pywind/clib/netif/linux_tuntap.c", "pywind/clib/netif/linux_hwinfo.c"
+    ]
+    sys_build.do_compile(
+        files, "freenet/lib/gw.so", cflags, debug=True, is_shared=True
+    )
+
+
+def build_gateway(cflags):
+    __build_gateway_module(cflags)
+    __build_cone_nat()
+
+
+def build_tunnel_server(cflags, kern_nat_mod=False):
     __build_fn_utils(cflags)
     __build_fdsl_ctl(cflags)
 
-    build_cone_nat()
+    __build_cone_nat()
 
 
-def build_cone_nat():
+def __build_cone_nat():
     """构建内核cone nat模块
     :return:
     """
@@ -57,12 +72,12 @@ def build_cone_nat():
     write_kern_ver_to_file("fdslight_etc/kern_version")
 
 
-def build_client(cflags, gw_mode=False):
+def build_tunnel_client(cflags, gw_mode=False):
     __build_fn_utils(cflags)
     __build_fdsl_ctl(cflags)
 
     if gw_mode:
-        build_cone_nat()
+        __build_cone_nat()
 
         os.chdir("driver/fdsl_dgram")
         os.system("make clean")
@@ -81,7 +96,7 @@ def build_client(cflags, gw_mode=False):
 
 def main():
     help_doc = """
-    gateway | server | local   python3_include
+    tunnel_gw | tunnel_server | tunnel_local | gateway   python3_include
     """
 
     argv = sys.argv[1:]
@@ -91,8 +106,8 @@ def main():
 
     mode = argv[0]
 
-    if mode not in ("gateway", "server", "local",):
-        print("the mode must be gateway,server or local")
+    if mode not in ("tunnel_gw", "tunnel_server", "tunnel_local", "gateway",):
+        print("the mode must be tunnel_gw,tunnel_server,tunnel_local,gateway")
         return
 
     if not os.path.isdir(argv[1]):
@@ -101,16 +116,20 @@ def main():
 
     cflags = " -I %s" % "".join(argv[1:])
 
+    if mode == "tunnel_gw":
+        build_tunnel_client(cflags, gw_mode=True)
+        return
+
+    if mode == "tunnel_server":
+        build_tunnel_server(cflags)
+        return
+
+    if mode == "tunnel_local":
+        build_tunnel_client(cflags, gw_mode=False)
+        return
+
     if mode == "gateway":
-        build_client(cflags, gw_mode=True)
-        return
-
-    if mode == "server":
-        build_server(cflags)
-        return
-
-    if mode == "local":
-        build_client(cflags, gw_mode=False)
+        build_gateway(cflags)
 
 
 if __name__ == '__main__':

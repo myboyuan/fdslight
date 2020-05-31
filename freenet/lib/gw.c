@@ -123,7 +123,7 @@ gw_nm_handle_for_read(PyObject *self,PyObject *args)
         ether_handle(mbuf);
     }
 
-    ioctl(netmap->fd,NIOCRXSYNC,NULL);
+    ioctl(nm->fd,NIOCRXSYNC,NULL);
 
     return NULL;
 }

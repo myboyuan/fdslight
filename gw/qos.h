@@ -22,7 +22,7 @@ struct qos{
     struct qos_slot *slots[QOS_SLOT_SIZE];
 
     u_int32_t pre_alloc_num;
-    u_int32_t pre_alloc_num;
+    u_int32_t cur_alloc_num;
 };
 
 
