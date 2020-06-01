@@ -10,10 +10,6 @@ struct mbuf{
     // 表示TAP网卡
 #define MBUF_IF_TAP 1
     int if_flags;
-    // 流量传输方向
-#define MBUF_DIR_IN 0
-#define MBUF_DIR_OUT 1
-    int traffic_dir;
 #define MBUF_BEGIN 128
     u_int32_t begin;
     u_int32_t offset;

@@ -13,7 +13,7 @@ struct ether_header{
     };
 };
 
-
+void ether_send(struct mbuf *m);
 void ether_handle(struct mbuf *m);
 
 #endif

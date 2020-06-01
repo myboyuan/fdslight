@@ -4,11 +4,21 @@
 #include "qos.h"
 
 #include "../pywind/clib/netutils.h"
+#include "../pywind/clib/debug.h"
 
 
 static void __ipv6_handle(struct mbuf *m)
 {
+    struct netutil_ip6hdr *header=(struct netutil_ip6hdr *)(m->data+m->offset);
+    int version= (header->ver_and_tc & 0xf0) >> 4;
 
+    if(6!=version){
+        mbuf_pool_put(m);
+        return;
+    }
+
+    DBG_FLAGS;
+    mbuf_pool_put(m);
 }
 
 static void __ipv4_handle(struct mbuf *m)
@@ -20,6 +30,8 @@ static void __ipv4_handle(struct mbuf *m)
 
     version=(iphdr->ver_and_ihl & 0xf0) >> 4;
     hdr_len=(iphdr->ver_and_ihl & 0x0f) * 4;
+
+    DBG_FLAGS;
 
     if(4!=version){
         mbuf_pool_put(m);
@@ -35,6 +47,8 @@ static void __ipv4_handle(struct mbuf *m)
         mbuf_pool_put(m);
         return;
     }
+
+    DBG_FLAGS;
 
     qos_handle(m,0);
 

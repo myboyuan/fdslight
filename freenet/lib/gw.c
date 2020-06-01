@@ -90,7 +90,7 @@ gw_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     const char *tap_name;
     const char *if_name;
     char tap_name2[512];
-    int flags;
+    int flags,is_err;
 
     tap_name2[0]='\0';
 
@@ -104,6 +104,19 @@ gw_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
+    is_err=mbuf_pool_init(pre_alloc_mbuf);
+    if(is_err){
+        STDERR("cannot initialized mbuf pool\r\n");
+        return NULL;
+    }
+
+    is_err=qos_init(pre_alloc_qos_slot);
+    if(is_err){
+        STDERR("cannot initialized qos\r\n");
+        return NULL;
+    }
+
+
     self=(fdsl_gw *)type->tp_alloc(type,0);
     if(NULL==self) return NULL;
 
@@ -113,6 +126,9 @@ gw_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if(NULL==netmap){
         Py_TYPE(self)->tp_free((PyObject *) self);
         STDERR("cannot open if_name %s for netmap\r\n",if_name);
+
+        mbuf_pool_uninit();
+        qos_uninit();
         return NULL;
     }
 
@@ -120,7 +136,11 @@ gw_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if(self->tap_fd<0){
         Py_TYPE(self)->tp_free((PyObject *) self);
         STDERR("cannot create tap device %s\r\n",tap_name2);
+
         __nm_close(netmap);
+        mbuf_pool_uninit();
+        qos_uninit();
+
         return NULL;
     }
 
@@ -165,6 +185,7 @@ gw_nm_handle_for_read(PyObject *self,PyObject *args)
         if(NULL==buf) break;
 
         mbuf=mbuf_pool_get();
+  
         if(NULL==mbuf) break;
 
         mbuf->begin=MBUF_BEGIN;
@@ -174,6 +195,8 @@ gw_nm_handle_for_read(PyObject *self,PyObject *args)
 
         mbuf->tail=mbuf->tail+size;
         mbuf->end=mbuf->tail;
+
+        mbuf->if_flags=MBUF_IF_PHY;
 
         ether_handle(mbuf);
     }
@@ -210,6 +233,8 @@ gw_nm_handle_for_write(PyObject *self,PyObject *args)
         if(r<1) break;
         gw->nm_sent_head=m->next;
         if(NULL==gw->nm_sent_head) gw->nm_sent_last=NULL;
+
+        mbuf_pool_put(m);
     }
 
     Py_RETURN_TRUE;
@@ -241,6 +266,8 @@ gw_tap_handle_for_read(PyObject *self,PyObject *args)
         m->offset=m->begin;
         m->tail=m->begin+read_size;
         m->end=m->tail;
+
+        m->if_flags=MBUF_IF_TAP;
 
         ether_handle(m);
     }
@@ -280,6 +307,7 @@ gw_tap_handle_for_write(PyObject *self,PyObject *args)
 
         gw->tap_sent_head=m->next;
         if(NULL==gw->tap_sent_head) gw->tap_sent_last=NULL;
+        mbuf_pool_put(m);
     }
 
     
