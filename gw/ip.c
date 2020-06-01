@@ -31,8 +31,6 @@ static void __ipv4_handle(struct mbuf *m)
     version=(iphdr->ver_and_ihl & 0xf0) >> 4;
     hdr_len=(iphdr->ver_and_ihl & 0x0f) * 4;
 
-    DBG_FLAGS;
-
     if(4!=version){
         mbuf_pool_put(m);
         return;
@@ -47,8 +45,6 @@ static void __ipv4_handle(struct mbuf *m)
         mbuf_pool_put(m);
         return;
     }
-
-    DBG_FLAGS;
 
     qos_handle(m,0);
 

@@ -7,6 +7,10 @@
 
 #define QOS_SLOT_SIZE 256
 
+#if QOS_SLOT_SIZE<1
+#error The value of QOS_SLOT_SIZE at least
+#endif
+
 struct qos_slot{
     // 用于对所有可用槽组成一个列表
     struct qos_slot *speed_next;

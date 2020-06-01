@@ -58,6 +58,9 @@ class fdsl_gw(dispatcher.dispatcher):
         self.__netmap_fd = self.create_handler(-1, nm_handler.nm_handler, self.gw.netmap_fd())
         self.__tap_fd = self.create_handler(-1, tap_handler.tapdev_handler, self.gw.tap_fd())
 
+        os.system("ip -4 address add %s dev %s" % (lan_address["inet"], tap_name,))
+        os.system("ip -6 address add %s dev %s" % (lan_address["inet6"], tap_name,))
+
     @property
     def debug(self):
         return self.__debug

@@ -23,11 +23,6 @@ typedef struct{
     PyObject_HEAD
 
     struct nm_desc *netmap;
-    
-    struct mbuf *nm_sent_head;
-    struct mbuf *nm_sent_last;
-    struct mbuf *tap_sent_head;
-    struct mbuf *tap_sent_last;
 
     int tap_fd;
     char tap_name[512];
@@ -36,6 +31,12 @@ typedef struct{
 static PyObject *ev_notify_cb=NULL;
 static int netmap_write_flags=0;
 static int tap_write_flags=0;
+
+static struct mbuf *nm_sent_head=NULL;
+static struct mbuf *nm_sent_last=NULL;
+
+static struct mbuf *tap_sent_head=NULL;
+static struct mbuf *tap_sent_last=NULL;
 
 static struct nm_desc *__nm_open(const char *if_name)
 {
@@ -150,11 +151,11 @@ gw_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     self->netmap=netmap;
     
-    self->nm_sent_head=NULL;
-    self->nm_sent_last=NULL;
+    nm_sent_head=NULL;
+    nm_sent_last=NULL;
     
-    self->tap_sent_head=NULL;
-    self->tap_sent_last=NULL;
+    tap_sent_head=NULL;
+    tap_sent_last=NULL;
 
     flags=fcntl(self->tap_fd,F_GETFL,0);
     fcntl(self->tap_fd,F_SETFL,flags | O_NONBLOCK);
@@ -212,27 +213,31 @@ gw_nm_handle_for_write(PyObject *self,PyObject *args)
     fdsl_gw *gw=(fdsl_gw *)self;
     struct mbuf *m;
     int r;
-    PyObject *f=ev_notify_cb,*arglist,*cb_rs;
+    PyObject *f=ev_notify_cb,*arglist,*cb_rs,*b;
 
     // 此处调用回调函数取消事件
-    if(NULL==gw->nm_sent_last){
+    if(NULL==nm_sent_last){
         netmap_write_flags=0;
-        arglist=Py_BuildValue("ssp","netmap","write",0);
+        b=PyBool_FromLong(0);
+
+        arglist=Py_BuildValue("(ssN)","netmap","write",b);
         cb_rs=PyObject_CallObject(f,arglist);
 
         Py_DECREF(arglist);
         Py_DECREF(cb_rs);
+        Py_DECREF(b);
+
         Py_RETURN_TRUE;
     }
 
     while(1){
-        m=gw->nm_sent_head;
+        m=nm_sent_head;
         if(NULL==m) break;
 
         r=nm_inject(gw->netmap,m->data+m->begin,m->end-m->begin);
         if(r<1) break;
-        gw->nm_sent_head=m->next;
-        if(NULL==gw->nm_sent_head) gw->nm_sent_last=NULL;
+        nm_sent_head=m->next;
+        if(NULL==nm_sent_head) nm_sent_last=NULL;
 
         mbuf_pool_put(m);
     }
@@ -281,22 +286,26 @@ gw_tap_handle_for_write(PyObject *self,PyObject *args)
     fdsl_gw *gw=(fdsl_gw *)self;
     struct mbuf *m;
     ssize_t r;
-    PyObject *f=ev_notify_cb,*arglist,*cb_rs;
+    PyObject *f=ev_notify_cb,*arglist,*cb_rs,*b;
 
     // 此处调用回调函数取消事件
-    if(NULL==gw->tap_sent_last){
+    if(NULL==tap_sent_last){
         tap_write_flags=0;
-        arglist=Py_BuildValue("ssp","tap","write",0);
+        b=PyBool_FromLong(0);
+        arglist=Py_BuildValue("(ssN)","tap","write",b);
         cb_rs=PyObject_CallObject(f,arglist);
 
         Py_DECREF(arglist);
         Py_DECREF(cb_rs);
+        Py_DECREF(b);
+
         Py_RETURN_TRUE;
     }
 
     while(1){
-        m=gw->tap_sent_head;
+        m=tap_sent_head;
         if(NULL==m) break;
+        
 
         r=write(gw->tap_fd,m->data+m->begin,m->end-m->begin);
         
@@ -305,8 +314,8 @@ gw_tap_handle_for_write(PyObject *self,PyObject *args)
             Py_RETURN_FALSE;
         }
 
-        gw->tap_sent_head=m->next;
-        if(NULL==gw->tap_sent_head) gw->tap_sent_last=NULL;
+        tap_sent_head=m->next;
+        if(NULL==tap_sent_head) tap_sent_last=NULL;
         mbuf_pool_put(m);
     }
 
@@ -330,9 +339,9 @@ gw_netmap_fd(PyObject *self,PyObject *args)
 
 void send_data(struct mbuf *m)
 {
-    PyObject *f=ev_notify_cb,*arglist,*result;
+    PyObject *f=ev_notify_cb,*arglist,*result,*b;
     int *flags;
-    const char *name;
+    const char *name,*ev_name="write";
     const char *names[]={"netmap","tap"};
 
     if(NULL==m) return;
@@ -341,9 +350,27 @@ void send_data(struct mbuf *m)
     if(MBUF_IF_PHY==m->if_flags){
         flags=&netmap_write_flags;
         name=names[0];
+
+        if(NULL!=nm_sent_last){
+            nm_sent_last->next=m;
+        }else{
+            nm_sent_head=m;
+        }
+
+        nm_sent_last=m;
+
+
     }else{
         flags=&tap_write_flags;
         name=names[1];
+
+        if(NULL!=tap_sent_last){
+            tap_sent_last->next=m;
+        }else{
+            tap_sent_head=m;
+        }
+
+        tap_sent_last=m;
     }
 
     // 已经加入过写事件那么不再加入该事件
@@ -351,11 +378,13 @@ void send_data(struct mbuf *m)
 
     *flags=1;
 
-    arglist=Py_BuildValue("ssp",name,"write",1);
+    b=PyBool_FromLong(1);
+    arglist=Py_BuildValue("(ssN)",name,ev_name,b);
     result=PyObject_CallObject(f,arglist);
 
-    Py_DECREF(arglist);
-    Py_DECREF(result);
+    Py_XDECREF(arglist);
+    Py_XDECREF(result);
+    Py_DECREF(b);
 }
 
 static PyMethodDef gw_methods[]={
