@@ -6,13 +6,14 @@
 #include "qos.h"
 #include "ether.h"
 
-#include "../pywind/clib/sysloop.h"
 #include "../pywind/clib/netutils.h"
+#include "../pywind/clib/debug.h"
 
 /// 是否开启游戏优化,开启之后UDP和UDPLite数据包直接发送,不经过重新排序发送
 static int qos_game_first=0;
 static struct qos qos;
 static int qos_is_initialized=0;
+static int qos_num_for_calc=0;
 
 static unsigned int __qos_calc_slot(unsigned char *dst_addr,u_int8_t protocol,u_int16_t id,int is_ipv6)
 {
@@ -26,21 +27,33 @@ static unsigned int __qos_calc_slot(unsigned char *dst_addr,u_int8_t protocol,u_
 
     v=(unsigned int *)buf;
 
-    return (*v) % QOS_SLOT_SIZE;
+    return (*v) % qos_num_for_calc;
 }
 
-static int __qos_put(void *data,u_int32_t slot)
+static int __qos_put(struct mbuf *m,u_int32_t slot)
 {
+    struct qos_slot *s=&(qos.slots[slot]);
     
+    // 非常重要,否则会出现段错误
+    m->next=NULL;
 
+    if(s->is_used){
+        s->mbuf_last->next=m;
+        s->mbuf_last=m;
 
+        return 0;
+    }
+
+    bzero(s,sizeof(struct qos_slot));
+    s->is_used=1;
+
+    s->mbuf_head=m;
+    s->mbuf_last=m;
+
+    s->speed_next=qos.speed_head;
+    qos.speed_head=s;
 
     return 0;
-}
-
-static void *__qos_get(void)
-{
-    return NULL;
 }
 
 static void __qos_handle_ip(struct mbuf *m)
@@ -102,27 +115,61 @@ static void __qos_handle_ipv6(struct mbuf *m)
     
     slot=__qos_calc_slot(header->dst_addr,header->next_header,port,1);
 
-    if(slot<0){
-        mbuf_pool_put(m);
-        return;
-    }
-
     if(__qos_put(m,slot)){
         mbuf_pool_put(m);
         return;
     }
 }
 
-int qos_init(u_int32_t pre_alloc_num)
+void qos_send(void)
 {
+    struct qos_slot *slot,*old;
+    struct mbuf *mbuf;
 
+    slot=qos.speed_head;
+    old=qos.speed_head;
+
+    while(NULL!=slot){
+        mbuf=slot->mbuf_head;
+        slot->mbuf_head=mbuf->next;
+
+        if(NULL!=slot->mbuf_head){
+            old=slot;
+            slot=slot->speed_next;
+            ether_send(mbuf);
+            continue;
+        }
+
+        ether_send(mbuf);
+
+        slot->is_used=0;
+
+        if(slot==qos.speed_head){
+            qos.speed_head=slot->speed_next;
+            old=qos.speed_head;
+            slot=slot->speed_next;
+            continue;
+        }
+
+        old->speed_next=slot->speed_next;
+        slot=slot->speed_next;
+    }
+
+}
+
+int qos_have_data(void)
+{
+    int rs=NULL==qos.speed_head?0:1;
+
+    return rs;
+}
+
+int qos_init(void)
+{
     bzero(&qos,sizeof(struct qos));
     qos_is_initialized=1;
 
-    for(u_int32_t n=0;n<pre_alloc_num;n++){
-        
-
-    }
+    if(0==QOS_SLOT_SIZE%2) qos_num_for_calc=QOS_SLOT_SIZE-1;
 
 
     return 0;
@@ -130,11 +177,33 @@ int qos_init(u_int32_t pre_alloc_num)
 
 void qos_uninit(void)
 {
+    struct qos_slot *slot;
+    struct mbuf *m,*t;
+    
+
     if(!qos_is_initialized) return;
+
+    for(int n=0;n<QOS_SLOT_SIZE;n++){
+        slot=&(qos.slots[n]);
+        if(!slot->is_used) continue;
+
+        m=slot->mbuf_head;
+        while(NULL!=m){
+            t=m->next;
+            mbuf_pool_put(m);
+            m=t;
+        }
+    }
+
+    qos_is_initialized=0;
+
 }
 
 void qos_handle(struct mbuf *m,int is_ipv6)
 {
     if(is_ipv6) __qos_handle_ipv6(m);
     else __qos_handle_ip(m);
+
+    qos_send();
 }
+

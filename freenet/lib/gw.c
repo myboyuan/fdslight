@@ -72,6 +72,8 @@ gw_dealloc(fdsl_gw *self)
 
     tapdev_close(self->tap_fd,self->tap_name);
 
+    // 注意这里和mbuf的uninit顺序不能调,QOS可能会保存一部分mbuf
+    // 所以要先释放qos再释放mbuf
     qos_uninit();
     mbuf_pool_uninit();
 
@@ -83,7 +85,7 @@ gw_dealloc(fdsl_gw *self)
 static PyObject *
 gw_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    u_int32_t pre_alloc_mbuf,pre_alloc_qos_slot;
+    u_int32_t pre_alloc_mbuf;
     fdsl_gw *self;
     struct nm_desc *netmap;
     PyObject *cb;
@@ -97,7 +99,7 @@ gw_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     Py_XDECREF(ev_notify_cb);
 
-    if(!PyArg_ParseTuple(args,"ssIIO:set_callback",&if_name,&tap_name,&pre_alloc_mbuf,&pre_alloc_qos_slot,&cb)) return NULL;
+    if(!PyArg_ParseTuple(args,"ssIO:set_callback",&if_name,&tap_name,&pre_alloc_mbuf,&cb)) return NULL;
     
 
     if(!PyCallable_Check(cb)){
@@ -111,7 +113,7 @@ gw_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    is_err=qos_init(pre_alloc_qos_slot);
+    is_err=qos_init();
     if(is_err){
         STDERR("cannot initialized qos\r\n");
         return NULL;
@@ -223,9 +225,9 @@ gw_nm_handle_for_write(PyObject *self,PyObject *args)
         arglist=Py_BuildValue("(ssN)","netmap","write",b);
         cb_rs=PyObject_CallObject(f,arglist);
 
-        Py_DECREF(arglist);
-        Py_DECREF(cb_rs);
         Py_DECREF(b);
+        Py_DECREF(arglist);
+        Py_XDECREF(cb_rs);
 
         Py_RETURN_TRUE;
     }
@@ -295,10 +297,10 @@ gw_tap_handle_for_write(PyObject *self,PyObject *args)
         arglist=Py_BuildValue("(ssN)","tap","write",b);
         cb_rs=PyObject_CallObject(f,arglist);
 
-        Py_DECREF(arglist);
-        Py_DECREF(cb_rs);
         Py_DECREF(b);
-
+        Py_DECREF(arglist);
+        Py_XDECREF(cb_rs);
+  
         Py_RETURN_TRUE;
     }
 
@@ -319,7 +321,6 @@ gw_tap_handle_for_write(PyObject *self,PyObject *args)
         mbuf_pool_put(m);
     }
 
-    
     Py_RETURN_TRUE;
 }
 
@@ -335,6 +336,19 @@ gw_netmap_fd(PyObject *self,PyObject *args)
 {
     fdsl_gw *gw=(fdsl_gw *)self;
     return PyLong_FromLong(gw->netmap->fd);
+}
+
+static PyObject *
+gw_qos_have_data(PyObject *self,PyObject *args)
+{
+    return PyBool_FromLong(qos_have_data());
+}
+
+static PyObject *
+gw_qos_send(PyObject *self,PyObject *args)
+{
+    qos_send();
+    Py_RETURN_NONE;
 }
 
 void send_data(struct mbuf *m)
@@ -382,9 +396,9 @@ void send_data(struct mbuf *m)
     arglist=Py_BuildValue("(ssN)",name,ev_name,b);
     result=PyObject_CallObject(f,arglist);
 
-    Py_XDECREF(arglist);
-    Py_XDECREF(result);
     Py_DECREF(b);
+    Py_DECREF(arglist);
+    Py_XDECREF(result);
 }
 
 static PyMethodDef gw_methods[]={
@@ -394,6 +408,8 @@ static PyMethodDef gw_methods[]={
     {"tap_handle_for_write",(PyCFunction)gw_tap_handle_for_write,METH_NOARGS,"handle write for tap device"},
     {"tap_fd",(PyCFunction)gw_tap_fd,METH_NOARGS,"get tap device fileno"},
     {"netmap_fd",(PyCFunction)gw_netmap_fd,METH_NOARGS,"get netmap device fileno"},
+    {"qos_have_data",(PyCFunction)gw_qos_have_data,METH_NOARGS,"check if all data have been sent"},
+    {"qos_send",(PyCFunction)gw_qos_send,METH_NOARGS,"send data from qos"},
     {NULL}
 };
 
@@ -402,10 +418,10 @@ static PyTypeObject gw_type={
     .tp_new=gw_new,
     .tp_dealloc=(destructor)gw_dealloc,
     .tp_name="gw",
-    .tp_doc="gw",
+    .tp_doc="gateway module for python",
     .tp_basicsize=sizeof(fdsl_gw),
     .tp_itemsize=0,
-    .tp_flags=Py_TPFLAGS_DEFAULT,
+    .tp_flags=Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .tp_methods=gw_methods
 };
 

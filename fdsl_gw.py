@@ -53,13 +53,13 @@ class fdsl_gw(dispatcher.dispatcher):
 
         for cmd in cmds: os.system(cmd)
 
-        self.__gw = gw.gw(netmap_name, tap_name, 1024, 1024, self.gw_cb)
+        self.__gw = gw.gw(netmap_name, tap_name, 1024, self.gw_cb)
 
         self.__netmap_fd = self.create_handler(-1, nm_handler.nm_handler, self.gw.netmap_fd())
         self.__tap_fd = self.create_handler(-1, tap_handler.tapdev_handler, self.gw.tap_fd())
 
-        os.system("ip -4 address add %s dev %s" % (lan_address["inet"], tap_name,))
-        os.system("ip -6 address add %s dev %s" % (lan_address["inet6"], tap_name,))
+        os.system("ip -4 address replace %s dev %s" % (lan_address["inet"], tap_name,))
+        os.system("ip -6 address replace %s dev %s" % (lan_address["inet6"], tap_name,))
 
     @property
     def debug(self):
@@ -74,7 +74,11 @@ class fdsl_gw(dispatcher.dispatcher):
         return self.__gw
 
     def myloop(self):
-        pass
+        if self.__gw.qos_have_data():
+            self.set_default_io_wait_time(0)
+            self.__gw.qos_send()
+        else:
+            self.set_default_io_wait_time(10)
 
     def gw_cb(self, name: str, ev_name: str, is_added: bool):
         if name not in ("netmap", "tap",): return

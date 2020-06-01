@@ -17,8 +17,7 @@ static void __ipv6_handle(struct mbuf *m)
         return;
     }
 
-    DBG_FLAGS;
-    mbuf_pool_put(m);
+    qos_handle(m,1);
 }
 
 static void __ipv4_handle(struct mbuf *m)
