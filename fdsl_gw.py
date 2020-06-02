@@ -53,7 +53,7 @@ class fdsl_gw(dispatcher.dispatcher):
 
         for cmd in cmds: os.system(cmd)
 
-        self.__gw = gw.gw(netmap_name, tap_name, 1024, self.gw_cb)
+        self.__gw = gw.gw(netmap_name, tap_name, 256, self.gw_cb)
 
         self.__netmap_fd = self.create_handler(-1, nm_handler.nm_handler, self.gw.netmap_fd())
         self.__tap_fd = self.create_handler(-1, tap_handler.tapdev_handler, self.gw.tap_fd())

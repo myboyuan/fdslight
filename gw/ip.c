@@ -17,6 +17,7 @@ static void __ipv6_handle(struct mbuf *m)
         return;
     }
 
+
     qos_handle(m,1);
 }
 

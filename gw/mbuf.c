@@ -80,8 +80,8 @@ struct mbuf * mbuf_pool_get(void)
 void mbuf_pool_put(struct mbuf *m)
 {
     struct mbuf_pool *pool=&mbuf_pool;
-    if(pool->pre_alloc_num > pool->cur_alloc_num){
-        ex_free(m);
+    if(pool->cur_alloc_num > pool->pre_alloc_num){
+        free(m);
         pool->cur_alloc_num-=1;
         return;
     }

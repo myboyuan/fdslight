@@ -33,6 +33,7 @@ def __build_gateway_module(cflags):
     files += [
         "freenet/lib/gw.c", "pywind/clib/netif/linux_tuntap.c", "pywind/clib/netif/linux_hwinfo.c"
     ]
+
     sys_build.do_compile(
         files, "freenet/lib/gw.so", cflags, debug=True, is_shared=True
     )

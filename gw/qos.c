@@ -15,12 +15,12 @@ static struct qos qos;
 static int qos_is_initialized=0;
 static int qos_num_for_calc=0;
 
-static unsigned int __qos_calc_slot(unsigned char *dst_addr,u_int8_t protocol,u_int16_t id,int is_ipv6)
+static unsigned int __qos_calc_slot(unsigned char *addr,u_int8_t protocol,u_int16_t id,int is_ipv6)
 {
     unsigned char buf[4];
     unsigned int *v;
 
-    buf[0]=dst_addr[0];
+    buf[0]=addr[0];
     buf[1]=protocol;
     
     memcpy(buf+2,&id,2);
@@ -81,7 +81,7 @@ static void __qos_handle_ip(struct mbuf *m)
         port=0;
     }
     
-    slot=__qos_calc_slot(header->dst_addr,header->protocol,port,0);
+    slot=__qos_calc_slot(header->src_addr,header->protocol,port,0);
 
     if(__qos_put(m,slot)){
         mbuf_pool_put(m);
@@ -113,7 +113,7 @@ static void __qos_handle_ipv6(struct mbuf *m)
         port=0;
     }
     
-    slot=__qos_calc_slot(header->dst_addr,header->next_header,port,1);
+    slot=__qos_calc_slot(header->src_addr,header->next_header,port,1);
 
     if(__qos_put(m,slot)){
         mbuf_pool_put(m);
