@@ -38,7 +38,7 @@ class fdsl_gw(dispatcher.dispatcher):
         self.gw_init()
 
     def check_kern_mod(self):
-        ko_file = "%s/netmap/netmap.ko" % BASE_DIR
+        ko_file = "%s/driver/netmap.ko" % BASE_DIR
 
         if not os.path.isfile(ko_file):
             print("you must install this software")
