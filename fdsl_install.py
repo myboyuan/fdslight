@@ -39,9 +39,33 @@ def __build_gateway_module(cflags):
     )
 
 
+def __build_netmap():
+    os.chdir("netmap")
+
+    cmds = [
+        "tar xf .git.tgz",
+        "git pull origin master",
+        "./configure",
+        "make",
+        "make install"
+    ]
+
+    for cmd in cmds: os.system(cmd)
+
+    os.chdir("..")
+
+
 def build_gateway(cflags):
+    user = os.getenv("USER")
+
+    if user != "root":
+        print("ERROR:you should use root user to install it")
+        return
+
     __build_gateway_module(cflags)
     __build_cone_nat()
+    __build_netmap()
+
     write_kern_ver_to_file("fdslight_etc/kern_version")
 
 
@@ -57,8 +81,16 @@ def __build_cone_nat():
     :return:
     """
     os.chdir("driver/netfilter-full-cone-nat")
-    os.system("make clean")
-    os.system("make")
+
+    cmds = [
+        "tar xf .git.tgz",
+        "git pull origin master",
+        "make clean",
+        "make",
+        "make install"
+    ]
+
+    for cmd in cmds: os.system(cmd)
 
     fname = "xt_FULLCONENAT.ko"
     fpath = "../%s" % fname
