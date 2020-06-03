@@ -38,12 +38,9 @@ def __build_gateway_module(cflags):
         files, "freenet/lib/gw.so", cflags, debug=True, is_shared=True
     )
 
+
 def build_gateway(cflags):
     user = os.getenv("USER")
-
-    if user != "root":
-        print("ERROR:you should use root user to install it")
-        return
 
     __build_gateway_module(cflags)
     __build_cone_nat()
@@ -65,8 +62,6 @@ def __build_cone_nat():
     os.chdir("driver/netfilter-full-cone-nat")
 
     cmds = [
-        "tar xf .git.tgz",
-        "git pull origin master",
         "make clean",
         "make",
         "make install"
