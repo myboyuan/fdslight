@@ -41,7 +41,7 @@ class fdsl_gw(dispatcher.dispatcher):
         ko_file = "%s/driver/netmap.ko" % BASE_DIR
 
         if not os.path.isfile(ko_file):
-            print("you must install this software")
+            print("ERROR:not found kernel module %s" % ko_file)
             return False
 
         fpath = "%s/fdslight_etc/kern_version" % BASE_DIR
