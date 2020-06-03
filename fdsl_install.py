@@ -61,10 +61,10 @@ def build_gateway(cflags):
     if user != "root":
         print("ERROR:you should use root user to install it")
         return
-
+    # 首先要构建netmap模块,gateway_module依赖netmap模块
+    __build_netmap()
     __build_gateway_module(cflags)
     __build_cone_nat()
-    __build_netmap()
 
     write_kern_ver_to_file("fdslight_etc/kern_version")
 
