@@ -73,6 +73,7 @@ class fdsl_gw(dispatcher.dispatcher):
         cmds = [
             "modprobe -r veth",
             "insmod %s/netmap/netmap.ko" % BASE_DIR,
+            "ip link set %s up" % netmap_name,
             # 设置网卡为混杂模式
             "ip link set %s promisc on" % netmap_name,
         ]
