@@ -164,6 +164,9 @@ def __start_service(debug):
 
         if pid != 0: sys.exit(0)
         proc.write_pid(PID_FILE)
+        
+        sys.stdout = open(LOG_FILE, "a+")
+        sys.stderr = open(ERR_FILE, "a+")
 
     configs = configfile.ini_parse_from_file("%s/fdslight_etc/fn_gw.ini" % BASE_DIR)
     cls = fdsl_gw()
