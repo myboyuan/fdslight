@@ -40,8 +40,6 @@ def __build_gateway_module(cflags):
 
 
 def build_gateway(cflags):
-    user = os.getenv("USER")
-
     __build_gateway_module(cflags)
     __build_cone_nat()
 
