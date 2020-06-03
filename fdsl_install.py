@@ -38,31 +38,13 @@ def __build_gateway_module(cflags):
         files, "freenet/lib/gw.so", cflags, debug=True, is_shared=True
     )
 
-
-def __build_netmap():
-    os.chdir("netmap")
-
-    cmds = [
-        "tar xf .git.tgz",
-        "git pull origin master",
-        "./configure",
-        "make",
-        "make install"
-    ]
-
-    for cmd in cmds: os.system(cmd)
-
-    os.chdir("..")
-
-
 def build_gateway(cflags):
     user = os.getenv("USER")
 
     if user != "root":
         print("ERROR:you should use root user to install it")
         return
-    # 首先要构建netmap模块,gateway_module依赖netmap模块
-    __build_netmap()
+
     __build_gateway_module(cflags)
     __build_cone_nat()
 
