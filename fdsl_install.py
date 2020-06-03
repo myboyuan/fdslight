@@ -40,10 +40,9 @@ def __build_gateway_module(cflags):
 
 
 def build_gateway(cflags):
+    write_kern_ver_to_file("fdslight_etc/kern_version")
     __build_gateway_module(cflags)
     __build_cone_nat()
-
-    write_kern_ver_to_file("fdslight_etc/kern_version")
 
 
 def build_tunnel_server(cflags, kern_nat_mod=False):
