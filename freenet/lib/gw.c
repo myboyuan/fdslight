@@ -223,12 +223,9 @@ gw_nm_handle_for_write(PyObject *self,PyObject *args)
         netmap_write_flags=0;
         b=PyBool_FromLong(0);
 
-        DBG_FLAGS;
         arglist=Py_BuildValue("(ssN)","netmap","write",b);
         cb_rs=PyObject_CallObject(f,arglist);
-        DBG_FLAGS;
 
-        Py_DECREF(b);
         Py_DECREF(arglist);
         Py_XDECREF(cb_rs);
 
@@ -298,19 +295,13 @@ gw_tap_handle_for_write(PyObject *self,PyObject *args)
         tap_write_flags=0;
         b=PyBool_FromLong(0);
         arglist=Py_BuildValue("(ssN)","tap","write",b);
-        DBG_FLAGS;
         cb_rs=PyObject_CallObject(f,arglist);
-        DBG_FLAGS;
-
-        Py_DECREF(b);
+        
         Py_DECREF(arglist);
         Py_XDECREF(cb_rs);
-        DBG_FLAGS;
   
         Py_RETURN_TRUE;
     }
-
-    DBG_FLAGS;
 
     while(1){
         m=tap_sent_head;
@@ -404,10 +395,8 @@ void send_data(struct mbuf *m)
     arglist=Py_BuildValue("(ssN)",name,ev_name,b);
     result=PyObject_CallObject(f,arglist);
 
-    Py_DECREF(b);
     Py_DECREF(arglist);
     Py_XDECREF(result);
-    DBG_FLAGS;
 }
 
 static PyMethodDef gw_methods[]={

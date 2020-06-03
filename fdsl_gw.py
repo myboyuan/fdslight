@@ -37,12 +37,38 @@ class fdsl_gw(dispatcher.dispatcher):
 
         self.gw_init()
 
+    def check_kern_mod(self):
+        ko_file = "%s/netmap/netmap.ko" % BASE_DIR
+
+        if not os.path.isfile(ko_file):
+            print("you must install this software")
+            return False
+
+        fpath = "%s/fdslight_etc/kern_version" % BASE_DIR
+        if not os.path.isfile(fpath):
+            print("you must install this software")
+            return False
+
+        with open(fpath, "r") as f:
+            cp_ver = f.read()
+            fp = os.popen("uname -r")
+            now_ver = fp.read()
+            fp.close()
+
+        if cp_ver != now_ver:
+            print("the kernel is changed,please reinstall this software")
+            return False
+
+        return True
+
     def gw_init(self):
         devices = self.__configs["network_devices"]
         lan_address = self.__configs["lan_address"]
 
         netmap_name = devices["ethernet_name"]
         tap_name = devices.get("tap_name", "gateway")
+
+        if not self.check_kern_mod(): sys.exit(-1)
 
         cmds = [
             "modprobe -r veth",
@@ -115,7 +141,12 @@ class fdsl_gw(dispatcher.dispatcher):
         return
 
     def release(self):
-        pass
+        self.delete_handler(self.__tap_fd)
+        self.delete_handler(self.__netmap_fd)
+        del self.__gw
+
+        # 释放调用的内和模块资源之后再删除模块
+        os.system("rmmod netmap")
 
 
 def __start_service(debug):
@@ -137,16 +168,15 @@ def __start_service(debug):
     configs = configfile.ini_parse_from_file("%s/fdslight_etc/fn_gw.ini" % BASE_DIR)
     cls = fdsl_gw()
 
-    if debug:
-        cls.ioloop(debug, configs)
-        return
     try:
         cls.ioloop(debug, configs)
+    except KeyboardInterrupt:
+        pass
     except:
-        cls.release()
         logging.print_error()
 
-    os.remove(PID_FILE)
+    cls.release()
+    if not debug: os.remove(PID_FILE)
     sys.exit(0)
 
 
