@@ -50,7 +50,7 @@ goo.gl:1
 *.ads-twitter.com:1
 *.withgoogle.com:1
 *.google:1
-
+*.vimeo.com:1
 
 #  社交网络
 *.facebook.com:1
