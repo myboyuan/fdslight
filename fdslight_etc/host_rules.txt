@@ -52,6 +52,7 @@ goo.gl:1
 *.google:1
 *.paypal.com:1
 *.paypal.com:1
+*.paypalobjects.com:1
 
 #  社交网络
 *.facebook.com:1
