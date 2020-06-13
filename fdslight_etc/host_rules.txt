@@ -96,6 +96,7 @@ goo.gl:1
 *.netflix.com:1
 *.nflximg.net:1
 *.youtaker.com:1
+*.vimeocdn.com:1
 
 # 博客
 *.wordpress.com:1
