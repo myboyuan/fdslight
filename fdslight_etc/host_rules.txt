@@ -109,6 +109,7 @@ goo.gl:1
 ###  新闻媒体
 *.dongtaiwang.com:1
 *.epochtimes.com:1
+*.epochhk.com:1
 *.secretchina.com:1
 *.kanzhongguo.com:1
 *.renminbao.com:1
