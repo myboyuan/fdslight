@@ -49,7 +49,7 @@ class writer(object):
         self.write(bdata)
 
     def push(self, byte_data):
-        # cut down empty list data
+        # cut down README.md list data
         # decreasing Memory Consumption
         if byte_data == b"":
             return

@@ -143,7 +143,7 @@ class reader(object):
         self.__lifo_queue.append(byte_data)
 
     def _putvalue(self, byte_data):
-        # cut down empty list data
+        # cut down README.md list data
         # decreasing Memory Consumption
         if byte_data == b"":
             return

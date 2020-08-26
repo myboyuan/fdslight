@@ -8,12 +8,14 @@
 #include<net/if.h>
 #include<sys/sysctl.h>
 #include<net/if_tun.h>
+#include<net/if_tap.h>
 #include<sys/socket.h>
 #include<stdlib.h>
 #include<sys/stat.h>
 #include<sys/ioctl.h>
 
 #include "tuntap.h"
+#include "../debug.h"
 
 static int __tuntap_create(char *tuntap_name,int is_tap)
 {
@@ -47,10 +49,12 @@ static int __tuntap_create(char *tuntap_name,int is_tap)
     fd = open(buf, O_RDWR);
     v = 0;
 
-    rs = ioctl(fd, TUNSLMODE, &v);
+    if(!is_tap) rs = ioctl(fd, TUNSLMODE, &v);
+    else rs=0;
+    
     if (rs < 0){
-        close(fd);
-        fprintf(stderr, "cannot set tuntap argument at function %s\r\n", __func__);
+        tapdev_close(fd,name);
+        STDERR("cannot set tuntap\r\n");
         return -1;
     }
 

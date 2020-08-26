@@ -143,3 +143,71 @@ def is_port_number(n):
     if v > 0xffff or v < 1: return False
 
     return True
+
+
+def is_ipv4_address(sts_ipaddr):
+    """检查是否是IPv4地址"""
+    if not isinstance(sts_ipaddr, str): return False
+    if len(sts_ipaddr) < 7: return False
+
+    seq = sts_ipaddr.split(".")
+    if len(seq) != 4: return False
+
+    for c in seq:
+        try:
+            v = int(c)
+            if v > 255: return False
+        except ValueError:
+            return False
+        ''''''
+    try:
+        socket.inet_aton(sts_ipaddr)
+    except OSError:
+        return False
+    return True
+
+
+def is_ipv6_address(sts_ipaddr):
+    """检查是否是IPv6地址"""
+    if not isinstance(sts_ipaddr, str): return False
+    if sts_ipaddr.find(":") < 0: return False
+    seq = sts_ipaddr.split(":")
+
+    for s in seq:
+        if not s: continue
+        s = "0x%s" % s
+        try:
+            int(s, 16)
+        except ValueError:
+            return False
+
+    try:
+        socket.inet_pton(socket.AF_INET6, sts_ipaddr)
+    except OSError:
+        return False
+    return True
+
+
+def byte_hwaddr_to_str(byte_hwaddr: bytes):
+    """硬件地址转换成字符串类型
+    """
+    seq = []
+    for i in byte_hwaddr:
+        s = hex(i)
+        s = s[2:]
+        if len(s) < 2: s = "0%s" % s
+        seq.append(s)
+
+    return ":".join(seq)
+
+
+def str_hwaddr_to_bytes(s: str):
+    seq = s.split(":")
+    new_seq = []
+
+    for x in seq:
+        t = "0x%s" % x
+        n = int(t, 16)
+        new_seq.append(n)
+
+    return bytes(new_seq)

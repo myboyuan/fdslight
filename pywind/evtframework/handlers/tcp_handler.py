@@ -77,6 +77,12 @@ class tcp_handler(handler.handler):
     def writer(self):
         return self.__writer
 
+    def send(self, *args):
+        return self.socket.send(*args)
+
+    def recv(self, *args):
+        return self.socket.recv(*args)
+
     def evt_read(self):
         if self.__is_listen_socket:
             self.tcp_accept()
@@ -89,7 +95,7 @@ class tcp_handler(handler.handler):
         # 使用for,防止一直读取数据
         for i in range(self.tcp_loop_read_num):
             try:
-                recv_data = self.socket.recv(self.tcp_recv_buf_size)
+                recv_data = self.recv(self.tcp_recv_buf_size)
                 if not recv_data:
                     # 处理未接收完毕的数据
                     if self.reader.size() > 0: self.tcp_readable()
@@ -127,7 +133,7 @@ class tcp_handler(handler.handler):
         if self.writer.size() == 0:
             self.tcp_writable()
         try:
-            sent_size = self.socket.send(sent_data)
+            sent_size = self.send(sent_data)
 
             if size > sent_size:
                 self.writer.write(sent_data[sent_size:])

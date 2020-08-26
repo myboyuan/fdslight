@@ -4,8 +4,9 @@ import os
 import random
 import time
 import urllib.parse
+import json
 
-import pywind as reader
+import pywind.lib.reader as reader
 import pywind.web.lib.multipart as http_multipart
 
 
@@ -585,6 +586,13 @@ class handler(object):
         self.set_status("200 OK")
         self.set_header("Content-Type", content_type)
         self.finish(byte_data)
+
+    def finish_with_json(self, o, charset="utf-8"):
+        s = json.dumps(o)
+        self.finish_with_bytes("application/json;charset=%s" % charset, s.encode())
+
+    def finish_with_text(self, text, charset="utf-8"):
+        self.finish_with_bytes("text/plain;charset=%s" % charset, text.encode())
 
     def get_header_date(self, seconds):
         """生成WEB常用的GMT时间格式"""

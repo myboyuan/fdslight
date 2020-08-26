@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import pywind as reader
+import pywind.lib.reader as reader
 import pywind.web.lib.httpchunked as httpchunked
 import sys, traceback
 

@@ -8,7 +8,7 @@ import socket, os, time
 class scgiErr(Exception): pass
 
 
-class scgid_listen(tcp_handler.tcp_handler):
+class scgid_listener(tcp_handler.tcp_handler):
     # 最大连接数
     __max_conns = 0
     __current_conns = 0
@@ -17,7 +17,7 @@ class scgid_listen(tcp_handler.tcp_handler):
 
     def init_func(self, creator_fd, configs):
         self.__configs = configs
-        self.__max_conns = configs.get("max_conns", 10)
+        self.__max_conns = configs.get("max_conns", 100)
         use_unix_socket = configs.get("use_unix_socket", False)
         if use_unix_socket:
             s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -65,6 +65,8 @@ class scgid(tcp_handler.tcp_handler):
     __header_ok = False
     __wsgi = None
     __mtime = None
+    __sent_buf = None
+    __closed = None
 
     def __parse_scgi_header(self):
         size = self.reader.size()
@@ -74,12 +76,13 @@ class scgid(tcp_handler.tcp_handler):
 
         if pos < 0 and size > 16: raise scgiErr("cannot found length")
         try:
-            hdr_size = int(rdata[0:pos]) + 1
+            tot_len = int(rdata[0:pos])
         except ValueError:
             raise scgiErr("invalid length character")
-        pos += 1
 
+        pos += 1
         rdata = rdata[pos:]
+
         if rdata[0:14] != b"CONTENT_LENGTH": raise scgiErr("cannot found content_length at first")
 
         t = rdata[15:]
@@ -92,7 +95,7 @@ class scgid(tcp_handler.tcp_handler):
         except ValueError:
             raise scgiErr("invalid content_length character")
 
-        pos += 1
+        hdr_size = tot_len - content_length + 1
         hdr_data = rdata[0:hdr_size]
 
         if len(hdr_data) != hdr_size:
@@ -133,6 +136,8 @@ class scgid(tcp_handler.tcp_handler):
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
         self.__mtime = time.time()
+        self.__sent_buf = []
+        self.__closed = False
 
         return self.fileno
 
@@ -155,7 +160,10 @@ class scgid(tcp_handler.tcp_handler):
 
     def tcp_writable(self):
         self.__mtime = time.time()
-        self.remove_evt_write(self.fileno)
+        if self.__sent_buf: self.writer.write(self.__sent_buf.pop(0))
+        if self.writer.size() == 0:
+            self.remove_evt_write(self.fileno)
+            return
 
     def tcp_error(self):
         self.delete_handler(self.fileno)
@@ -177,14 +185,17 @@ class scgid(tcp_handler.tcp_handler):
         if self.__wsgi: self.__wsgi.finish()
 
     def task_loop(self):
+        if self.__closed and not self.__sent_buf and self.writer.size() == 0:
+            self.delete_handler(self.fileno)
+            return
         self.__wsgi.handle()
 
     def __finish_request(self, *args, **kwargs):
-        self.delete_this_no_sent_data()
+        self.__closed = True
 
     def __resp_body_data(self, body_data, *args, **kwargs):
         self.add_evt_write(self.fileno)
-        self.writer.write(body_data)
+        self.__sent_buf += self.slice_data(body_data)
 
     def __resp_header(self, status, resp_headers, *args, **kwargs):
         tmplist = ["Status: %s\r\n" % status, ]
@@ -195,4 +206,21 @@ class scgid(tcp_handler.tcp_handler):
         tmplist.append("\r\n")
 
         self.add_evt_write(self.fileno)
-        self.writer.write("".join(tmplist).encode())
+
+        byte_data = "".join(tmplist).encode()
+        self.__sent_buf += self.slice_data(byte_data)
+
+    def slice_data(self, byte_data, block_size=4096):
+        """对数据进行分片
+        """
+        b, e = (0, block_size,)
+        results = []
+
+        while 1:
+            data = byte_data[b:e]
+            if not data: break
+            b = e
+            e += block_size
+            results.append(data)
+
+        return results

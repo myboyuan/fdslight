@@ -15,8 +15,10 @@ class dispatcher(object):
     __loop_tasks = None
 
     __default_io_wait_time = None
+    __debug = None
 
-    def __init__(self):
+    def __init__(self, debug=False):
+        self.__debug = debug
         global_vars["pyw.ioevtfw.dispatcher"] = self
         self.__default_io_wait_time = 10
 
