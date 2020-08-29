@@ -34,7 +34,7 @@ class builder(object):
         return res
 
     def gen_rand_bytes(self):
-        n = random.randint(0, 1024)
+        n = random.randint(0, 14)
 
         return (n, os.urandom(n),)
 
