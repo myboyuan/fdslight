@@ -4,7 +4,7 @@ import os
 builder = tunnel_tcp.builder(tunnel_tcp.MIN_FIXED_HEADER_SIZE)
 
 session_id=os.urandom(16)
-data = builder.build_packet(session_id, 1, b"hello,world")
+data = builder.build_packet(session_id, 1, b"hello,world,debian wheezy")
 
 parser = tunnel_tcp.parser(tunnel_tcp.MIN_FIXED_HEADER_SIZE)
 parser.input(data)

@@ -50,13 +50,12 @@ class builder(object):
             if not _byte_data: break
 
             rand_length, rand_bytes = self.gen_rand_bytes()
-
-            pkt_len = len(_byte_data) + rand_length
-            tot_len = self.get_payload_length(pkt_len)
+            pkt_len = len(_byte_data)
+            tot_len = self.get_payload_length(pkt_len) + rand_length
             base_hdr = self.__build_proto_headr(session_id, rand_length, tot_len, pkt_len, action)
 
             e_hdr = self.wrap_header(base_hdr)
-            e_body = self.wrap_body(pkt_len, rand_bytes + _byte_data)
+            e_body = b"".join([rand_bytes, self.wrap_body(pkt_len, _byte_data)])
 
             seq.append(b"".join((e_hdr, e_body,)))
             a, b = (b, b + 60000,)
@@ -118,10 +117,11 @@ class parser(object):
 
         if self.__header_ok:
             if size < self.__tot_length: return
-            e_body = self.__reader.read(self.__tot_length)
+            self.__reader.read(self.__rand_length)
+            e_body = self.__reader.read(self.__tot_length - self.__rand_length)
             body = self.unwrap_body(self.__real_length, e_body)
 
-            self.__results.append((self.__session_id, self.__action, body[self.__rand_length:],))
+            self.__results.append((self.__session_id, self.__action, body,))
             self.reset()
             return
         if self.__reader.size() < self.__fixed_hdr_size: return

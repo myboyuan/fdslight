@@ -12,7 +12,7 @@ import freenet.lib.base_proto.tunnel_tcp as tunnel
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.crypto.aes._aes_cfb as aes_cfb
 
-FIXED_HEADER_SIZE = 64
+FIXED_HEADER_SIZE = 48
 
 
 class encrypt(tunnel.builder):
@@ -106,7 +106,7 @@ key="name"
 builder = encrypt()
 builder.config({"key":key})
 
-e_rs = builder.build_packet(bytes(16),tunnel.ACT_IPDATA,b"hello")
+e_rs = builder.build_packet(bytes(16),proto_utils.ACT_IPDATA,b"hello")
 builder.reset()
 
 parser = decrypt()
@@ -117,7 +117,7 @@ while parser.can_continue_parse():
     parser.parse()
 print(parser.get_pkt())
 
-e_rs = builder.build_packet(bytes(16),tunnel.ACT_IPDATA,b"world")
+e_rs = builder.build_packet(bytes(16),proto_utils.ACT_IPDATA,b"world")
 builder.reset()
 parser.input(e_rs)
 
