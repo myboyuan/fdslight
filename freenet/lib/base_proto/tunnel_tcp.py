@@ -2,19 +2,21 @@
 """TCP隧道
 协议格式如下:
 session_id:16 byte 会话ID,16 bytes的MD5值
-payload_md5:16 byte 未加密的内容的MD5值
 reverse:4bit 保留
 action:4 bit 包动作
+rand_byte_size:2 bytes 产生的随机byte数目
 tot_length: 2 bytes 包的总长度
 real_length: 2 bytes 加密前的长度
 """
-MIN_FIXED_HEADER_SIZE = 37
+MIN_FIXED_HEADER_SIZE = 23
 
 import pywind.lib.reader as reader
 import freenet.lib.base_proto.utils as proto_utils
 import struct
 
-_FMT = "!16s16sbHH"
+_FMT = "!16sbHHH"
+
+import random, os
 
 
 class builder(object):
@@ -25,29 +27,16 @@ class builder(object):
         if fixed_hdr_size < MIN_FIXED_HEADER_SIZE: raise ValueError(
             "min fixed header size is %s" % MIN_FIXED_HEADER_SIZE)
 
-    def __build_proto_headr(self, session_id, payload_m5, tot_len, real_size, action):
-        """
-        seq = [
-            session_id, payload_m5,
-        ]
-
-        T = (
-            action & 0x0f,
-            (tot_len & 0xff00) >> 8,
-            tot_len & 0x00ff,
-            (real_size & 0xff00) >> 8,
-            real_size & 0x00ff,
-        )
-
-        seq.append(bytes(T))
-
-        return b"".join(seq)
-        """
+    def __build_proto_headr(self, session_id, rand_size, tot_len, real_size, action):
         res = struct.pack(
-            _FMT, session_id, payload_m5, action, tot_len, real_size
+            _FMT, session_id, action, rand_size, tot_len, real_size
         )
-
         return res
+
+    def gen_rand_bytes(self):
+        n = random.randint(0, 1024)
+
+        return (n, os.urandom(n),)
 
     def build_packet(self, session_id, action, byte_data):
         if len(session_id) != 16: raise proto_utils.ProtoError("the size of session_id must be 16")
@@ -60,13 +49,14 @@ class builder(object):
             _byte_data = byte_data[a:b]
             if not _byte_data: break
 
-            pkt_len = len(_byte_data)
+            rand_length, rand_bytes = self.gen_rand_bytes()
+
+            pkt_len = len(_byte_data) + rand_length
             tot_len = self.get_payload_length(pkt_len)
-            payload_md5 = proto_utils.calc_content_md5(_byte_data)
-            base_hdr = self.__build_proto_headr(session_id, payload_md5, tot_len, pkt_len, action)
+            base_hdr = self.__build_proto_headr(session_id, rand_length, tot_len, pkt_len, action)
 
             e_hdr = self.wrap_header(base_hdr)
-            e_body = self.wrap_body(pkt_len, _byte_data)
+            e_body = self.wrap_body(pkt_len, rand_bytes + _byte_data)
 
             seq.append(b"".join((e_hdr, e_body,)))
             a, b = (b, b + 60000,)
@@ -97,7 +87,7 @@ class parser(object):
     __reader = None
     __fixed_hdr_size = MIN_FIXED_HEADER_SIZE
     __session_id = None
-    __payload_md5 = None
+    __rand_length = None
     # 数据负荷大小
     __tot_length = 0
     # 解密后的数据大小
@@ -118,17 +108,6 @@ class parser(object):
             "min fixed header size is %s" % MIN_FIXED_HEADER_SIZE)
 
     def __parse_header(self, hdr):
-        """
-        session_id = hdr[0:16]
-        paylod_md5 = hdr[16:32]
-
-        n = hdr[32]
-        action = n & 0x0f
-        tot_len = (hdr[33] << 8) | hdr[34]
-        real_size = (hdr[35] << 8) | hdr[36]
-
-        return (session_id, paylod_md5, action, tot_len, real_size,)
-        """
         return struct.unpack(_FMT, hdr)
 
     def input(self, byte_data):
@@ -142,10 +121,7 @@ class parser(object):
             e_body = self.__reader.read(self.__tot_length)
             body = self.unwrap_body(self.__real_length, e_body)
 
-            if proto_utils.calc_content_md5(body) != self.__payload_md5: raise proto_utils.ProtoError(
-                "data has been modified")
-
-            self.__results.append((self.__session_id, self.__action, body,))
+            self.__results.append((self.__session_id, self.__action, body[self.__rand_length:],))
             self.reset()
             return
         if self.__reader.size() < self.__fixed_hdr_size: return
@@ -153,8 +129,8 @@ class parser(object):
         if not hdr:
             self.reset()
             return
-        self.__session_id, self.__payload_md5, \
-        self.__action, self.__tot_length, self.__real_length = self.__parse_header(hdr)
+        self.__session_id, \
+        self.__action, self.__rand_length, self.__tot_length, self.__real_length = self.__parse_header(hdr)
         self.__header_ok = True
 
     def unwrap_header(self, header):
