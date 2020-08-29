@@ -51,6 +51,7 @@ class tcp_tunnel(tcp_handler.tcp_handler):
         else:
             fa = socket.AF_INET
         s = socket.socket(fa, socket.SOCK_STREAM)
+        s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
         self.__over_https = kwargs.get("tunnel_over_https", False)
 

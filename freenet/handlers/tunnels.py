@@ -84,6 +84,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         self.__over_http = over_http
         self.__http_auth_id = http_configs["auth_id"]
 
+        cs.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.set_socket(cs)
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
 
