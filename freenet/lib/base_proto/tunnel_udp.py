@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """协议帧格式
 session_id: 16bytes 会话ID,为MD5值
-packet_md5:16 bytes 没有分包之前的内容MD5值
 tot_len:2 bytes 未分包前的数据长度
 payload_length:2 bytes 实际负载数据长度
 tot_seg: 4 bit 全部的分包个数
@@ -12,9 +11,9 @@ action:4bit 动作
 import freenet.lib.base_proto.utils as proto_utils
 import struct
 
-MIN_FIXED_HEADER_SIZE = 38
+MIN_FIXED_HEADER_SIZE = 22
 
-_FMT = "!16s16sHHbb"
+_FMT = "!16sHHbb"
 
 
 class builder(object):
@@ -64,25 +63,10 @@ class builder(object):
 
         return (bytes(list_a), bytes(list_b), bytes(csum_list),)
 
-    def __build_proto_header(self, session_id, pkt_md5, pkt_len, real_size, tot_seg, seq, action):
+    def __build_proto_header(self, session_id, pkt_len, real_size, tot_seg, seq, action):
         if action not in proto_utils.ACTS: raise ValueError("not support action type")
-        """
-        L = [
-            session_id, pkt_md5,
-        ]
-
-        T = [
-            (pkt_len & 0xff00) >> 8, pkt_len & 0x00ff,
-            (real_size & 0xff00) >> 8, real_size & 0x00ff,
-            (tot_seg << 4) | seq, action,
-        ]
-
-        L.append(bytes(T))
-
-        return b"".join(L)
-        """
         return struct.pack(
-            _FMT, session_id, pkt_md5,
+            _FMT, session_id,
             pkt_len, real_size, (tot_seg << 4) | seq, action
         )
 
@@ -130,12 +114,11 @@ class builder(object):
         data_seq = []
         tmp_t = self.__get_sent_raw_data(data_len, byte_data, redundancy=redundancy)
         tot_seq = len(tmp_t)
-        md5_hash = proto_utils.calc_content_md5(byte_data)
         seq = 1
 
         for block in tmp_t:
             size = len(block)
-            base_header = self.__build_proto_header(session_id, md5_hash, data_len, size, tot_seq, seq, action)
+            base_header = self.__build_proto_header(session_id, data_len, size, tot_seq, seq, action)
             e_hdr = self.wrap_header(base_header)
             e_body = self.wrap_body(size, block)
             data_seq.append(b"".join((e_hdr, e_body,)))
@@ -174,7 +157,6 @@ class builder(object):
 
 class parser(object):
     __fixed_header_size = 0
-    __pkt_md5 = None
     __data_area = None
     # 总共的段数
     __tot_seg = 0
@@ -200,28 +182,13 @@ class parser(object):
         return bytes(tmp_list)
 
     def __parse_header(self, header):
-        """
-        session_id = header[0:16]
-        pkt_md5 = header[16:32]
-
-        pkt_len = (header[32] << 8) | header[33]
-        payload_len = (header[34] << 8) | header[35]
-
-        seg_info = header[36]
-
-        tot_seg = (seg_info & 0xf0) >> 4
-        seq = seg_info & 0x0f
-        action = header[37] & 0x0f
-
-        return (session_id, pkt_md5, pkt_len, payload_len, tot_seg, seq, action,)
-        """
         res = struct.unpack(_FMT, header)
 
         return (
             res[0], res[1],
-            res[2], res[3],
-            (res[4] & 0xf0) >> 4,
-            res[4] & 0x0f, res[5],
+            res[2],
+            (res[3] & 0xf0) >> 4,
+            res[3] & 0x0f, res[4],
         )
 
     def __get_pkt(self, pkt):
@@ -229,15 +196,11 @@ class parser(object):
 
         return pkt[0:self.__pkt_len]
 
-    def __check_data_is_modify(self, md5, byte_data):
-        n_md5 = proto_utils.calc_content_md5(byte_data)
-        return md5 == n_md5
-
     def parse(self, packet):
         real_header = self.unwrap_header(packet[0:self.__fixed_header_size])
         if not real_header: return
 
-        session_id, pkt_md5, pkt_len, payload_len, tot_seg, seq, action = self.__parse_header(real_header)
+        session_id, pkt_len, payload_len, tot_seg, seq, action = self.__parse_header(real_header)
         real_body = self.unwrap_body(payload_len, packet[self.__fixed_header_size:])
 
         self.__pkt_len = pkt_len
@@ -248,10 +211,7 @@ class parser(object):
         # 如果只有一个数据包,那么直接返回
         if tot_seg == 1:
             self.reset()
-            if not self.__check_data_is_modify(pkt_md5, real_body): return None
             return (session_id, action, real_body,)
-
-        if pkt_md5 != self.__pkt_md5 and self.__data_area: self.reset()
 
         # 最大分段只能是3段
         if tot_seg > 3: return None
@@ -261,16 +221,13 @@ class parser(object):
             pkt = b"".join((self.__data_area[1], self.__data_area[2],))
             self.reset()
             body_data = self.__get_pkt(pkt)
-            if not self.__check_data_is_modify(pkt_md5, body_data): return None
             return (session_id, action, body_data,)
         if len(self.__data_area) == 2:
             result = self.__get_data_from_raib()
             body_data = self.__get_pkt(result)
             self.reset()
-            if not self.__check_data_is_modify(pkt_md5, body_data): return None
             return (session_id, action, body_data,)
 
-        self.__pkt_md5 = pkt_md5
         return None
 
     def __get_data_from_raib(self):
@@ -331,8 +288,9 @@ b = builder(MIN_FIXED_HEADER_SIZE)
 data = list(bytes(1400))
 data.append(69)
 
-edata = b.build_packets(bytes(16), ACT_IPDATA, bytes(data))
-edata.pop(1)
+edata = b.build_packets(bytes(16), 1, b"hello,world")
+print(edata)
+# edata.pop(1)
 # print(edata)
 
 for t in edata:

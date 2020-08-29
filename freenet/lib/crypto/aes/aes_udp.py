@@ -12,7 +12,7 @@ import os
 import freenet.lib.base_proto.tunnel_udp as tunnel
 import freenet.lib.crypto.aes._aes_cfb as aes_cfb
 
-FIXED_HEADER_SIZE = 64
+FIXED_HEADER_SIZE = 48
 
 
 class encrypt(tunnel.builder):
@@ -111,13 +111,12 @@ for n in range(length):
 
 key = "hello"
 builder = encrypt()
-builder.config({"key":key})
+builder.config({"key": key})
 
-packets = builder.build_packets(bytes(16),tunnel.ACT_IPDATA,b"hello")
+packets = builder.build_packets(bytes(16), 2, b"hello,world")
 
 parser = decrypt()
-parser.config({"key":"hello"})
-
+parser.config({"key": "hello"})
 
 for pkt in packets:
     ret = parser.parse(pkt)
