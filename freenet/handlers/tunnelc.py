@@ -430,7 +430,7 @@ class udp_tunnel(udp_handler.udp_handler):
         server_ip = self.dispatcher.get_server_ip(server_address[0])
 
         if not server_ip: return False
-
+        print(server_ip)
         try:
             self.connect((server_ip, server_address[1]))
         except socket.gaierror:
