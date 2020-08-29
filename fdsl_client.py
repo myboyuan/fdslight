@@ -28,7 +28,7 @@ _MODE_GW = 1
 _MODE_LOCAL = 2
 
 # 自动日志清理时间
-AUTO_LOG_CLEAN_TIME = 60
+AUTO_LOG_CLEAN_TIME = 3600
 
 PID_FILE = "/tmp/fdslight.pid"
 LOG_FILE = "/tmp/fdslight.log"
