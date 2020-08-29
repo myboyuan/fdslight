@@ -596,6 +596,7 @@ class _fdslight_client(dispatcher.dispatcher):
         return ipaddr
 
     def clean_log(self):
+        if self.__debug: return
         sys.stdout.close()
         # 删除日志
         os.remove(LOG_FILE)
