@@ -3,6 +3,6 @@
 import socket
 
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-s.connect(("iplc.gg.uovz.com", 12347))
+s.connect(("119.147.144.130", 12347))
 s.send(b"hello")
 s.close()

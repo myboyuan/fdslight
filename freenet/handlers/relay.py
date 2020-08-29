@@ -188,6 +188,7 @@ class udp_listener(udp_handler.udp_handler):
         return self.fileno
 
     def udp_readable(self, message, address):
+        print(message, address)
         name = "%s-%s" % address
         if name in self.__session_fds_reverse:
             fd = self.__session_fds_reverse[name]

@@ -430,7 +430,7 @@ class udp_tunnel(udp_handler.udp_handler):
         server_ip = self.dispatcher.get_server_ip(server_address[0])
 
         if not server_ip: return False
-        print(server_ip)
+
         try:
             self.connect((server_ip, server_address[1]))
         except socket.gaierror:
@@ -489,6 +489,7 @@ class udp_tunnel(udp_handler.udp_handler):
         self.unregister(self.fileno)
         self.dispatcher.tell_tunnel_close()
         self.close()
+        if not self.__server_address: return
         logging.print_general("udp_close", self.__server_address)
 
     def send_msg_to_tunnel(self, session_id, action, message):
