@@ -467,7 +467,6 @@ class udp_tunnel(udp_handler.udp_handler):
         self.remove_evt_write(self.fileno)
 
     def udp_error(self):
-        logging.print_error()
         logging.print_general("udp_error", self.__server_address)
         self.delete_handler(self.fileno)
 

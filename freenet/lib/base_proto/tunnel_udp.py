@@ -197,6 +197,7 @@ class parser(object):
         return pkt[0:self.__pkt_len]
 
     def parse(self, packet):
+        if len(packet) < self.__fixed_header_size: return
         real_header = self.unwrap_header(packet[0:self.__fixed_header_size])
         if not real_header: return
 
