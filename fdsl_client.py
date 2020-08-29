@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, os
+import sys, os, time
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -27,6 +27,9 @@ import dns.resolver
 _MODE_GW = 1
 _MODE_LOCAL = 2
 
+# 自动日志清理时间
+AUTO_LOG_CLEAN_TIME = 60
+
 PID_FILE = "/tmp/fdslight.pid"
 LOG_FILE = "/tmp/fdslight.log"
 ERR_FILE = "/tmp/fdslight_error.log"
@@ -35,6 +38,9 @@ ERR_FILE = "/tmp/fdslight_error.log"
 class _fdslight_client(dispatcher.dispatcher):
     # 路由超时时间
     __ROUTE_TIMEOUT = 1200
+
+    # 最近日志清理时间
+    __last_log_clean_time = None
 
     __routes = None
 
@@ -118,6 +124,7 @@ class _fdslight_client(dispatcher.dispatcher):
         signal.signal(signal.SIGINT, self.__exit)
 
         self.__route_timer = timer.timer()
+        self.__last_log_clean_time = time.time()
         self.__routes = {}
         self.__configs = configs
         self.__static_routes = {}
@@ -588,9 +595,21 @@ class _fdslight_client(dispatcher.dispatcher):
 
         return ipaddr
 
+    def clean_log(self):
+        sys.stdout.close()
+        # 删除日志
+        os.remove(LOG_FILE)
+        sys.stdout = open(LOG_FILE, "a+")
+
     def myloop(self):
         names = self.__route_timer.get_timeout_names()
         for name in names: self.__del_route(name)
+
+        # 自动清理日志
+        t = time.time()
+        if t - self.__last_log_clean_time > AUTO_LOG_CLEAN_TIME:
+            self.clean_log()
+            self.__last_log_clean_time = t
 
     def set_route(self, host, prefix=None, timeout=None, is_ipv6=False, is_dynamic=True):
         if host in self.__routes: return
