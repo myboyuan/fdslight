@@ -315,6 +315,4 @@ login.oracle.com:1
 *.whatismyip.com:3
 *.whatismyipaddress.com:3
 *.microsoft.com:3
-
-
-
+*.arpa:3
