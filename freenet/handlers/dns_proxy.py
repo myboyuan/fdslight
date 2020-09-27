@@ -164,7 +164,10 @@ class udp_client_for_dns(udp_handler.udp_handler):
         s = socket.socket(fa, socket.SOCK_DGRAM)
 
         self.set_socket(s)
-        self.bind((address, 0))
+        if is_ipv6:
+            self.bind(("::", 0))
+        else:
+            self.bind(("0.0.0.0", 0))
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
