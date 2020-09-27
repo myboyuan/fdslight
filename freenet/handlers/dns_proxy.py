@@ -164,10 +164,7 @@ class udp_client_for_dns(udp_handler.udp_handler):
         s = socket.socket(fa, socket.SOCK_DGRAM)
 
         self.set_socket(s)
-        if is_ipv6:
-            self.bind(("::", 0))
-        else:
-            self.bind(("0.0.0.0", 0))
+        self.connect((address, 0))
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
@@ -238,6 +235,7 @@ class dnsc_proxy(dns_base):
         self.__timer = timer.timer()
         self.__ip_match = ip_match.ip_match()
         self.__host_match = host_match.host_match()
+        self.__dnsserver = ""
 
         self.set_timeout(self.fileno, self.__LOOP_TIMEOUT)
         self.register(self.fileno)
@@ -260,6 +258,7 @@ class dnsc_proxy(dns_base):
         :param server:
         :return:
         """
+        self.__dnsserver = server
         self.__udp_client = self.create_handler(self.fileno, udp_client_for_dns, server, is_ipv6=is_ipv6)
 
     def __set_route(self, ip, flags, is_ipv6=False):
@@ -272,8 +271,8 @@ class dnsc_proxy(dns_base):
         if flags in (0, 3,): return
         # 查找是否匹配地址,不匹配说明需要走代理
         is_ip_match = self.__ip_match.match(ip, is_ipv6=is_ipv6)
-        # 如果和DNSServer一致那么就跳过
         if ip == self.__dnsserver: return
+
         if flags == 1 or not is_ip_match:
             if not is_ip_match and self.dispatcher.tunnel_conn_fail_count > 0: return
             self.dispatcher.set_route(ip, is_ipv6=is_ipv6, is_dynamic=True)
