@@ -150,8 +150,11 @@ class dnsd_proxy(dns_base):
 
 class udp_client_for_dns(udp_handler.udp_handler):
     __creator = None
+    __address = None
 
     def init_func(self, creator, address, is_ipv6=False):
+        self.__address = address
+
         if is_ipv6:
             fa = socket.AF_INET6
         else:
@@ -161,13 +164,16 @@ class udp_client_for_dns(udp_handler.udp_handler):
         s = socket.socket(fa, socket.SOCK_DGRAM)
 
         self.set_socket(s)
-        self.connect((address, 53))
+        self.bind((address, 0))
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
         return self.fileno
 
     def udp_readable(self, message, address):
+        if address[0] != self.__address: return
+        if address[1] != 53: return
+
         self.send_message_to_handler(self.fileno, self.__creator, message)
 
     def udp_writable(self):
