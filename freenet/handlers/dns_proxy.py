@@ -164,7 +164,7 @@ class udp_client_for_dns(udp_handler.udp_handler):
         s = socket.socket(fa, socket.SOCK_DGRAM)
 
         self.set_socket(s)
-        self.connect((address, 0))
+        self.connect((address, 53))
         self.register(self.fileno)
         self.add_evt_read(self.fileno)
 
