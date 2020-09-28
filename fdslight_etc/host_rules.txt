@@ -305,6 +305,7 @@ login.oracle.com:1
 *.canonical.com:1
 *.msauth.net:1
 *.layerpanel.com:1
+*.herokuapp.com:1
 
 ### xxx
 *.pornhub.com:1
