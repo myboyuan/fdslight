@@ -317,3 +317,7 @@ login.oracle.com:1
 *.whatismyipaddress.com:3
 *.microsoft.com:3
 *.arpa:3
+*.baidu.com:3
+*.bilibili.com:3
+*.bilivideo.com:3
+*.qq.com:3
