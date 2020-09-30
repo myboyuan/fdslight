@@ -14,6 +14,8 @@ goo.gl:1
 *.google.co.jp:1
 *.google.com.vn:1
 *.google.ru:1
+*.google.ua:1
+*.google.com.ua:1
 *.googledrive.com:1
 *.youtube.com:1
 *.youtu.be:1
