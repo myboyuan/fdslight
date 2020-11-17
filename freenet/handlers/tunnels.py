@@ -224,7 +224,7 @@ class _tcp_tunnel_handler(tcp_handler.tcp_handler):
         if status[0:3] == "101":
             headers += [("Connection", "Upgrade",), ("Upgrade", "websocket",)]
             headers += [("Sec-WebSocket-Accept", wslib.gen_handshake_key(self.__http_ws_key))]
-            headers += [("Sec-WebSocket-Protocol", "fdslight")]
+            headers += [("Sec-WebSocket-Protocol", "chat")]
             headers += [("X-Auth-Id", hashlib.sha256(self.__http_auth_id.encode()).hexdigest())]
         s = httputils.build_http1x_resp_header(status, headers)
 
