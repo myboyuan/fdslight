@@ -88,6 +88,7 @@ goo.gl:1
 *.pinimg.com:1
 *.snapchat.com:1
 *.parler.com:1
+*.gab.com:1
 
 # 防止skype重定向到gmw.cn
 *.skype.com:1
