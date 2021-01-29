@@ -251,6 +251,7 @@ security.debian.org:1
 *.v0cdn.net:1
 *.internetfreedom.org:1
 *.v2ray.com:1
+*.conoha.jp:0
 #防止AMP 404
 *.ampproject.org:1
 *.medium.com:1
