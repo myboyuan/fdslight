@@ -90,6 +90,8 @@ goo.gl:1
 *.parler.com:1
 *.gab.com:1
 *.pixiv.net:1
+*.pixiv.org:1
+*.pximg.net:1
 
 # 防止skype重定向到gmw.cn
 *.skype.com:1
