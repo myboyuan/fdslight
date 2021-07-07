@@ -92,6 +92,7 @@ goo.gl:1
 *.pixiv.net:1
 *.pixiv.org:1
 *.pximg.net:1
+*.gettr.com:1
 
 # 防止skype重定向到gmw.cn
 *.skype.com:1
