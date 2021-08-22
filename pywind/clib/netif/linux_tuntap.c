@@ -30,7 +30,8 @@ static int __tuntap_create(char *name,int flags)
 	ifr.ifr_flags |= flags;
 
 	if (*name != '\0'){
-		strncpy(ifr.ifr_name, name, IFNAMSIZ);
+		strncpy(ifr.ifr_name, name, IFNAMSIZ-1);
+		ifr.ifr_name[IFNAMSIZ-1]='\0';
 	}else{
         STDERR("wrong tuntap_name\r\n");
         return -1;
@@ -85,6 +86,14 @@ int tundev_up(const char *name)
 	return __tuntap_up(name);
 }
 
+int tundev_set_nonblocking(int fd)
+{
+	int flags;
+
+    flags=fcntl(fd,F_GETFL,0);
+    return fcntl(fd,F_SETFL,flags | O_NONBLOCK);
+}
+
 int tapdev_create(char *tap_name)
 {
 	return __tuntap_create(tap_name,IFF_TAP | IFF_NO_PI);
@@ -98,4 +107,12 @@ void tapdev_close(int fd,const char *name)
 int tapdev_up(const char *name)
 {
 	return __tuntap_up(name);
+}
+
+int tapdev_set_nonblocking(int fd)
+{
+	int flags;
+
+    flags=fcntl(fd,F_GETFL,0);
+    return fcntl(fd,F_SETFL,flags | O_NONBLOCK);
 }
