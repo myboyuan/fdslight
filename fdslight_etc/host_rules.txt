@@ -99,6 +99,8 @@ goo.gl:1
 *.skype.com:1
 
 ### 音视频媒体网站
+podcasts.apple.com:1
+podcasts.captivate.fm:1
 *.nicovideo.jp:1
 *.spotify.com:1
 *.scdn.co:1
@@ -180,6 +182,7 @@ goo.gl:1
 *.livefilestore.com:1
 
 # 其它网站
+*.stackpathcdn.com:1
 *.wikipedia.org:1
 *.wikimedia.org:1
 *.wikidata.org:1
