@@ -31,6 +31,10 @@ class server(dispatcher.dispatcher):
     __fds = None
 
     def init_func(self, debug):
+        if not debug:
+            sys.stdout = open(LOG_FILE, "w")
+            sys.stderr = open(ERR_FILE, "w")
+
         self.__debug = debug
         self.__fwd_tb = {}
         self.__fwd_tb_reverse = {}

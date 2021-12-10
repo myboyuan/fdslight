@@ -75,7 +75,6 @@ class n2nd(udp_handler.udp_handler):
             return
 
     def udp_readable(self, message, address):
-        self.dispatcher.send_to_wrapper_client(message)
         if address[0] == self.__remote_address[0] and address[1] == self.__remote_address[1]:
             self.handle_from_wan(message)
             return

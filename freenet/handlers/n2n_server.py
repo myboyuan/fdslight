@@ -77,7 +77,7 @@ class n2n_wrapper(udp_handler.udp_handler):
         self.sendto(message, self.__client_addr)
         self.add_evt_write(self.fileno)
 
-    def handle_pong(self):
+    def handle_ping(self):
         byte_data = self.__builder.build(n2n.TYPE_PONG, os.urandom(32))
         self.send_data(byte_data)
 
@@ -90,7 +90,7 @@ class n2n_wrapper(udp_handler.udp_handler):
         self.__client_addr = address
 
         if _type == n2n.TYPE_PING:
-            self.handle_pong()
+            self.handle_ping()
             return
 
         if _type == n2n.TYPE_DATA:
