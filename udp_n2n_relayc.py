@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys, os, signal
+import dns.resolver
 
 BASE_DIR = os.path.dirname(sys.argv[0])
 
@@ -13,6 +14,7 @@ ERR_FILE = "/tmp/udp_n2n_c_error.log"
 
 import pywind.evtframework.evt_dispatcher as dispatcher
 import pywind.lib.configfile as configfile
+import pywind.lib.netutils as netutils
 import freenet.lib.proc as proc
 
 import freenet.lib.logging as logging
@@ -52,6 +54,8 @@ class server(dispatcher.dispatcher):
             redir_host = v["redirect_host"]
             redir_port = int(v["redirect_port"])
 
+            host = self.get_server_ip(host)
+
             fd = self.create_handler(-1, n2n_client.n2nd, ("0.0.0.0", 0), (host, port,), (redir_host, redir_port))
             self.__fds.append(fd)
 
@@ -60,6 +64,35 @@ class server(dispatcher.dispatcher):
 
     def release(self):
         for fd in self.__fds: self.delete_handler(fd)
+
+    def get_server_ip(self, host):
+        """获取服务器IP
+        :param host:
+        :return:
+        """
+        if netutils.is_ipv4_address(host): return host
+        if netutils.is_ipv6_address(host): return host
+
+        resolver = dns.resolver.Resolver()
+
+        try:
+            rs = resolver.query(host, "A")
+        except dns.resolver.NoAnswer:
+            return None
+        except dns.resolver.Timeout:
+            return None
+        except dns.resolver.NoNameservers:
+            return None
+        except:
+            return None
+
+        ipaddr = None
+
+        for anwser in rs:
+            ipaddr = anwser.__str__()
+            break
+
+        return ipaddr
 
 
 def __start_service(debug):
