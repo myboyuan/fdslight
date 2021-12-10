@@ -7,9 +7,9 @@ if not BASE_DIR: BASE_DIR = "."
 
 sys.path.append(BASE_DIR)
 
-PID_FILE = "/tmp/udp_n2n_relay.pid"
-LOG_FILE = "/tmp/udp_n2n_relay.log"
-ERR_FILE = "/tmp/udp_n2n_error.log"
+PID_FILE = "/tmp/udp_n2n_relayc.pid"
+LOG_FILE = "/tmp/udp_n2n_relayc.log"
+ERR_FILE = "/tmp/udp_n2n_c_error.log"
 
 import pywind.evtframework.evt_dispatcher as dispatcher
 import pywind.lib.configfile as configfile
