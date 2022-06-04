@@ -1,4 +1,4 @@
- IP(VPN)代理软件，更多详情请查看项目上方的wiki页面
+ IP(VPN)代理客户端软件，更多详情请查看项目上方的wiki页面
 教程链接 https://fdslight.github.io/fdslight/
 
 #软件功能说明  
@@ -6,6 +6,5 @@
 2. TCP使用分发规则：在名单内的使用代理。
 3. 可以指定特定局域网客户机进行UDP全局代理，该功能为游戏联机准备(gateway模式)
 4. 软件架设以及二次开发在 github 的 wiki 和项目pages当中
-
-
-#注意：每个发布版本的rules是固定的，请下载版本后从实时源码中下载rules
+5. 请软件服务端使用ixc_ProxyServd软件,本软件不再包含
+6. 每个的版本rules是的固定，请下载版本后从实时源码中下载rules
