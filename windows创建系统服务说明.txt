@@ -1,1 +1,0 @@
-windows 创建服务请使用SrvanyUI 这个第三方作者的软件
