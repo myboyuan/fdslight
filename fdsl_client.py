@@ -11,6 +11,7 @@ sys.path.append(BASE_DIR)
 import pywind.evtframework.evt_dispatcher as dispatcher
 import pywind.lib.timer as timer
 import pywind.lib.configfile as configfile
+import pywind.lib.netutils as netutils
 import freenet.lib.utils as utils
 import freenet.lib.base_proto.utils as proto_utils
 import freenet.lib.proc as proc
@@ -22,6 +23,8 @@ import freenet.handlers.tunnelc as tunnelc
 import freenet.lib.file_parser as file_parser
 import freenet.handlers.traffic_pass as traffic_pass
 import freenet.lib.logging as logging
+import freenet.lib.racs_cext as racs_cext
+import freenet.handlers.racs as racs
 import dns.resolver
 
 _MODE_GW = 1
@@ -91,6 +94,11 @@ class _fdslight_client(dispatcher.dispatcher):
 
     __enable_nat_module = None
 
+    __racs_fd = None
+    __racs_cfg = None
+    __racs_byte_network_v4 = None
+    __racs_byte_network_v6 = None
+
     @property
     def https_configs(self):
         configs = self.__configs.get("tunnel_over_https", {})
@@ -130,6 +138,9 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__static_routes = {}
         self.__tunnel_conn_fail_count = 0
         self.__enable_nat_module = enable_nat_module
+        self.__racs_fd = -1
+
+        self.load_racs_configs()
 
         if mode == "local":
             self.__mode = _MODE_LOCAL
@@ -211,6 +222,7 @@ class _fdslight_client(dispatcher.dispatcher):
         ''''''
 
         signal.signal(signal.SIGUSR1, self.__set_rules)
+        self.racs_reset()
 
     def __load_kernel_mod(self):
         ko_file = "%s/driver/fdslight_dgram.ko" % BASE_DIR
@@ -256,6 +268,32 @@ class _fdslight_client(dispatcher.dispatcher):
         ip_ver = self.__mbuf.ip_version()
 
         if ip_ver not in (4, 6,): return
+        if not self.racs_configs["connection"]["enable"]:
+            self.send_msg_to_tunnel(proto_utils.ACT_IPDATA, message)
+            return
+
+        if version == 4:
+            dst_addr = message[16:20]
+            is_ipv6 = False
+        else:
+            dst_addr = message[24:40]
+            is_ipv6 = True
+
+        if is_ipv6 and not self.racs_configs["network"]["enable_ip6"]:
+            self.send_msg_to_tunnel(proto_utils.ACT_IPDATA, message)
+            return
+
+        if is_ipv6:
+            is_racs_network = racs_cext.is_same_subnet_with_msk(dst_addr, self.__racs_byte_network_v6[0],
+                                                                self.__racs_byte_network_v6[1], is_ipv6)
+        else:
+            is_racs_network = racs_cext.is_same_subnet_with_msk(dst_addr, self.__racs_byte_network_v4[0],
+                                                                self.__racs_byte_network_v4[1], is_ipv6)
+
+        if is_racs_network:
+            if self.__racs_fd > 0:
+                self.get_handler(self.__racs_fd).send_msg(message)
+            return
 
         action = proto_utils.ACT_IPDATA
         is_ipv6 = False
@@ -718,6 +756,91 @@ class _fdslight_client(dispatcher.dispatcher):
         """
         path = "%s/fdslight_etc/ca-bundle.crt" % BASE_DIR
         return path
+
+    def racs_reset(self):
+        if self.__racs_fd > 0:
+            self.delete_handler(self.__racs_fd)
+        self.__racs_fd = -1
+
+        self.load_racs_configs()
+
+        conn = self.__racs_cfg["connection"]
+        security = self.__racs_cfg["security"]
+        network = self.__racs_cfg["network"]
+
+        if conn["enable_ip6"]:
+            self.__racs_fd = self.create_handler(-1, racs.udp_tunnel, (conn["host"], int(conn["port"]),), is_ipv6=True)
+        else:
+            self.__racs_fd = self.create_handler(-1, racs.udp_tunnel, (conn["host"], int(conn["port"]),), is_ipv6=False)
+
+        self.get_handler(self.__racs_fd).enable(conn["enable"])
+        self.get_handler(self.__racs_fd).set_key(security["shared_key"])
+        self.get_handler(self.__racs_fd).set_priv_key(security["private_key"])
+
+        if network["enable_ip6"]:
+            host, prefix = netutils.parse_ip_with_prefix(network["ip6_route"])
+            self.set_route(host, prefix, is_ipv6=True, is_dynamic=False)
+        host, prefix = netutils.parse_ip_with_prefix(network["ip_route"])
+        self.set_route(host, prefix, is_ipv6=False, is_dynamic=False)
+
+    @property
+    def racs_configs(self):
+        return self.__racs_cfg
+
+    def get_racs_server_ip(self, host, enable_ipv6=False):
+        if utils.is_ipv4_address(host): return host
+        if utils.is_ipv6_address(host): return host
+
+        resolver = dns.resolver.Resolver()
+
+        try:
+            if enable_ipv6:
+                rs = resolver.query(host, "AAAA")
+            else:
+                rs = resolver.query(host, "A")
+        except dns.resolver.NoAnswer:
+            return None
+        except dns.resolver.Timeout:
+            return None
+        except dns.resolver.NoNameservers:
+            return None
+        except:
+            return None
+
+        ipaddr = None
+
+        for anwser in rs:
+            ipaddr = anwser.__str__()
+            break
+        return ipaddr
+
+    def load_racs_configs(self):
+        fpath = "%s/fdslight_etc/racs.ini" % BASE_DIR
+        configs = configfile.ini_parse_from_file(fpath)
+        conn = configs["connection"]
+        network = configs["network"]
+
+        conn["enable"] = bool(int(conn["enable"]))
+        conn["enable_ip6"] = bool(int(conn["enable_ip6"]))
+
+        network["enable_ip6"] = bool(int(network["enable_ip6"]))
+
+        host, prefix = netutils.parse_ip_with_prefix(network["ip_route"])
+
+        self.__racs_byte_network_v4 = (
+            socket.inet_pton(socket.AF_INET, host),
+            socket.inet_pton(socket.AF_INET, netutils.ip_prefix_convert(int(prefix), is_ipv6=False))
+        )
+
+        host, prefix = netutils.parse_ip_with_prefix(network["ip6_route"])
+        self.__racs_byte_network_v6 = (
+            socket.inet_pton(socket.AF_INET6, host),
+            socket.inet_pton(socket.AF_INET6, netutils.ip_prefix_convert(int(prefix), is_ipv6=True))
+        )
+        self.__racs_cfg = configs
+
+    def send_to_local(self, msg: bytes):
+        self.send_msg_to_tun(msg)
 
 
 def __start_service(mode, debug):

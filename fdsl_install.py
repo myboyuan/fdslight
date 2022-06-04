@@ -18,52 +18,30 @@ def write_kern_ver_to_file(fpath):
 
 def __build_fn_utils(cflags):
     sys_build.do_compile(
-        ["freenet/lib/fn_utils.c"], "freenet/lib/fn_utils.so", cflags, debug=True, is_shared=True
+        ["freenet/lib/fn_utils.c"], "freenet/lib/fn_utils.so", cflags, debug=False, is_shared=True
     )
 
 
 def __build_fdsl_ctl(cflags):
     sys_build.do_compile(
-        ["driver/fdsl_dgram/py_fdsl_ctl.c"], "freenet/lib/fdsl_ctl.so", cflags, debug=True, is_shared=True
+        ["driver/fdsl_dgram/py_fdsl_ctl.c"], "freenet/lib/fdsl_ctl.so", cflags, debug=False, is_shared=True
     )
 
 
-def build_server(cflags, kern_nat_mod=False):
-    __build_fn_utils(cflags)
-    __build_fdsl_ctl(cflags)
-
-    build_cone_nat()
-
-
-def build_cone_nat():
-    """构建内核cone nat模块
-    :return:
-    """
-    os.chdir("driver/netfilter-full-cone-nat")
-    os.system("make clean")
-    os.system("make")
-
-    fname = "xt_FULLCONENAT.ko"
-    fpath = "../%s" % fname
-
-    if os.path.isfile(fpath):
-        os.remove(fpath)
-    if not os.path.isfile(fname):
-        print("ERROR: please install linux kernel headers")
-        return
-    shutil.move(fname, fpath)
-
-    os.chdir("../../")
-    write_kern_ver_to_file("fdslight_etc/kern_version")
+def __build_fdsl_racs(cflags):
+    sys_build.do_compile(
+        ["pywind/clib/netutils.c", "freenet/lib/racs_cext.c"], "freenet/lib/racs_cext.so", cflags, debug=False,
+        is_shared=True
+    )
 
 
 def build_client(cflags, gw_mode=False):
+    cflags+=" -O3 -Wall"
     __build_fn_utils(cflags)
     __build_fdsl_ctl(cflags)
+    __build_fdsl_racs(cflags)
 
     if gw_mode:
-        build_cone_nat()
-
         os.chdir("driver/fdsl_dgram")
         os.system("make clean")
         os.system("make")
@@ -81,7 +59,7 @@ def build_client(cflags, gw_mode=False):
 
 def main():
     help_doc = """
-    gateway | server | local   python3_include
+    gateway | local   python3_include
     """
 
     argv = sys.argv[1:]
@@ -91,8 +69,8 @@ def main():
 
     mode = argv[0]
 
-    if mode not in ("gateway", "server", "local",):
-        print("the mode must be gateway,server or local")
+    if mode not in ("gateway", "local",):
+        print("the mode must be gateway or local")
         return
 
     if not os.path.isdir(argv[1]):
@@ -103,10 +81,6 @@ def main():
 
     if mode == "gateway":
         build_client(cflags, gw_mode=True)
-        return
-
-    if mode == "server":
-        build_server(cflags)
         return
 
     if mode == "local":
