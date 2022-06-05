@@ -65,7 +65,6 @@ class udp_tunnel(udp_handler.udp_handler):
     def udp_readable(self, message, address):
         if not self.__tunnel_ok: return
         if not self.__server_address: return
-
         # 核对地址是否一致
         if self.__server_address[0] != address[0]: return
         if self.__server_address[1] != address[1]: return
