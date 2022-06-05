@@ -272,7 +272,7 @@ class _fdslight_client(dispatcher.dispatcher):
             self.send_msg_to_tunnel(proto_utils.ACT_IPDATA, message)
             return
 
-        if version == 4:
+        if ip_ver == 4:
             dst_addr = message[16:20]
             is_ipv6 = False
         else:
