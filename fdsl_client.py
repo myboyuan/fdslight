@@ -778,6 +778,7 @@ class _fdslight_client(dispatcher.dispatcher):
             host, prefix = netutils.parse_ip_with_prefix(network["ip6_route"])
             self.set_route(host, prefix, is_ipv6=True, is_dynamic=False)
         host, prefix = netutils.parse_ip_with_prefix(network["ip_route"])
+        if not self.racs_configs["connection"]["enable"]: return
         self.set_route(host, prefix, is_ipv6=False, is_dynamic=False)
 
     @property
