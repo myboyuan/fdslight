@@ -92,8 +92,6 @@ class _fdslight_client(dispatcher.dispatcher):
     __local_dns = None
     __local_dns6 = None
 
-    __enable_nat_module = None
-
     __racs_fd = None
     __racs_cfg = None
     __racs_byte_network_v4 = None
@@ -126,7 +124,7 @@ class _fdslight_client(dispatcher.dispatcher):
     def tunnel_conn_fail_count(self):
         return self.__tunnel_conn_fail_count
 
-    def init_func(self, mode, debug, configs, enable_nat_module=False):
+    def init_func(self, mode, debug, configs):
         self.create_poll()
 
         signal.signal(signal.SIGINT, self.__exit)
@@ -137,7 +135,6 @@ class _fdslight_client(dispatcher.dispatcher):
         self.__configs = configs
         self.__static_routes = {}
         self.__tunnel_conn_fail_count = 0
-        self.__enable_nat_module = enable_nat_module
         self.__racs_fd = -1
 
         self.load_racs_configs()
