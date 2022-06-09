@@ -162,6 +162,7 @@ tun_create(char *dev, int flags)
 	if (*dev != '\0')
 	{
 		strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+		ifr.ifr_name[IFNAMSIZ-1]='\0';
 	}
 
 	if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0)

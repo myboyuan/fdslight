@@ -265,9 +265,6 @@ class _fdslight_client(dispatcher.dispatcher):
         ip_ver = self.__mbuf.ip_version()
 
         if ip_ver not in (4, 6,): return
-        if not self.racs_configs["connection"]["enable"]:
-            self.send_msg_to_tunnel(proto_utils.ACT_IPDATA, message)
-            return
 
         if ip_ver == 4:
             dst_addr = message[16:20]
@@ -276,21 +273,17 @@ class _fdslight_client(dispatcher.dispatcher):
             dst_addr = message[24:40]
             is_ipv6 = True
 
-        if is_ipv6 and not self.racs_configs["network"]["enable_ip6"]:
-            self.send_msg_to_tunnel(proto_utils.ACT_IPDATA, message)
-            return
-
-        if is_ipv6:
-            is_racs_network = racs_cext.is_same_subnet_with_msk(dst_addr, self.__racs_byte_network_v6[0],
-                                                                self.__racs_byte_network_v6[1], is_ipv6)
-        else:
-            is_racs_network = racs_cext.is_same_subnet_with_msk(dst_addr, self.__racs_byte_network_v4[0],
-                                                                self.__racs_byte_network_v4[1], is_ipv6)
-
-        if is_racs_network:
-            if self.__racs_fd > 0:
-                self.get_handler(self.__racs_fd).send_msg(message)
-            return
+        if self.racs_configs["connection"]["enable"]:
+            if is_ipv6 and self.racs_configs["network"]["enable_ip6"]:
+                is_racs_network = racs_cext.is_same_subnet_with_msk(dst_addr, self.__racs_byte_network_v6[0],
+                                                                    self.__racs_byte_network_v6[1], is_ipv6)
+            else:
+                is_racs_network = racs_cext.is_same_subnet_with_msk(dst_addr, self.__racs_byte_network_v4[0],
+                                                                    self.__racs_byte_network_v4[1], is_ipv6)
+            if is_racs_network:
+                if self.__racs_fd > 0:
+                    self.get_handler(self.__racs_fd).send_msg(message)
+                return
 
         action = proto_utils.ACT_IPDATA
         is_ipv6 = False
